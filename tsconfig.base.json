@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "ESNext",
+    "lib": ["DOM", "ES2021"],
+    "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@tgim/ui/*": ["packages/ui/src/*"],
+      "@tgim/hooks/*": ["packages/hooks/src/*"],
+      "@tgim/utils/*": ["packages/utils/src/*"],
+      "@tgim/stores/*": ["packages/stores/src/*"],
+      "@tgim/types/*": ["packages/types/src/*"]
+    },
+    "strict": true,
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "ts-node": {
+    "esm": true
+  },
+  "exclude": ["node_modules", "dist"]
+}

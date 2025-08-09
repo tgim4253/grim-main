@@ -1,0 +1,59 @@
+/* ==================== Design Tokens ==================== */
+:root {
+  --color-bg-0: var(--gray-50;);
+  --color-bg-1: var(--gray-100);
+  --color-bg-2: var(--gray-200);
+  --color-bg-3: var(--gray-300);
+  --color-bg-4: var(--gray-400);
+  --color-bg-5: var(--gray-550);
+  --color-bg-6: var(--gray-600);
+  --color-bg-7: var(--gray-700);
+  --color-bg-8: var(--gray-800);
+  --color-bg-9: var(--gray-900);
+
+  --color-sidebar-light: var(--color-bg-1);
+  --color-sidebar-dark: var(--color-bg-8);
+  --color-sidebar-hover-light: var(--color-bg-8);
+  --color-sidebar-hover-dark: var(--color-bg-9);
+
+  --color-sidebar-border-light: var(--color-bg-7);
+  --color-sidebar-border-dark: var(--color-bg-5);
+
+  /* icon */
+
+  --color-icon-sidebar-light: var(--color-text);
+  --color-icon-sidebar-hover-light: var(--color-bg-6);
+  --color-icon-sidebar-dark: var(--color-bg-6);
+  --color-icon-sidebar-hover-dark: var(--color-bg-3);
+
+  --color-icon-main-light: var(--color-bg-4);
+  --color-icon-main-hover-light: var(--color-bg-3);
+  --color-icon-main-dark: var(--color-bg-4);
+  --color-icon-main-hover-dark: var(--color-bg-3);
+}
+
+:root {
+  --color-sidebar-bg: var(--color-sidebar-light);
+  --color-sidebar-hover-bg: var(--color-sidebar-hover-light);
+  --color-sidebar-border: var(--color-sidebar-border-light);
+
+  /* icon */
+  --color-icon-sidebar: var(--color-icon-sidebar-light);
+  --color-icon-sidebar-hover: var(--color-icon-sidebar-hover-light);
+
+  --color-icon-main: var(--color-icon-main-light);
+  --color-icon-main-hover: var(--color-icon-main-hover-light);
+}
+
+[data-theme='dark'] {
+  --color-sidebar-bg: var(--color-sidebar-dark);
+  --color-sidebar-hover-bg: var(--color-sidebar-hover-dark);
+  --color-sidebar-border: var(--color-sidebar-border-dark);
+
+  /* icon */
+  --color-icon-sidebar: var(--color-icon-sidebar-dark);
+  --color-icon-sidebar-hover: var(--color-icon-sidebar-hover-dark);
+
+  --color-icon-main: var(--color-icon-main-dark);
+  --color-icon-main-hover: var(--color-icon-main-hover-dark);
+}

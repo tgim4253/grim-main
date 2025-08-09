@@ -1,0 +1,7 @@
+{
+  "start_prompt": "How would you like to get started?",
+  "new_repository": "Create a new reference folder",
+  "new_repository_prompt": "Create a new {{vault_name}} in the selected folder.",
+  "import_repository": "Import reference folder",
+  "import_repository_prompt": "Import an existing {{vault_name}} from the selected folder."
+}

@@ -1,0 +1,52 @@
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { invoke } from '@tauri-apps/api/core';
+const appWindow = getCurrentWindow();
+
+const windowControllerIpc = {
+  minimize() {
+    appWindow.minimize();
+  },
+  async maximize() {
+    const isMaximized = await appWindow.isMaximized();
+    if (isMaximized) {
+      await appWindow.unmaximize();
+    } else {
+      await appWindow.maximize();
+    }
+  },
+  close() {
+    appWindow.close();
+  },
+};
+
+const moaIpc = {
+  async loadMoas() {
+    const a = (await invoke('list_moas')) as { name: string; path: string; moa_id: string }[];
+    console.log(a);
+    return a;
+  },
+  async createMoa(data: {
+    name: string;
+    path: string;
+  }): Promise<{ name: string; path: string; moaId: string }> {
+    const response = (await invoke('create_moa', { moa: data })) as {
+      name: string;
+      path: string;
+      moaId: string;
+    };
+    return response;
+  },
+  async openMoa(moaId: string) {
+    console.log({ moaId });
+    await invoke('open_moa', { moaId });
+  },
+  async bootsrapMoa(moaId: string) {
+    const response = await invoke('bootstrap_moa', { moaId });
+    console.log(response);
+  },
+};
+
+export const ipc = {
+  windowController: windowControllerIpc,
+  moa: moaIpc,
+};

@@ -1,0 +1,92 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+}
+
+/* Default Button Style */
+.btn-default {
+  color: var(--btn-default-fg);
+  background-color: var(--btn-default-bg);
+  padding: 0.5rem 1rem;
+  border-color: var(--btn-default-bg);
+  border-radius: 0.5rem; /* Reduced border-radius for a sharper look */
+}
+
+.btn-default:hover {
+  background-color: var(--btn-titlebar-bg);
+}
+
+/* Titlebar Button Style - more subtle */
+.btn-titlebar {
+  background-color: var(--btn-titlebar-bg);
+  color: var(--color-text);
+  padding: 0.5rem 1rem;
+  border-color: transparent;
+  border-radius: 0;
+  justify-content: flex-end; /* Align to the right */
+  width: 100%; /* Take full width */
+}
+
+.btn-titlebar:hover {
+  background-color: var(--btn-titlebar-bg-hover);
+}
+
+/* List Button Style - more subtle */
+.btn-list {
+  justify-content: start;
+  color: var(--color-text);
+  background-color: var(--btn-list-bg);
+  white-space: pre-wrap;
+  border-color: transparent;
+  border-radius: 0;
+  overflow-wrap: break-word;
+  width: 100%; /* Take full width */
+}
+
+.btn-list:hover {
+  background-color: var(--btn-list-bg-hover);
+}
+
+/* Icon Button Style - more subtle */
+
+.btn-icon {
+}
+
+.btn-icon:hover {
+}
+
+/* Card Button Style - more subtle */
+.btn-card {
+  background-color: var(--btn-card-bg);
+}
+
+.btn-card:hover {
+  background-color: var(--btn-card-bg-hover);
+}
+
+.btn-primary {
+  background-color: var(--brand-500);
+  color: var(--color-text);
+  padding: 0.5rem 1rem;
+}
+
+.btn-primary:hover {
+  background-color: var(--brand-600);
+}
+
+/* Secondary Button Style */
+.btn-secondary {
+  background-color: transparent;
+  color: var(--color-text);
+  padding: 0.5rem 1rem;
+  border-color: var(--color-border);
+}
+
+.btn-secondary:hover {
+  background-color: var(--color-surface-hover);
+  border-color: var(--color-border-hover);
+}

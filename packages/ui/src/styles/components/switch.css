@@ -1,0 +1,37 @@
+.switch {
+  cursor: pointer;
+  border-radius: 0;
+  padding: 0.5rem 0.3rem;
+}
+
+.switch-language {
+  color: var(--color-text);
+  background-color: var(--switch-language-bg);
+}
+
+.switch-language:focus {
+  outline: none;
+}
+
+.switch-language:hover {
+  background-color: var(--switch-language-bg-hover);
+  border-color: var(--switch-language-bg-hover);
+}
+
+.switch-language option {
+  color: var(--color-text);
+  background-color: var(--switch-language-bg);
+  outline: none;
+  cursor: pointer;
+}
+
+.switch-language option:hover,
+.switch-language option:focus {
+  background-color: var(--switch-language-bg-hover);
+  color: var(--color-text);
+}
+
+.switch-language option:checked {
+  background-color: var(--switch-language-bg-hover);
+  color: var(--color-text);
+}

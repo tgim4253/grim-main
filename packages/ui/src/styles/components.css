@@ -1,0 +1,86 @@
+/* Component-level tokens reference role/palette variables */
+
+/* ===== Buttons: Default ===== */
+:root {
+  --btn-default-bg: var(--indigo-500);
+  --btn-default-bg-hover: var(--indigo-600);
+  --btn-default-fg: var(--white);
+  --btn-default-ring: var(--color-text);
+}
+
+[data-theme='dark'] {
+  --btn-default-bg: var(--color-bg-8);
+  --btn-default-bg-hover: var(--color-bg-9);
+  --btn-default-fg: var(--color-text);
+  --btn-default-ring: var(--color-text);
+}
+
+/* ===== Buttons: Titlebar (Light by default) ===== */
+:root {
+  --btn-titlebar-bg: var(--gray-100);
+  --btn-titlebar-bg-hover: var(--gray-200);
+  --btn-titlebar-fg: var(--color-text);
+}
+
+/* ===== Buttons: Titlebar (Dark overrides) ===== */
+[data-theme='dark'] {
+  --btn-titlebar-bg: var(--color-bg-6);
+  --btn-titlebar-bg-hover: var(--color-bg-7);
+  --btn-titlebar-fg: var(--color-text);
+}
+
+/* ===== Buttons: List item (Light by default) ===== */
+:root {
+  --btn-list-bg: var(--gray-100);
+  --btn-list-bg-hover: var(--gray-200);
+  --btn-list-fg: var(--color-text);
+}
+
+/* ===== Buttons: List item (Dark overrides) ===== */
+[data-theme='dark'] {
+  --btn-list-bg: var(--color-bg-8);
+  --btn-list-bg-hover: var(--color-bg-9);
+  --btn-list-fg: var(--color-text);
+}
+
+/* ===== Buttons: icon (Light by default) ===== */
+:root {
+  --btn-icon-bg: var(--gray-100);
+  --btn-icon-bg-hover: var(--gray-200);
+  --btn-icon-fg: var(--color-text);
+}
+
+/* ===== Buttons: Card (Dark overrides) ===== */
+[data-theme='dark'] {
+  --btn-card-bg: var(--color-bg-6);
+  --btn-card-bg-hover: var(--color-bg-7);
+  --btn-card-fg: var(--color-text);
+}
+
+/* ===== Buttons: Card (Light by default) ===== */
+:root {
+  --btn-card-bg: var(--gray-100);
+  --btn-card-bg-hover: var(--gray-200);
+  --btn-card-fg: var(--color-text);
+}
+
+/* ===== Buttons: icon (Dark overrides) ===== */
+[data-theme='dark'] {
+  --btn-icon-bg: var(--color-bg-6);
+  --btn-icon-bg-hover: var(--color-bg-3);
+  --btn-icon-fg: var(--color-text);
+}
+
+/* ===== Switches: Language (Light by default) ===== */
+:root {
+  --switch-language-bg: var(--gray-100);
+  --switch-language-bg-hover: var(--gray-200);
+  --switch-language-fg: var(--color-text);
+}
+
+/* ===== Switches: Language (Dark overrides) ===== */
+[data-theme='dark'] {
+  --switch-language-bg: var(--color-bg-8);
+  --switch-language-bg-hover: var(--color-bg-9);
+  --switch-language-fg: var(--color-text);
+}

@@ -1,0 +1,7 @@
+{
+  "start_prompt": "어떻게 시작하시겠어요?",
+  "new_repository": "새로운 레퍼런스 보관함 생성",
+  "new_repository_prompt": "선택한 폴더 안에 새로운 {{vault_name}}를 생성합니다.",
+  "import_repository": "레퍼런스 보관함 가져오기",
+  "import_repository_prompt": "선택한 폴더내에서 이미 존재하는 {{vault_name}}를 가져옵니다."
+}

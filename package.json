@@ -1,0 +1,49 @@
+{
+  "name": "grim-app",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.13.1",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @grim/desktop dev",
+    "build": "pnpm --filter @grim/desktop build",
+    "tauri": "pnpm --filter @grim/desktop tauri",
+    "lint": "eslint . --ext .ts,.tsx --fix",
+    "lint:check": "eslint . --ext .ts,.tsx",
+    "format": "prettier --check .",
+    "translate": "pnpm --filter @grim/scripts translate",
+    "format:write": "prettier --write ."
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.7.1",
+    "@typescript-eslint/eslint-plugin": "^8.37.0",
+    "@typescript-eslint/parser": "^8.37.0",
+    "eslint": "^9.31.0",
+    "eslint-config-airbnb": "^19.0.4",
+    "eslint-config-airbnb-typescript": "^18.0.0",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-prettier": "^5.5.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "execa": "^9.6.0",
+    "prettier": "^3.6.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3",
+    "vite": "^5.4.19",
+    "vite-tsconfig-paths": "^5.1.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron"
+    ],
+    "ignoredBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "dependencies": {
+    "typescript-eslint": "^8.37.0"
+  }
+}

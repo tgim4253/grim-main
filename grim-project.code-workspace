@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "apps/desktop/src"
+		},
+		{
+			"path": "apps/desktop/src-tauri"
+		},
+		{
+			"path": "packages/ui"
+		}
+	],
+	"settings": {}
+}

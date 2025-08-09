@@ -1,0 +1,69 @@
+# ───────────────────────────────
+# 📦 Node.js / pnpm
+node_modules/
+.pnpm/
+.pnpm-debug.log
+pnpm-lock.yaml
+
+# ───────────────────────────────
+# ⚙️ Build output
+dist/
+build/
+out/
+coverage/
+
+# ───────────────────────────────
+# 🧪 Test / reports
+*.log
+*.tsbuildinfo
+coverage/
+
+# ───────────────────────────────
+# 💻 OS-specific
+.DS_Store
+Thumbs.db
+
+# ───────────────────────────────
+# ⚙️ Vite / Electron
+.vite/
+.cache/
+*.local
+*.env
+.env.*
+!env.d.ts
+
+# ───────────────────────────────
+# 🧼 Others
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ───────────────────────────────
+# 📁 Monorepo-specific
+apps/**/dist/
+packages/**/dist/
+scripts/**/dist/
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+~$*.xlsx
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

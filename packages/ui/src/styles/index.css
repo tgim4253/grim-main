@@ -1,0 +1,9 @@
+@import './colors.css';
+@import './tokens.css';
+@import './components.css';
+@import './background.css';
+
+@import './components/button.css';
+@import './components/input.css';
+@import './components/switch.css';
+@import './components/splitter.css';

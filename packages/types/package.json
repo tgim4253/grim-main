@@ -1,0 +1,15 @@
+{
+  "name": "@eolgae/types",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.tx",
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "packageManager": "pnpm@10.13.1",
+  "devDependencies": {
+    "arborist": "^0.1.0",
+    "react": "^19.1.0",
+    "react-arborist": "^3.4.3"
+  }
+}

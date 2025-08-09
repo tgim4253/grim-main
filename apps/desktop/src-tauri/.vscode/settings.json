@@ -1,0 +1,12 @@
+{
+    "[rust]": {
+        "editor.defaultFormatter": "rust-lang.rust-analyzer", 
+        "editor.formatOnSave": true 
+    },
+    // rustfmt 옵션 지정
+    "rust-analyzer.rustfmt.extraArgs": ["--edition", "2021"],
+    "rust-analyzer.rustfmt.overrideCommand": [
+        "rustfmt", 
+        "--edition", "2021"
+    ]
+}
