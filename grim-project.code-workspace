@@ -1,17 +1,20 @@
 {
-	"folders": [
-		{
-			"path": "."
-		},
-		{
-			"path": "apps/desktop/src"
-		},
-		{
-			"path": "apps/desktop/src-tauri"
-		},
-		{
-			"path": "packages/ui"
-		}
-	],
-	"settings": {}
+  "folders": [
+    {
+      "path": ".",
+    },
+    {
+      "path": "apps/desktop/src",
+    },
+    {
+      "path": "apps/desktop/src-tauri",
+    },
+    {
+      "path": "packages/ui",
+    },
+    {
+      "path": "packages/dnd",
+    },
+  ],
+  "settings": {},
 }

@@ -10,7 +10,8 @@
       "@tgim/hooks/*": ["packages/hooks/src/*"],
       "@tgim/utils/*": ["packages/utils/src/*"],
       "@tgim/stores/*": ["packages/stores/src/*"],
-      "@tgim/types/*": ["packages/types/src/*"]
+      "@tgim/types/*": ["packages/types/src/*"],
+      "@tgim/dnd/*": ["packages/dnd/src/*"]
     },
     "strict": true,
     "jsx": "react-jsx",
