@@ -1,19 +1,19 @@
 import { create } from 'zustand';
-import { FileTreeTypes } from '@tgim/types/index';
+import { FileTreeApi, FileTreeData, FileNodeApi } from '@tgim/types/index';
 import { TreeUtils } from '@tgim/utils/index';
 
 interface FileTreeState {
-  treeApi: FileTreeTypes.FileTreeApi | null;
-  setTreeApi: (treeApi: FileTreeTypes.FileTreeApi) => void;
+  treeApi: FileTreeApi | null;
+  setTreeApi: (treeApi: FileTreeApi) => void;
 
-  treeData: FileTreeTypes.FileTreeData[];
-  setTreeData: (data: FileTreeTypes.FileTreeData[]) => void;
+  treeData: FileTreeData[];
+  setTreeData: (data: FileTreeData[]) => void;
 
   onMove: (args: {
     dragIds: string[];
-    dragNodes: FileTreeTypes.FileNodeApi[];
+    dragNodes: FileNodeApi[];
     parentId: string | null;
-    parentNode: FileTreeTypes.FileNodeApi | null;
+    parentNode: FileNodeApi | null;
     index: number;
   }) => void;
 }
@@ -38,10 +38,10 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
     if (!treeApi) return;
 
     const treeData = get().treeData;
-    const removedData = TreeUtils.removeNodes<FileTreeTypes.FileTreeData>(treeData, dragIds);
+    const removedData = TreeUtils.removeNodes<FileTreeData>(treeData, dragIds);
 
     const nodesToInsert = dragNodes.map(node => node.data);
-    const newData = TreeUtils.insertNodes<FileTreeTypes.FileTreeData>(
+    const newData = TreeUtils.insertNodes<FileTreeData>(
       removedData,
       nodesToInsert,
       parentId,

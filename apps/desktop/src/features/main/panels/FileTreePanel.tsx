@@ -1,17 +1,17 @@
-import React, { useMemo, useState } from 'react';
-import { DndContext, closestCenter, DragOverlay, useDraggable, useDroppable } from '@dnd-kit/core';
-import { ChevronDown, ChevronRight, File, Folder, MoreVertical } from 'lucide-react';
-import { FileNode } from './types';
-import { batchMoveIntoParent, buildDepthMap, findNode, flattenVisible } from './ops';
-import { asContainerId, asFolderId, parseDropTarget } from '@/shared/dndIds';
-import { ContainerDroppable } from '@/shared/ContainerDroppable';
-import { DragChip } from '@/shared/DragChip';
-import { useStandardSensors } from '@/shared/sensors';
-import { useMultiSelect } from '@/shared/useMultiSelect';
-import { useHoverOpen } from '@/shared/useHoverOpen';
+import { FileTreeData } from '@tgim/types/index';
+import { useMemo, useState } from 'react';
+import {
+  useHoverOpen,
+  useMultiSelect,
+  useStandardSensors,
+  DragHandle,
+  parseDropTarget,
+} from '@tgim/dnd/index';
+import { DndContext, DragOverlay, closestCenter } from '@dnd-kit/core';
+import { NodeList } from '@tgim/ui/index';
+import { File, Folder } from 'lucide-react';
 
-// Sample data (replace with your own)
-const sampleData: FileNode[] = [
+const sampleData: FileTreeData[] = [
   {
     id: '1',
     name: 'Root 1',
@@ -40,145 +40,148 @@ const sampleData: FileNode[] = [
   },
 ];
 
-const Row: React.FC<{
-  node: FileNode;
-  depth: number;
-  expanded: boolean;
-  onToggle: (id: string) => void;
-  hovered?: boolean;
-  selected?: boolean;
-  onSelect?: (e: React.MouseEvent, id: string) => void;
-}> = ({ node, depth, expanded, onToggle, hovered, selected, onSelect }) => {
-  const isFolder = node.icon === 'folder';
-  const {
-    attributes,
-    listeners,
-    setNodeRef: setDragRef,
-    isDragging,
-  } = useDraggable({ id: node.id });
-  const { setNodeRef: setDropRef, isOver } = useDroppable({
-    id: asFolderId(node.id),
-    disabled: !isFolder,
-  });
-  const setRefs = (el: HTMLElement | null) => {
-    setDragRef(el);
-    setDropRef(el);
+//#region utils
+export const findNode = (tree: FileTreeData[], id: string): FileTreeData | null => {
+  for (const n of tree) {
+    if (n.id === id) return n;
+    if (n.children) {
+      const f = findNode(n.children, id);
+      if (f) return f;
+    }
+  }
+  return null;
+};
+
+// Returns true if `childId` is within subtree rooted at `parentId`.
+// Also returns true if both ids are the same (self is treated as descendant).
+export const isDescendant = (tree: FileTreeData[], parentId: string, childId: string): boolean => {
+  if (parentId === childId) return true;
+  const parent = findNode(tree, parentId);
+  if (!parent?.children) return false;
+
+  const stack: FileTreeData[] = [...parent.children];
+  while (stack.length) {
+    const cur = stack.pop()!;
+    if (cur.id === childId) return true;
+    if (cur.children) stack.push(...cur.children);
+  }
+  return false;
+};
+
+// for rendering depth, return id -> depth map
+const buildDepthMap = (
+  tree: FileTreeData[],
+  depth = 0,
+  map: Map<string, number> = new Map<string, number>(),
+): Map<string, number> => {
+  for (const n of tree) {
+    map.set(n.id, depth);
+    if (n.children?.length) buildDepthMap(n.children, depth + 1, map);
+  }
+  return map;
+};
+
+//Returns a flat list of node ids as they would appear in a tree UI,
+// respecting "expanded" state(Set of expanded folder id). Children of collapsed nodes are omitted.
+const flattenVisible = (tree: FileTreeData[], expanded: Set<string>): string[] => {
+  const out: string[] = [];
+
+  const walk = (nodes: FileTreeData[]) => {
+    for (const n of nodes) {
+      out.push(n.id);
+      if (n.children?.length && expanded.has(n.id)) {
+        walk(n.children);
+      }
+    }
   };
-  const highlight = hovered || isOver;
 
-  return (
-    <li ref={setRefs} className="list-none">
-      <div
-        className={`group flex items-center gap-2 w-full select-none rounded-xl pr-2 py-1.5 ${
-          highlight
-            ? 'ring-2 ring-indigo-400/70 bg-indigo-50/60'
-            : selected
-              ? 'bg-indigo-100 ring-1 ring-indigo-300'
-              : isDragging
-                ? 'bg-indigo-50'
-                : 'hover:bg-zinc-100'
-        }`}
-        style={{ paddingLeft: depth * 16 + 8, cursor: isDragging ? 'grabbing' : 'default' }}
-        onClick={e => onSelect?.(e, node.id)}
-        {...attributes}
-        {...listeners}
-      >
-        {isFolder ? (
-          <button
-            className="size-5 grid place-content-center text-zinc-500 hover:text-zinc-800"
-            onClick={e => {
-              e.stopPropagation();
-              onToggle(node.id);
-            }}
-            aria-label={expanded ? 'Collapse' : 'Expand'}
-          >
-            {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-          </button>
-        ) : (
-          <span className="size-5" />
-        )}
-
-        <span className="text-zinc-700">
-          {isFolder ? <Folder className="size-4" /> : <File className="size-4" />}
-        </span>
-        <span className="text-sm text-zinc-800 font-medium flex-1 truncate">{node.name}</span>
-        <button className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500 hover:text-zinc-800">
-          <MoreVertical className="size-4" />
-        </button>
-      </div>
-    </li>
-  );
+  walk(tree);
+  return out;
 };
 
-const NodeList: React.FC<{
-  parentId: string;
-  nodes: FileNode[];
-  expandedSet: Set<string>;
-  onToggle: (id: string) => void;
-  depthMap: Map<string, number>;
-  dragging: boolean;
-  hoverId: string | null;
-  selectedSet: Set<string>;
-  onSelect: (e: React.MouseEvent, id: string) => void;
-}> = ({
-  parentId,
-  nodes,
-  expandedSet,
-  onToggle,
-  depthMap,
-  dragging,
-  hoverId,
-  selectedSet,
-  onSelect,
-}) => {
-  return (
-    <ContainerDroppable id={asContainerId(parentId)} dragging={dragging}>
-      {nodes.map(node => {
-        const depth = depthMap.get(node.id) ?? 0;
-        const expanded = expandedSet.has(node.id);
-        const selected = selectedSet.has(node.id);
-        return (
-          <React.Fragment key={node.id}>
-            <Row
-              node={node}
-              depth={depth}
-              expanded={expanded}
-              onToggle={onToggle}
-              hovered={hoverId === node.id}
-              selected={selected}
-              onSelect={onSelect}
-            />
-            {node.icon === 'folder' && node.children?.length && expanded ? (
-              <NodeList
-                parentId={node.id}
-                nodes={node.children}
-                expandedSet={expandedSet}
-                onToggle={onToggle}
-                depthMap={depthMap}
-                dragging={dragging}
-                hoverId={hoverId}
-                selectedSet={selectedSet}
-                onSelect={onSelect}
-              />
-            ) : null}
-          </React.Fragment>
-        );
-      })}
-    </ContainerDroppable>
-  );
+//temp
+export const removeNode = (
+  tree: FileTreeData[],
+  id: string,
+): { removed: FileTreeData | null; next: FileTreeData[] } => {
+  // Removes the node (by id) from the tree immutably.
+  // Returns the removed node and the next root array.
+  const next: FileTreeData[] = [];
+  let removed: FileTreeData | null = null;
+
+  for (const n of tree) {
+    if (n.id === id) {
+      // Shallow-clone to keep immutability expectations clear
+      removed = { ...n };
+      continue; // skip pushing this node
+    }
+    if (n.children?.length) {
+      const { removed: r, next: ch } = removeNode(n.children, id);
+      if (r) removed = r;
+      next.push({ ...n, children: ch });
+    } else {
+      next.push(n);
+    }
+  }
+
+  return { removed, next };
 };
 
-export function FileTree({
-  initialData = sampleData,
-  onChange,
-}: {
-  initialData?: FileNode[];
-  onChange?: (next: FileNode[]) => void;
-}) {
-  const [tree, setTree] = useState<FileNode[]>(initialData);
+export const insertNode = (
+  tree: FileTreeData[],
+  parentId: string,
+  node: FileTreeData,
+): FileTreeData[] => {
+  // Inserts `node` under `parentId` immutably.
+  // Special-case: "root" means append at top level.
+  if (parentId === 'root') return [...tree, node];
+
+  return tree.map(n => {
+    if (n.id !== parentId) {
+      return n.children ? { ...n, children: insertNode(n.children, parentId, node) } : n;
+    }
+    const children = n.children ? [...n.children, node] : [node];
+    return { ...n, children };
+  });
+};
+
+// Batch move (append), filtering invalid moves and parent/child conflicts
+export const batchMoveIntoParent = (
+  tree: FileTreeData[],
+  ids: string[],
+  targetParent: string,
+): FileTreeData[] => {
+  // Moves multiple nodes under `targetParent` (append),
+  // skipping illegal moves (cycles) and removing child entries when their parent is also selected.
+  const depthMap = buildDepthMap(tree);
+
+  const unique = Array.from(new Set(ids));
+
+  const filtered = unique
+    // prevent cycles: can't move a node into its own descendant or itself
+    .filter(id => id !== targetParent && !isDescendant(tree, id, targetParent))
+    // drop children if their ancestor is also selected (move ancestor once)
+    .filter(id => !unique.some(o => o !== id && isDescendant(tree, o, id)));
+
+  // Move deeper nodes first so we don't disturb ancestors before their children move
+  filtered.sort((a, b) => (depthMap.get(b) ?? 0) - (depthMap.get(a) ?? 0));
+
+  let next = tree;
+  for (const id of filtered) {
+    const { removed, next: n } = removeNode(next, id);
+    if (!removed) continue; // silently skip if id not found
+    next = insertNode(n, targetParent, removed);
+  }
+  return next;
+};
+
+//#endregion utils
+
+export function FileTree({ initialData = sampleData }: { initialData?: FileTreeData[] }) {
+  const [tree, setTree] = useState<FileTreeData[]>(initialData);
   const [expanded, setExpanded] = useState<Set<string>>(() => {
     const s = new Set<string>();
-    const walk = (nodes: FileNode[]) => {
+    const walk = (nodes: FileTreeData[]) => {
       for (const n of nodes) {
         if (n.children?.length) s.add(n.id);
         if (n.children) walk(n.children);
@@ -194,9 +197,15 @@ export function FileTree({
   const { selected, onItemClick, clearSelection, onDragStartSelect } = useMultiSelect(visibleOrder);
 
   // Hover-to-open
-  const { hoverId, onDragOverHoverOpen, resetHoverOpen } = useHoverOpen(id => {
-    setExpanded(prev => new Set(prev).add(id));
-  }, 700);
+  const { hoverId, onDragOverHoverOpen, resetHoverOpen } = useHoverOpen(
+    id => {
+      setExpanded(prev => new Set(prev).add(id));
+    },
+    {
+      delay: 700,
+      isValidTarget: () => true,
+    },
+  );
 
   // DnD
   const sensors = useStandardSensors(4);
@@ -223,7 +232,7 @@ export function FileTree({
           resetHoverOpen();
         }}
         onDragOver={({ over, active }) => {
-          onDragOverHoverOpen(over?.id, String(active.id));
+          onDragOverHoverOpen(over?.id, [String(active.id)]);
         }}
         onDragEnd={({ active, over }) => {
           setActiveId(null);
@@ -238,7 +247,7 @@ export function FileTree({
 
           setExpanded(prev => (targetParent !== 'root' ? new Set(prev).add(targetParent) : prev));
           setTree(nextTree);
-          onChange?.(nextTree);
+          // onChange?.(nextTree);
           resetHoverOpen();
         }}
       >
@@ -262,17 +271,13 @@ export function FileTree({
 
         <DragOverlay dropAnimation={null}>
           {activeNode ? (
-            <DragChip
-              icon={
-                activeNode.icon === 'folder' ? (
-                  <Folder className="size-3.5" />
-                ) : (
-                  <File className="size-3.5" />
-                )
-              }
-              label={activeLabel}
-              count={selected.size || undefined}
-            />
+            <DragHandle>
+              {activeNode.icon === 'folder' ? (
+                <Folder className="size-3.5" />
+              ) : (
+                <File className="size-3.5" />
+              )}
+            </DragHandle>
           ) : null}
         </DragOverlay>
       </DndContext>
