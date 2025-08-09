@@ -6,6 +6,6 @@ export const Droppable: React.FC<
 > = ({ id, children, dragging, render }) => {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
-    render({setNodeRef, isOver, children, dragging})
+    render({})
   );
 };
