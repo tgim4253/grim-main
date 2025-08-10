@@ -1,6 +1,7 @@
 use crate::{
     bootstrap::{self, PathManager, PATH_MANAGER},
     models::{
+        connection::Connection,
         file::NodeFolder,
         node::{Node, NodeData, NodeRow},
     },
@@ -40,6 +41,32 @@ impl DbManager {
 
         Ok(pool)
     }
+}
+
+pub async fn fectch_connections(moa_id: String, ids: Vec<String>) -> Result<Vec<Connection>> {
+    let pool = DB_MANAGER.get_or_open(&moa_id).await?;
+    let mut tx = pool.begin().await?;
+
+    let connections: Vec<Connection> = sqlx::query_as(
+        r#"
+        SELECT
+            c.id,
+            c.src_node_id,
+            c.dst_node_id,
+            c.kind_id AS kind_rule_id,
+            ckr.kind,
+            ckr.default_weight AS weight,
+        FROM connection c
+        JOIN connection_kind_rule ckr ON c.kind_id = ckr.id
+        WHERE c.src_node_id IN (SELECT value FROM json_each(?1)) OR c.dst_node_id IN (SELECT value FROM json_each(?1))
+        "#
+    )
+    .fetch_all(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+
+    Ok(connections)
 }
 
 // Preload directory table rows for frontend using sqlx
