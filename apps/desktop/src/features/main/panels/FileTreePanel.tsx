@@ -13,25 +13,6 @@ import { File, Folder } from 'lucide-react';
 import useFileTreeStore from '@tgim/stores/fileTreeStore';
 import { useShallow } from 'zustand/shallow';
 
-const sampleData: FileTreeData[] = [
-  {
-    id: '1',
-    name: 'Root 1',
-    icon: 'folder',
-    path: '',
-    type: 'Note',
-    children: [{ id: '1-1', name: 'Child 1-1', icon: 'file', path: '', type: 'Note' }],
-  },
-  {
-    id: '2',
-    name: 'Root 2',
-    icon: 'folder',
-    path: '',
-    type: 'Note',
-    children: [{ id: '2-1', name: 'Child 2-1', icon: 'file', path: '', type: 'Note' }],
-  },
-];
-
 /* local utils for rendering */
 
 // Find node by id (UI helper)
@@ -74,20 +55,14 @@ const flattenVisible = (tree: FileTreeData[], expanded: Set<string>): string[] =
   return out;
 };
 
-export function FileTree({ initialData = sampleData }: { initialData?: FileTreeData[] }) {
+export const FileTree = () => {
   // Select only what we need from the store (shallow compare to reduce re-renders)
-  const { treeData, setTreeData, onMove } = useFileTreeStore(
+  const { treeData, onMove } = useFileTreeStore(
     useShallow(s => ({
       treeData: s.treeData,
-      setTreeData: s.setTreeData,
       onMove: s.onMove,
     })),
   );
-
-  // Initialize treeData once when initialData changes
-  useEffect(() => {
-    setTreeData(initialData);
-  }, [initialData, setTreeData]);
 
   // Expanded state: open folders initially if they have children
   const [expanded, setExpanded] = useState<Set<string>>(() => {
@@ -98,7 +73,7 @@ export function FileTree({ initialData = sampleData }: { initialData?: FileTreeD
         if (n.children) walk(n.children);
       }
     };
-    walk(initialData);
+    walk([]);
     return s;
   });
 
@@ -190,6 +165,6 @@ export function FileTree({ initialData = sampleData }: { initialData?: FileTreeD
       </DndContext>
     </div>
   );
-}
+};
 
 export default FileTree;

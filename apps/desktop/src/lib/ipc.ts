@@ -1,5 +1,6 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
+import { GraphResponse } from '@tgim/types/graph';
 const appWindow = getCurrentWindow();
 
 const windowControllerIpc = {
@@ -38,8 +39,9 @@ const moaIpc = {
   async openMoa(moaId: string) {
     await invoke('open_moa', { moaId });
   },
-  async bootsrapMoa(moaId: string) {
-    const response = await invoke('bootstrap_moa', { moaId });
+  async bootsrapMoa(moaId: string): Promise<GraphResponse> {
+    const response = (await invoke('bootstrap_moa', { moaId })) as GraphResponse;
+    return response;
   },
 };
 

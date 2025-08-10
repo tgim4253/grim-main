@@ -51,7 +51,6 @@ pub async fn open_or_create_db(db_path: &Path) -> Result<Pool<Sqlite>> {
 pub async fn ensure_schema(pool: &Pool<Sqlite>) -> Result<()> {
     // Use a transaction for schema setup
     let mut tx = pool.begin().await?;
-
     /* --------------------------- meta --------------------------- */
     sqlx::query(
         r#"CREATE TABLE IF NOT EXISTS meta (

@@ -55,7 +55,7 @@ pub async fn fectch_connections(moa_id: String, ids: Vec<String>) -> Result<Vec<
             c.dst_node_id,
             c.kind_id AS kind_rule_id,
             ckr.kind,
-            ckr.default_weight AS weight,
+            ckr.default_weight AS weight
         FROM connection c
         JOIN connection_kind_rule ckr ON c.kind_id = ckr.id
         WHERE c.src_node_id IN (SELECT value FROM json_each(?1)) OR c.dst_node_id IN (SELECT value FROM json_each(?1))

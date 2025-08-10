@@ -1,11 +1,17 @@
 import { create } from 'zustand';
-import { FileTreeData } from '@tgim/types/index';
+import {
+  FileTreeData,
+  FileTreeNodeType,
+  GraphResponse,
+  NodeFolder,
+  PanelType,
+} from '@tgim/types/index';
 
 interface FileTreeState {
   // current tree data
   treeData: FileTreeData[];
   setTreeData: (data: FileTreeData[]) => void;
-  // convertToTreeData:
+  convertToTreeData: (data: GraphResponse) => FileTreeData[];
 
   // move nodes into a parent (append)
   onMove: (args: { dragIds: string[]; parentId: string; index?: number }) => void;
@@ -124,6 +130,53 @@ const batchMoveIntoParent = (tree: FileTreeData[], ids: string[], targetParent: 
 const useFileTreeStore = create<FileTreeState>((set, get) => ({
   treeData: [],
   setTreeData: data => set({ treeData: data }),
+
+  convertToTreeData: data => {
+    const { nodes, connections } = data;
+
+    const nodeMap = new Map<string, FileTreeData>();
+    for (const n of nodes) {
+      const folderData = n.data['Folder'] as NodeFolder;
+      console.log(n);
+      nodeMap.set(n.id, {
+        id: n.id,
+        name: folderData.folder_name ?? '',
+        icon: n.kind === 'folder' ? 'folder' : 'file',
+        type: n.kind as FileTreeNodeType,
+      });
+    }
+
+    // Build the tree structure based on connections
+    const tree: FileTreeData[] = [];
+    const childrenMap = new Map<string, FileTreeData[]>();
+
+    for (const conn of connections) {
+      const srcNode = nodeMap.get(conn.src_node_id);
+      const dstNode = nodeMap.get(conn.dst_node_id);
+
+      if (srcNode && dstNode) {
+        if (!childrenMap.has(srcNode.id)) {
+          childrenMap.set(srcNode.id, []);
+        }
+        childrenMap.get(srcNode.id)?.push(dstNode);
+      }
+    }
+
+    // Assign children and identify root nodes
+    for (const n of nodes) {
+      const fileTreeData = nodeMap.get(n.id);
+      if (fileTreeData) {
+        fileTreeData.children = childrenMap.get(n.id) || undefined;
+        // Determine if it's a root node (no incoming connections as a child)
+        tree.push(fileTreeData);
+      }
+    }
+
+    // This function is designed to convert a GraphResponse into a single FileTreeData object
+    // representing the root of the file tree. Since a GraphResponse can represent multiple
+    // root nodes, we'll create a dummy root to contain them.
+    return tree;
+  },
 
   onMove: ({ dragIds, parentId }) => {
     if (!dragIds?.length) return;

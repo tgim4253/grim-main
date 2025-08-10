@@ -33,12 +33,6 @@ pub enum NodeData {
     File(FileContent),
 }
 
-#[derive(Debug, FromRow)]
-pub struct NodeWithConnections {
-    pub node: Vec<Node>,
-    pub connections: Vec<Connection>,
-}
-
 #[derive(Debug)]
 pub struct NodeRow<T> {
     // node
@@ -64,4 +58,10 @@ where
             data: T::from_row(row)?,
         })
     }
+}
+
+#[derive(Debug, FromRow, Serialize)]
+pub struct NodeWithConnections {
+    pub nodes: Vec<Node>,
+    pub connections: Vec<Connection>,
 }

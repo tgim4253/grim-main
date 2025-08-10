@@ -15,11 +15,15 @@ export interface Connection {
 export interface Node {
   id: string;
   kind: string;
-  data: NodeData;
+  data: any;
   created_at: string;
   updated_at: string;
 }
 
+export enum NodeKind {
+  Folder = 'Folder',
+  File = 'File',
+}
 export type NodeData = NodeFolder | NodeFile;
 
 export interface NodeFolder {

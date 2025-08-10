@@ -9,6 +9,7 @@ import SidebarPanel from './layout/sidebar/SidebarPanel';
 import { Split, SplitPanel } from '@tgim/ui/Splitter';
 import useSidebarStore from '@tgim/stores/sidebarStore';
 import { useShallow } from 'zustand/shallow';
+import useFileTreeStore from '@tgim/stores/fileTreeStore';
 
 const Main: React.FC = () => {
   const { setSidebarHidden, setSidebarSize } = useSidebarStore(
@@ -18,6 +19,13 @@ const Main: React.FC = () => {
         setSidebarSize: state.setSize,
       };
     }),
+  );
+
+  const { convertToTreeData, setTreeData } = useFileTreeStore(
+    useShallow(state => ({
+      convertToTreeData: state.convertToTreeData,
+      setTreeData: state.setTreeData,
+    })),
   );
 
   const { leftSidebar } = useSidebarStore(
@@ -31,7 +39,8 @@ const Main: React.FC = () => {
     const load = async () => {
       try {
         const data = await ipc.moa.bootsrapMoa(moa_id);
-        console.log(data);
+        const treeData = convertToTreeData(data);
+        setTreeData(treeData);
       } catch (err) {
         console.error(err);
       }
