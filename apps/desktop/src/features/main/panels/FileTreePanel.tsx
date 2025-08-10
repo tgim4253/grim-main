@@ -1,5 +1,5 @@
 import { FileTreeData } from '@tgim/types/index';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   useHoverOpen,
   useMultiSelect,
@@ -10,6 +10,8 @@ import {
 import { DndContext, DragOverlay, closestCenter } from '@dnd-kit/core';
 import { NodeList } from '@tgim/ui/index';
 import { File, Folder } from 'lucide-react';
+import useFileTreeStore from '@tgim/stores/fileTreeStore';
+import { useShallow } from 'zustand/shallow';
 
 const sampleData: FileTreeData[] = [
   {
@@ -30,7 +32,9 @@ const sampleData: FileTreeData[] = [
   },
 ];
 
-//#region utils
+/* local utils for rendering */
+
+// Find node by id (UI helper)
 export const findNode = (tree: FileTreeData[], id: string): FileTreeData | null => {
   for (const n of tree) {
     if (n.id === id) return n;
@@ -42,23 +46,7 @@ export const findNode = (tree: FileTreeData[], id: string): FileTreeData | null 
   return null;
 };
 
-// Returns true if `childId` is within subtree rooted at `parentId`.
-// Also returns true if both ids are the same (self is treated as descendant).
-export const isDescendant = (tree: FileTreeData[], parentId: string, childId: string): boolean => {
-  if (parentId === childId) return true;
-  const parent = findNode(tree, parentId);
-  if (!parent?.children) return false;
-
-  const stack: FileTreeData[] = [...parent.children];
-  while (stack.length) {
-    const cur = stack.pop()!;
-    if (cur.id === childId) return true;
-    if (cur.children) stack.push(...cur.children);
-  }
-  return false;
-};
-
-// for rendering depth, return id -> depth map
+// Returns a depth map used for indent rendering
 const buildDepthMap = (
   tree: FileTreeData[],
   depth = 0,
@@ -71,11 +59,9 @@ const buildDepthMap = (
   return map;
 };
 
-//Returns a flat list of node ids as they would appear in a tree UI,
-// respecting "expanded" state(Set of expanded folder id). Children of collapsed nodes are omitted.
+// Returns visible id list based on expanded set
 const flattenVisible = (tree: FileTreeData[], expanded: Set<string>): string[] => {
   const out: string[] = [];
-
   const walk = (nodes: FileTreeData[]) => {
     for (const n of nodes) {
       out.push(n.id);
@@ -84,91 +70,26 @@ const flattenVisible = (tree: FileTreeData[], expanded: Set<string>): string[] =
       }
     }
   };
-
   walk(tree);
   return out;
 };
 
-//temp
-export const removeNode = (
-  tree: FileTreeData[],
-  id: string,
-): { removed: FileTreeData | null; next: FileTreeData[] } => {
-  // Removes the node (by id) from the tree immutably.
-  // Returns the removed node and the next root array.
-  const next: FileTreeData[] = [];
-  let removed: FileTreeData | null = null;
-
-  for (const n of tree) {
-    if (n.id === id) {
-      // Shallow-clone to keep immutability expectations clear
-      removed = { ...n };
-      continue; // skip pushing this node
-    }
-    if (n.children?.length) {
-      const { removed: r, next: ch } = removeNode(n.children, id);
-      if (r) removed = r;
-      next.push({ ...n, children: ch });
-    } else {
-      next.push(n);
-    }
-  }
-
-  return { removed, next };
-};
-
-export const insertNode = (
-  tree: FileTreeData[],
-  parentId: string,
-  node: FileTreeData,
-): FileTreeData[] => {
-  // Inserts `node` under `parentId` immutably.
-  // Special-case: "root" means append at top level.
-  if (parentId === 'root') return [...tree, node];
-
-  return tree.map(n => {
-    if (n.id !== parentId) {
-      return n.children ? { ...n, children: insertNode(n.children, parentId, node) } : n;
-    }
-    const children = n.children ? [...n.children, node] : [node];
-    return { ...n, children };
-  });
-};
-
-// Batch move (append), filtering invalid moves and parent/child conflicts
-export const batchMoveIntoParent = (
-  tree: FileTreeData[],
-  ids: string[],
-  targetParent: string,
-): FileTreeData[] => {
-  // Moves multiple nodes under `targetParent` (append),
-  // skipping illegal moves (cycles) and removing child entries when their parent is also selected.
-  const depthMap = buildDepthMap(tree);
-
-  const unique = Array.from(new Set(ids));
-
-  const filtered = unique
-    // prevent cycles: can't move a node into its own descendant or itself
-    .filter(id => id !== targetParent && !isDescendant(tree, id, targetParent))
-    // drop children if their ancestor is also selected (move ancestor once)
-    .filter(id => !unique.some(o => o !== id && isDescendant(tree, o, id)));
-
-  // Move deeper nodes first so we don't disturb ancestors before their children move
-  filtered.sort((a, b) => (depthMap.get(b) ?? 0) - (depthMap.get(a) ?? 0));
-
-  let next = tree;
-  for (const id of filtered) {
-    const { removed, next: n } = removeNode(next, id);
-    if (!removed) continue; // silently skip if id not found
-    next = insertNode(n, targetParent, removed);
-  }
-  return next;
-};
-
-//#endregion utils
-
 export function FileTree({ initialData = sampleData }: { initialData?: FileTreeData[] }) {
-  const [tree, setTree] = useState<FileTreeData[]>(initialData);
+  // Select only what we need from the store (shallow compare to reduce re-renders)
+  const { treeData, setTreeData, onMove } = useFileTreeStore(
+    useShallow(s => ({
+      treeData: s.treeData,
+      setTreeData: s.setTreeData,
+      onMove: s.onMove,
+    })),
+  );
+
+  // Initialize treeData once when initialData changes
+  useEffect(() => {
+    setTreeData(initialData);
+  }, [initialData, setTreeData]);
+
+  // Expanded state: open folders initially if they have children
   const [expanded, setExpanded] = useState<Set<string>>(() => {
     const s = new Set<string>();
     const walk = (nodes: FileTreeData[]) => {
@@ -180,29 +101,24 @@ export function FileTree({ initialData = sampleData }: { initialData?: FileTreeD
     walk(initialData);
     return s;
   });
+
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  // Multi-select
-  const visibleOrder = useMemo(() => flattenVisible(tree, expanded), [tree, expanded]);
+  // Multi-select (based on visible order)
+  const visibleOrder = useMemo(() => flattenVisible(treeData, expanded), [treeData, expanded]);
   const { selected, onItemClick, clearSelection, onDragStartSelect } = useMultiSelect(visibleOrder);
 
-  // Hover-to-open
+  // Hover-to-open folder while dragging
   const { hoverId, onDragOverHoverOpen, resetHoverOpen } = useHoverOpen(
-    id => {
-      setExpanded(prev => new Set(prev).add(id));
-    },
-    {
-      delay: 700,
-      isValidTarget: () => true,
-    },
+    id => setExpanded(prev => new Set(prev).add(id)),
+    { delay: 700, isValidTarget: () => true },
   );
 
-  // DnD
+  // DnD sensors and depth map for rendering
   const sensors = useStandardSensors(4);
-  const depthMap = useMemo(() => buildDepthMap(tree), [tree]);
+  const depthMap = useMemo(() => buildDepthMap(treeData), [treeData]);
 
-  const activeNode = activeId ? findNode(tree, activeId) : null;
-  const activeLabel = activeNode?.name ?? '';
+  const activeNode = activeId ? findNode(treeData, activeId) : null;
 
   return (
     <div className="w-full h-full text-sidebar-text" onClick={clearSelection}>
@@ -225,22 +141,26 @@ export function FileTree({ initialData = sampleData }: { initialData?: FileTreeD
           setActiveId(null);
           const target = parseDropTarget(over?.id);
           if (!target) return;
-          const targetParent = target.id;
+          const targetParent = target.id; // "root" or folder id
 
-          // Move all selected (or the active one) into target folder/container (append only)
+          // Move all selected (or the active one) into target container (append)
           const ids = selected.size ? Array.from(selected) : [String(active.id)];
-          const nextTree = batchMoveIntoParent(tree, ids, targetParent);
-          if (nextTree === tree) return;
 
+          onMove({
+            dragIds: ids,
+            parentId: targetParent,
+            index: 0, // currently unused; kept for API compatibility
+          });
+
+          // Expand the drop target if it is not the root
           setExpanded(prev => (targetParent !== 'root' ? new Set(prev).add(targetParent) : prev));
-          setTree(nextTree);
-          // onChange?.(nextTree);
+
           resetHoverOpen();
         }}
       >
         <NodeList
           parentId="root"
-          nodes={tree}
+          nodes={treeData}
           expandedSet={expanded}
           onToggle={id =>
             setExpanded(prev => {
