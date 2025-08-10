@@ -22,7 +22,6 @@ const windowControllerIpc = {
 const moaIpc = {
   async loadMoas() {
     const a = (await invoke('list_moas')) as { name: string; path: string; moa_id: string }[];
-    console.log(a);
     return a;
   },
   async createMoa(data: {
@@ -37,12 +36,10 @@ const moaIpc = {
     return response;
   },
   async openMoa(moaId: string) {
-    console.log({ moaId });
     await invoke('open_moa', { moaId });
   },
   async bootsrapMoa(moaId: string) {
     const response = await invoke('bootstrap_moa', { moaId });
-    console.log(response);
   },
 };
 
