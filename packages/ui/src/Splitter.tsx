@@ -172,7 +172,6 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
       if (newSizes) setSizes(newSizes);
       setHiddens(Array(panels.length).fill(false));
       setIntrinsicMins(Array(panels.length).fill(0));
-      console.log('hi~');
     }, [panels.length]);
 
     // ---- Drag-resize handler ------------------------------------------------
@@ -378,7 +377,6 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
 
     // ---- Enhance panels + splitters --------------------------------------
     const enhancedChildren = useMemo(() => {
-      console.log('bye~');
       // 1) Panels render (same as before, minus inline splitters)
       const panelNodes = panels.map((child, index) => {
         let sizePct = sizes[index] ?? 0;
