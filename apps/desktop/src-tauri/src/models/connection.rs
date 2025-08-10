@@ -7,6 +7,12 @@ pub struct Connection {
     pub dst_node_id: String,
     pub kind_rule_id: String,
     pub kind: String,
+    pub weight: i64,
+}
+
+pub struct ConnectionKind {
+    pub kind_rule_id: String,
+    pub kind: String,
     pub default_weight: i64,
     pub editable: bool,
     pub description: Option<String>,
