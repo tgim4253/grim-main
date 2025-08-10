@@ -30,10 +30,10 @@ const MoaDetail: React.FC<Props> = ({ type }) => {
   const { t } = useTranslation(['common']);
   const navigate = useNavigate();
   return (
-    <div className="relative flex flex-col items-center justify-center h-full bg-background text-foreground mt-5">
+    <div className="relative flex flex-col items-center justify-center h-full bg-background text-foreground ">
       <Button
         variant="icon"
-        className="absolute top-4 left-4 text-icon-main hover:text-icon-hover-main"
+        className="absolute top-1 left-4 text-icon-main hover:text-icon-hover-main"
         onClick={() => navigate(-1)}
       >
         <div className="flex items-center space-x-2">
@@ -41,7 +41,7 @@ const MoaDetail: React.FC<Props> = ({ type }) => {
           <span>{t('common:back')}</span>
         </div>
       </Button>
-      <div>{type === 'new' ? <NewMoa /> : <NewMoa />}</div>
+      <div className="mt-10">{type === 'new' ? <NewMoa /> : <NewMoa />}</div>
     </div>
   );
 };

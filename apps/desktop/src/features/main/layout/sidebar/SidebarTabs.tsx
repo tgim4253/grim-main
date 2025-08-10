@@ -29,7 +29,7 @@ const SidebarTabs: React.FC<SidebarProps> = ({ sidebarPosition }) => {
   );
 
   return (
-    <div className="min-w-8 w-fit flex flex-col bg-sidebar border-r border-t rounded-tr-md border-border-sidebar h-full overflow-hidden">
+    <div className="min-w-8 w-fit flex flex-col bg-sidebar-bg border-r border-t rounded-tr-md border-border-sidebar h-full overflow-hidden">
       {tabs.map(tab => {
         return (
           <Button

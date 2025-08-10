@@ -1,0 +1,134 @@
+:root {
+  --tree-font:
+    ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple SD Gothic Neo',
+    'Noto Sans KR', 'Malgun Gothic', sans-serif;
+
+  /* Light theme */
+  --bg: #ffffff;
+  --fg: #1f2328;
+  --muted-500: #6b7280;
+  --muted-600: #525866;
+  --muted-700: #3f4553;
+
+  /* Obsidian-ish accent (purple/indigo) */
+  --accent-400: #8b7bff;
+  --accent-300: #b1a9ff;
+
+  /* Row states (light) */
+  --row-hover: #f6f7fb;
+  --row-selected: #eef0ff;
+  --row-selected-border: #cfd6ff;
+  --row-highlight-bg: #f0f2ff; /* drag-over / hover highlight */
+  --row-dragging: #f7f7ff;
+
+  /* Icon/button sizes */
+  --icon-size: 16px;
+  --toggle-size: 20px;
+
+  --row-vpad: 6px;
+  --row-hpad: 8px;
+  --depth-unit: 16px; /* indent width per depth level */
+}
+
+.tree {
+  margin: 0;
+  padding: 6px;
+  background-color: transparent;
+}
+
+.tree-node {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tree-node + .tree-node {
+  margin-top: 2px;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+
+  padding: var(--row-vpad) var(--row-hpad);
+  padding-left: calc(var(--depth, 0) * var(--depth-unit) + var(--row-hpad));
+
+  background: transparent;
+  user-select: none;
+
+  cursor: default;
+}
+
+.tree-row:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+}
+
+.tree-row.is-selected {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+.tree-row.is-highlighted {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+.tree-row.is-dragging {
+  background-color: rgba(255, 255, 255, 0);
+  cursor: grabbing;
+}
+
+.tree-row .toggle {
+  width: var(--toggle-size);
+  height: var(--toggle-size);
+  display: grid;
+  place-items: center;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.tree-row .toggle:hover {
+}
+
+/* Spacer used when there is no toggle (files) */
+.tree-row .spacer {
+  width: var(--toggle-size);
+  height: var(--toggle-size);
+  display: inline-block;
+}
+
+/* File/Folder icon */
+.tree-row .icon {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  flex: 0 0 auto;
+}
+
+/* Name text */
+.tree-row .name {
+  flex: 1 1 auto;
+  min-width: 0; /* enables ellipsis */
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* “More” (kebab) button */
+.tree-row .more {
+  border: none;
+  background: transparent;
+  padding: 0;
+  opacity: 0; /* hidden by default */
+  transition: opacity 140ms ease;
+}
+
+.tree-row:hover .more {
+  opacity: 1; /* show on hover (Obsidian-like subtlety) */
+}
+
+.tree-row .more:hover {
+}

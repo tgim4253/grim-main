@@ -45,9 +45,13 @@
 
 /* ===== Buttons: icon (Light by default) ===== */
 :root {
-  --btn-icon-bg: var(--gray-100);
-  --btn-icon-bg-hover: var(--gray-200);
-  --btn-icon-fg: var(--color-text);
+  --btn-icon-color: var(--gray-100);
+  --btn-icon-hover-color: var(--gray-200);
+}
+
+[data-theme='dark'] {
+  --btn-icon-color: rgba(255, 255, 255, 0.5);
+  --btn-icon-hover-color: rgba(255, 255, 255, 0.95);
 }
 
 /* ===== Buttons: Card (Dark overrides) ===== */

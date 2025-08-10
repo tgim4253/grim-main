@@ -54,9 +54,11 @@
 /* Icon Button Style - more subtle */
 
 .btn-icon {
+  color: var(--btn-icon-color);
 }
 
 .btn-icon:hover {
+  color: var(--btn-icon-hover-color);
 }
 
 /* Card Button Style - more subtle */

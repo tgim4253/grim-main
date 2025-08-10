@@ -18,17 +18,7 @@ const sampleData: FileTreeData[] = [
     icon: 'folder',
     path: '',
     type: 'Note',
-    children: [
-      { id: '1-1', name: 'Child 1-1', icon: 'file', path: '', type: 'Note' },
-      {
-        id: '1-2',
-        name: 'Child 1-2',
-        icon: 'file',
-        path: '',
-        type: 'Note',
-        children: [{ id: '1-2-1', name: 'Subchild 1-2-1', icon: 'file', path: '', type: 'Note' }],
-      },
-    ],
+    children: [{ id: '1-1', name: 'Child 1-1', icon: 'file', path: '', type: 'Note' }],
   },
   {
     id: '2',
@@ -215,10 +205,7 @@ export function FileTree({ initialData = sampleData }: { initialData?: FileTreeD
   const activeLabel = activeNode?.name ?? '';
 
   return (
-    <div
-      className="w-full max-w-xl rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm"
-      onClick={clearSelection}
-    >
+    <div className="w-full h-full text-sidebar-text" onClick={clearSelection}>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}

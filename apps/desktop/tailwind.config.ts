@@ -25,19 +25,19 @@ export default {
           10: 'var(--color-bg-10)', // UI component background
         },
         border: {
-          'sidebar': 'var(--color-sidebar-border)'
-        }, 
+          sidebar: 'var(--color-sidebar-border)',
+        },
         'sidebar-light': 'var(--color-sidebar-light)', // sidebar background
         'sidebar-dark': 'var(--color-sidebar-dark)', // sidebar background
-        sidebar: 'var(--color-sidebar-bg)', // sidebar background', 
+        sidebar: { bg: 'var(--color-sidebar-bg)', text: 'var(--color-text)' }, // sidebar background',
         'sidebar-hover': 'var(--color-sidebar-hover-bg)',
         icon: {
-          'sidebar': 'var(--color-icon-sidebar)',
-          'main': 'var(--color-icon-main)'
+          sidebar: 'var(--color-icon-sidebar)',
+          main: 'var(--color-icon-main)',
         },
         'icon-hover': {
-          'sidebar': 'var(--color-icon-sidebar-hover)',
-          'main': 'var(--color-icon-main-hover)'
+          sidebar: 'var(--color-icon-sidebar-hover)',
+          main: 'var(--color-icon-main-hover)',
         },
         'background-hover': 'var(--color-bg-hover)', // background on hover
         foreground: 'var(--color-text)', // main text / icons
