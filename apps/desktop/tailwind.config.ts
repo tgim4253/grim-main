@@ -29,8 +29,29 @@ export default {
         },
         'sidebar-light': 'var(--color-sidebar-light)', // sidebar background
         'sidebar-dark': 'var(--color-sidebar-dark)', // sidebar background
-        sidebar: { bg: 'var(--color-sidebar-bg)', text: 'var(--color-text)' }, // sidebar background',
-        'sidebar-hover': 'var(--color-sidebar-hover-bg)',
+        sidebar: {
+          bg: 'var(--color-sidebar-bg)',
+          text: 'var(--color-text)',
+          icon: 'var(--color-icon-sidebar)',
+          hover: 'var(--color-sidebar-hover-bg)',
+        }, // sidebar background',
+        main: {
+          bg: 'var(--color-main-bg)',
+          text: 'var(--color-text)',
+          icon: 'var(--color-icon-main)',
+          hover: 'var(--color-main-hover-bg)',
+        },
+        modal: {
+          bg: 'var(--color-modal-bg)',
+          text: 'var(--color-text)',
+          icon: 'var(--color-icon-sidebar)',
+          hover: 'var(--color-sidebar-hover-bg)',
+          input: {
+            bg: 'var(--color-modal-input-bg)',
+            hover: 'var(--color-modal-input-hover-bg)',
+            placeholder: 'var(--color-modal-input-placeholder)',
+          }
+        },
         icon: {
           sidebar: 'var(--color-icon-sidebar)',
           main: 'var(--color-icon-main)',

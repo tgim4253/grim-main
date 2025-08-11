@@ -56,6 +56,7 @@ const NewMoa: React.FC = () => {
         )}
         <Input.Input
           placeholder="보관함 이름을 입력해주세요."
+          className="bg-sidebar-bg hover:text-sidebar-text hover:bg-sidebar-hover"
           onChange={e => setName(e.target.value)}
         />
         <div className="flex justify-end">

@@ -18,6 +18,7 @@ fn main() {
             commands::moa::create_moa,
             commands::moa::open_moa,
             commands::moa::bootstrap_moa,
+            commands::db::create_folder,
         ])
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_decorum::init())

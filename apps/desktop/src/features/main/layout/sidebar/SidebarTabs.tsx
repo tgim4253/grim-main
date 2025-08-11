@@ -3,6 +3,7 @@ import * as Icons from 'lucide-react';
 import { useSidebarStore } from '@tgim/stores/index';
 import { shallow, useShallow } from 'zustand/shallow';
 import { useCallback } from 'react';
+import cn from '@tgim/utils/cn';
 
 const SidebarTabs: React.FC<SidebarProps> = ({ sidebarPosition }) => {
   const { activeTab, tabs } = useSidebarStore(
@@ -44,12 +45,10 @@ const SidebarTabs: React.FC<SidebarProps> = ({ sidebarPosition }) => {
               setActiveTab(tab.name);
               setHiddenPanel(false);
             }}
-            className={
-              'p-2 w-full hover:text-icon-hover-sidebar hover:bg-sidebar-hover ' +
-              (activeTab === tab.name
-                ? 'text-icon-hover-sidebar bg-sidebar-hover'
-                : 'text-icon-sidebar')
-            }
+            className={cn(
+              'p-2 w-full hover:text-icon-hover-sidebar hover:bg-sidebar-hover ',
+              activeTab === tab.name ? 'selected bg-sidebar-hover' : 'text-icon-sidebar',
+            )}
           >
             {<tab.icon />}
           </Button>

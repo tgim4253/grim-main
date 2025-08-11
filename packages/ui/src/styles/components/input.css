@@ -1,56 +1,38 @@
-/* ===== Input: Base ===================================================== */
-/* Reuses your design tokens; provides sensible fallbacks. */
 .input {
-  /* layout */
-  display: block; /* inputs usually block/stretch better than inline-flex */
+  display: block;
   width: 100%;
   padding: 0.5rem 0.75rem;
-  border-radius: 0.5rem; /* same radius as buttons */
+  border-radius: 0.5rem;
   border: 1px solid transparent;
 
-  /* typography */
   font-size: 0.875rem;
   font-weight: 400;
   line-height: 1.25rem;
 
-  /* colors (fallback to btn tokens if input-specific tokens are undefined) */
   color: var(--color-text);
-  background-color: var(--input-default-bg, var(--btn-default-bg));
-  border-color: var(--input-border, var(--btn-default-bg));
 
-  /* behavior */
   transition: all 0.2s ease-in-out;
   outline: none;
   -webkit-appearance: none;
   appearance: none;
 }
 
-/* Placeholder: keep it subtle */
-.input::placeholder { /* use reduced contrast */
-  /* English: slightly dim the placeholder for better hierarchy */
+.input::placeholder {
   color: color-mix(in oklab, var(--color-text) 50%, transparent);
   opacity: 0.7;
 }
 
-/* Hover state */
-.input:hover {
-  background-color: var(--input-hover-bg, var(--btn-titlebar-bg));
-}
-
 /* Focus state (keyboard-visible) */
 .input:focus-visible {
-  border-color: var(--input-focus-border, rgba(0,0,0,0.2));
+  border-color: var(--input-focus-border, rgba(0, 0, 0, 0.2));
   /* English: soft focus ring; tune token in your theme */
-  box-shadow: 0 0 0 3px var(--input-focus-ring, rgba(0,0,0,0.08));
+  box-shadow: 0 0 0 3px var(--input-focus-ring, rgba(0, 0, 0, 0.08));
 }
 
 /* Disabled & read-only */
 .input:disabled {
   cursor: not-allowed;
   opacity: 0.6;
-}
-.input[readonly] {
-  background-color: var(--input-readonly-bg, var(--btn-list-bg));
 }
 
 /* Invalid (native form validation) */
@@ -119,9 +101,17 @@
   opacity: 0.8;
 }
 
-.input-icon-start { inset-inline-start: 0; }
-.input-icon-end   { inset-inline-end: 0; }
+.input-icon-start {
+  inset-inline-start: 0;
+}
+.input-icon-end {
+  inset-inline-end: 0;
+}
 
 /* provide padding so text doesn't overlap icons */
-.input.with-start-icon { padding-inline-start: 2rem; }
-.input.with-end-icon   { padding-inline-end: 2rem; }
+.input.with-start-icon {
+  padding-inline-start: 2rem;
+}
+.input.with-end-icon {
+  padding-inline-end: 2rem;
+}

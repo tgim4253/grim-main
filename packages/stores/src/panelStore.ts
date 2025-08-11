@@ -1,14 +1,14 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { immer } from 'zustand/middleware/immer';
-import { type PanelTypes } from '@tgim/types/index';
+import { PanelType } from '@tgim/types/index';
 /* ---------- Types ---------- */
 
 interface PanelItem {
   id: string;
   name: string;
   path: string;
-  type: PanelTypes.PanelType;
+  type: PanelType;
 }
 
 interface PanelContainer {

@@ -13,8 +13,9 @@ export const TreeNode: React.FC<{
   onToggle: (id: string) => void;
   hovered?: boolean;
   selected?: boolean;
+  onClickOption?: (node: FileTreeData | undefined) => void;
   onSelect?: (e: React.MouseEvent, id: string) => void;
-}> = ({ node, depth, expanded, onToggle, hovered, selected, onSelect }) => {
+}> = ({ node, depth, expanded, onToggle, hovered, onClickOption, selected, onSelect }) => {
   const isFolder = node.icon === 'folder';
   const {
     attributes,
@@ -76,7 +77,14 @@ export const TreeNode: React.FC<{
           {node.name}
         </span>
 
-        <Button variant="icon" aria-label="More actions" onClick={e => e.stopPropagation()}>
+        <Button
+          variant="icon"
+          aria-label="More actions"
+          onClick={e => {
+            e.stopPropagation();
+            onClickOption?.(node);
+          }}
+        >
           <MoreVertical className="icon" />
         </Button>
       </div>
@@ -94,6 +102,7 @@ export const NodeList: React.FC<{
   hoverId: string | null;
   selectedSet: Set<string>;
   onSelect: (e: React.MouseEvent, id: string) => void;
+  onClickOption?: (node: FileTreeData | undefined) => void;
 }> = ({
   parentId,
   nodes,
@@ -104,8 +113,8 @@ export const NodeList: React.FC<{
   hoverId,
   selectedSet,
   onSelect,
+  onClickOption,
 }) => {
-  console.log(nodes);
   const orderedNodes = [...nodes].sort((a, b) => {
     const aHas = a.children == null ? 0 : 1;
     const bHas = b.children == null ? 0 : 1;
@@ -132,6 +141,7 @@ export const NodeList: React.FC<{
                 hovered={hoverId === node.id}
                 selected={selected}
                 onSelect={onSelect}
+                onClickOption={onClickOption}
               />
               {node.children?.length && expanded ? (
                 <NodeList
@@ -144,6 +154,7 @@ export const NodeList: React.FC<{
                   hoverId={hoverId}
                   selectedSet={selectedSet}
                   onSelect={onSelect}
+                  onClickOption={onClickOption}
                 />
               ) : null}
             </React.Fragment>

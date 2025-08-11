@@ -25,5 +25,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@types/react": "^19.1.9"
   }
 }

@@ -12,6 +12,10 @@ import { NodeList } from '@tgim/ui/index';
 import { File, Folder } from 'lucide-react';
 import useFileTreeStore from '@tgim/stores/fileTreeStore';
 import { useShallow } from 'zustand/shallow';
+import { Modal } from '@tgim/ui/index';
+import NewFolderModal from '../../file/modal/NewFolderModal';
+import { ipc } from '../../../lib/ipc';
+import { useMoa } from '@tgim/hooks/useMoa';
 
 /* local utils for rendering */
 
@@ -56,6 +60,8 @@ const flattenVisible = (tree: FileTreeData[], expanded: Set<string>): string[] =
 };
 
 export const FileTree = () => {
+  const [isFolderModal, setIsFolderModal] = useState(false);
+
   // Select only what we need from the store (shallow compare to reduce re-renders)
   const { treeData, onMove } = useFileTreeStore(
     useShallow(s => ({
@@ -94,6 +100,16 @@ export const FileTree = () => {
   const depthMap = useMemo(() => buildDepthMap(treeData), [treeData]);
 
   const activeNode = activeId ? findNode(treeData, activeId) : null;
+
+  const [optionNode, setOptionNode] = useState<FileTreeData | undefined>(undefined);
+
+  const onOptionClick = (node: FileTreeData | undefined) => {
+    if (!node) return;
+    setOptionNode(node);
+    if (!isFolderModal) setIsFolderModal(true);
+  };
+
+  const { moaId } = useMoa(location);
 
   return (
     <div className="w-full h-full text-sidebar-text" onClick={clearSelection}>
@@ -149,6 +165,7 @@ export const FileTree = () => {
           hoverId={hoverId}
           selectedSet={selected}
           onSelect={onItemClick}
+          onClickOption={onOptionClick}
         />
 
         <DragOverlay dropAnimation={null}>
@@ -163,6 +180,25 @@ export const FileTree = () => {
           ) : null}
         </DragOverlay>
       </DndContext>
+      {isFolderModal && (
+        <Modal onClose={() => setIsFolderModal(false)} className="bg-modal-bg">
+          <NewFolderModal
+            onClose={() => setIsFolderModal(false)}
+            onSubmit={d => {
+              if (!moaId) return;
+              try {
+                ipc.graph.createFolder(moaId, {
+                  name: d.name,
+                  path: d.path,
+                  parent_id: optionNode?.id ?? 'root',
+                });
+              } catch (err) {
+                console.error(err);
+              }
+            }}
+          />
+        </Modal>
+      )}
     </div>
   );
 };

@@ -131,52 +131,64 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
   treeData: [],
   setTreeData: data => set({ treeData: data }),
 
-  convertToTreeData: data => {
+  convertToTreeData: (data) => {
     const { nodes, connections } = data;
 
     const nodeMap = new Map<string, FileTreeData>();
+    const incoming = new Map<string, number>(); 
+
     for (const n of nodes) {
-      const folderData = n.data['Folder'] as NodeFolder;
-      console.log(n);
+      const folderData = (n.data?.["Folder"] as NodeFolder) ?? undefined;
+
       nodeMap.set(n.id, {
         id: n.id,
-        name: folderData.folder_name ?? '',
-        icon: n.kind === 'folder' ? 'folder' : 'file',
+        name: folderData?.folder_name ?? "",
+        icon: n.kind === "folder" ? "folder" : "file",
         type: n.kind as FileTreeNodeType,
+        children: n.kind === "folder" ? [] : undefined,
       });
+
+      incoming.set(n.id, 0);
     }
 
-    // Build the tree structure based on connections
-    const tree: FileTreeData[] = [];
     const childrenMap = new Map<string, FileTreeData[]>();
 
     for (const conn of connections) {
-      const srcNode = nodeMap.get(conn.src_node_id);
-      const dstNode = nodeMap.get(conn.dst_node_id);
+      if (conn.kind !== "contains") continue;
 
-      if (srcNode && dstNode) {
-        if (!childrenMap.has(srcNode.id)) {
-          childrenMap.set(srcNode.id, []);
-        }
-        childrenMap.get(srcNode.id)?.push(dstNode);
+      const parent = nodeMap.get(conn.src_node_id);
+      const child = nodeMap.get(conn.dst_node_id);
+
+      if (!parent || !child) continue;
+      if (parent.id === child.id) continue;
+      if (parent.type !== "folder") continue;
+
+      const arr = childrenMap.get(parent.id) ?? [];
+      if (!arr.some((c) => c.id === child.id)) arr.push(child);
+      childrenMap.set(parent.id, arr);
+
+      incoming.set(child.id, (incoming.get(child.id) ?? 0) + 1);
+    }
+
+    for (const [id, node] of nodeMap) {
+      if (node.type === "folder") {
+        node.children = childrenMap.get(id) ?? [];
+      } else {
+        node.children = undefined;
       }
     }
 
-    // Assign children and identify root nodes
-    for (const n of nodes) {
-      const fileTreeData = nodeMap.get(n.id);
-      if (fileTreeData) {
-        fileTreeData.children = childrenMap.get(n.id) || undefined;
-        // Determine if it's a root node (no incoming connections as a child)
-        tree.push(fileTreeData);
+    const roots: FileTreeData[] = [];
+    for (const [id, cnt] of incoming) {
+      if (cnt === 0) {
+        const rootNode = nodeMap.get(id);
+        if (rootNode) roots.push(rootNode);
       }
     }
 
-    // This function is designed to convert a GraphResponse into a single FileTreeData object
-    // representing the root of the file tree. Since a GraphResponse can represent multiple
-    // root nodes, we'll create a dummy root to contain them.
-    return tree;
+    return roots;
   },
+
 
   onMove: ({ dragIds, parentId }) => {
     if (!dragIds?.length) return;

@@ -11,8 +11,26 @@
   --color-bg-8: var(--gray-800);
   --color-bg-9: var(--gray-900);
 
+  /* modal */
+  --color-modal-input-dark: var(--color-bg-6);
+  --color-modal-input-light: var(--color-bg-6);
+  --color-modal-input-hover-dark: var(--color-bg-7);
+  --color-modal-input-hover-light: var(--color-bg-7);
+  --color-modal-input-placeholder: var(--gray-500);
+
+  --color-modal-dark: var(--color-bg-8);
+  --color-modal-light: var(--color-bg-1);
+
+  /* main */
+  --color-main-dark: var(--color-bg-6);
+  --color-main-light: var(--color-bg-1);
+  --color-main-hover-dark: var(--color-bg-7);
+  --color-main-hover-light: var(--color-bg-1);
+
+  /* sidebar */
   --color-sidebar-light: var(--color-bg-1);
   --color-sidebar-dark: var(--color-bg-8);
+  --color-main-dark: var(--color-bg-8);
   --color-sidebar-hover-light: var(--color-bg-8);
   --color-sidebar-hover-dark: var(--color-bg-9);
 
@@ -33,6 +51,18 @@
 }
 
 :root {
+  /* modal */
+  --color-modal-bg: var(--color-modal-light);
+  --color-modal-hover-bg: var(--color-modal-light);
+  --color-modal-input-bg: var(--color-modal-input-light);
+  --color-modal-input-hover-bg: var(--color-modal-input-hover-light);
+  --color-modal-input-placeholder: var(--color-modal-input-placeholder);
+
+  /* main */
+  --color-main-bg: var(--color-main-light);
+  --color-main-hover-bg: var(--color-main-hover-light);
+
+  /* sidebar */
   --color-sidebar-bg: var(--color-sidebar-light);
   --color-sidebar-hover-bg: var(--color-sidebar-hover-light);
   --color-sidebar-border: var(--color-sidebar-border-light);
@@ -46,6 +76,21 @@
 }
 
 [data-theme='dark'] {
+  /* modal */
+  --color-modal-bg: var(--color-modal-dark);
+  --color-modal-hover-bg: var(--color-modal-dark);
+  --color-modal-input-bg: var(--color-modal-input-dark);
+  --color-modal-input-hover-bg: var(--color-modal-input-hover-dark);
+  --color-modal-input-placeholder: var(--color-modal-input-placeholder);
+
+  /* main */
+  --color-main-bg: var(--color-main-dark);
+  --color-main-hover-bg: var(--color-main-hover-dark);
+
+  /* sidebar */
+  --color-sidebar-bg: var(--color-sidebar-light);
+  --color-sidebar-hover-bg: var(--color-sidebar-hover-light);
+  --color-sidebar-border: var(--color-sidebar-border-light);
   --color-sidebar-bg: var(--color-sidebar-dark);
   --color-sidebar-hover-bg: var(--color-sidebar-hover-dark);
   --color-sidebar-border: var(--color-sidebar-border-dark);

@@ -3,9 +3,10 @@ use crate::{
     models::{
         connection::Connection,
         file::NodeFolder,
-        node::{Node, NodeData, NodeRow},
+        node::{Node, NodeData, NodeKind, NodeRow},
     },
     services::{integrity, moa_services},
+    utils::identifier::get_unique_id,
 };
 use anyhow::Result;
 use once_cell::sync::Lazy;
@@ -43,7 +44,7 @@ impl DbManager {
     }
 }
 
-pub async fn fectch_connections(moa_id: String, ids: Vec<String>) -> Result<Vec<Connection>> {
+pub async fn fetch_connections(moa_id: String, ids: Vec<String>) -> Result<Vec<Connection>> {
     let pool = DB_MANAGER.get_or_open(&moa_id).await?;
     let mut tx = pool.begin().await?;
 
@@ -58,9 +59,10 @@ pub async fn fectch_connections(moa_id: String, ids: Vec<String>) -> Result<Vec<
             ckr.default_weight AS weight
         FROM connection c
         JOIN connection_kind_rule ckr ON c.kind_id = ckr.id
-        WHERE c.src_node_id IN (SELECT value FROM json_each(?1)) OR c.dst_node_id IN (SELECT value FROM json_each(?1))
-        "#
+        WHERE c.src_node_id IN (SELECT value FROM json_each(?1))
+        "#,
     )
+    .bind(serde_json::to_string(&ids)?)
     .fetch_all(&mut *tx)
     .await?;
 
@@ -108,4 +110,78 @@ pub async fn fetch_folder_nodes(moa_id: String) -> Result<Vec<Node>> {
     tx.commit().await?;
 
     Ok(nodes)
+}
+
+pub async fn create_folder_node(moa_id: String, name: String, parent_id: String) -> Result<Node> {
+    let pool = DB_MANAGER.get_or_open(&moa_id).await?;
+    let mut tx = pool.begin().await?;
+
+    let node_id = get_unique_id();
+    let folder_id = get_unique_id();
+    let now = crate::utils::date::get_now_date();
+
+    sqlx::query(
+        r#"
+        INSERT INTO node (id, kind, created_at, updated_at)
+        VALUES (?1, 'folder', ?2, ?2)
+        "#,
+    )
+    .bind(&node_id)
+    .bind(&now)
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query(
+        r#"
+        INSERT INTO node_folder (id, node_id, name)
+        VALUES (?1, ?2, ?3)
+        "#,
+    )
+    .bind(&folder_id)
+    .bind(&node_id)
+    .bind(&name)
+    .execute(&mut *tx)
+    .await?;
+
+    // Create a connection from parent_id to the new folder node
+    let connection_id = get_unique_id();
+    sqlx::query(
+        r#"
+        INSERT INTO connection (id, src_node_id, dst_node_id, kind_id)
+        VALUES (?1, ?2, ?3, (SELECT id FROM connection_kind_rule WHERE kind = 'contains'))
+        "#,
+    )
+    .bind(&connection_id)
+    .bind(&parent_id)
+    .bind(&node_id)
+    .execute(&mut *tx)
+    .await?;
+
+    let connection_id = get_unique_id();
+    sqlx::query(
+        r#"
+        INSERT INTO connection (id, src_node_id, dst_node_id, kind_id)
+        VALUES (?1, ?2, ?3, (SELECT id FROM connection_kind_rule WHERE kind = 'containedIn'))
+        "#,
+    )
+    .bind(&connection_id)
+    .bind(&node_id)
+    .bind(&parent_id)
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+
+    Ok(Node {
+        id: node_id.clone(),
+        kind: NodeKind::Folder,
+        data: NodeData::Folder(NodeFolder {
+            folder_id,
+            real_folder_id: None,
+            folder_name: Some(name),
+            node_id: node_id.clone(),
+        }),
+        created_at: Some(now.clone()),
+        updated_at: Some(now),
+    })
 }

@@ -10,8 +10,10 @@ import { Split, SplitPanel } from '@tgim/ui/Splitter';
 import useSidebarStore from '@tgim/stores/sidebarStore';
 import { useShallow } from 'zustand/shallow';
 import useFileTreeStore from '@tgim/stores/fileTreeStore';
+import { useMoa } from '@tgim/hooks';
 
 const Main: React.FC = () => {
+  const { moaId } = useMoa(location);
   const { setSidebarHidden, setSidebarSize } = useSidebarStore(
     useShallow(state => {
       return {
@@ -34,11 +36,10 @@ const Main: React.FC = () => {
     })),
   );
   useEffect(() => {
-    const queryParams = new URLSearchParams(location.search);
-    const moa_id = queryParams.get('moa_id') as string;
+    if (!moaId) return;
     const load = async () => {
       try {
-        const data = await ipc.moa.bootsrapMoa(moa_id);
+        const data = await ipc.moa.bootsrapMoa(moaId);
         const treeData = convertToTreeData(data);
         setTreeData(treeData);
       } catch (err) {
@@ -46,7 +47,7 @@ const Main: React.FC = () => {
       }
     };
     load();
-  }, []);
+  }, [moaId]);
 
   const [isMac, setIsMac] = useState(false);
 

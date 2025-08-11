@@ -9,15 +9,11 @@
 
 /* Default Button Style */
 .btn-default {
-  color: var(--btn-default-fg);
-  background-color: var(--btn-default-bg);
   padding: 0.5rem 1rem;
-  border-color: var(--btn-default-bg);
   border-radius: 0.5rem; /* Reduced border-radius for a sharper look */
 }
 
 .btn-default:hover {
-  background-color: var(--btn-titlebar-bg);
 }
 
 /* Titlebar Button Style - more subtle */
@@ -54,10 +50,15 @@
 /* Icon Button Style - more subtle */
 
 .btn-icon {
+  aspect-ratio: 1 / 1;
   color: var(--btn-icon-color);
 }
 
 .btn-icon:hover {
+  color: var(--btn-icon-hover-color);
+}
+
+.btn-icon.selected {
   color: var(--btn-icon-hover-color);
 }
 

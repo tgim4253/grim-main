@@ -45,7 +45,14 @@ const moaIpc = {
   },
 };
 
+const graphIpc = {
+  createFolder(moaId: string, data: { name: string; path: string; parent_id: string }) {
+    invoke('create_folder', { moaId, data });
+  },
+};
+
 export const ipc = {
   windowController: windowControllerIpc,
   moa: moaIpc,
+  graph: graphIpc,
 };

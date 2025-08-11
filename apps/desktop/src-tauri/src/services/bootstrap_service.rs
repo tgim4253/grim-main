@@ -32,7 +32,8 @@ pub async fn bootstrap_moa_service(app_handle: tauri::AppHandle, moa_id: String)
 pub async fn fetch_init_data_for_front(moa_id: String) -> Result<NodeWithConnections> {
     let folders = db::fetch_folder_nodes(moa_id.clone()).await?;
     let connections =
-        db::fectch_connections(moa_id.clone(), folders.iter().map(|f| f.id.clone()).collect())
+        db::fetch_connections(moa_id.clone(), folders.iter().map(|f| f.id.clone()).collect())
             .await?;
+    println!("{}", connections.len().clone().to_string());
     Ok(NodeWithConnections { nodes: folders, connections: connections })
 }

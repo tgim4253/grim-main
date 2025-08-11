@@ -277,7 +277,7 @@ pub async fn seed_initial_data(pool: &Pool<Sqlite>) -> Result<()> {
         .await?;
 
     if has_root == 0 {
-        let root_id = get_unique_id();
+        let root_id = "root";
         sqlx::query(
             r#"INSERT OR IGNORE INTO node (id, kind, created_at, updated_at)
                VALUES (?1, 'folder', ?2, ?2);
