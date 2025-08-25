@@ -7,6 +7,8 @@ import MoaDetail from './MoaDetail';
 import { ToastContainer } from 'react-toastify';
 import { platform } from '@tauri-apps/plugin-os';
 import { useEffect, useState } from 'react';
+import { listen } from '@tauri-apps/api/event';
+
 const Moa: React.FC = () => {
   const [isMac, setIsMac] = useState(false);
 

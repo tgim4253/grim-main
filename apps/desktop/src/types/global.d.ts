@@ -16,6 +16,19 @@ declare global {
       setSize: (s: number) => void;
     }) => React.ReactNode;
   }
+  type Stage =
+    | 'Migrating'
+    | 'RefreshingMounts'
+    | 'ResolvingAnchors'
+    | 'InitialScan'
+    | 'Ready'
+    | 'Error';
+
+  interface AppProgressEvent {
+    stage: Stage;
+    percent: number;
+    note?: string;
+  }
 }
 
 export {};

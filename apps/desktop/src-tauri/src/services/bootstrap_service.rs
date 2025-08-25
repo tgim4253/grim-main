@@ -21,6 +21,7 @@ pub enum Stage {
     RefreshingMounts,
     ResolvingAnchors,
     InitialScan,
+
     #[default]
     Ready,
     Error,
@@ -94,7 +95,7 @@ async fn run_bootstrap_pipeline(
     moa_id: String,
 ) -> anyhow::Result<()> {
     step(&app, &state, &moa_id, Stage::Migrating, 0, Some("Applying DB migrations")).await;
-    apply_migrations(&app, &state, &moa_id).await?;
+    apply_migrations(&moa_id).await?;
 
     step(&app, &state, &moa_id, Stage::RefreshingMounts, 15, Some("Enumerating volumes")).await;
 
@@ -153,11 +154,7 @@ pub async fn fetch_init_data_for_front(moa_id: String) -> Result<NodeWithConnect
     Ok(NodeWithConnections { nodes: folders, connections: connections })
 }
 
-async fn apply_migrations(
-    app: &tauri::AppHandle,
-    state: &AppState,
-    moa_id: &str,
-) -> anyhow::Result<()> {
+async fn apply_migrations(moa_id: &str) -> anyhow::Result<()> {
     let moa = moa_services::MOA_DATA.read().unwrap().get_by_id(&moa_id).unwrap();
 
     let name = moa.name;
