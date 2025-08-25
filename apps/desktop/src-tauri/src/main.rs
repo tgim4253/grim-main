@@ -9,7 +9,12 @@ mod models;
 mod services;
 mod utils;
 
+use std::sync::Arc;
+
 use services::moa_services;
+use tokio::sync::Mutex;
+
+use crate::services::bootstrap_service::{AppState, AppStatus};
 
 fn main() {
     tauri::Builder::default()
@@ -19,10 +24,12 @@ fn main() {
             commands::moa::open_moa,
             commands::moa::bootstrap_moa,
             commands::db::create_folder,
+            commands::moa::bootstrap_status,
         ])
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_decorum::init())
         .plugin(tauri_plugin_dialog::init())
+        .manage(AppState::default())
         .setup(|app| {
             let moa = moa_services::load_latest_moas(&app.handle());
 

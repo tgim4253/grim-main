@@ -79,11 +79,10 @@ pub async fn fetch_folder_nodes(moa_id: String) -> Result<Vec<Node>> {
     let rows: Vec<NodeRow<NodeFolder>> = sqlx::query_as(
         r#"
         SELECT
-            n.id                AS node_id,
-            n.kind              AS kind,
-            nf.id        AS folder_id,
-            nf.real_folder_id   AS real_folder_id,
-            nf.name             AS folder_name,
+            n.id          AS node_id,
+            n.kind        AS kind,
+            nf.id         AS folder_id,
+            nf.display_name       AS folder_name,
             n.created_at,
             n.updated_at
         FROM node               n
@@ -133,40 +132,44 @@ pub async fn create_folder_node(moa_id: String, name: String, parent_id: String)
 
     sqlx::query(
         r#"
-        INSERT INTO node_folder (id, node_id, name)
-        VALUES (?1, ?2, ?3)
+        INSERT INTO node_folder (id, node_id, display_name, created_at, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?4)
         "#,
     )
     .bind(&folder_id)
     .bind(&node_id)
     .bind(&name)
+    .bind(&now)
     .execute(&mut *tx)
     .await?;
 
-    // Create a connection from parent_id to the new folder node
-    let connection_id = get_unique_id();
+    // parent -> child (contains)
+    let contains_id = get_unique_id();
     sqlx::query(
         r#"
-        INSERT INTO connection (id, src_node_id, dst_node_id, kind_id)
-        VALUES (?1, ?2, ?3, (SELECT id FROM connection_kind_rule WHERE kind = 'contains'))
+        INSERT INTO connection (id, src_node_id, dst_node_id, kind_id, created_at)
+        VALUES (?1, ?2, ?3, (SELECT id FROM connection_kind_rule WHERE kind = 'contains'), ?4)
         "#,
     )
-    .bind(&connection_id)
+    .bind(&contains_id)
     .bind(&parent_id)
     .bind(&node_id)
+    .bind(&now)
     .execute(&mut *tx)
     .await?;
 
-    let connection_id = get_unique_id();
+    // OPTIONAL: child -> parent (containedIn). Keep only if you seeded this rule.
+    let contained_in_id = get_unique_id();
     sqlx::query(
         r#"
-        INSERT INTO connection (id, src_node_id, dst_node_id, kind_id)
-        VALUES (?1, ?2, ?3, (SELECT id FROM connection_kind_rule WHERE kind = 'containedIn'))
+        INSERT INTO connection (id, src_node_id, dst_node_id, kind_id, created_at)
+        VALUES (?1, ?2, ?3, (SELECT id FROM connection_kind_rule WHERE kind = 'containedIn'), ?4)
         "#,
     )
-    .bind(&connection_id)
+    .bind(&contained_in_id)
     .bind(&node_id)
     .bind(&parent_id)
+    .bind(&now)
     .execute(&mut *tx)
     .await?;
 
@@ -177,9 +180,9 @@ pub async fn create_folder_node(moa_id: String, name: String, parent_id: String)
         kind: NodeKind::Folder,
         data: NodeData::Folder(NodeFolder {
             folder_id,
-            real_folder_id: None,
-            folder_name: Some(name),
             node_id: node_id.clone(),
+            folder_name: Some(name),
+            // real_folder_id: None,   // <-- 제거
         }),
         created_at: Some(now.clone()),
         updated_at: Some(now),

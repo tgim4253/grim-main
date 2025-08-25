@@ -16,7 +16,6 @@ pub enum IntegrityCheckResult {
 pub struct NodeFolder {
     pub folder_id: String,
     pub node_id: String,
-    pub real_folder_id: Option<String>,
     pub folder_name: Option<String>,
 }
 
