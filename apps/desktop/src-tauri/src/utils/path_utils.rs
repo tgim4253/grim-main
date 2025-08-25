@@ -45,7 +45,7 @@ pub fn normalize_path(path: &str) -> PathBuf {
 }
 
 #[cfg(target_os = "macos")]
-pub fn detect_storage_root(path: &PathBuf) -> StorageRootInfo {
+pub fn detect_storage_root(path: &PathBuf) -> Result<StorageRootInfo> {
     let now: DateTime<Utc> = Utc::now();
     let now_s = now.to_rfc3339();
 
@@ -67,7 +67,7 @@ pub fn detect_storage_root(path: &PathBuf) -> StorageRootInfo {
     // --- availability (mount path exists and reachable) ---
     let is_available = mount_path.exists();
 
-    StorageRootInfo {
+    Ok(StorageRootInfo {
         platform: OsPlatform::Macos,
         kind,
         stable_id,
@@ -77,7 +77,7 @@ pub fn detect_storage_root(path: &PathBuf) -> StorageRootInfo {
         mount_path: mount_path_s,
         updated_at: now_s.clone(),
         created_at: now_s,
-    }
+    })
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -226,52 +226,95 @@ fn classify_kind(
     device: Option<&str>,
     fstype: Option<&str>,
 ) -> StorageKind {
-    // --- 1) Network by fs type or device syntax ---
-    // Common network filesystems on macOS: smbfs, afpfs, nfs, webdav
-    if let Some(fs) = fstype {
-        let fs = fs.to_ascii_lowercase();
-        if matches!(fs.as_str(), "smbfs" | "afpfs" | "nfs" | "webdav") {
+    use std::path::Path;
+
+    // --- 0) Helpers ---
+    // Normalize lowercase fs string once
+    let fs_lc = fstype.map(|s| s.to_ascii_lowercase());
+    let dev = device.unwrap_or("");
+
+    // Helper: known URL-like network specifiers
+    let is_network_device = {
+        // Examples: //user@host/share, smb://..., afp://..., nfs://..., webdav://...
+        let d = dev.to_ascii_lowercase();
+        d.starts_with("//")
+            || d.starts_with("smb://")
+            || d.starts_with("afp://")
+            || d.starts_with("nfs://")
+            || d.starts_with("webdav://")
+            || d.starts_with("cifs://")
+            // sshfs can appear via macFUSE; device may look like "sshfs#user@host:..."
+            || d.starts_with("sshfs#")
+    };
+
+    // --- 1) Network / Virtual by fs type or device syntax ---
+    if let Some(ref fs) = fs_lc {
+        // Common network filesystems on macOS
+        if matches!(
+            fs.as_str(),
+            "smbfs" | "afpfs" | "nfs" | "webdav" | "webdavfs" | "cifs" | "sshfs"
+        ) {
             return StorageKind::Network;
         }
-        // Virtual-like mounts: autofs/devfs/fuse (heuristic)
-        if fs == "autofs" || fs == "devfs" || fs.contains("fuse") {
+        // FUSE is a mixed bag: sshfs is network; others are usually virtual
+        if fs.contains("fuse") {
+            if dev.to_ascii_lowercase().contains("sshfs") {
+                return StorageKind::Network;
+            }
+            return StorageKind::Virtual;
+        }
+        // autofs/devfs are virtual
+        if fs == "autofs" || fs == "devfs" {
             return StorageKind::Virtual;
         }
     }
-    // Device string like "//user@server/share" indicates a network share
-    if device.map_or(false, |d| d.starts_with("//")) {
+    if is_network_device {
         return StorageKind::Network;
     }
 
-    // --- 2) Internal: system roots or user/home/iCloud paths ---
-    if mount_path == std::path::Path::new("/")
-        || mount_path == std::path::Path::new("/System/Volumes/Data")
+    // --- 2) Internal: system roots or user's home / iCloud Drive ---
+    if mount_path == Path::new("/")
+        || mount_path == Path::new("/System/Volumes/Data")
+        || mount_path == Path::new("/System/Volumes/Preboot")
+        || mount_path == Path::new("/System/Volumes/VM")
+        || mount_path == Path::new("/System/Volumes/Update")
+        || mount_path == Path::new("/System/Volumes/iSCPreboot")
     {
         return StorageKind::Internal;
     }
     if let Some(home) = dirs_next::home_dir() {
-        // Treat paths under Home (incl. iCloud Drive) as Internal storage
-        let icloud = home.join("Library/Mobile Documents/com~apple~CloudDocs");
-        if norm.starts_with(&home) || norm.starts_with(&icloud) {
+        // Treat anything under the user's Home as Internal (incl. iCloud Drive)
+        let icloud_docs = home.join("Library/Mobile Documents/com~apple~CloudDocs");
+        if norm.starts_with(&home) || norm.starts_with(&icloud_docs) {
             return StorageKind::Internal;
         }
     }
 
-    // --- 3) External: typical removable media path under /Volumes/<Name> ---
-    if mount_path.starts_with(std::path::Path::new("/Volumes")) {
+    // --- 3) External: typical removable media under /Volumes/<Name> ---
+    if mount_path.starts_with(Path::new("/Volumes")) {
+        // Heuristic: Boot Camp (NTFS) on the internal disk is often /dev/disk0s*
+        // If device path hints clearly at the internal physical disk, bias to Internal.
+        // (Still a heuristic; diskutil(8) would be more authoritative.)
+        if dev.starts_with("/dev/disk0") {
+            return StorageKind::Internal;
+        }
         return StorageKind::External;
     }
 
     // --- 4) Fallback heuristics by fs type ---
-    if let Some(fs) = fstype {
-        let fs = fs.to_ascii_lowercase();
-        // Common local filesystems; default to Internal when unsure
-        if fs.contains("apfs") || fs.contains("hfs") || fs.contains("msdos") || fs.contains("exfat")
+    if let Some(ref fs) = fs_lc {
+        // Common local filesystems; when unsure, default to Internal
+        if fs.contains("apfs")
+            || fs.contains("hfs")     // covers "hfs", "hfs+"
+            || fs.contains("msdos")   // "msdos", "msdosfs"
+            || fs.contains("exfat")
+            || fs == "ntfs"
+        // Boot Camp mounted atypically
         {
             return StorageKind::Internal;
         }
     }
 
-    // --- 5) Unknown when nothing matched ---
+    // --- 5) Unknown as last resort ---
     StorageKind::Unknown
 }

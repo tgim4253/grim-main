@@ -191,3 +191,191 @@ pub async fn create_virtual_folder(
         updated_at: Some(now),
     })
 }
+
+// ensure_storage_root_and_real_folder.rs
+
+pub async fn ensure_storage_root_and_real_folder(
+    moa_id: String,
+    sroot_info: &crate::models::file::StorageRootInfo,
+    norm_path: &std::path::PathBuf,
+) -> Result<String> {
+    let pool = DB_MANAGER.get_or_open(&moa_id).await?;
+    let mut tx = pool.begin().await?;
+
+    // 1. Ensure StorageRoot exists or create it
+    let sroot_id = {
+        let existing_sroot_id: Option<String> = sqlx::query_scalar(
+            r#"
+            SELECT id FROM storage_root
+            WHERE platform = ?1 AND stable_id = ?2
+            "#,
+        )
+        .bind(&sroot_info.platform)
+        .bind(&sroot_info.stable_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        if let Some(id) = existing_sroot_id {
+            // Update existing storage root
+            sqlx::query(
+                r#"
+                UPDATE storage_root SET
+                    secondary_id = ?1,
+                    kind = ?2,
+                    label = ?3,
+                    is_available = ?4,
+                    updated_at = ?5
+                WHERE id = ?6
+                "#,
+            )
+            .bind(&sroot_info.secondary_id)
+            .bind(&sroot_info.kind)
+            .bind(&sroot_info.label)
+            .bind(sroot_info.is_available)
+            .bind(&sroot_info.updated_at)
+            .bind(&id)
+            .execute(&mut *tx)
+            .await?;
+            id
+        } else {
+            // Create new storage root
+            let new_id = get_unique_id();
+            sqlx::query(
+                r#"
+                INSERT INTO storage_root
+                    (id, platform, stable_id, secondary_id, kind, label, is_available, created_at, updated_at)
+                VALUES
+                    (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                "#,
+            )
+            .bind(&new_id)
+            .bind(&sroot_info.platform)
+            .bind(&sroot_info.stable_id)
+            .bind(&sroot_info.secondary_id)
+            .bind(&sroot_info.kind)
+            .bind(&sroot_info.label)
+            .bind(sroot_info.is_available)
+            .bind(&sroot_info.created_at)
+            .bind(&sroot_info.updated_at)
+            .execute(&mut *tx)
+            .await?;
+            new_id
+        }
+    };
+
+    // 2. Ensure StorageRootMount exists or create/update it
+    let _sroot_mount_id = {
+        let existing_mount_id: Option<String> = sqlx::query_scalar(
+            r#"
+            SELECT id FROM storage_root_mount
+            WHERE storage_root_id = ?1 AND mount_path = ?2
+            "#,
+        )
+        .bind(&sroot_id)
+        .bind(&sroot_info.mount_path)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        if let Some(id) = existing_mount_id {
+            sqlx::query(
+                r#"
+                UPDATE storage_root_mount SET
+                    updated_at = ?1
+                WHERE id = ?2
+                "#,
+            )
+            .bind(&sroot_info.updated_at)
+            .bind(&id)
+            .execute(&mut *tx)
+            .await?;
+            id
+        } else {
+            let new_id = get_unique_id();
+            sqlx::query(
+                r#"
+                INSERT INTO storage_root_mount
+                    (id, storage_root_id, mount_path, created_at, updated_at)
+                VALUES
+                    (?1, ?2, ?3, ?4, ?5)
+                "#,
+            )
+            .bind(&new_id)
+            .bind(&sroot_id)
+            .bind(&sroot_info.mount_path)
+            .bind(&sroot_info.created_at)
+            .bind(&sroot_info.updated_at)
+            .execute(&mut *tx)
+            .await?;
+            new_id
+        }
+    };
+
+    // 3. Traverse path components and ensure real_folder entries
+    let mut current_parent_id: Option<String> = None;
+
+    // safer handling: strip_prefix 가 실패하면 빈 PathBuf 사용
+    let components_path = if let Ok(sub_path) = norm_path.strip_prefix(&sroot_info.mount_path) {
+        sub_path
+    } else {
+        norm_path
+    };
+
+    for component in components_path
+        .components()
+        .filter_map(|c| c.as_os_str().to_str())
+        .filter(|s| !s.is_empty())
+    {
+        let name_norm = component.to_lowercase();
+        let now = crate::utils::date::get_now_date();
+
+        let existing_folder_id: Option<String> = sqlx::query_scalar(
+            r#"
+            SELECT id FROM real_folder
+            WHERE storage_root_id = ?1 AND parent_id IS ?2 AND name_norm = ?3
+            "#,
+        )
+        .bind(&sroot_id)
+        .bind(&current_parent_id)
+        .bind(&name_norm)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        if let Some(id) = existing_folder_id {
+            sqlx::query(
+                r#"
+                UPDATE real_folder SET
+                    updated_at = ?1
+                WHERE id = ?2
+                "#,
+            )
+            .bind(&now)
+            .bind(&id)
+            .execute(&mut *tx)
+            .await?;
+            current_parent_id = Some(id);
+        } else {
+            let new_id = get_unique_id();
+            sqlx::query(
+                r#"
+                INSERT INTO real_folder
+                    (id, storage_root_id, parent_id, name, name_norm, created_at, updated_at, error_flag)
+                VALUES
+                    (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'Success')
+                "#,
+            )
+            .bind(&new_id)
+            .bind(&sroot_id)
+            .bind(&current_parent_id)
+            .bind(component)
+            .bind(&name_norm)
+            .bind(&now)
+            .bind(&now)
+            .execute(&mut *tx)
+            .await?;
+            current_parent_id = Some(new_id);
+        }
+    }
+
+    tx.commit().await?;
+    current_parent_id.context("Failed to get real_folder_id for the path")
+}
