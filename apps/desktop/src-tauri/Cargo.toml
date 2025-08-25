@@ -34,5 +34,9 @@ tokio = "1.47.1"
 once_cell = "1.21.3"
 tauri-plugin-os = "2"
 tauri-plugin-decorum = "1.1.1"
+dunce = "1.0.5"
+mountpoints = "0.2.1"
+plist = "1.7.4"
+dirs-next = "2.0.0"
 
 [target."cfg(target_os = \"macos\")".dependencies]

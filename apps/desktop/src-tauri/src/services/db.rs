@@ -111,7 +111,11 @@ pub async fn fetch_folder_nodes(moa_id: String) -> Result<Vec<Node>> {
     Ok(nodes)
 }
 
-pub async fn create_folder_node(moa_id: String, name: String, parent_id: String) -> Result<Node> {
+pub async fn create_virtual_folder(
+    moa_id: String,
+    name: String,
+    parent_id: String,
+) -> Result<Node> {
     let pool = DB_MANAGER.get_or_open(&moa_id).await?;
     let mut tx = pool.begin().await?;
 
@@ -158,7 +162,7 @@ pub async fn create_folder_node(moa_id: String, name: String, parent_id: String)
     .execute(&mut *tx)
     .await?;
 
-    // OPTIONAL: child -> parent (containedIn). Keep only if you seeded this rule.
+    //  child -> parent (containedIn)
     let contained_in_id = get_unique_id();
     sqlx::query(
         r#"
@@ -182,7 +186,6 @@ pub async fn create_folder_node(moa_id: String, name: String, parent_id: String)
             folder_id,
             node_id: node_id.clone(),
             folder_name: Some(name),
-            // real_folder_id: None,   // <-- 제거
         }),
         created_at: Some(now.clone()),
         updated_at: Some(now),

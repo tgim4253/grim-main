@@ -23,7 +23,7 @@ fn main() {
             commands::moa::create_moa,
             commands::moa::open_moa,
             commands::moa::bootstrap_moa,
-            commands::db::create_folder,
+            commands::file::create_folder,
             commands::moa::bootstrap_status,
         ])
         .plugin(tauri_plugin_os::init())
