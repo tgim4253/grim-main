@@ -1,9 +1,14 @@
 use crate::bootstrap;
+use crate::models::file::StorageRootInfo;
 use crate::models::node::NodeWithConnections;
+use crate::services::db::DB_MANAGER;
+use crate::services::storage_root::enumerate_mounted_root;
 use crate::services::{db, integrity, moa_services};
+use crate::utils::identifier::IdType;
 use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::sync::Arc;
 use tauri::{Emitter, State};
 use tokio::sync::{Mutex, RwLock};
@@ -98,6 +103,7 @@ async fn run_bootstrap_pipeline(
     apply_migrations(&moa_id).await?;
 
     step(&app, &state, &moa_id, Stage::RefreshingMounts, 15, Some("Enumerating volumes")).await;
+    ensure_mounted_volume(&moa_id).await?;
 
     step(&app, &state, &moa_id, Stage::ResolvingAnchors, 40, None).await;
 
@@ -154,7 +160,7 @@ pub async fn fetch_init_data_for_front(moa_id: String) -> Result<NodeWithConnect
     Ok(NodeWithConnections { nodes: folders, connections: connections })
 }
 
-async fn apply_migrations(moa_id: &str) -> anyhow::Result<()> {
+async fn apply_migrations(moa_id: &str) -> Result<()> {
     let moa = moa_services::MOA_DATA.read().unwrap().get_by_id(&moa_id).unwrap();
 
     let name = moa.name;
@@ -174,5 +180,63 @@ async fn apply_migrations(moa_id: &str) -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!("Failed to ensure database schema: {}", e))?;
 
     integrity::seed_initial_data(&pool).await.context("Failed to seed initial database data")?;
+    Ok(())
+}
+
+async fn ensure_mounted_volume(moa_id: &str) -> Result<()> {
+    let mounted = enumerate_mounted_root()?;
+
+    let pool = DB_MANAGER.get_or_open(&moa_id).await?;
+    let mut tx = pool.begin().await?;
+
+    sqlx::query(
+        r#"
+        UPDATE storage_root SET
+            is_available = FALSE"#,
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    let mut roots_changed: HashSet<IdType> = HashSet::new();
+
+    for m in mounted {
+        let root_id: Option<String> = sqlx::query_scalar(
+            r#"
+            SELECT id FROM storage_root
+            WHERE platform = ?1 AND stable_id = ?2
+            "#,
+        )
+        .bind(&m.platform)
+        .bind(&m.stable_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let Some(rid) = root_id else {
+            continue;
+        };
+
+        sqlx::query(
+            r#"
+                UPDATE storage_root SET
+                    secondary_id = ?1,
+                    kind = ?2,
+                    label = ?3,
+                    is_available = ?4,
+                    updated_at = ?5
+                WHERE id = ?6
+                "#,
+        )
+        .bind(&m.secondary_id)
+        .bind(&m.kind)
+        .bind(&m.label)
+        .bind(m.is_available)
+        .bind(&m.updated_at)
+        .bind(&rid)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    tx.commit().await?;
+
     Ok(())
 }

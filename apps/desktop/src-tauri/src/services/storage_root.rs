@@ -1,4 +1,5 @@
 use crate::models::file::OsPlatform;
+use crate::utils::date::get_now_date;
 use crate::utils::path_utils::normalize_path;
 use chrono::{DateTime, Utc};
 use std::path::Path;
@@ -15,6 +16,38 @@ pub fn get_mount_paths() -> Result<Vec<PathBuf>> {
 
     Ok(mps)
 }
+
+pub fn enumerate_mounted_root() -> Result<Vec<StorageRootInfo>> {
+    let mut roots = Vec::new();
+    let now_s = get_now_date();
+
+    #[cfg(target_os = "macos")]
+    {
+        let mount_paths = get_mount_paths()?;
+        for mp in mount_paths {
+            let mount_path_s = mp.to_string_lossy().to_string();
+            let (device, fstype) = find_device_and_fstype(&mount_path_s);
+            let (stable_id, secondary_id, label) = query_disk_ids(device.as_deref());
+            let kind = classify_kind(&mp, &mp, device.as_deref(), fstype.as_deref());
+            let is_available = mp.exists();
+
+            roots.push(StorageRootInfo {
+                platform: OsPlatform::Macos,
+                kind,
+                stable_id,
+                secondary_id,
+                label,
+                is_available,
+                mount_path: mount_path_s,
+                updated_at: now_s.clone(),
+                created_at: now_s.clone(),
+            });
+        }
+    }
+
+    Ok(roots)
+}
+
 #[cfg(target_os = "macos")]
 pub fn detect_storage_root(path: &PathBuf) -> Result<StorageRootInfo> {
     let now: DateTime<Utc> = Utc::now();
