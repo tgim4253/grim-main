@@ -8,10 +8,14 @@ use crate::{
     services::{integrity, moa_services},
     utils::identifier::get_unique_id,
 };
-use anyhow::Result;
+use anyhow::{Error, Result};
 use once_cell::sync::Lazy;
 use sqlx::{Pool, Sqlite};
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use tokio::sync::RwLock;
 
 pub struct DbManager {
@@ -192,7 +196,37 @@ pub async fn create_virtual_folder(
     })
 }
 
-// ensure_storage_root_and_real_folder.rs
+pub async fn create_virtual_folder_mount(
+    moa_id: String,
+    virtual_node_id: String,
+    real_folder_id: String,
+) -> Result<()> {
+    let pool = DB_MANAGER.get_or_open(&moa_id).await?;
+    let mut tx = pool.begin().await?;
+
+    let mount_id = get_unique_id();
+    let now = crate::utils::date::get_now_date();
+
+    // todo: enable, priority, recursive setting from front
+    sqlx::query(
+        r#"
+        INSERT INTO virtual_folder_mount
+            (id, virtual_node_id, real_folder_id, created_at, enable, priority, recursive)
+        VALUES
+            (?1, ?2, ?3, ?4, 1, 0, 1)
+        "#,
+    )
+    .bind(&mount_id)
+    .bind(&virtual_node_id)
+    .bind(&real_folder_id)
+    .bind(&now)
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+
+    Ok(())
+}
 
 pub async fn ensure_storage_root_and_real_folder(
     moa_id: String,
@@ -310,21 +344,30 @@ pub async fn ensure_storage_root_and_real_folder(
         }
     };
 
-    // 3. Traverse path components and ensure real_folder entries
     let mut current_parent_id: Option<String> = None;
 
-    // safer handling: strip_prefix 가 실패하면 빈 PathBuf 사용
     let components_path = if let Ok(sub_path) = norm_path.strip_prefix(&sroot_info.mount_path) {
         sub_path
     } else {
         norm_path
     };
 
-    for component in components_path
-        .components()
-        .filter_map(|c| c.as_os_str().to_str())
-        .filter(|s| !s.is_empty())
-    {
+    let components: Vec<&str> = if components_path.as_os_str().is_empty() {
+        vec![""]
+    } else {
+        components_path
+            .components()
+            .filter_map(|c| c.as_os_str().to_str())
+            .filter(|s| !s.is_empty())
+            .collect()
+    };
+
+    let mut rel_path = PathBuf::from("");
+    let mut abs_path = PathBuf::from(&sroot_info.mount_path);
+    for component in components {
+        abs_path.push(component);
+        rel_path.push(component);
+
         let name_norm = component.to_lowercase();
         let now = crate::utils::date::get_now_date();
 
@@ -358,9 +401,9 @@ pub async fn ensure_storage_root_and_real_folder(
             sqlx::query(
                 r#"
                 INSERT INTO real_folder
-                    (id, storage_root_id, parent_id, name, name_norm, created_at, updated_at, error_flag)
+                    (id, storage_root_id, parent_id, name, name_norm, created_at, updated_at, error_flag, abs_path_cached, root_rel_path)
                 VALUES
-                    (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'Success')
+                    (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'Success', ?8, ?9)
                 "#,
             )
             .bind(&new_id)
@@ -370,6 +413,8 @@ pub async fn ensure_storage_root_and_real_folder(
             .bind(&name_norm)
             .bind(&now)
             .bind(&now)
+            .bind(&abs_path.to_string_lossy().to_string())
+            .bind(&rel_path.to_string_lossy().to_string())
             .execute(&mut *tx)
             .await?;
             current_parent_id = Some(new_id);
@@ -377,5 +422,9 @@ pub async fn ensure_storage_root_and_real_folder(
     }
 
     tx.commit().await?;
-    current_parent_id.context("Failed to get real_folder_id for the path")
+    if let Some(id) = current_parent_id {
+        Ok(id)
+    } else {
+        Err(anyhow::anyhow!("Failed to create or find real_folder ID"))
+    }
 }
