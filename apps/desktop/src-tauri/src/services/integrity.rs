@@ -204,10 +204,15 @@ pub async fn ensure_schema(pool: &Pool<Sqlite>) -> Result<()> {
       error_msg          TEXT,
       last_seen_scan_id  TEXT REFERENCES scan_session(id),
       last_seen_at       TEXT,
+      created_at       TEXT DEFAULT (datetime('now')),
+      updated_at       TEXT DEFAULT (datetime('now')),
       UNIQUE (storage_root_id, parent_id, name_norm)
     );
     "#).execute(&mut *tx).await?;
     sqlx::query(r#"CREATE INDEX IF NOT EXISTS idx_real_folder_err ON real_folder(error_flag);"#)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(r#"CREATE INDEX IF NOT EXISTS idx_real_folder_parent ON real_folder(parent_id);"#)
         .execute(&mut *tx)
         .await?;
 
@@ -289,14 +294,13 @@ pub async fn ensure_schema(pool: &Pool<Sqlite>) -> Result<()> {
       id               TEXT PRIMARY KEY,                            -- uuid
       virtual_node_id  TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE,  -- must be kind='folder' (enforce by trigger/app)
       real_folder_id   TEXT NOT NULL REFERENCES real_folder(id) ON DELETE CASCADE,
-      base_rel_path    TEXT,
       recursive        INTEGER DEFAULT 1,                           -- boolean
       enabled          INTEGER DEFAULT 1,                           -- boolean
       priority         INTEGER DEFAULT 0,
       include_glob     TEXT,
       exclude_glob     TEXT,
       created_at       TEXT DEFAULT (datetime('now')),
-      UNIQUE (virtual_node_id, real_folder_id, base_rel_path)
+      UNIQUE (virtual_node_id, real_folder_id)
     );
     "#).execute(&mut *tx).await?;
     sqlx::query(r#"CREATE INDEX IF NOT EXISTS idx_vfm_virtual       ON virtual_folder_mount(virtual_node_id);"#).execute(&mut *tx).await?;
