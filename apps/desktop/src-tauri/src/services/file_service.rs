@@ -25,7 +25,7 @@ pub async fn first_mount_folder(
     let norm_path = crate::utils::path_utils::normalize_path(&path);
 
     // storage root
-    let sroot_info = crate::utils::path_utils::detect_storage_root(&norm_path)?;
+    let sroot_info = crate::services::storage_root::detect_storage_root(&norm_path)?;
 
     let real_folder_id =
         ensure_storage_root_and_real_folder(moa_id.clone(), &sroot_info, &norm_path).await?;
