@@ -3,10 +3,13 @@ use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Type};
 use std::{
     convert::{From, TryFrom},
-    fs,
+    fs::{self, Metadata},
     path::Path,
     string,
+    time::UNIX_EPOCH,
 };
+
+use crate::utils::file_utils::guess_mime;
 
 #[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct NodeFolder {
@@ -195,5 +198,62 @@ impl FileType {
         }
 
         Ok(())
+    }
+}
+
+pub struct FileInfo {
+    pub mime_guess: String,
+    pub kind_guess: FileType,
+
+    pub file_exists: bool,
+    pub file_size: Option<i64>,  // non-null if exists & accessible
+    pub file_mtime: Option<i64>, // non-null if exists & accessible
+
+    /// Only for images when accessible
+    pub sha256_image: Option<String>,
+
+    pub real_folder_id: String,
+
+    pub file_name: String,
+    pub file_name_norm: String,
+}
+
+impl FileInfo {
+    pub async fn new(file_path: &Path, real_folder_id: String, file_name: String) -> Result<Self> {
+        let file_name_norm = file_name.to_lowercase();
+        let mime_guess = guess_mime(file_path);
+        let kind_guess = FileType::from(file_path);
+
+        let meta = tokio::fs::metadata(file_path)
+            .await
+            .with_context(|| format!("Failed to read metadata: {}", file_path.display()))?;
+
+        let file_exists = meta.is_file();
+        let file_size = if file_exists { Some(meta.len() as i64) } else { None };
+
+        let file_mtime = if file_exists { Some(Self::file_mtime_epoch(&meta)?) } else { None };
+
+        Ok(FileInfo {
+            mime_guess,
+            kind_guess,
+
+            file_exists,
+            file_size,
+            file_mtime,
+
+            sha256_image: None,
+
+            real_folder_id,
+            file_name,
+            file_name_norm,
+        })
+    }
+
+    pub fn file_mtime_epoch(meta: &Metadata) -> Result<i64> {
+        if let Ok(mtime) = meta.modified()?.duration_since(UNIX_EPOCH) {
+            Ok(mtime.as_secs() as i64)
+        } else {
+            Err(anyhow!("Failed to get file modification time"))
+        }
     }
 }

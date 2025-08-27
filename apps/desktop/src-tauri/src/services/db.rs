@@ -1,12 +1,13 @@
 use crate::{
     bootstrap::{self, PathManager, PATH_MANAGER},
+    config::file::MatchStates,
     models::{
         connection::Connection,
-        file::NodeFolder,
+        file::{FileInfo, NodeFolder},
         node::{Node, NodeData, NodeKind, NodeRow},
     },
     services::{integrity, moa_services},
-    utils::identifier::get_unique_id,
+    utils::{file_utils::normailze_file_name, identifier::get_unique_id},
 };
 use anyhow::{Error, Result};
 use once_cell::sync::Lazy;
@@ -457,4 +458,60 @@ where
     } else {
         Err(anyhow::anyhow!("Failed to create or find real_folder ID"))
     }
+}
+
+/// return file_path_id
+pub async fn create_file_path<'a, E>(executor: &mut E, file_info: &FileInfo) -> Result<String>
+where
+    for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+{
+    let file_path_id = get_unique_id();
+    let now = crate::utils::date::get_now_date();
+
+    sqlx::query(
+        r#"
+        INSERT INTO file_path
+            (id, folder_id, file_name, file_name_norm, mtime, is_found, last_seen_at)
+        VALUES
+            (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+        ON CONFLICT(folder_id, file_name_norm) DO UPDATE SET
+            file_name    = excluded.file_name,
+            mtime        = excluded.mtime,
+            is_found   = excluded.is_found,
+            last_seen_at = excluded.last_seen_at
+        "#,
+    )
+    .bind(&file_path_id)
+    .bind(&file_info.real_folder_id)
+    .bind(&file_info.file_name)
+    .bind(&file_info.file_name_norm)
+    .bind(&file_info.file_mtime)
+    .bind(&file_info.file_exists)
+    .bind(&now)
+    .execute(&mut *executor)
+    .await?;
+
+    Ok(file_path_id)
+}
+
+pub async fn set_unknown_all_file_binding<'a, E>(
+    executor: &mut E,
+    file_path_id: &String,
+) -> Result<String>
+where
+    for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+{
+    sqlx::query(
+        r#"
+        UPDATE file_path_content_binding SET
+            match_states = ?3,
+        WHERE file_path_id = ?1
+        "#,
+    )
+    .bind(&file_path_id)
+    .bind(MatchStates::Unknown)
+    .execute(&mut *executor)
+    .await?;
+
+    Ok(file_path_id.to_string())
 }

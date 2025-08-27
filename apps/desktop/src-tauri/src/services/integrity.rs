@@ -257,7 +257,6 @@ pub async fn ensure_schema(pool: &Pool<Sqlite>) -> Result<()> {
       folder_id                     TEXT NOT NULL REFERENCES real_folder(id) ON DELETE CASCADE,
       file_name                     TEXT NOT NULL,
       file_name_norm                TEXT NOT NULL,
-      current_file_content_id       TEXT REFERENCES file_content(id) ON DELETE RESTRICT,
       mtime                         INTEGER CHECK (mtime >= 0),
       is_found                      INTEGER NOT NULL DEFAULT 0,                         -- boolean
       error_msg                     TEXT,
