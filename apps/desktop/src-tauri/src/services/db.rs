@@ -236,7 +236,7 @@ pub async fn ensure_storage_root_and_real_folder(
     let pool = DB_MANAGER.get_or_open(&moa_id).await?;
     let mut tx = pool.begin().await?;
 
-    // 1. Ensure StorageRoot exists or create it
+    // Ensure StorageRoot exists or create it
     let sroot_id = {
         let existing_sroot_id: Option<String> = sqlx::query_scalar(
             r#"
@@ -297,7 +297,7 @@ pub async fn ensure_storage_root_and_real_folder(
         }
     };
 
-    // 2. Ensure StorageRootMount exists or create/update it
+    // Ensure StorageRootMount exists or create/update it
     let _sroot_mount_id = {
         let existing_mount_id: Option<String> = sqlx::query_scalar(
             r#"

@@ -28,3 +28,11 @@ pub fn normalize_path(path: &str) -> PathBuf {
     #[cfg(not(windows))]
     abs
 }
+
+pub fn concat_paths(paths: &[PathBuf]) -> PathBuf {
+    let mut result = PathBuf::new();
+    for path in paths {
+        result.push(path);
+    }
+    result
+}

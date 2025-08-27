@@ -180,7 +180,8 @@ pub async fn ensure_schema(pool: &Pool<Sqlite>) -> Result<()> {
       mount_path       TEXT NOT NULL,                             -- 'E:\' | '/Volumes/USB' | '/mnt/share'
       is_primary       INTEGER DEFAULT 1,                          -- boolean
       created_at       TEXT DEFAULT (datetime('now')),
-      updated_at       TEXT DEFAULT (datetime('now'))
+      updated_at       TEXT DEFAULT (datetime('now')),
+      UNIQUE (storage_root_id, mount_path)
     );
     "#).execute(&mut *tx).await?;
     sqlx::query(
