@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::{path::BaseDirectory, AppHandle, Manager};
 
 pub fn get_moa_file_path(app: &AppHandle) -> PathBuf {
@@ -7,7 +7,11 @@ pub fn get_moa_file_path(app: &AppHandle) -> PathBuf {
         .unwrap_or_else(|_| std::env::current_dir().unwrap().join("moa.json"))
 }
 
-pub fn normalize_path(path: &str) -> PathBuf {
+pub fn normalize_path<P>(path: P) -> PathBuf
+where
+    P: AsRef<Path>,
+{
+    let path = path.as_ref();
     let abs = dunce::canonicalize(path).unwrap_or_else(|_| PathBuf::from(path)); // resolves . and ..
 
     #[cfg(windows)]

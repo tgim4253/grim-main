@@ -193,20 +193,20 @@ pub async fn ensure_schema(pool: &Pool<Sqlite>) -> Result<()> {
     /* -------------------------------- Real folder tree (physical) ------------------------------------- */
     sqlx::query(r#"
     CREATE TABLE IF NOT EXISTS real_folder (
-      id                 TEXT PRIMARY KEY,                         -- uuid
-      storage_root_id    TEXT REFERENCES storage_root(id) ON DELETE SET NULL,
-      parent_id          TEXT REFERENCES real_folder(id) ON DELETE CASCADE,
-      name               TEXT NOT NULL,                            -- single segment
-      name_norm          TEXT,                                     -- lowercased for case-insensitive FS
-      root_rel_path      TEXT,                                     -- optional cache
-      abs_path_cached    TEXT,                                     -- optional cache
-      mtime              INTEGER,
-      error_flag         TEXT CHECK (error_flag IN ('Success','NotFound','Mismatch')),
-      error_msg          TEXT,
-      last_seen_scan_id  TEXT REFERENCES scan_session(id),
-      last_seen_at       TEXT,
-      created_at       TEXT DEFAULT (datetime('now')),
-      updated_at       TEXT DEFAULT (datetime('now')),
+      id                TEXT PRIMARY KEY,                         -- uuid
+      storage_root_id   TEXT REFERENCES storage_root(id) ON DELETE SET NULL,
+      parent_id         TEXT REFERENCES real_folder(id) ON DELETE CASCADE,
+      name              TEXT NOT NULL,                            -- single segment
+      name_norm         TEXT,                                     -- lowercased for case-insensitive FS
+      root_rel_path     TEXT,                                     -- optional cache
+      abs_path_cached   TEXT,                                     -- optional cache
+      mtime             INTEGER,
+      error_flag        TEXT CHECK (error_flag IN ('success','notfound','mismatch')),
+      error_msg         TEXT,
+      last_seen_scan_   TEXT REFERENCES scan_session(id),
+      last_seen_at      TEXT,
+      created_at        TEXT DEFAULT (datetime('now')),
+      updated_at        TEXT DEFAULT (datetime('now')),
       UNIQUE (storage_root_id, parent_id, name_norm)
     );
     "#).execute(&mut *tx).await?;
@@ -217,77 +217,126 @@ pub async fn ensure_schema(pool: &Pool<Sqlite>) -> Result<()> {
         .execute(&mut *tx)
         .await?;
 
-    /* ---------------------------- File objects, content, and paths ------------------------------------ */
+    /* ---------------------------- File content, paths and binds ------------------------------------ */
     sqlx::query(
         r#"
     CREATE TABLE IF NOT EXISTS file_content (
       id         TEXT PRIMARY KEY,                                  -- uuid
       mime       TEXT,
-      size       INTEGER,
+      size       INTEGER NOT NULL DEFAULT 0 
+                    CHECK (size >= 0),
       sha256     TEXT,
+      kind       TEXT NOT NULL DEFAULT 'unknown'
+                 CHECK (kind IN ('image','video','document','graphictool','audio','archive','unknown')),
       created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now')),
-      UNIQUE(sha256)
+      updated_at TEXT DEFAULT (datetime('now'))
     );
     "#,
     )
     .execute(&mut *tx)
     .await?;
+
+    // Enforce uniqueness only when sha256 IS NOT NULL
+    sqlx::query(
+        r#"CREATE UNIQUE INDEX IF NOT EXISTS uq_file_content_sha256_notnull
+           ON file_content(sha256) WHERE sha256 IS NOT NULL;"#,
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    // quries by size
     sqlx::query(r#"CREATE INDEX IF NOT EXISTS idx_file_content_size ON file_content(size);"#)
         .execute(&mut *tx)
         .await?;
 
-    sqlx::query(
-        r#"
-    CREATE TABLE IF NOT EXISTS fs_object (
-      id                          TEXT PRIMARY KEY,                 -- uuid
-      platform                    TEXT,                             -- 'posix'|'windows'|'unknown'
-      device_id                   TEXT,                             -- POSIX st_dev
-      inode_id                    TEXT,                             -- POSIX st_ino
-      volume_serial               TEXT,                             -- Windows
-      file_ref_num                TEXT,                             -- Windows FRN
-      link_count                  INTEGER,
-      birthtime                   TEXT,
-      ctime                       TEXT,
-      current_file_content_id     TEXT REFERENCES file_content(id) ON DELETE RESTRICT,
-      created_at                  TEXT DEFAULT (datetime('now')),
-      updated_at                  TEXT DEFAULT (datetime('now')),
-      UNIQUE(device_id, inode_id),
-      UNIQUE(volume_serial, file_ref_num)
-    );
-    "#,
-    )
-    .execute(&mut *tx)
-    .await?;
-
+    // -- file_path --
     sqlx::query(
         r#"
     CREATE TABLE IF NOT EXISTS file_path (
-      id                 TEXT PRIMARY KEY,                          -- uuid
-      folder_id          TEXT NOT NULL REFERENCES real_folder(id) ON DELETE CASCADE,
-      fs_object_id       TEXT REFERENCES fs_object(id) ON DELETE RESTRICT,
-      file_name          TEXT NOT NULL,
-      file_name_norm     TEXT,
-      mtime              INTEGER,
-      error_flag         TEXT NOT NULL CHECK (error_flag IN ('Success','NotFound','Mismatch')),
-      error_msg          TEXT,
-      last_seen_scan_id  TEXT REFERENCES scan_session(id),
-      last_seen_at       TEXT,
+      id                            TEXT PRIMARY KEY,                          -- uuid
+      folder_id                     TEXT NOT NULL REFERENCES real_folder(id) ON DELETE CASCADE,
+      file_name                     TEXT NOT NULL,
+      file_name_norm                TEXT NOT NULL,
+      current_file_content_id       TEXT REFERENCES file_content(id) ON DELETE RESTRICT,
+      mtime                         INTEGER CHECK (mtime >= 0),
+      is_found                      INTEGER NOT NULL DEFAULT 0,                         -- boolean
+      error_msg                     TEXT,
+      last_seen_scan_id             TEXT REFERENCES scan_session(id),
+      last_seen_at                  TEXT,
       UNIQUE (folder_id, file_name_norm)
     );
     "#,
     )
     .execute(&mut *tx)
     .await?;
-    sqlx::query(r#"CREATE INDEX IF NOT EXISTS idx_file_path_folder   ON file_path(folder_id);"#)
+    sqlx::query(
+        r#"CREATE INDEX IF NOT EXISTS idx_file_path_folder_mtime   ON file_path(folder_id, mtime);"#,
+    )
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(r#"CREATE INDEX IF NOT EXISTS idx_current_file_content    ON file_path(current_file_content_id);"#)
         .execute(&mut *tx)
         .await?;
-    sqlx::query(r#"CREATE INDEX IF NOT EXISTS idx_file_path_fsobj    ON file_path(fs_object_id);"#)
+    sqlx::query(r#"CREATE INDEX IF NOT EXISTS idx_file_path_err      ON file_path(is_found);"#)
         .execute(&mut *tx)
         .await?;
-    sqlx::query(r#"CREATE INDEX IF NOT EXISTS idx_file_path_err      ON file_path(error_flag);"#)
-        .execute(&mut *tx)
-        .await?;
+
+    // -- binding --
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS file_path_content_binding (
+          id              TEXT PRIMARY KEY,                              -- uuid
+          file_path_id    TEXT NOT NULL REFERENCES file_path(id) ON DELETE CASCADE,
+          file_content_id TEXT NOT NULL REFERENCES file_content(id) ON DELETE CASCADE,
+
+          detected_at     TEXT NOT NULL DEFAULT (datetime('now')),       -- first seen pairing
+          resolved_at     TEXT,                                          -- set when version resolution done
+
+          is_active       INTEGER NOT NULL DEFAULT 0 CHECK (is_active IN (0,1)),
+          
+          match_states    TEXT NOT NULL DEFAULT 'unknown' CHECK (match_states IN ('unknown','mismatch','match'))
+        );
+        "#,
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    // Lookups
+    sqlx::query(
+        r#"CREATE INDEX IF NOT EXISTS idx_binding_file_path
+           ON file_path_content_binding(file_path_id);"#,
+    )
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(
+        r#"CREATE INDEX IF NOT EXISTS idx_binding_file_content
+           ON file_path_content_binding(file_content_id);"#,
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    // Only one active binding per path (partial unique)
+    sqlx::query(
+        r#"CREATE UNIQUE INDEX IF NOT EXISTS uq_binding_active_per_path
+           ON file_path_content_binding(file_path_id)
+           WHERE is_active = 1;"#,
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    // Optional: fast filter & combined match/active filter
+    sqlx::query(
+        r#"CREATE INDEX IF NOT EXISTS idx_binding_is_active
+           ON file_path_content_binding(is_active);"#,
+    )
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(
+        r#"CREATE INDEX IF NOT EXISTS idx_binding_match_active
+           ON file_path_content_binding(match_states, is_active);"#,
+    )
+    .execute(&mut *tx)
+    .await?;
 
     /* ------------------------- Virtual mounts & direct node bindings ---------------------------------- */
     sqlx::query(r#"
@@ -312,15 +361,15 @@ pub async fn ensure_schema(pool: &Pool<Sqlite>) -> Result<()> {
         r#"
     CREATE TABLE IF NOT EXISTS node_file_binding (
       node_id      TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE,       -- node.kind='file'
-      file_path_id TEXT NOT NULL REFERENCES file_path(id) ON DELETE CASCADE,
-      PRIMARY KEY (node_id, file_path_id)
+      file_content_id TEXT NOT NULL REFERENCES file_content(id) ON DELETE CASCADE,
+      PRIMARY KEY (node_id, file_content_id)
     );
     "#,
     )
     .execute(&mut *tx)
     .await?;
     sqlx::query(
-        r#"CREATE INDEX IF NOT EXISTS idx_nfb_filepath ON node_file_binding(file_path_id);"#,
+        r#"CREATE INDEX IF NOT EXISTS idx_nfb_filepath ON node_file_binding(file_content_id);"#,
     )
     .execute(&mut *tx)
     .await?;

@@ -1,19 +1,12 @@
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Type};
 use std::{
     convert::{From, TryFrom},
+    fs,
+    path::Path,
     string,
 };
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
-#[sqlx(type_name = "TEXT")] // SQLite TEXT
-#[sqlx(rename_all = "lowercase")] // NotFound → "notfound"
-#[serde(rename_all = "lowercase")] // JSON 직렬화용(선택)
-pub enum IntegrityCheckResult {
-    NotFound = -1,
-    Success = 0,
-    Mismatch = 1,
-}
 
 #[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct NodeFolder {
@@ -104,4 +97,103 @@ pub struct StorageRootInfo {
 
     pub updated_at: String,
     pub created_at: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
+#[sqlx(type_name = "TEXT")]
+#[sqlx(rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
+pub enum FileType {
+    Image,
+    Video,
+    Document,
+    GraphicTool,
+    Audio,
+    Archive,
+    #[default]
+    Unknown,
+}
+
+impl From<&Path> for FileType {
+    fn from(path: &Path) -> Self {
+        match path.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase().as_str() {
+            // Image
+            "jpg" | "jpeg" | "png" | "gif" | "bmp" | "tiff" | "webp" | "heic" => FileType::Image,
+
+            // Video
+            "mp4" | "mov" | "avi" | "mkv" | "webm" | "flv" | "wmv" => FileType::Video,
+
+            // Audio
+            "mp3" | "wav" | "flac" | "aac" | "ogg" | "m4a" => FileType::Audio,
+
+            // Document
+            "pdf" | "txt" | "doc" | "docx" | "xls" | "xlsx" | "ppt" | "pptx" | "odt" | "md" => {
+                FileType::Document
+            }
+
+            // Graphic / Tool-specific (이미지 툴)
+            "psd" => FileType::GraphicTool,  // Photoshop
+            "ai" => FileType::GraphicTool,   // Illustrator
+            "xd" => FileType::GraphicTool,   // Adobe XD
+            "fig" => FileType::GraphicTool,  // Figma
+            "clip" => FileType::GraphicTool, // Clip Studio
+            "kra" => FileType::GraphicTool,  // Krita
+            "sai" => FileType::GraphicTool,  // Paint Tool SAI
+            "pur" => FileType::GraphicTool,  // PureRef
+
+            // 압축파일
+            "zip" | "rar" | "7z" | "tar" | "gz" => FileType::Archive,
+
+            // Default
+            _ => FileType::Unknown,
+        }
+    }
+}
+
+impl FileType {
+    /// Validate an image file with size, signature, and pixel constraints.
+    pub fn check_is_img(path: &Path) -> Result<()> {
+        const MAX_BYTES: u64 = 20 * 1024 * 1024; // 20MB
+        const MAX_PIXELS: u64 = 400_000_000; // 400M px
+
+        // 1) Size check via metadata (no need to open the file here)
+        let meta = fs::metadata(path)
+            .with_context(|| format!("Failed to read metadata: {}", path.display()))?;
+
+        let len = meta.len();
+        if len == 0 {
+            return Err(anyhow!("Empty file"));
+        }
+        if len > MAX_BYTES {
+            return Err(anyhow!("File too large: {} bytes > {}", len, MAX_BYTES));
+        }
+
+        // 2) MIME magic (signature) check
+        //    Note: infer reads from the path internally.
+        let is_image_signature = infer::get_from_path(path)
+            .map_err(|e| anyhow!("Type sniffing failed: {e}"))?
+            .map(|k| k.mime_type().starts_with("image/"))
+            .unwrap_or(false);
+
+        if !is_image_signature {
+            return Err(anyhow!("Not an image file: {}", path.display()));
+        }
+
+        // 3) Pixel/Dimension check (uses 'image' crate)
+        let (w, h) = image::image_dimensions(path)
+            .with_context(|| format!("Failed to read image dimensions: {}", path.display()))?;
+
+        let pixels = (w as u64)
+            .checked_mul(h as u64)
+            .ok_or_else(|| anyhow!("Pixel count overflow: {}x{}", w, h))?;
+
+        if pixels == 0 {
+            return Err(anyhow!("Invalid image dimensions: {}x{}", w, h));
+        }
+        if pixels > MAX_PIXELS {
+            return Err(anyhow!("Image too large: {} pixels > {}", pixels, MAX_PIXELS));
+        }
+
+        Ok(())
+    }
 }

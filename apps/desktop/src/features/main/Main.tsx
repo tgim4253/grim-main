@@ -55,7 +55,7 @@ const Main: React.FC = () => {
         const [next, ...rest] = prev;
         setProgress(next);
         if (rest.length > 0) {
-          setTimeout(tick, 200);
+          setTimeout(tick, 50);
         } else {
           setProcessing(false);
         }

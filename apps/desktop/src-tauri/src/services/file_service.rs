@@ -1,43 +1,211 @@
-use anyhow::Result;
-
-use crate::{
-    models::{file::FolderData, node::Node},
-    services::db::{self, create_virtual_folder_mount, ensure_storage_root_and_real_folder},
+use std::{
+    collections::HashSet,
+    fs::{self, DirEntry, File},
+    io::{self, BufReader},
+    path::{self, Path, PathBuf},
+    pin::Pin,
 };
 
-pub async fn create_folder(app: tauri::AppHandle, moa_id: String, data: FolderData) -> Result<()> {
-    let node = db::create_virtual_folder(moa_id.clone(), data.name, data.parent_id).await?;
+use anyhow::{anyhow, bail, Context, Result};
+use async_recursion::async_recursion;
+use sha2::{Digest, Sha256};
+use sqlx::{Sqlite, SqlitePool, Transaction};
 
-    if let Some(path) = data.path {
-        if !path.is_empty() {
-            first_mount_folder(app, moa_id.clone(), node, path).await?;
-        }
-    }
-    Ok(())
+use crate::{
+    app_launcher::moa,
+    models::{
+        file::{FileType, FolderData, StorageRootInfo},
+        node::Node,
+    },
+    services::{
+        db::{
+            self, create_virtual_folder_mount, ensure_real_folder,
+            ensure_storage_root_and_real_folder, DB_MANAGER,
+        },
+        storage_root,
+    },
+    utils::{date::get_now_date, path_utils::normalize_path},
+};
+
+pub async fn create_folder(moa_id: String, data: FolderData) -> Result<Node> {
+    let mut tx: Transaction<'_, Sqlite> = DB_MANAGER.create_new_tx(&moa_id).await?;
+
+    let node = db::create_virtual_folder(tx.as_mut(), data.name, data.parent_id).await?;
+
+    tx.commit().await?;
+
+    Ok(node)
 }
 
-pub async fn first_mount_folder(
-    app: tauri::AppHandle,
-    moa_id: String,
-    node: Node,
-    path: String,
-) -> Result<()> {
+pub async fn first_mount_folder(moa_id: String, node: Node, path: String) -> Result<()> {
+    let mut tx = DB_MANAGER.create_new_tx(&moa_id).await?;
+
     let norm_path = crate::utils::path_utils::normalize_path(&path);
 
     // storage root
-    let sroot_info = crate::services::storage_root::detect_storage_root(&norm_path)?;
+    let sroot_info = storage_root::detect_storage_root(&norm_path)?;
 
     let real_folder_id =
-        ensure_storage_root_and_real_folder(moa_id.clone(), &sroot_info, &norm_path).await?;
+        ensure_storage_root_and_real_folder(tx.as_mut(), &sroot_info, &norm_path).await?;
 
     let mount_id =
-        create_virtual_folder_mount(moa_id.clone(), node.id.clone(), real_folder_id.clone());
+        create_virtual_folder_mount(tx.as_mut(), node.id.clone(), real_folder_id.clone()).await?;
+
+    upsert_folder(&mut tx, real_folder_id.clone(), node.id, &norm_path, true, Some(true)).await?;
 
     let scan_id = start_scan_job(moa_id.clone(), real_folder_id).await?;
+
+    tx.commit().await?;
 
     Ok(())
 }
 
 pub async fn start_scan_job(moa_id: String, real_folder_id: String) -> Result<String> {
     Ok("".to_string())
+}
+
+// Scan Folder and Upser file and folder content
+/// make_virtaul_folder: when reculrsive is false,
+///                      if make_virtual_folder is true, create virtual folder for each sub folder
+///                      if make_virtual_folder is false, not create virtual folder.
+// TODO: Currently everything is in a single transaction.
+//       Consider splitting mounts and file upserts into separate transactions
+//       if performance or long-running locks become an issue.
+#[async_recursion]
+async fn upsert_folder(
+    tx: &mut Transaction<'_, Sqlite>,
+    parent_real_folder_id: String,
+    parent_virtual_folder_id: String,
+    abs_dir: &Path,
+    recursive: bool,
+    make_virtual_folder: Option<bool>,
+) -> Result<()> {
+    let make_vf = make_virtual_folder.unwrap_or(true);
+    // Use async directory reading to avoid blocking the runtime
+    let mut dir = tokio::fs::read_dir(abs_dir)
+        .await
+        .with_context(|| format!("failed to read_dir {:?}", abs_dir))?;
+
+    let mut folder_entries: Vec<(PathBuf, String)> = Vec::new();
+    while let Some(entry) = dir
+        .next_entry()
+        .await
+        .with_context(|| format!("failed to read entry under {:?}", abs_dir))?
+    {
+        let entry_path: PathBuf = entry.path();
+        let file_type = entry
+            .file_type()
+            .await
+            .with_context(|| format!("failed to get file_type for {:?}", entry_path))?;
+        // Avoid symlink loops (temp)
+        if file_type.is_symlink() {
+            continue;
+        }
+
+        if file_type.is_dir() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if recursive {
+                folder_entries.push((entry_path, name));
+            } else if make_vf {
+                // Only create virtual folders for direct child directories, do not mount.
+                db::create_virtual_folder(tx.as_mut(), name, parent_virtual_folder_id.clone())
+                    .await
+                    .with_context(|| {
+                        format!("create_virtual_folder failed for {:?}", entry_path)
+                    })?;
+            }
+        } else if file_type.is_file() {
+            upsert_file_entry(tx, &parent_real_folder_id, &entry)
+                .await
+                .with_context(|| format!("upsert_file_entry failed for {:?}", entry_path))?;
+        } else {
+            continue;
+        }
+    }
+
+    if recursive {
+        for (entry_path, name) in folder_entries {
+            // create child virtual folder node under the parent virtual folder
+            let child_vf = db::create_virtual_folder(
+                tx.as_mut(),
+                name.clone(),
+                parent_virtual_folder_id.clone(),
+            )
+            .await
+            .with_context(|| format!("create_virtual_folder failed for {:?}", entry_path))?;
+
+            //  ensure child real folder exists for this path
+            let sroot_id: String = sqlx::query_scalar(
+                "SELECT storage_root_id FROM real_folder
+                     WHERE id = ?",
+            )
+            .bind(&parent_real_folder_id)
+            .fetch_optional(tx.as_mut())
+            .await
+            .with_context(|| "failed to load storage_root for parent_real_folder_id")?
+            .unwrap();
+
+            // normalize child path
+            let normalized = normalize_path(&entry_path);
+
+            let child_real_folder_id =
+                ensure_real_folder(tx.as_mut(), sroot_id.clone(), &normalized)
+                    .await
+                    .with_context(|| format!("ensure_real_folder failed for {:?}", entry_path))?;
+
+            // mount child vf <-> child real folder
+            db::create_virtual_folder_mount(
+                tx.as_mut(),
+                child_vf.id.clone(),
+                child_real_folder_id.clone(),
+            )
+            .await
+            .with_context(|| format!("mount vf<->rf failed for {:?}", entry_path))?;
+
+            // recurse into the child directory
+            upsert_folder(
+                tx,
+                child_real_folder_id,
+                child_vf.id,
+                &entry_path,
+                recursive,
+                Some(make_vf),
+            )
+            .await?;
+        }
+    };
+
+    Ok(())
+}
+
+async fn upsert_file_entry(
+    tx: &mut Transaction<'_, Sqlite>,
+    folder_id: &str,
+    entry: &tokio::fs::DirEntry,
+) -> Result<()> {
+    let file_name = entry.file_name().to_string_lossy().to_string();
+    let file_name_norm = file_name.to_lowercase();
+    let now = get_now_date();
+
+    Ok(())
+}
+
+// sha256
+
+fn sha256_of(path: &Path) -> Result<String> {
+    let file = File::open(path)?;
+    let mut reader = BufReader::new(file);
+    let mut hasher = Sha256::new();
+
+    io::copy(&mut reader, &mut hasher)?;
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+pub fn sha_256_of_img(path: &Path) -> Result<String> {
+    if !matches!(FileType::from(path), FileType::Image) {
+        bail!("Not an image file: {}", path.display());
+    }
+    FileType::check_is_img(path)?;
+
+    sha256_of(path)
 }

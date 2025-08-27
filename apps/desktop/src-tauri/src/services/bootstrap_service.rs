@@ -159,10 +159,14 @@ fn emit(app_handle: &tauri::AppHandle, moa_id: &str, payload: impl Serialize + C
 }
 
 pub async fn fetch_init_data_for_front(moa_id: String) -> Result<NodeWithConnections> {
-    let folders = db::fetch_folder_nodes(moa_id.clone()).await?;
+    let mut tx = DB_MANAGER.create_new_tx(&moa_id).await?;
+
+    let folders = db::fetch_folder_nodes(tx.as_mut()).await?;
     let connections =
-        db::fetch_connections(moa_id.clone(), folders.iter().map(|f| f.id.clone()).collect())
-            .await?;
+        db::fetch_connections(tx.as_mut(), folders.iter().map(|f| f.id.clone()).collect()).await?;
+
+    tx.commit().await?;
+
     Ok(NodeWithConnections { nodes: folders, connections: connections })
 }
 
@@ -314,7 +318,7 @@ async fn ensure_mounted_volume(moa_id: &str) -> Result<()> {
             UPDATE real_folder
                SET abs_path_cached = CASE
                    WHEN root_rel_path IS NULL OR root_rel_path = '' THEN $2
-                   ELSE rtrim(?, '/') || '/' || ltrim(root_rel_path, '/')
+                   ELSE rtrim($2, '/') || '/' || ltrim(root_rel_path, '/')
                END,
                    updated_at = $3
              WHERE storage_root_id = $1

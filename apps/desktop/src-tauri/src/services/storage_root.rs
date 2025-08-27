@@ -53,7 +53,7 @@ pub fn detect_storage_root(path: &PathBuf) -> Result<StorageRootInfo> {
     let now: DateTime<Utc> = Utc::now();
     let now_s = now.to_rfc3339();
 
-    let norm = normalize_path(&path.to_string_lossy());
+    let norm = normalize_path(&path);
 
     // --- find mount point (best prefix match) ---
     let mount_path = find_mount_point(&norm).unwrap_or_else(|| PathBuf::from("/"));

@@ -10,7 +10,7 @@ use crate::{
 };
 use anyhow::{Error, Result};
 use once_cell::sync::Lazy;
-use sqlx::{Pool, Sqlite};
+use sqlx::{Executor, Pool, Sqlite, Transaction};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -46,12 +46,17 @@ impl DbManager {
 
         Ok(pool)
     }
+
+    pub async fn create_new_tx(&self, moa_id: &str) -> anyhow::Result<Transaction<'_, Sqlite>> {
+        let pool = self.get_or_open(moa_id).await?;
+        Ok(pool.begin().await?)
+    }
 }
 
-pub async fn fetch_connections(moa_id: String, ids: Vec<String>) -> Result<Vec<Connection>> {
-    let pool = DB_MANAGER.get_or_open(&moa_id).await?;
-    let mut tx = pool.begin().await?;
-
+pub async fn fetch_connections<'a, E>(executor: &mut E, ids: Vec<String>) -> Result<Vec<Connection>>
+where
+    for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+{
     let connections: Vec<Connection> = sqlx::query_as(
         r#"
         SELECT
@@ -67,19 +72,17 @@ pub async fn fetch_connections(moa_id: String, ids: Vec<String>) -> Result<Vec<C
         "#,
     )
     .bind(serde_json::to_string(&ids)?)
-    .fetch_all(&mut *tx)
+    .fetch_all(&mut *executor)
     .await?;
-
-    tx.commit().await?;
 
     Ok(connections)
 }
 
 // Preload directory table rows for frontend using sqlx
-pub async fn fetch_folder_nodes(moa_id: String) -> Result<Vec<Node>> {
-    let pool = DB_MANAGER.get_or_open(&moa_id).await?;
-    let mut tx: sqlx::Transaction<'static, Sqlite> = pool.begin().await?;
-
+pub async fn fetch_folder_nodes<'a, E>(executor: &mut E) -> Result<Vec<Node>>
+where
+    for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+{
     let rows: Vec<NodeRow<NodeFolder>> = sqlx::query_as(
         r#"
         SELECT
@@ -95,7 +98,7 @@ pub async fn fetch_folder_nodes(moa_id: String) -> Result<Vec<Node>> {
         ORDER BY n.created_at
         "#,
     )
-    .fetch_all(&mut *tx)
+    .fetch_all(&mut *executor)
     .await?;
 
     let mut nodes: Vec<Node> = Vec::new();
@@ -110,19 +113,17 @@ pub async fn fetch_folder_nodes(moa_id: String) -> Result<Vec<Node>> {
         });
     }
 
-    tx.commit().await?;
-
     Ok(nodes)
 }
 
-pub async fn create_virtual_folder(
-    moa_id: String,
+pub async fn create_virtual_folder<'a, E>(
+    executor: &mut E,
     name: String,
     parent_id: String,
-) -> Result<Node> {
-    let pool = DB_MANAGER.get_or_open(&moa_id).await?;
-    let mut tx = pool.begin().await?;
-
+) -> Result<Node>
+where
+    for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+{
     let node_id = get_unique_id();
     let folder_id = get_unique_id();
     let now = crate::utils::date::get_now_date();
@@ -135,7 +136,7 @@ pub async fn create_virtual_folder(
     )
     .bind(&node_id)
     .bind(&now)
-    .execute(&mut *tx)
+    .execute(&mut *executor)
     .await?;
 
     sqlx::query(
@@ -148,7 +149,7 @@ pub async fn create_virtual_folder(
     .bind(&node_id)
     .bind(&name)
     .bind(&now)
-    .execute(&mut *tx)
+    .execute(&mut *executor)
     .await?;
 
     // parent -> child (contains)
@@ -163,7 +164,7 @@ pub async fn create_virtual_folder(
     .bind(&parent_id)
     .bind(&node_id)
     .bind(&now)
-    .execute(&mut *tx)
+    .execute(&mut *executor)
     .await?;
 
     //  child -> parent (containedIn)
@@ -178,10 +179,8 @@ pub async fn create_virtual_folder(
     .bind(&node_id)
     .bind(&parent_id)
     .bind(&now)
-    .execute(&mut *tx)
+    .execute(&mut *executor)
     .await?;
-
-    tx.commit().await?;
 
     Ok(Node {
         id: node_id.clone(),
@@ -196,14 +195,14 @@ pub async fn create_virtual_folder(
     })
 }
 
-pub async fn create_virtual_folder_mount(
-    moa_id: String,
+pub async fn create_virtual_folder_mount<'a, E>(
+    executor: &mut E,
     virtual_node_id: String,
     real_folder_id: String,
-) -> Result<()> {
-    let pool = DB_MANAGER.get_or_open(&moa_id).await?;
-    let mut tx = pool.begin().await?;
-
+) -> Result<()>
+where
+    for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+{
     let mount_id = get_unique_id();
     let now = crate::utils::date::get_now_date();
 
@@ -211,7 +210,7 @@ pub async fn create_virtual_folder_mount(
     sqlx::query(
         r#"
         INSERT INTO virtual_folder_mount
-            (id, virtual_node_id, real_folder_id, created_at, enable, priority, recursive)
+            (id, virtual_node_id, real_folder_id, created_at, enabled, priority, recursive)
         VALUES
             (?1, ?2, ?3, ?4, 1, 0, 1)
         "#,
@@ -220,22 +219,36 @@ pub async fn create_virtual_folder_mount(
     .bind(&virtual_node_id)
     .bind(&real_folder_id)
     .bind(&now)
-    .execute(&mut *tx)
+    .execute(&mut *executor)
     .await?;
-
-    tx.commit().await?;
 
     Ok(())
 }
 
-pub async fn ensure_storage_root_and_real_folder(
-    moa_id: String,
+pub async fn ensure_storage_root_and_real_folder<'a, E>(
+    executor: &mut E,
     sroot_info: &crate::models::file::StorageRootInfo,
     norm_path: &std::path::PathBuf,
-) -> Result<String> {
-    let pool = DB_MANAGER.get_or_open(&moa_id).await?;
-    let mut tx = pool.begin().await?;
+) -> Result<String>
+where
+    for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+{
+    // Ensure StorageRoot exists or create it
+    let sroot_id = ensure_storage_root(executor, sroot_info).await?;
 
+    // Ensure RealFolder exists or create it
+    let real_folder_id = ensure_real_folder(executor, sroot_id.clone(), norm_path).await?;
+
+    Ok(real_folder_id)
+}
+
+pub async fn ensure_storage_root<'a, E>(
+    executor: &mut E,
+    sroot_info: &crate::models::file::StorageRootInfo,
+) -> Result<String>
+where
+    for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+{
     // Ensure StorageRoot exists or create it
     let sroot_id = {
         let existing_sroot_id: Option<String> = sqlx::query_scalar(
@@ -246,7 +259,7 @@ pub async fn ensure_storage_root_and_real_folder(
         )
         .bind(&sroot_info.platform)
         .bind(&sroot_info.stable_id)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(&mut *executor)
         .await?;
 
         if let Some(id) = existing_sroot_id {
@@ -268,7 +281,7 @@ pub async fn ensure_storage_root_and_real_folder(
             .bind(sroot_info.is_available)
             .bind(&sroot_info.updated_at)
             .bind(&id)
-            .execute(&mut *tx)
+            .execute(&mut *executor)
             .await?;
             id
         } else {
@@ -291,7 +304,7 @@ pub async fn ensure_storage_root_and_real_folder(
             .bind(sroot_info.is_available)
             .bind(&sroot_info.created_at)
             .bind(&sroot_info.updated_at)
-            .execute(&mut *tx)
+            .execute(&mut *executor)
             .await?;
             new_id
         }
@@ -307,7 +320,7 @@ pub async fn ensure_storage_root_and_real_folder(
         )
         .bind(&sroot_id)
         .bind(&sroot_info.mount_path)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(&mut *executor)
         .await?;
 
         if let Some(id) = existing_mount_id {
@@ -320,7 +333,7 @@ pub async fn ensure_storage_root_and_real_folder(
             )
             .bind(&sroot_info.updated_at)
             .bind(&id)
-            .execute(&mut *tx)
+            .execute(&mut *executor)
             .await?;
             id
         } else {
@@ -338,19 +351,37 @@ pub async fn ensure_storage_root_and_real_folder(
             .bind(&sroot_info.mount_path)
             .bind(&sroot_info.created_at)
             .bind(&sroot_info.updated_at)
-            .execute(&mut *tx)
+            .execute(&mut *executor)
             .await?;
             new_id
         }
     };
 
-    let mut current_parent_id: Option<String> = None;
+    Ok(sroot_id)
+}
 
-    let components_path = if let Ok(sub_path) = norm_path.strip_prefix(&sroot_info.mount_path) {
-        sub_path
-    } else {
-        norm_path
-    };
+pub async fn ensure_real_folder<'a, E>(
+    executor: &mut E,
+    sroot_id: String,
+    norm_path: &std::path::PathBuf,
+) -> Result<String>
+where
+    for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+{
+    let mut current_parent_id: Option<String> = None;
+    let mount_path: String = sqlx::query_scalar(
+        r#"
+        SELECT mount_path FROM storage_root_mount
+        WHERE storage_root_id = ?1
+        "#,
+    )
+    .bind(&sroot_id)
+    .fetch_optional(&mut *executor)
+    .await?
+    .unwrap();
+
+    let components_path =
+        if let Ok(sub_path) = norm_path.strip_prefix(&mount_path) { sub_path } else { norm_path };
 
     let components: Vec<&str> = if components_path.as_os_str().is_empty() {
         vec![""]
@@ -363,7 +394,7 @@ pub async fn ensure_storage_root_and_real_folder(
     };
 
     let mut rel_path = PathBuf::from("");
-    let mut abs_path = PathBuf::from(&sroot_info.mount_path);
+    let mut abs_path = PathBuf::from(&mount_path);
     for component in components {
         abs_path.push(component);
         rel_path.push(component);
@@ -380,7 +411,7 @@ pub async fn ensure_storage_root_and_real_folder(
         .bind(&sroot_id)
         .bind(&current_parent_id)
         .bind(&name_norm)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(&mut *executor)
         .await?;
 
         if let Some(id) = existing_folder_id {
@@ -393,7 +424,7 @@ pub async fn ensure_storage_root_and_real_folder(
             )
             .bind(&now)
             .bind(&id)
-            .execute(&mut *tx)
+            .execute(&mut *executor)
             .await?;
             current_parent_id = Some(id);
         } else {
@@ -403,7 +434,7 @@ pub async fn ensure_storage_root_and_real_folder(
                 INSERT INTO real_folder
                     (id, storage_root_id, parent_id, name, name_norm, created_at, updated_at, error_flag, abs_path_cached, root_rel_path)
                 VALUES
-                    (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'Success', ?8, ?9)
+                    (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'success', ?8, ?9)
                 "#,
             )
             .bind(&new_id)
@@ -415,13 +446,12 @@ pub async fn ensure_storage_root_and_real_folder(
             .bind(&now)
             .bind(&abs_path.to_string_lossy().to_string())
             .bind(&rel_path.to_string_lossy().to_string())
-            .execute(&mut *tx)
+            .execute(&mut *executor)
             .await?;
             current_parent_id = Some(new_id);
         }
     }
 
-    tx.commit().await?;
     if let Some(id) = current_parent_id {
         Ok(id)
     } else {
