@@ -273,9 +273,7 @@ pub async fn ensure_schema(pool: &Pool<Sqlite>) -> Result<()> {
     )
     .execute(&mut *tx)
     .await?;
-    sqlx::query(r#"CREATE INDEX IF NOT EXISTS idx_current_file_content    ON file_path(current_file_content_id);"#)
-        .execute(&mut *tx)
-        .await?;
+
     sqlx::query(r#"CREATE INDEX IF NOT EXISTS idx_file_path_err      ON file_path(is_found);"#)
         .execute(&mut *tx)
         .await?;

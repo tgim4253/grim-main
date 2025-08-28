@@ -9,7 +9,7 @@ use crate::{
     services::{integrity, moa_services},
     utils::{file_utils::normailze_file_name, identifier::get_unique_id},
 };
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Error, Result};
 use once_cell::sync::Lazy;
 use sqlx::{Executor, Pool, Sqlite, Transaction};
 use std::{
@@ -494,6 +494,8 @@ where
     Ok(file_path_id)
 }
 
+// pub async fn
+
 pub async fn set_unknown_all_file_binding<'a, E>(
     executor: &mut E,
     file_path_id: &String,
@@ -514,4 +516,107 @@ where
     .await?;
 
     Ok(file_path_id.to_string())
+}
+
+pub async fn resolve_and_upsert_file_content<'a, E>(
+    executor: &mut E,
+    file_path_id: &str,
+    file_info: &FileInfo,
+) -> Result<String>
+where
+    for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+{
+    let now = crate::utils::date::get_now_date();
+
+    let size = file_info
+        .file_size
+        .ok_or_else(|| anyhow!("file_size must be provided when file_exists=true"))?;
+
+    // Check if file_content exists by sha256
+    let file_content_id: Option<String> = if let Some(sha256) = &file_info.sha256_image {
+        sqlx::query_scalar("SELECT id FROM file_content WHERE sha256 = ?1")
+            .bind(sha256)
+            .fetch_optional(&mut *executor)
+            .await?
+    } else {
+        None
+    };
+
+    let file_content_id = if let Some(id) = file_content_id {
+        // Update existing file_content (e.g., mime, size if they changed)
+        sqlx::query(
+            r#"
+            UPDATE file_content SET
+                mime = ?1,
+                size = ?2,
+                kind = ?3,
+                updated_at = ?4
+            WHERE id = ?5
+            "#,
+        )
+        .bind(&file_info.mime_guess)
+        .bind(file_info.file_size)
+        .bind(file_info.kind_guess)
+        .bind(&now)
+        .bind(&id)
+        .execute(&mut *executor)
+        .await?;
+        id
+    } else {
+        // Create new file_content
+        let new_id = get_unique_id();
+        sqlx::query(
+            r#"
+            INSERT INTO file_content
+                (id, mime, size, sha256, kind, created_at, updated_at)
+            VALUES
+                (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            "#,
+        )
+        .bind(&new_id)
+        .bind(&file_info.mime_guess)
+        .bind(file_info.file_size)
+        .bind(&file_info.sha256_image)
+        .bind(file_info.kind_guess)
+        .bind(&now)
+        .bind(&now)
+        .execute(&mut *executor)
+        .await?;
+        new_id
+    };
+
+    Ok(file_content_id)
+}
+
+pub async fn bind_file_content_to_file_path<'a, E>(
+    executor: &mut E,
+    file_path_id: &str,
+    file_content_id: &str,
+) -> Result<String>
+where
+    for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+{
+    let now = crate::utils::date::get_now_date();
+
+    let binding_id: String = sqlx::query_scalar(
+        r#"
+        INSERT INTO file_path_content_binding
+            (file_path_id, file_content_id, match_states, created_at, updated_at)
+        VALUES
+            (?1, ?2, ?3, ?4, ?5)
+        ON CONFLICT(file_path_id, file_content_id) DO UPDATE SET
+            match_states = excluded.match_states,
+            updated_at   = excluded.updated_at
+        RETURNING id
+    "#,
+    )
+    .bind(&file_path_id) // ?1
+    .bind(&file_content_id) // ?2
+    .bind(MatchStates::Unknown) // ?3 (ensure this type is supported by sqlx)
+    .bind(&now) // ?4
+    .bind(&now) // ?5
+    .fetch_one(&mut *executor) // English: fetch the single scalar `id`
+    .await?;
+
+    Ok(binding_id)
 }

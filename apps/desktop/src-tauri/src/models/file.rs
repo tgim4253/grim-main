@@ -201,6 +201,7 @@ impl FileType {
     }
 }
 
+#[derive(Debug, Clone, FromRow, Serialize)]
 pub struct FileInfo {
     pub mime_guess: String,
     pub kind_guess: FileType,
@@ -233,6 +234,11 @@ impl FileInfo {
 
         let file_mtime = if file_exists { Some(Self::file_mtime_epoch(&meta)?) } else { None };
 
+        let sha256_image: Option<String> = if kind_guess == FileType::Image {
+            Some(crate::services::file_service::sha_256_of_img(file_path)?)
+        } else {
+            None
+        };
         Ok(FileInfo {
             mime_guess,
             kind_guess,
@@ -241,7 +247,7 @@ impl FileInfo {
             file_size,
             file_mtime,
 
-            sha256_image: None,
+            sha256_image,
 
             real_folder_id,
             file_name,

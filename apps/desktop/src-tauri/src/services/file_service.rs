@@ -194,72 +194,12 @@ async fn upsert_file_entry(
     // mark_previous_binding_unknown
     db::set_unknown_all_file_binding(tx.as_mut(), &file_path_id).await?;
 
-    Ok(())
-}
+    // upsert file_content
+    let file_content_id =
+        db::resolve_and_upsert_file_content(tx.as_mut(), &file_path_id, &file_info).await?;
 
-async fn resolve_and_upsert_file_content(
-    tx: &mut Transaction<'_, Sqlite>,
-    file_path_id: &str,
-    file_info: &FileInfo,
-) -> Result<()> {
-    // let now = crate::utils::date::get_now_date();
-
-    // let size = file_info
-    //     .file_size
-    //     .ok_or_else(|| anyhow!("file_size must be provided when file_exists=true"))?;
-
-    // // Check if file_content exists by sha256
-    // let file_content_id: Option<String> = if let Some(sha256) = &file_info.sha256_image {
-    //     sqlx::query_scalar("SELECT id FROM file_content WHERE sha256 = ?1")
-    //         .bind(sha256)
-    //         .fetch_optional(&mut *tx)
-    //         .await?
-    // } else {
-    //     None
-    // };
-
-    // let file_content_id = if let Some(id) = file_content_id {
-    //     // Update existing file_content (e.g., mime, size if they changed)
-    //     sqlx::query(
-    //         r#"
-    //         UPDATE file_content SET
-    //             mime = ?1,
-    //             size = ?2,
-    //             kind = ?3,
-    //             updated_at = ?4
-    //         WHERE id = ?5
-    //         "#,
-    //     )
-    //     .bind(&file_info.mime_guess)
-    //     .bind(file_info.file_size)
-    //     .bind(file_info.kind_guess.to_string())
-    //     .bind(&now)
-    //     .bind(&id)
-    //     .execute(&mut *tx)
-    //     .await?;
-    //     id
-    // } else {
-    //     // Create new file_content
-    //     let new_id = get_unique_id();
-    //     sqlx::query(
-    //         r#"
-    //         INSERT INTO file_content
-    //             (id, mime, size, sha256, kind, created_at, updated_at)
-    //         VALUES
-    //             (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-    //         "#,
-    //     )
-    //     .bind(&new_id)
-    //     .bind(&file_info.mime_guess)
-    //     .bind(file_info.file_size)
-    //     .bind(&file_info.sha256_image)
-    //     .bind(file_info.kind_guess.to_string())
-    //     .bind(&now)
-    //     .bind(&now)
-    //     .execute(&mut *tx)
-    //     .await?;
-    //     new_id
-    // };
+    // binding
+    db::bind_file_content_to_file_path(tx.as_mut(), &file_path_id, &file_content_id).await?;
 
     Ok(())
 }
