@@ -226,6 +226,7 @@ pub async fn ensure_schema(pool: &Pool<Sqlite>) -> Result<()> {
       size       INTEGER NOT NULL DEFAULT 0 
                     CHECK (size >= 0),
       sha256     TEXT,
+      xxh3_64    TEXT,
       kind       TEXT NOT NULL DEFAULT 'unknown'
                  CHECK (kind IN ('image','video','document','graphictool','audio','archive','unknown')),
       created_at TEXT DEFAULT (datetime('now')),
@@ -240,6 +241,13 @@ pub async fn ensure_schema(pool: &Pool<Sqlite>) -> Result<()> {
     sqlx::query(
         r#"CREATE UNIQUE INDEX IF NOT EXISTS uq_file_content_sha256_notnull
            ON file_content(sha256) WHERE sha256 IS NOT NULL;"#,
+    )
+    .execute(&mut *tx)
+    .await?;
+    // Enforce uniqueness only when xxh3_64 IS NOT NULL
+    sqlx::query(
+        r#"CREATE UNIQUE INDEX IF NOT EXISTS uq_file_content_xxh3_64_notnull
+           ON file_content(xxh3_64) WHERE xxh3_64 IS NOT NULL;"#,
     )
     .execute(&mut *tx)
     .await?;
@@ -262,6 +270,8 @@ pub async fn ensure_schema(pool: &Pool<Sqlite>) -> Result<()> {
       error_msg                     TEXT,
       last_seen_scan_id             TEXT REFERENCES scan_session(id),
       last_seen_at                  TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
       UNIQUE (folder_id, file_name_norm)
     );
     "#,
@@ -291,7 +301,11 @@ pub async fn ensure_schema(pool: &Pool<Sqlite>) -> Result<()> {
 
           is_active       INTEGER NOT NULL DEFAULT 0 CHECK (is_active IN (0,1)),
           
-          match_states    TEXT NOT NULL DEFAULT 'unknown' CHECK (match_states IN ('unknown','mismatch','match'))
+          match_states    TEXT NOT NULL DEFAULT 'unknown' CHECK (match_states IN ('unknown','mismatch','match')),
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now')),
+
+          UNIQUE (file_path_id, file_content_id)
         );
         "#,
     )
@@ -357,9 +371,11 @@ pub async fn ensure_schema(pool: &Pool<Sqlite>) -> Result<()> {
     sqlx::query(
         r#"
     CREATE TABLE IF NOT EXISTS node_file_binding (
+      id           TEXT PRIMARY KEY,                                          -- uuid
       node_id      TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE,       -- node.kind='file'
       file_content_id TEXT NOT NULL REFERENCES file_content(id) ON DELETE CASCADE,
-      PRIMARY KEY (node_id, file_content_id)
+      created_at       TEXT DEFAULT (datetime('now')),
+      UNIQUE (node_id, file_content_id)
     );
     "#,
     )

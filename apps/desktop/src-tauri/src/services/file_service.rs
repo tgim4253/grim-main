@@ -1,7 +1,8 @@
 use std::{
     collections::HashSet,
     fs::{self, DirEntry, File},
-    io::{self, BufReader},
+    hash::Hasher,
+    io::{self, BufReader, Read},
     path::{self, Path, PathBuf},
     pin::Pin,
 };
@@ -10,6 +11,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use async_recursion::async_recursion;
 use sha2::{Digest, Sha256};
 use sqlx::{Sqlite, SqlitePool, Transaction};
+use twox_hash::XxHash64;
 
 use crate::{
     app_launcher::moa,
@@ -19,8 +21,8 @@ use crate::{
     },
     services::{
         db::{
-            self, create_file_path, create_virtual_folder_mount, ensure_real_folder,
-            ensure_storage_root_and_real_folder, DB_MANAGER,
+            self, create_file_node, create_file_path, create_virtual_folder_mount,
+            ensure_real_folder, ensure_storage_root_and_real_folder, DB_MANAGER,
         },
         storage_root,
     },
@@ -81,6 +83,7 @@ async fn upsert_folder(
     make_virtual_folder: Option<bool>,
 ) -> Result<()> {
     let make_vf = make_virtual_folder.unwrap_or(true);
+
     // Use async directory reading to avoid blocking the runtime
     let mut dir = tokio::fs::read_dir(abs_dir)
         .await
@@ -93,6 +96,12 @@ async fn upsert_folder(
         .with_context(|| format!("failed to read entry under {:?}", abs_dir))?
     {
         let entry_path: PathBuf = entry.path();
+
+        // check file is hidden
+        if check_is_hidden(&entry_path) {
+            continue;
+        };
+
         let file_type = entry
             .file_type()
             .await
@@ -104,6 +113,7 @@ async fn upsert_folder(
 
         if file_type.is_dir() {
             let name = entry.file_name().to_string_lossy().to_string();
+
             if recursive {
                 folder_entries.push((entry_path, name));
             } else if make_vf {
@@ -115,14 +125,23 @@ async fn upsert_folder(
                     })?;
             }
         } else if file_type.is_file() {
-            upsert_file_entry(tx, &parent_real_folder_id, &entry)
+            upsert_file_entry(tx, &parent_real_folder_id, &parent_virtual_folder_id, &entry)
                 .await
-                .with_context(|| format!("upsert_file_entry failed for {:?}", entry_path))?;
+                .map_err(|e| anyhow!("upsert_file_entry failed for {:?} {}", entry_path, e))?;
         } else {
             continue;
         }
     }
-
+    //  ensure child real folder exists for this path
+    let sroot_id: String = sqlx::query_scalar(
+        "SELECT storage_root_id FROM real_folder
+                     WHERE id = ?",
+    )
+    .bind(&parent_real_folder_id)
+    .fetch_optional(tx.as_mut())
+    .await
+    .with_context(|| "failed to load storage_root for parent_real_folder_id")?
+    .ok_or_else(|| anyhow!("parent_real_folder_id not found: {}", parent_real_folder_id))?;
     if recursive {
         for (entry_path, name) in folder_entries {
             // create child virtual folder node under the parent virtual folder
@@ -134,24 +153,11 @@ async fn upsert_folder(
             .await
             .with_context(|| format!("create_virtual_folder failed for {:?}", entry_path))?;
 
-            //  ensure child real folder exists for this path
-            let sroot_id: String = sqlx::query_scalar(
-                "SELECT storage_root_id FROM real_folder
-                     WHERE id = ?",
-            )
-            .bind(&parent_real_folder_id)
-            .fetch_optional(tx.as_mut())
-            .await
-            .with_context(|| "failed to load storage_root for parent_real_folder_id")?
-            .unwrap();
-
             // normalize child path
             let normalized = normalize_path(&entry_path);
 
             let child_real_folder_id =
-                ensure_real_folder(tx.as_mut(), sroot_id.clone(), &normalized)
-                    .await
-                    .with_context(|| format!("ensure_real_folder failed for {:?}", entry_path))?;
+                ensure_real_folder(tx.as_mut(), sroot_id.clone(), &normalized).await?;
 
             // mount child vf <-> child real folder
             db::create_virtual_folder_mount(
@@ -163,7 +169,7 @@ async fn upsert_folder(
             .with_context(|| format!("mount vf<->rf failed for {:?}", entry_path))?;
 
             // recurse into the child directory
-            upsert_folder(
+            if let Err(e) = upsert_folder(
                 tx,
                 child_real_folder_id,
                 child_vf.id,
@@ -171,7 +177,10 @@ async fn upsert_folder(
                 recursive,
                 Some(make_vf),
             )
-            .await?;
+            .await
+            {
+                println!("{}", e);
+            };
         }
     };
 
@@ -181,6 +190,7 @@ async fn upsert_folder(
 async fn upsert_file_entry(
     tx: &mut Transaction<'_, Sqlite>,
     parent_real_folder_id: &str,
+    parent_virtual_folder_id: &str,
     entry: &tokio::fs::DirEntry,
 ) -> Result<()> {
     let file_name = entry.file_name().to_string_lossy().to_string();
@@ -191,20 +201,44 @@ async fn upsert_file_entry(
 
     let file_path_id = create_file_path(tx.as_mut(), &file_info).await?;
 
-    // mark_previous_binding_unknown
-    db::set_unknown_all_file_binding(tx.as_mut(), &file_path_id).await?;
-
     // upsert file_content
-    let file_content_id =
-        db::resolve_and_upsert_file_content(tx.as_mut(), &file_path_id, &file_info).await?;
+    let file_content_id = db::resolve_and_upsert_file_content(tx.as_mut(), &file_info).await?;
 
+    create_file_node(tx.as_mut(), parent_virtual_folder_id, &file_content_id).await?;
     // binding
     db::bind_file_content_to_file_path(tx.as_mut(), &file_path_id, &file_content_id).await?;
 
     Ok(())
 }
-// sha256
 
+#[cfg(unix)]
+pub fn check_is_hidden(path: &Path) -> bool {
+    if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
+        name.starts_with('.')
+    } else {
+        false
+    }
+}
+
+#[cfg(windows)]
+pub fn check_is_hidden(path: &Path) -> bool {
+    use std::os::windows::ffi::OsStrExt;
+    use winapi::um::fileapi::GetFileAttributesW;
+    use winapi::um::winnt::FILE_ATTRIBUTE_HIDDEN;
+
+    let wide: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+    unsafe {
+        let attrs = GetFileAttributesW(wide.as_ptr());
+        if attrs == u32::MAX {
+            return false; // invalid path or error
+        }
+        (attrs & FILE_ATTRIBUTE_HIDDEN) != 0
+    }
+}
+
+// -- hash --
+
+// sha256
 fn sha256_of(path: &Path) -> Result<String> {
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
@@ -214,11 +248,38 @@ fn sha256_of(path: &Path) -> Result<String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
-pub fn sha_256_of_img(path: &Path) -> Result<String> {
+pub fn sha256_of_img(path: &Path) -> Result<String> {
     if !matches!(FileType::from(path), FileType::Image) {
         bail!("Not an image file: {}", path.display());
     }
     FileType::check_is_img(path)?;
 
     sha256_of(path)
+}
+
+// xxhash
+
+pub fn xxh3_64_of(path: &Path) -> Result<String> {
+    let file = File::open(path)?;
+    let mut reader = BufReader::new(file);
+    let mut hasher = XxHash64::default();
+
+    let mut buffer = [0u8; 8192]; // 8KB 버퍼
+    loop {
+        let n = reader.read(&mut buffer)?;
+        if n == 0 {
+            break;
+        }
+        hasher.write(&buffer[..n]);
+    }
+
+    Ok(format!("{:016x}", hasher.finish()))
+}
+
+pub fn xxh3_644_of_img(path: &Path) -> Result<String> {
+    if !matches!(FileType::from(path), FileType::Image) {
+        bail!("Not an image file: {}", path.display());
+    }
+    FileType::check_is_img(path)?;
+    xxh3_64_of(path)
 }

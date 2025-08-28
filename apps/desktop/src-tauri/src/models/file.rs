@@ -9,7 +9,7 @@ use std::{
     time::UNIX_EPOCH,
 };
 
-use crate::utils::file_utils::guess_mime;
+use crate::{services::file_service::xxh3_64_of, utils::file_utils::guess_mime};
 
 #[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct NodeFolder {
@@ -210,8 +210,7 @@ pub struct FileInfo {
     pub file_size: Option<i64>,  // non-null if exists & accessible
     pub file_mtime: Option<i64>, // non-null if exists & accessible
 
-    /// Only for images when accessible
-    pub sha256_image: Option<String>,
+    pub xxh3_64: String,
 
     pub real_folder_id: String,
 
@@ -234,11 +233,14 @@ impl FileInfo {
 
         let file_mtime = if file_exists { Some(Self::file_mtime_epoch(&meta)?) } else { None };
 
-        let sha256_image: Option<String> = if kind_guess == FileType::Image {
-            Some(crate::services::file_service::sha_256_of_img(file_path)?)
-        } else {
-            None
-        };
+        // let sha256_image: Option<String> = if kind_guess == FileType::Image {
+        //     Some(crate::services::file_service::sha256_of_img(file_path)?)
+        // } else {
+        //     None
+        // };
+        let xxh3_64 = xxh3_64_of(&file_path)
+            .with_context(|| format!("Failed to calculate xxHash64 for {:?}", file_path))?;
+
         Ok(FileInfo {
             mime_guess,
             kind_guess,
@@ -247,7 +249,7 @@ impl FileInfo {
             file_size,
             file_mtime,
 
-            sha256_image,
+            xxh3_64,
 
             real_folder_id,
             file_name,

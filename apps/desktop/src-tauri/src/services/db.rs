@@ -3,7 +3,7 @@ use crate::{
     config::file::MatchStates,
     models::{
         connection::Connection,
-        file::{FileInfo, NodeFolder},
+        file::{FileContent, FileInfo, NodeFolder},
         node::{Node, NodeData, NodeKind, NodeRow},
     },
     services::{integrity, moa_services},
@@ -468,7 +468,7 @@ where
     let file_path_id = get_unique_id();
     let now = crate::utils::date::get_now_date();
 
-    sqlx::query(
+    let file_path_id: String = sqlx::query_scalar(
         r#"
         INSERT INTO file_path
             (id, folder_id, file_name, file_name_norm, mtime, is_found, last_seen_at)
@@ -478,7 +478,8 @@ where
             file_name    = excluded.file_name,
             mtime        = excluded.mtime,
             is_found   = excluded.is_found,
-            last_seen_at = excluded.last_seen_at
+            last_seen_at = ?7
+        RETURNING id
         "#,
     )
     .bind(&file_path_id)
@@ -488,39 +489,15 @@ where
     .bind(&file_info.file_mtime)
     .bind(&file_info.file_exists)
     .bind(&now)
-    .execute(&mut *executor)
-    .await?;
+    .fetch_one(&mut *executor)
+    .await
+    .map_err(|e| anyhow!(format!("Failed to insert or update file_path: {}", e)))?;
 
     Ok(file_path_id)
 }
 
-// pub async fn
-
-pub async fn set_unknown_all_file_binding<'a, E>(
-    executor: &mut E,
-    file_path_id: &String,
-) -> Result<String>
-where
-    for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
-{
-    sqlx::query(
-        r#"
-        UPDATE file_path_content_binding SET
-            match_states = ?3,
-        WHERE file_path_id = ?1
-        "#,
-    )
-    .bind(&file_path_id)
-    .bind(MatchStates::Unknown)
-    .execute(&mut *executor)
-    .await?;
-
-    Ok(file_path_id.to_string())
-}
-
 pub async fn resolve_and_upsert_file_content<'a, E>(
     executor: &mut E,
-    file_path_id: &str,
     file_info: &FileInfo,
 ) -> Result<String>
 where
@@ -532,15 +509,12 @@ where
         .file_size
         .ok_or_else(|| anyhow!("file_size must be provided when file_exists=true"))?;
 
-    // Check if file_content exists by sha256
-    let file_content_id: Option<String> = if let Some(sha256) = &file_info.sha256_image {
-        sqlx::query_scalar("SELECT id FROM file_content WHERE sha256 = ?1")
-            .bind(sha256)
+    // Check if file_content exists by xxh3_64
+    let file_content_id: Option<String> =
+        sqlx::query_scalar("SELECT id FROM file_content WHERE xxh3_64 = ?1")
+            .bind(&file_info.xxh3_64)
             .fetch_optional(&mut *executor)
-            .await?
-    } else {
-        None
-    };
+            .await?;
 
     let file_content_id = if let Some(id) = file_content_id {
         // Update existing file_content (e.g., mime, size if they changed)
@@ -555,7 +529,7 @@ where
             "#,
         )
         .bind(&file_info.mime_guess)
-        .bind(file_info.file_size)
+        .bind(size)
         .bind(file_info.kind_guess)
         .bind(&now)
         .bind(&id)
@@ -568,7 +542,7 @@ where
         sqlx::query(
             r#"
             INSERT INTO file_content
-                (id, mime, size, sha256, kind, created_at, updated_at)
+                (id, mime, size, xxh3_64, kind, created_at, updated_at)
             VALUES
                 (?1, ?2, ?3, ?4, ?5, ?6, ?7)
             "#,
@@ -576,7 +550,7 @@ where
         .bind(&new_id)
         .bind(&file_info.mime_guess)
         .bind(file_info.file_size)
-        .bind(&file_info.sha256_image)
+        .bind(&file_info.xxh3_64)
         .bind(file_info.kind_guess)
         .bind(&now)
         .bind(&now)
@@ -597,26 +571,114 @@ where
     for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
 {
     let now = crate::utils::date::get_now_date();
+    let new_id = get_unique_id();
 
     let binding_id: String = sqlx::query_scalar(
         r#"
         INSERT INTO file_path_content_binding
-            (file_path_id, file_content_id, match_states, created_at, updated_at)
+            (id, file_path_id, file_content_id, match_states, is_active, created_at, updated_at)
         VALUES
-            (?1, ?2, ?3, ?4, ?5)
+            (?1, ?2, ?3, ?4, 1, ?5, ?6)
         ON CONFLICT(file_path_id, file_content_id) DO UPDATE SET
             match_states = excluded.match_states,
+            is_active = 1,
             updated_at   = excluded.updated_at
         RETURNING id
     "#,
     )
-    .bind(&file_path_id) // ?1
-    .bind(&file_content_id) // ?2
-    .bind(MatchStates::Unknown) // ?3 (ensure this type is supported by sqlx)
-    .bind(&now) // ?4
-    .bind(&now) // ?5
-    .fetch_one(&mut *executor) // English: fetch the single scalar `id`
+    .bind(new_id)
+    .bind(file_path_id)
+    .bind(&file_content_id)
+    .bind(MatchStates::Match)
+    .bind(&now)
+    .bind(&now)
+    .fetch_one(&mut *executor)
+    .await
+    .map_err(|e| anyhow!(format!("Failed to bind file_path: {}", e)))?;
+
+    // set all other mount paths of this binding match_states=unknown
+    sqlx::query(
+        r#"
+            UPDATE file_path_content_binding
+               SET match_states = CASE WHEN id = ?1 THEN 'match' ELSE 'unknown' END,
+                   updated_at = ?2
+             WHERE file_path_id = ?3
+            "#,
+    )
+    .bind(&binding_id)
+    .bind(&now)
+    .bind(file_path_id)
+    .execute(&mut *executor)
     .await?;
 
     Ok(binding_id)
+}
+
+pub async fn create_file_node<'a, E>(
+    executor: &mut E,
+    parent_node_id: &str,
+    file_content_id: &str,
+) -> Result<()>
+where
+    for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+{
+    let node_id = get_unique_id();
+    let binding_id = get_unique_id();
+    let now = crate::utils::date::get_now_date();
+
+    sqlx::query(
+        r#"
+        INSERT INTO node (id, kind, created_at, updated_at)
+        VALUES (?1, 'folder', ?2, ?2)
+        "#,
+    )
+    .bind(&node_id)
+    .bind(&now)
+    .execute(&mut *executor)
+    .await?;
+
+    sqlx::query(
+        r#"
+        INSERT INTO node_file_binding (id, node_id, file_content_id, created_at)
+        VALUES (?1, ?2, ?3, ?4)
+        "#,
+    )
+    .bind(&binding_id)
+    .bind(&node_id)
+    .bind(&file_content_id)
+    .bind(&now)
+    .execute(&mut *executor)
+    .await?;
+
+    // parent -> child (contains)
+    let contains_id = get_unique_id();
+    sqlx::query(
+        r#"
+        INSERT INTO connection (id, src_node_id, dst_node_id, kind_id, created_at)
+        VALUES (?1, ?2, ?3, (SELECT id FROM connection_kind_rule WHERE kind = 'contains'), ?4)
+        "#,
+    )
+    .bind(&contains_id)
+    .bind(&parent_node_id)
+    .bind(&node_id)
+    .bind(&now)
+    .execute(&mut *executor)
+    .await?;
+
+    //  child -> parent (containedIn)
+    let contained_in_id = get_unique_id();
+    sqlx::query(
+        r#"
+        INSERT INTO connection (id, src_node_id, dst_node_id, kind_id, created_at)
+        VALUES (?1, ?2, ?3, (SELECT id FROM connection_kind_rule WHERE kind = 'containedIn'), ?4)
+        "#,
+    )
+    .bind(&contained_in_id)
+    .bind(&node_id)
+    .bind(&parent_node_id)
+    .bind(&now)
+    .execute(&mut *executor)
+    .await?;
+
+    Ok(())
 }
