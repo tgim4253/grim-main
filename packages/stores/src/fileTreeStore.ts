@@ -1,10 +1,10 @@
 import { create } from 'zustand';
 import {
   FileTreeData,
-  FileTreeNodeType,
   GraphResponse,
+  NodeFile,
   NodeFolder,
-  PanelType,
+  NodeKind,
 } from '@tgim/types/index';
 
 interface FileTreeState {
@@ -139,18 +139,17 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
 
     for (const n of nodes) {
       const folderData = (n.data?.["Folder"] as NodeFolder) ?? undefined;
-
+      const fileData = (n.data?.["File"] as NodeFile) ?? undefined;
       nodeMap.set(n.id, {
         id: n.id,
-        name: folderData?.folder_name ?? "",
+        name: folderData?.folder_name ?? fileData?.file_name ?? "",
         icon: n.kind === "folder" ? "folder" : "file",
-        type: n.kind as FileTreeNodeType,
+        type:  n.kind === "folder" ? NodeKind.Folder : NodeKind.File,
         children: n.kind === "folder" ? [] : undefined,
       });
 
       incoming.set(n.id, 0);
     }
-
     const childrenMap = new Map<string, FileTreeData[]>();
 
     for (const conn of connections) {
@@ -161,7 +160,7 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
 
       if (!parent || !child) continue;
       if (parent.id === child.id) continue;
-      if (parent.type !== "folder") continue;
+      // if (parent.type !== "folder") continue;
 
       const arr = childrenMap.get(parent.id) ?? [];
       if (!arr.some((c) => c.id === child.id)) arr.push(child);

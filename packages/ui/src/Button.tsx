@@ -4,7 +4,15 @@ import { cn } from '@tgim/utils/index';
 
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   asChild?: boolean;
-  variant?: 'default' | 'titlebar' | 'list-item' | 'icon' | 'card' | 'primary' | 'secondary';
+  variant?:
+    | 'default'
+    | 'titlebar'
+    | 'list-item'
+    | 'icon'
+    | 'card'
+    | 'primary'
+    | 'secondary'
+    | 'panel-tab';
   size?: 'sm' | 'md' | 'lg';
 };
 
@@ -16,6 +24,7 @@ const variantClasses: Record<NonNullable<ButtonProps['variant']>, string> = {
   card: 'btn-card',
   primary: 'btn-primary',
   secondary: 'btn-secondary',
+  'panel-tab': 'btn-panel-tab',
 };
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(

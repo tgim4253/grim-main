@@ -6,7 +6,7 @@ use crate::models::{
     file::{FileContent, NodeFolder},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Hash)]
 #[sqlx(type_name = "TEXT")] // SQLite TEXT
 #[sqlx(rename_all = "lowercase")] // Folder → "folder"
 #[serde(rename_all = "lowercase")] // JSON 직렬화용(선택)

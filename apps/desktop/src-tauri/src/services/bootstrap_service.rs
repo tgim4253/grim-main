@@ -1,6 +1,6 @@
 use crate::bootstrap;
 use crate::models::file::StorageRootInfo;
-use crate::models::node::NodeWithConnections;
+use crate::models::node::{NodeKind, NodeWithConnections};
 use crate::services::db::DB_MANAGER;
 use crate::services::storage_root::enumerate_mounted_root;
 use crate::services::{db, integrity, moa_services};
@@ -161,13 +161,15 @@ fn emit(app_handle: &tauri::AppHandle, moa_id: &str, payload: impl Serialize + C
 pub async fn fetch_init_data_for_front(moa_id: String) -> Result<NodeWithConnections> {
     let mut tx = DB_MANAGER.create_new_tx(&moa_id).await?;
 
-    let folders = db::fetch_folder_nodes(tx.as_mut()).await?;
+    let folder_and_files =
+        db::fetch_nodes(tx.as_mut(), HashSet::from([NodeKind::Folder, NodeKind::File])).await?;
     let connections =
-        db::fetch_connections(tx.as_mut(), folders.iter().map(|f| f.id.clone()).collect()).await?;
+        db::fetch_connections(tx.as_mut(), folder_and_files.iter().map(|f| f.id.clone()).collect())
+            .await?;
 
     tx.commit().await?;
 
-    Ok(NodeWithConnections { nodes: folders, connections: connections })
+    Ok(NodeWithConnections { nodes: folder_and_files, connections: connections })
 }
 
 async fn apply_migrations(moa_id: &str) -> Result<()> {

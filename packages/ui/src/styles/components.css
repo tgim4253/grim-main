@@ -75,6 +75,22 @@
   --btn-icon-fg: var(--color-text);
 }
 
+/* ===== Buttons: Card (Light by default) ===== */
+:root {
+  --btn-panel-tab-bg: var(--gray-100);
+  --btn-panel-tab-bg-hover: var(--gray-200);
+  --btn-panel-tab-bg-selected: var(--gray-200);
+  --btn-panel-tab-fg: var(--color-text);
+}
+
+/* ===== Buttons: icon (Dark overrides) ===== */
+[data-theme='dark'] {
+  --btn-panel-tab-bg: var(--color-bg-6);
+  --btn-panel-tab-bg-hover: var(--color-bg-7);
+  --btn-panel-tab-bg-selected: var(--color-bg-8);
+  --btn-panel-tab-fg: var(--color-text);
+}
+
 /* ===== Switches: Language (Light by default) ===== */
 :root {
   --switch-language-bg: var(--gray-100);

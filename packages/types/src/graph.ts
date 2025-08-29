@@ -21,8 +21,8 @@ export interface Node {
 }
 
 export enum NodeKind {
-  Folder = 'Folder',
-  File = 'File',
+  Folder = 'folder',
+  File = 'file',
 }
 export type NodeData = NodeFolder | NodeFile;
 
@@ -37,4 +37,5 @@ export interface NodeFile {
   file_id: string;
   node_id: string;
   sha256: string | null;
+  file_name: string | null;
 }

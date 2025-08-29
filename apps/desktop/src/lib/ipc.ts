@@ -49,6 +49,9 @@ const graphIpc = {
   createFolder(moaId: string, data: { name: string; path: string; parent_id: string }) {
     invoke('create_folder', { moaId, data });
   },
+  fetchGraphOne(moaId: string, nodeId: string) {
+    return invoke('fetch_graph_one', { moaId, nodeId }) as Promise<GraphResponse>;
+  },
 };
 
 export const ipc = {

@@ -51,9 +51,7 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-
   padding: var(--row-vpad) var(--row-hpad);
-  padding-left: calc(var(--depth, 0) * var(--depth-unit) + var(--row-hpad));
 
   background: transparent;
   user-select: none;
@@ -89,13 +87,17 @@
   padding: 0;
 }
 
+.tree-row .indent {
+  min-width: calc(var(--depth, 0) * var(--depth-unit) + var(--row-hpad));
+}
+
 .tree-row .toggle:hover {
 }
 
 /* Spacer used when there is no toggle (files) */
 .tree-row .spacer {
-  width: var(--toggle-size);
-  height: var(--toggle-size);
+  min-width: var(--toggle-size);
+  min-height: var(--toggle-size);
   display: inline-block;
 }
 

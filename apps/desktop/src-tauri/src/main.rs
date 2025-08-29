@@ -25,6 +25,7 @@ fn main() {
             commands::moa::bootstrap_moa,
             commands::file::create_folder,
             commands::moa::bootstrap_status,
+            commands::graph::fetch_graph_one,
         ])
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_decorum::init())

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import { Routes, Route, useSearchParams } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import { ipc } from '../../lib/ipc';
@@ -15,6 +15,53 @@ import { listen } from '@tauri-apps/api/event';
 import ProgressWindow from './ProgressWindow';
 
 import { debounce } from 'lodash';
+import usePanelsStore from '@tgim/stores/panelStore';
+import PanelContainer from './panels/Container';
+
+interface LayoutPorps {
+  layoutId: string;
+}
+const Layout: React.FC<LayoutPorps> = ({ layoutId }) => {
+  const {
+    containers,
+    layout: layoutData,
+    splitContainer,
+  } = usePanelsStore(
+    useShallow(s => ({
+      containers: s.containers,
+      layout: s.layout[layoutId],
+      splitContainer: s.splitContainer,
+    })),
+  );
+
+  if (!layoutData) return null;
+
+  return (
+    <Split position={layoutData.axis}>
+      {(
+        { Panel }, // render prop
+      ) =>
+        layoutData.children.map(childId => {
+          const container = containers[childId];
+          if (container) {
+            return (
+              <Panel key={childId}>
+                <PanelContainer containerId={childId}></PanelContainer>
+              </Panel>
+            );
+          }
+
+          // nested split lives inside this panel
+          return (
+            <Panel key={childId}>
+              <Layout layoutId={childId} />
+            </Panel>
+          );
+        })
+      }
+    </Split>
+  );
+};
 
 const Main: React.FC = () => {
   const { moaId } = useMoa(location);
@@ -27,7 +74,17 @@ const Main: React.FC = () => {
   const [processing, setProcessing] = useState(false);
   const [ready, setReady] = useState(false);
   const [isMac, setIsMac] = useState(false);
+  const { rootLayoutId, layout } = usePanelsStore(
+    useShallow(s => ({
+      rootLayoutId: s.rootLayout?.id,
+      layout: s.layout,
+    })),
+  );
+  const rootLayout = layout[rootLayoutId ?? ''];
 
+  useEffect(() => {
+    console.log(rootLayout);
+  }, [rootLayout]);
   useEffect(() => {
     console.log(progress);
     if (progress.stage === 'Ready') {
@@ -136,30 +193,37 @@ const Main: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex w-full h-full bg-background-6 overflow-hidden" data-theme="dark">
+    <div className="flex flex-col w-full h-full bg-background-6 overflow-hidden" data-theme="dark">
       {!isMac && (
         <div className="fixed w-full top-0 z-50">
           <TitleBar />
         </div>
       )}
+      <div className="h-8"></div>
       {ready ? (
-        <div className="h-full w-full flex overflow-hidden mt-8">
-          <SidebarTabs sidebarPosition="left"></SidebarTabs>
-          <Split position="horizontal" className="w-full h-screen">
-            {!leftSidebar.hidden ? (
-              <SplitPanel
-                canHidden
-                hiddenSize={leftSidebar.hiddenSize ?? leftSidebar.minSize}
-                minSize={leftSidebar.minSize}
-                initialSize={leftSidebar.size}
-                onHidden={hidden => setSidebarHidden('left', hidden)}
-                onSizeChange={size => setSidebarSize('left', size)}
-              >
-                <SidebarPanel sidebarPosition="left"></SidebarPanel>
-              </SplitPanel>
-            ) : null}
+        <div className="flex-1 w-full flex overflow-hidden">
+          <SidebarTabs sidebarPosition="left" />
 
-            <SplitPanel minSize={200}>hi~</SplitPanel>
+          <Split position="horizontal" className="w-full h-screen">
+            {({ Panel }) => (
+              <>
+                {!leftSidebar.hidden ? (
+                  <Panel
+                    key="left"
+                    canHidden
+                    hiddenSize={leftSidebar.hiddenSize ?? leftSidebar.minSize}
+                    minSize={leftSidebar.minSize}
+                    initialSize={leftSidebar.size}
+                    onHidden={hidden => setSidebarHidden('left', hidden)}
+                    onSizeChange={size => setSidebarSize('left', size)}
+                  >
+                    <SidebarPanel sidebarPosition="left" />
+                  </Panel>
+                ) : null}
+
+                <Panel key="center">{rootLayout && <Layout layoutId={rootLayout.id} />}</Panel>
+              </>
+            )}
           </Split>
         </div>
       ) : (

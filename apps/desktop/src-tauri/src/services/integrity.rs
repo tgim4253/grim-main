@@ -225,6 +225,7 @@ pub async fn ensure_schema(pool: &Pool<Sqlite>) -> Result<()> {
       mime       TEXT,
       size       INTEGER NOT NULL DEFAULT 0 
                     CHECK (size >= 0),
+      display_name TEXT,
       sha256     TEXT,
       xxh3_64    TEXT,
       kind       TEXT NOT NULL DEFAULT 'unknown'

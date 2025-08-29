@@ -93,3 +93,22 @@
   background-color: var(--color-surface-hover);
   border-color: var(--color-border-hover);
 }
+
+/* panel tab btn */
+
+.btn-panel-tab {
+  padding: 10px 20px;
+  cursor: pointer;
+
+  background-color: var(--btn-panel-tab-bg);
+  color: var(--btn-panel-tab-fg);
+}
+
+.btn-panel-tab:hover {
+  background-color: var(--btn-panel-tab-bg-hover);
+}
+
+.btn-panel-tab.selected {
+  background-color: var(--btn-panel-tab-bg-selected);
+  color: var(--btn-panel-tab-fg);
+}

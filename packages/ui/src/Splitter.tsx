@@ -34,11 +34,11 @@ export interface SplitPanelProps {
   __parentAxis?: 'width' | 'height'; // which axis the parent cares about
 }
 
-export interface SplitProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface SplitProps {
   position: Axis; // 'horizontal' uses width as main axis, 'vertical' uses height
   className?: string;
   splitterClassName?: string;
-  children?: React.ReactNode; // should be SplitPanel children
+  children: (api: { Panel: React.FC<SplitPanelProps> }) => React.ReactNode;
   splitterSize?: number; // px thickness of the splitter handle (for intrinsic min math)
   // internal (for nested propagation):
   __onIntrinsicMinChange?: (px: number) => void;
@@ -51,6 +51,35 @@ export interface SplitterProps {
   position: Axis;
   onResize: (leftIdx: number, rightIdx: number, deltaPx: number, isEnd?: boolean) => void;
   className?: string;
+}
+
+const isSplitPanelEl = (el: React.ReactElement<any>) =>
+  (el.type as any) === SplitPanel || (el.type as any)?.displayName === 'SplitPanel';
+
+function collectPanelsAtFirstDepth(nodes: React.ReactNode): React.ReactElement<SplitPanelProps>[] {
+  // start from the current children level
+  let level = React.Children.toArray(nodes).filter(React.isValidElement) as React.ReactElement[];
+  const result: React.ReactElement<SplitPanelProps>[] = [];
+  while (level.length > 0) {
+    const nextLevel: React.ReactElement[] = [];
+    console.log(level);
+    for (const el of level) {
+      if (isSplitPanelEl(el)) {
+        if (!(el.props as SplitPanelProps).hidden) {
+          result.push(el as React.ReactElement<SplitPanelProps>);
+        }
+        continue;
+      }
+      const children = (el.props as any)?.children;
+      if (!children) continue;
+      const arr = React.Children.toArray(children).filter(
+        React.isValidElement,
+      ) as React.ReactElement[];
+      nextLevel.push(...arr);
+    }
+    level = nextLevel;
+  }
+  return result;
 }
 
 // ---- Component -----------------------------------------------------------
@@ -68,21 +97,12 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
     },
     ref,
   ) => {
-    /**
-     * Filter only SplitPanel components (excluding hidden=true)
-     */
-    const panels = useMemo(() => {
-      return Children.toArray(children).filter(child => {
-        return (
-          React.isValidElement(child) &&
-          // loosely accept anything named SplitPanel; if you have a strict reference, compare to SplitPanel
-          ((child.type as any)?.displayName === 'SplitPanel' ||
-            (child.type as any) === SplitPanel) &&
-          !(child.props as SplitPanelProps).hidden
-        );
-      }) as React.ReactElement<SplitPanelProps>[];
-    }, [children]);
+    const rendered = children({ Panel: SplitPanel });
 
+    const panels = React.useMemo(() => {
+      return collectPanelsAtFirstDepth(rendered);
+    }, [rendered]);
+    console.log(panels);
     const containerRef = useRef<HTMLDivElement | null>(null);
 
     // panel sizes in % of container main axis
@@ -376,74 +396,67 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
     ]);
 
     // ---- Enhance panels + splitters --------------------------------------
-    const enhancedChildren = useMemo(() => {
-      // 1) Panels render (same as before, minus inline splitters)
-      const panelNodes = panels.map((child, index) => {
-        let sizePct = sizes[index] ?? 0;
+    const enhancedChildren = (
+      <>
+        {panels.map((child, index) => {
+          const sizePct = sizes[index] ?? 0;
+          const isHidden = hiddens[index];
 
-        // keep your existing hidden merge logic for panel sizing if you want,
-        // or simplify to not merge and just hide = 0%
-        const sizeStyle = hiddens[index]
-          ? { display: 'none' }
-          : position === 'horizontal'
-            ? { width: `${sizePct}%`, minWidth: `${child.props.minSize ?? 0}px`, flex: '0 0 auto' }
-            : { height: `${sizePct}%`, minHeight: `${child.props.minSize ?? 0}px` };
+          const sizeStyle = isHidden
+            ? { display: 'none' }
+            : position === 'horizontal'
+              ? {
+                  width: `${sizePct}%`,
+                  minWidth: `${child.props.minSize ?? 0}px`,
+                  flex: '0 0 auto',
+                }
+              : { height: `${sizePct}%`, minHeight: `${child.props.minSize ?? 0}px` };
 
-        const parentAxis: 'width' | 'height' = position === 'horizontal' ? 'width' : 'height';
+          const parentAxis: 'width' | 'height' = position === 'horizontal' ? 'width' : 'height';
 
-        return React.cloneElement(child, {
-          key: `panel-${index}`,
-          style: { ...child.props.style, ...sizeStyle },
-          __onIntrinsicMinChange: (px: number) => updateIntrinsicMin(index, px),
-          __parentAxis: parentAxis,
-        } as Partial<SplitPanelProps>);
-      });
+          return React.cloneElement(child, {
+            key: child.key ?? `panel-${index}`, // 🔑 keep original key
+            style: { ...child.props.style, ...sizeStyle },
+            __onIntrinsicMinChange: (px: number) => updateIntrinsicMin(index, px),
+            __parentAxis: parentAxis,
+          } as Partial<SplitPanelProps>);
+        })}
 
-      // 2) Compute visible cumulative % for boundaries
-      const visibleSizesPct = sizes.map((s, i) => (hiddens[i] ? 0 : (s ?? 0)));
-      const cumPct: number[] = [];
-      let acc = 0;
-      const el = containerRef.current;
-      const containerSize = el ? (position === 'horizontal' ? el.clientWidth : el.clientHeight) : 0;
+        {(() => {
+          const el = containerRef.current;
+          const containerSize = el
+            ? position === 'horizontal'
+              ? el.clientWidth
+              : el.clientHeight
+            : 0;
 
-      for (let i = 0; i < panels.length; i++) {
-        const minSizePct = ((panels[i].props.minSize ?? 0) / containerSize) * 100;
-        acc += Math.max(visibleSizesPct[i] || 0, minSizePct);
-        cumPct.push(acc);
-      }
+          const visibleSizesPct = sizes.map((s, i) => (hiddens[i] ? 0 : (s ?? 0)));
+          const cumPct: number[] = [];
+          let acc = 0;
+          for (let i = 0; i < panels.length; i++) {
+            const minSizePct = ((panels[i].props.minSize ?? 0) / (containerSize || 1)) * 100;
+            acc += Math.max(visibleSizesPct[i] || 0, minSizePct);
+            cumPct.push(acc);
+          }
 
-      // 3) Make overlay splitters only where both sides are visible
-
-      const splitterNodes: React.ReactNode[] = [];
-      for (let i = 0; i < panels.length - 1; i++) {
-        const leftVisible = !hiddens[i];
-        const rightVisible = !hiddens[i + 1];
-        if (!leftVisible || !rightVisible) continue;
-
-        const boundaryPct = cumPct[i]; // boundary after panel i
-        const boundaryPx = (boundaryPct / 100) * (containerSize || 0);
-
-        splitterNodes.push(
-          <Splitter
-            key={`splitter-${i}`}
-            size={splitterSize}
-            index={i}
-            position={position}
-            onResize={handleResize}
-            className={cn(splitterClassName)}
-            boundaryPx={boundaryPx}
-          />,
-        );
-      }
-
-      // 4) Return panels + overlay splitters stacked inside relative container
-      return (
-        <>
-          {panelNodes}
-          {splitterNodes}
-        </>
-      );
-    }, [sizes, hiddens]);
+          return panels.slice(0, -1).map((_, i) => {
+            if (hiddens[i] || hiddens[i + 1]) return null;
+            const boundaryPx = (cumPct[i] / 100) * (containerSize || 0);
+            return (
+              <Splitter
+                key={`splitter-${i}`}
+                size={splitterSize}
+                index={i}
+                position={position}
+                onResize={handleResize}
+                className={cn(splitterClassName)}
+                boundaryPx={isNaN(boundaryPx) ? 0 : boundaryPx}
+              />
+            );
+          });
+        })()}
+      </>
+    );
 
     return (
       <div
@@ -554,7 +567,7 @@ const Splitter = forwardRef<HTMLDivElement, SplitterOverlayProps>(
 
     const isH = position === 'horizontal';
     const crossStyles = isH ? { top: 0, height: '100%' } : { left: 0, width: '100%' };
-
+    if (isNaN(boundaryPx)) boundaryPx = 0;
     return (
       <div
         ref={ref}

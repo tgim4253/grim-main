@@ -13,7 +13,7 @@ use anyhow::{anyhow, Error, Result};
 use once_cell::sync::Lazy;
 use sqlx::{Executor, Pool, Sqlite, Transaction};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -115,6 +115,68 @@ where
     }
 
     Ok(nodes)
+}
+
+pub async fn fetch_file_nodes<'a, E>(executor: &mut E) -> Result<Vec<Node>>
+where
+    for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+{
+    let rows: Vec<NodeRow<FileContent>> = sqlx::query_as(
+        r#"
+        SELECT
+            n.id          AS node_id,
+            n.kind        AS kind,
+            fc.id         AS file_id,
+            fc.mime       AS mime,
+            fc.size       AS size,
+            fc.sha256     AS sha256,
+            fc.display_name  AS file_name,
+            n.created_at,
+            n.updated_at
+        FROM node               n
+        JOIN node_file_binding  nfb ON nfb.node_id = n.id
+        JOIN file_content       fc  ON fc.id = nfb.file_content_id
+        WHERE n.kind = 'file'
+        ORDER BY n.created_at
+        "#,
+    )
+    .fetch_all(&mut *executor)
+    .await?;
+
+    let mut nodes: Vec<Node> = Vec::new();
+
+    for row in rows {
+        nodes.push(Node {
+            id: row.node_id.clone(),
+            kind: row.kind,
+            data: NodeData::File(row.data),
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        });
+    }
+
+    Ok(nodes)
+}
+
+// Preload directory table rows for frontend using sqlx
+pub async fn fetch_nodes<'a, E>(executor: &mut E, kinds: HashSet<NodeKind>) -> Result<Vec<Node>>
+where
+    for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+{
+    let mut rows = Vec::new();
+
+    for kind in kinds {
+        match kind {
+            NodeKind::Folder => {
+                rows.extend(fetch_folder_nodes(executor).await?);
+            }
+            NodeKind::File => {
+                rows.extend(fetch_file_nodes(executor).await?);
+            }
+            _ => {}
+        }
+    }
+    Ok(rows)
 }
 
 pub async fn create_virtual_folder<'a, E>(
@@ -542,9 +604,9 @@ where
         sqlx::query(
             r#"
             INSERT INTO file_content
-                (id, mime, size, xxh3_64, kind, created_at, updated_at)
+                (id, mime, size, xxh3_64, kind, display_name, created_at, updated_at)
             VALUES
-                (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
             "#,
         )
         .bind(&new_id)
@@ -552,6 +614,7 @@ where
         .bind(file_info.file_size)
         .bind(&file_info.xxh3_64)
         .bind(file_info.kind_guess)
+        .bind(&file_info.file_name)
         .bind(&now)
         .bind(&now)
         .execute(&mut *executor)
@@ -629,7 +692,7 @@ where
     sqlx::query(
         r#"
         INSERT INTO node (id, kind, created_at, updated_at)
-        VALUES (?1, 'folder', ?2, ?2)
+        VALUES (?1, 'file', ?2, ?2)
         "#,
     )
     .bind(&node_id)

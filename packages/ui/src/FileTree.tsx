@@ -1,7 +1,7 @@
 import React from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { createContainerId, createFolderId, Droppable } from '@tgim/dnd/index';
-import type { FileTreeData } from '@tgim/types/index';
+import { NodeKind, type FileTreeData } from '@tgim/types/index';
 import { ChevronDown, ChevronRight, File, Folder, MoreVertical } from 'lucide-react';
 import cn from '@tgim/utils/cn';
 import Button from './Button';
@@ -15,8 +15,20 @@ export const TreeNode: React.FC<{
   selected?: boolean;
   onClickOption?: (node: FileTreeData | undefined) => void;
   onSelect?: (e: React.MouseEvent, id: string) => void;
-}> = ({ node, depth, expanded, onToggle, hovered, onClickOption, selected, onSelect }) => {
-  const isFolder = node.icon === 'folder';
+  openFile: (node: FileTreeData) => void;
+}> = ({
+  node,
+  depth,
+  expanded,
+  onToggle,
+  hovered,
+  onClickOption,
+  selected,
+  onSelect,
+  openFile,
+}) => {
+  const isFolder = node.type === NodeKind.Folder;
+  const isFile = node.type === NodeKind.File;
   const {
     attributes,
     listeners,
@@ -45,14 +57,15 @@ export const TreeNode: React.FC<{
           selected ? 'is-selected' : '',
           isDragging ? 'is-dragging' : '',
         )}
-        style={indentStyle}
         onClick={e => {
           onSelect?.(e, node.id);
           if (isFolder && !e.shiftKey && !e.metaKey && !e.ctrlKey) onToggle(node.id);
+          if (isFile && !e.shiftKey && !e.metaKey && !e.ctrlKey) openFile(node);
         }}
         {...attributes}
         {...listeners}
       >
+        <div className="indent" style={indentStyle}></div>
         {isFolder ? (
           <button
             className="toggle"
@@ -103,6 +116,7 @@ export const NodeList: React.FC<{
   selectedSet: Set<string>;
   onSelect: (e: React.MouseEvent, id: string) => void;
   onClickOption?: (node: FileTreeData | undefined) => void;
+  openFile: (node: FileTreeData) => void;
 }> = ({
   parentId,
   nodes,
@@ -114,6 +128,7 @@ export const NodeList: React.FC<{
   selectedSet,
   onSelect,
   onClickOption,
+  openFile,
 }) => {
   const orderedNodes = [...nodes].sort((a, b) => {
     const aHas = a.children == null ? 0 : 1;
@@ -141,6 +156,7 @@ export const NodeList: React.FC<{
                 hovered={hoverId === node.id}
                 selected={selected}
                 onSelect={onSelect}
+                openFile={openFile}
                 onClickOption={onClickOption}
               />
               {node.children?.length && expanded ? (
@@ -154,6 +170,7 @@ export const NodeList: React.FC<{
                   hoverId={hoverId}
                   selectedSet={selectedSet}
                   onSelect={onSelect}
+                  openFile={openFile}
                   onClickOption={onClickOption}
                 />
               ) : null}

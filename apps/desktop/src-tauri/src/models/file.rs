@@ -25,6 +25,7 @@ pub struct FileContent {
     pub mime: Option<String>,
     pub size: Option<i64>,
     pub sha256: Option<String>,
+    pub file_name: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

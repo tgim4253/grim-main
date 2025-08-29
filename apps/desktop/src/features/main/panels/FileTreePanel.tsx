@@ -1,5 +1,5 @@
 import { FileTreeData } from '@tgim/types/index';
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   useHoverOpen,
   useMultiSelect,
@@ -16,6 +16,7 @@ import { Modal } from '@tgim/ui/index';
 import NewFolderModal from '../../file/modal/NewFolderModal';
 import { ipc } from '../../../lib/ipc';
 import { useMoa } from '@tgim/hooks/useMoa';
+import usePanelsStore from '@tgim/stores/panelStore';
 
 /* local utils for rendering */
 
@@ -69,6 +70,8 @@ export const FileTree = () => {
       onMove: s.onMove,
     })),
   );
+
+  const { openFile } = usePanelsStore(useShallow(s => ({ openFile: s.addPanelWithoutContainer })));
 
   // Expanded state: open folders initially if they have children
   const [expanded, setExpanded] = useState<Set<string>>(() => {
@@ -153,18 +156,27 @@ export const FileTree = () => {
           parentId="root"
           nodes={treeData}
           expandedSet={expanded}
-          onToggle={id =>
+          onToggle={id => {
+            console.log(id);
             setExpanded(prev => {
               const n = new Set(prev);
               n.has(id) ? n.delete(id) : n.add(id);
               return n;
-            })
-          }
+            });
+          }}
           depthMap={depthMap}
           dragging={!!activeId}
           hoverId={hoverId}
           selectedSet={selected}
-          onSelect={onItemClick}
+          onSelect={(e: React.MouseEvent, id: string) => {
+            onItemClick(e, id);
+          }}
+          openFile={(node: FileTreeData) => {
+            openFile({
+              nodeId: node.id,
+              name: node.name,
+            });
+          }}
           onClickOption={onOptionClick}
         />
 

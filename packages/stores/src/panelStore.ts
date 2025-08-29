@@ -1,14 +1,13 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { immer } from 'zustand/middleware/immer';
-import { PanelType } from '@tgim/types/index';
+
 /* ---------- Types ---------- */
 
 interface PanelItem {
   id: string;
+  nodeId: string;
   name: string;
-  path: string;
-  type: PanelType;
 }
 
 interface PanelContainer {
@@ -17,32 +16,58 @@ interface PanelContainer {
   focusedPanelId?: string;
 }
 
+type ContainerId = string;
+type PanelId = string;
+type LayoutContainerId = string;
+
+interface LayoutContainer {
+  id: LayoutContainerId;
+  axis: 'vertical' | 'horizontal';
+  children: Array<LayoutContainerId | ContainerId>;
+}
 interface PanelsState {
-  panelEntities: Record<string, PanelItem>;
-  containers: Record<string, PanelContainer>;
+  rootLayout: LayoutContainer | null;
+  layout: Record<LayoutContainerId, LayoutContainer>;
+  // containerId -> layoutContainerIds
+  containerOwnership: Record<ContainerId, LayoutContainerId>;
+
+  panelEntities: Record<PanelId, PanelItem>;
+  containers: Record<ContainerId, PanelContainer>;
   // panelId -> containerId
-  panelOwnership: Record<string, string>;
+  panelOwnership: Record<PanelId, ContainerId>;
 
-  activePanelId: string | null;
+  activePanelId: PanelId | null;
 
-  // action Container
-  addContainer: () => string;
-  removeContainer: (containerId: string) => void;
+  // layout actions
+  getOrCreateLayoutId: () => LayoutContainerId;
+  removeLayoutAndChildren: (layoutId: LayoutContainerId) => void;
+  removeContainerFromLayout: (containerId: ContainerId) => void;
 
-  //action Panel
-  addPanel: (containerId: string, panel: Omit<PanelItem, 'id'> & { id?: string }) => void;
-  removePanel: (panelId: string) => void;
-  updatePanel: (change: Partial<Omit<PanelItem, 'id'>> & { id: string }) => void;
+  // container actions
+  addContainer: (layoutId?: LayoutContainerId) => ContainerId;
+  removeContainer: (containerId: ContainerId) => void;
+  moveContainerIntoLayout: (
+    containerId: ContainerId,
+    layoutId: LayoutContainerId,
+    index: number | null,
+  ) => void;
+  splitContainer: (containerId: ContainerId, axis: 'vertical' | 'horizontal') => ContainerId;
+
+  // panel actions
+  addPanel: (containerId: ContainerId, panel: Omit<PanelItem, 'id'> & { id?: PanelId }) => void;
+  removePanel: (panelId: PanelId) => void;
+  updatePanel: (change: Partial<Omit<PanelItem, 'id'>> & { id: PanelId }) => void;
   movePanel: (
-    targetIds: string[],
-    destinationContainerId: string,
+    targetIds: PanelId[],
+    destinationContainerId: ContainerId,
     destinationIndex: number,
   ) => void;
-  addPanelWithoutContainer: (panel: Omit<PanelItem, 'id'> & { id?: string }) => void;
+  addPanelWithoutContainer: (panel: Omit<PanelItem, 'id'> & { id?: PanelId }) => void;
+  splitPanel: (panelId: PanelId, axis: 'vertical' | 'horizontal') => void;
 
-  //Selectors
-  setActivePanel: (panelId: string | null) => void;
-  getFocusedContainerId: () => string | null;
+  // selectors
+  setActivePanel: (panelId: PanelId | null) => void;
+  getFocusedContainerId: () => ContainerId | null;
 }
 
 /* ---------- Helpers ---------- */
@@ -52,6 +77,9 @@ const createNewId = () => uuidv4();
 
 const usePanelsStore = create<PanelsState>()(
   immer((set, get) => ({
+    rootLayout: null,
+    layout: {},
+    containerOwnership: {},
     panelEntities: {},
     containers: {},
     panelOwnership: {},
@@ -59,28 +87,81 @@ const usePanelsStore = create<PanelsState>()(
 
     /* ----- Actions ----- */
 
-    // Container
-    addContainer: () => {
+    //layout
+    getOrCreateLayoutId: () => {
+      const rl = get().rootLayout;
+      if (rl) return rl.id;
+
       const id = createNewId();
       set(state => {
+        state.rootLayout = { id, axis: 'horizontal', children: [] };
+        state.layout[id] = state.rootLayout;
+      });
+      return id;
+    },
+
+    removeLayoutAndChildren: layoutId => {
+      set(state => {
+        const layout = state.layout[layoutId];
+        if (!layout) return;
+        layout.children.forEach(child => {
+          if (state.layout[child]) {
+            state.removeLayoutAndChildren(child);
+          } else if (state.containers[child]) {
+            state.removeContainer(child);
+          }
+        });
+        delete state.layout[layoutId];
+        delete state.containerOwnership[layoutId];
+      });
+    },
+
+    removeContainerFromLayout(containerId) {
+      set(state => {
+        const layoutId = state.containerOwnership[containerId];
+        if (!layoutId) return;
+        const layout = state.layout[layoutId];
+        if (!layout) return;
+        const idx = layout.children.indexOf(containerId);
+        if (idx === -1) return;
+        layout.children.splice(idx, 1);
+        delete state.containerOwnership[containerId];
+
+        // if the layout becomes empty, remove it
+        if (layout.children.length === 0) {
+          state.removeLayoutAndChildren(layoutId);
+        }
+      });
+    },
+
+    // Container
+    addContainer: (layoutId?: LayoutContainerId) => {
+      const id = createNewId();
+      layoutId = layoutId ?? get().getOrCreateLayoutId();
+
+      set(state => {
+        const layout = state.layout[layoutId];
         state.containers[id] = { id, panelIds: [] };
+        state.containerOwnership[id] = layoutId;
+        layout.children = [...layout.children, id];
       });
       return id;
     },
 
     removeContainer: containerId => {
       set(state => {
+        state.removeContainerFromLayout(containerId);
         const container: PanelContainer = state.containers[containerId];
         if (!container) return;
 
-        //container에 속한 Panel 삭제
+        // remove all panels in the container
         container.panelIds.forEach(pid => {
           delete state.panelEntities[pid];
           delete state.panelOwnership[pid];
         });
         delete state.containers[containerId];
 
-        //만약 삭제된 컨테이너에 active인 Panel이 있다면
+        // if the active panel was inside the deleted container
         if (state.activePanelId && !state.panelOwnership[state.activePanelId]) {
           const firstContainer = Object.values(state.containers)[0] as PanelContainer;
           state.activePanelId = firstContainer?.focusedPanelId ?? null;
@@ -88,24 +169,71 @@ const usePanelsStore = create<PanelsState>()(
       });
     },
 
-    //Panel
+    moveContainerIntoLayout: (containerId, layoutId, index) => {
+      set(state => {
+        const oldLayoutId = state.containerOwnership[containerId];
+        if (oldLayoutId === layoutId) return;
+
+        const oldLayout = state.layout[oldLayoutId];
+        if (oldLayout) {
+          state.removeContainerFromLayout(containerId);
+        }
+
+        const layout = state.layout[layoutId];
+        if (!layout) return;
+        index = index ?? layout.children.length;
+        layout.children.splice(index, 0, containerId);
+        state.containerOwnership[containerId] = layoutId;
+      });
+    },
+
+    splitContainer: (containerId, axis) => {
+      let newContainerId = createNewId();
+
+      set(state => {
+        const container = state.containers[containerId];
+        if (!container) return;
+
+        const parentLayoutId = state.containerOwnership[containerId] ?? state.getOrCreateLayoutId();
+        const parentLayout = state.layout[parentLayoutId];
+
+        // insert a new layout container
+        const newLayoutId = createNewId();
+        const index = parentLayout.children.indexOf(containerId);
+
+        if (index === -1) return;
+
+        state.containers[newContainerId] = { id: newContainerId, panelIds: [] };
+
+        state.layout[newLayoutId] = {
+          id: newLayoutId,
+          axis,
+          children: [containerId, newContainerId],
+        };
+        state.containerOwnership[containerId] = newLayoutId;
+        state.containerOwnership[newContainerId] = newLayoutId;
+
+        parentLayout.children[index] = newLayoutId;
+      });
+
+      return newContainerId;
+    },
+
+    // Panel
     addPanel: (containerId, panelInput) => {
       const id = createNewId();
       const panel: PanelItem = {
         id,
+        nodeId: panelInput.nodeId,
         name: panelInput.name,
-        path: panelInput.path,
-        type: panelInput.type ?? 'Note', // todo
       };
       set(state => {
         const container: PanelContainer = state.containers[containerId];
         if (!container) return;
 
-        // 컨테이너에 이미 존재하면 포커싱 & active
+        // If panel already exists in container, focus & set active
         const existingPanel = container.panelIds.find(
-          pid =>
-            state.panelEntities[pid].path === panel.path &&
-            state.panelEntities[pid].name === panel.name,
+          pid => state.panelEntities[pid].nodeId === panel.nodeId,
         );
         if (existingPanel) {
           container.focusedPanelId = existingPanel;
@@ -113,7 +241,7 @@ const usePanelsStore = create<PanelsState>()(
           return;
         }
 
-        // Panel entity 및 ownership 추가
+        // Add new panel entity and ownership
         state.panelEntities[id] = panel;
         state.panelOwnership[id] = containerId;
 
@@ -138,27 +266,27 @@ const usePanelsStore = create<PanelsState>()(
         const container: PanelContainer = state.containers[containerId];
         if (!container) return;
 
-        // container panelIds 배열에서 해당 panelId 삭제
+        // remove panelId from container.panelIds
         const idx = container.panelIds.indexOf(panelId);
         if (idx !== -1) container.panelIds.splice(idx, 1);
         delete state.panelEntities[panelId];
         delete state.panelOwnership[panelId];
 
-        // panel이 아예 없을시 container 삭제
+        // if container has no panels left, remove the container
         if (container.panelIds.length === 0) {
           delete state.containers[containerId];
 
-          // activePanelId와 삭제된 panel이 동일하다면
+          // if active panel was deleted
           if (state.activePanelId === panelId) {
             state.activePanelId =
               (Object.values(state.containers)[0] as PanelContainer)?.focusedPanelId ?? null;
           }
         } else {
-          // focusedPanel update
+          // update focused panel
           if (container.focusedPanelId === panelId) {
             container.focusedPanelId = container.panelIds[container.panelIds.length - 1];
           }
-          // activePanelId와 삭제된 panel이 동이라하다면
+          // if active panel was deleted
           if (state.activePanelId === panelId) {
             state.activePanelId = container.panelIds[0] ?? null;
           }
@@ -181,14 +309,14 @@ const usePanelsStore = create<PanelsState>()(
         const panelsToInsert: string[] = [];
         const affectedContainers = new Set<string>();
 
-        // --- targetIds에 해당하는 패널들을 기존 위치에서 제거하고 targetPanels에 저장 ---
+        // remove target panels from their source containers
         targetIds.forEach(pid => {
           const sourceContainerId = state.panelOwnership[pid];
           const sourceContainer = state.containers[sourceContainerId];
           if (!sourceContainer) return;
           affectedContainers.add(sourceContainerId);
 
-          // soucrceContainer에서 삭제 후 targetPanels에 저장
+          // remove from source container
           const idx = sourceContainer.panelIds.indexOf(pid);
           if (idx !== -1) sourceContainer.panelIds.splice(idx, 1);
 
@@ -196,7 +324,7 @@ const usePanelsStore = create<PanelsState>()(
           state.panelOwnership[pid] = destinationContainerId;
         });
 
-        // --- 대상 컨테이너에 패널들을 삽입 ---
+        // insert into destination container
         destContainer.panelIds.splice(destinationIndex, 0, ...panelsToInsert);
         if (panelsToInsert.some(pid => pid == state.activePanelId)) {
           destContainer.focusedPanelId = state.activePanelId ?? undefined;
@@ -207,7 +335,7 @@ const usePanelsStore = create<PanelsState>()(
           destContainer.focusedPanelId = panelsToInsert[panelsToInsert.length - 1];
         }
 
-        // 영향 받은 컨테이너 수정
+        // update affected containers
         affectedContainers.forEach(cid => {
           const cont = state.containers[cid];
           if (cont && cont.panelIds.length === 0) {
@@ -218,6 +346,25 @@ const usePanelsStore = create<PanelsState>()(
         });
       });
     },
+
+    splitPanel: (panelId, axis) => {
+      set(state => {
+        const panel = state.panelEntities[panelId];
+        if (!panel) return;
+
+        const containerId = state.panelOwnership[panelId];
+        if (!containerId) return;
+
+        const newContainerId = state.splitContainer(containerId, axis);
+
+        state.addPanel(newContainerId, {
+          nodeId: panel.nodeId,
+          name: panel.name,
+          id: createNewId(),
+        });
+      });
+    },
+
     getFocusedContainerId: () => {
       const panelId = get().activePanelId;
       return panelId ? (get().panelOwnership[panelId] ?? null) : null;
