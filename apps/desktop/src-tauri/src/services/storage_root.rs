@@ -1,7 +1,11 @@
+use crate::db::repository::sroot_repository::SrootRepository;
 use crate::models::file::OsPlatform;
+use crate::services::file_service::ensure_real_folder;
 use crate::utils::date::get_now_date;
 use crate::utils::path_utils::normalize_path;
 use chrono::{DateTime, Utc};
+use sqlx::Sqlite;
+use sqlx::Transaction;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -321,4 +325,18 @@ fn classify_kind(
 
     // --- 5) Unknown as last resort ---
     StorageKind::Unknown
+}
+
+pub async fn ensure_storage_root_and_real_folder(
+    tx: &mut Transaction<'_, Sqlite>,
+    sroot_info: &StorageRootInfo,
+    norm_path: &std::path::PathBuf,
+) -> Result<String> {
+    // Ensure StorageRoot exists or create it
+    let sroot_id = SrootRepository::ensure_storage_root(tx.as_mut(), sroot_info).await?;
+
+    // Ensure RealFolder exists or create it
+    let real_folder_id = ensure_real_folder(tx, sroot_id.clone(), norm_path).await?;
+
+    Ok(real_folder_id)
 }

@@ -9,22 +9,26 @@ use std::{
     time::UNIX_EPOCH,
 };
 
-use crate::{services::file_service::xxh3_64_of, utils::file_utils::guess_mime};
+use crate::{
+    config::file::IntegrityCheckResult, services::file_service::xxh3_64_of,
+    utils::file_utils::guess_mime,
+};
 
 #[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct NodeFolder {
     pub folder_id: String,
     pub node_id: String,
-    pub folder_name: Option<String>,
+    pub folder_name: String,
 }
 
 #[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct FileContent {
     pub file_id: String,
     pub node_id: String,
-    pub mime: Option<String>,
-    pub size: Option<i64>,
+    pub mime: String,
+    pub size: i64,
     pub sha256: Option<String>,
+    pub xxh3_64: String,
     pub file_name: String,
 }
 
@@ -212,6 +216,7 @@ pub struct FileInfo {
     pub file_mtime: Option<i64>, // non-null if exists & accessible
 
     pub xxh3_64: String,
+    pub sha256: Option<String>,
 
     pub real_folder_id: String,
 
@@ -251,6 +256,7 @@ impl FileInfo {
             file_mtime,
 
             xxh3_64,
+            sha256: None,
 
             real_folder_id,
             file_name,
@@ -278,3 +284,20 @@ impl FileInfo {
 //     files: Vec<FileInfo>,
 //     folders: Vec<DirectoryInfo>,
 // }
+
+pub struct RealFolderData {
+    pub id: String,
+    pub storage_root_id: Option<String>,
+    pub parent_id: Option<String>,
+    pub name: String,
+    pub name_norm: String,
+    pub root_rel_path: Option<String>,
+    pub abs_path_cached: Option<String>,
+    pub mtime: i64,
+    pub error_flag: IntegrityCheckResult,
+    pub error_msg: Option<String>,
+    pub last_seen_scan_id: Option<String>,
+    pub last_seen_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}

@@ -4,6 +4,7 @@ mod app_launcher;
 mod bootstrap;
 mod commands;
 mod config;
+mod db;
 mod errors;
 mod models;
 mod services;

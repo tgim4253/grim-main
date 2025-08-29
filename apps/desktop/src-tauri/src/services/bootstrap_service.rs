@@ -1,4 +1,6 @@
 use crate::bootstrap;
+use crate::db::repository::connection_repository::ConnectionRepository;
+use crate::db::repository::node_repository::NodeRepository;
 use crate::models::file::StorageRootInfo;
 use crate::models::node::{NodeKind, NodeWithConnections};
 use crate::services::db::DB_MANAGER;
@@ -162,10 +164,13 @@ pub async fn fetch_init_data_for_front(moa_id: String) -> Result<NodeWithConnect
     let mut tx = DB_MANAGER.create_new_tx(&moa_id).await?;
 
     let folder_and_files =
-        db::fetch_nodes(tx.as_mut(), HashSet::from([NodeKind::Folder, NodeKind::File])).await?;
-    let connections =
-        db::fetch_connections(tx.as_mut(), folder_and_files.iter().map(|f| f.id.clone()).collect())
+        NodeRepository::fetch_nodes(tx.as_mut(), HashSet::from([NodeKind::Folder, NodeKind::File]))
             .await?;
+    let connections = ConnectionRepository::fetch_connections(
+        tx.as_mut(),
+        folder_and_files.iter().map(|f| f.id.clone()).collect(),
+    )
+    .await?;
 
     tx.commit().await?;
 

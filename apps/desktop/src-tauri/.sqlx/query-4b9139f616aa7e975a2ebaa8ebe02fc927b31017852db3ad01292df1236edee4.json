@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO storage_root\n                (id, platform, stable_id, secondary_id, kind, label, is_available, created_at, updated_at)\n            VALUES\n                (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)\n            ON CONFLICT(platform, stable_id) DO UPDATE SET\n                secondary_id = excluded.secondary_id,\n                kind         = excluded.kind,\n                label        = excluded.label,\n                is_available = excluded.is_available,\n                updated_at   = excluded.updated_at\n            RETURNING id as \"id!: String\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4b9139f616aa7e975a2ebaa8ebe02fc927b31017852db3ad01292df1236edee4"
+}

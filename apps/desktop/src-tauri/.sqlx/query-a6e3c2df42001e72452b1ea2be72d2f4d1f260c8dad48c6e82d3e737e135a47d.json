@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                c.id              AS \"id!\",\n                c.src_node_id     AS \"src_node_id!\",\n                c.dst_node_id     AS \"dst_node_id!\",\n                c.kind_id         AS \"kind_rule_id!\",\n                ckr.kind          AS \"kind!\",\n                ckr.default_weight AS \"weight!: i32\"\n            FROM connection c\n            LEFT JOIN connection_kind_rule ckr ON c.kind_id = ckr.id\n            WHERE c.src_node_id IN (SELECT value FROM json_each(?1))\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "src_node_id!",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "dst_node_id!",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "kind_rule_id!",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "kind!",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "weight!: i32",
+        "ordinal": 5,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "a6e3c2df42001e72452b1ea2be72d2f4d1f260c8dad48c6e82d3e737e135a47d"
+}

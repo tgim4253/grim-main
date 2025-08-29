@@ -10,29 +10,30 @@ use std::{
 use anyhow::{anyhow, bail, Context, Result};
 use async_recursion::async_recursion;
 use sha2::{Digest, Sha256};
-use sqlx::{Sqlite, SqlitePool, Transaction};
+use sqlx::{Sqlite, Transaction};
 use twox_hash::XxHash64;
 
 use crate::{
-    app_launcher::moa,
+    db::repository::{
+        file_repository::FileRepository, node_repository::NodeRepository,
+        sroot_repository::SrootRepository,
+    },
     models::{
-        file::{FileInfo, FileType, FolderData, StorageRootInfo},
+        file::{FileInfo, FileType, FolderData, RealFolderData, StorageRootInfo},
         node::Node,
     },
     services::{
-        db::{
-            self, create_file_node, create_file_path, create_virtual_folder_mount,
-            ensure_real_folder, ensure_storage_root_and_real_folder, DB_MANAGER,
-        },
-        storage_root,
+        db::{self, DB_MANAGER},
+        storage_root::{self, ensure_storage_root_and_real_folder},
     },
-    utils::{date::get_now_date, path_utils::normalize_path},
+    utils::{date::get_now_date, file_utils::file_mtime_epoch, path_utils::normalize_path},
 };
 
 pub async fn create_folder(moa_id: String, data: FolderData) -> Result<Node> {
     let mut tx: Transaction<'_, Sqlite> = DB_MANAGER.create_new_tx(&moa_id).await?;
 
-    let node = db::create_virtual_folder(tx.as_mut(), data.name, data.parent_id).await?;
+    let node =
+        FileRepository::create_virtual_folder(tx.as_mut(), data.name, data.parent_id).await?;
 
     tx.commit().await?;
 
@@ -48,10 +49,14 @@ pub async fn first_mount_folder(moa_id: String, node: Node, path: String) -> Res
     let sroot_info = storage_root::detect_storage_root(&norm_path)?;
 
     let real_folder_id =
-        ensure_storage_root_and_real_folder(tx.as_mut(), &sroot_info, &norm_path).await?;
+        ensure_storage_root_and_real_folder(&mut tx, &sroot_info, &norm_path).await?;
 
-    let mount_id =
-        create_virtual_folder_mount(tx.as_mut(), node.id.clone(), real_folder_id.clone()).await?;
+    let mount_id = FileRepository::create_virtual_folder_mount(
+        tx.as_mut(),
+        node.id.clone(),
+        real_folder_id.clone(),
+    )
+    .await?;
 
     upsert_folder(&mut tx, real_folder_id.clone(), node.id, &norm_path, true, Some(true)).await?;
 
@@ -118,11 +123,13 @@ async fn upsert_folder(
                 folder_entries.push((entry_path, name));
             } else if make_vf {
                 // Only create virtual folders for direct child directories, do not mount.
-                db::create_virtual_folder(tx.as_mut(), name, parent_virtual_folder_id.clone())
-                    .await
-                    .with_context(|| {
-                        format!("create_virtual_folder failed for {:?}", entry_path)
-                    })?;
+                FileRepository::create_virtual_folder(
+                    tx.as_mut(),
+                    name,
+                    parent_virtual_folder_id.clone(),
+                )
+                .await
+                .with_context(|| format!("create_virtual_folder failed for {:?}", entry_path))?;
             }
         } else if file_type.is_file() {
             upsert_file_entry(tx, &parent_real_folder_id, &parent_virtual_folder_id, &entry)
@@ -145,7 +152,7 @@ async fn upsert_folder(
     if recursive {
         for (entry_path, name) in folder_entries {
             // create child virtual folder node under the parent virtual folder
-            let child_vf = db::create_virtual_folder(
+            let child_vf = FileRepository::create_virtual_folder(
                 tx.as_mut(),
                 name.clone(),
                 parent_virtual_folder_id.clone(),
@@ -157,10 +164,10 @@ async fn upsert_folder(
             let normalized = normalize_path(&entry_path);
 
             let child_real_folder_id =
-                ensure_real_folder(tx.as_mut(), sroot_id.clone(), &normalized).await?;
+                ensure_real_folder(tx, sroot_id.clone(), &normalized).await?;
 
             // mount child vf <-> child real folder
-            db::create_virtual_folder_mount(
+            FileRepository::create_virtual_folder_mount(
                 tx.as_mut(),
                 child_vf.id.clone(),
                 child_real_folder_id.clone(),
@@ -199,16 +206,85 @@ async fn upsert_file_entry(
     let file_info: FileInfo =
         FileInfo::new(&file_path, parent_real_folder_id.to_string(), file_name).await?;
 
-    let file_path_id = create_file_path(tx.as_mut(), &file_info).await?;
+    let file_path_id = FileRepository::insert_file_path(tx.as_mut(), &file_info).await?;
 
     // upsert file_content
-    let file_content_id = db::resolve_and_upsert_file_content(tx.as_mut(), &file_info).await?;
+    let file_content_id = FileRepository::upsert_file_content(tx.as_mut(), &file_info).await?;
 
-    create_file_node(tx.as_mut(), parent_virtual_folder_id, &file_content_id).await?;
+    NodeRepository::create_file_node(
+        tx.as_mut(),
+        parent_virtual_folder_id.to_string(),
+        file_content_id.clone(),
+    )
+    .await?;
     // binding
-    db::bind_file_content_to_file_path(tx.as_mut(), &file_path_id, &file_content_id).await?;
+    FileRepository::upsert_file_path_content_binding(tx.as_mut(), &file_path_id, &file_content_id)
+        .await?;
 
     Ok(())
+}
+
+pub async fn ensure_real_folder(
+    tx: &mut Transaction<'_, Sqlite>,
+    sroot_id: String,
+    norm_path: &std::path::PathBuf,
+) -> Result<String> {
+    let mut current_parent_id: Option<String> = None;
+
+    let mount_path = SrootRepository::fetch_mount_path(tx.as_mut(), &sroot_id)
+        .await?
+        .ok_or_else(|| anyhow!("Failed to fetch mount path"))?;
+
+    let components_path =
+        if let Ok(sub_path) = norm_path.strip_prefix(&mount_path) { sub_path } else { norm_path };
+
+    let components: Vec<&str> = if components_path.as_os_str().is_empty() {
+        vec![""]
+    } else {
+        components_path
+            .components()
+            .filter_map(|c| c.as_os_str().to_str())
+            .filter(|s| !s.is_empty())
+            .collect()
+    };
+
+    let mut rel_path = PathBuf::from("");
+    let mut abs_path = PathBuf::from(&mount_path);
+    let now = crate::utils::date::get_now_date();
+
+    for component in components {
+        abs_path.push(component);
+        rel_path.push(component);
+
+        let metadata = tokio::fs::metadata(&abs_path).await?;
+        let mtime = file_mtime_epoch(&metadata)?;
+
+        let data = RealFolderData {
+            id: "".to_string(), // not needed for upsert
+            storage_root_id: Some(sroot_id.to_owned()),
+            parent_id: current_parent_id.clone(),
+            name: component.to_string(),
+            name_norm: component.to_lowercase(),
+            root_rel_path: Some(rel_path.to_string_lossy().into_owned()),
+            abs_path_cached: Some(abs_path.to_string_lossy().into_owned()),
+            mtime: mtime,
+            error_flag: crate::config::file::IntegrityCheckResult::Success,
+            error_msg: None,
+            last_seen_scan_id: None,
+            last_seen_at: None,
+            created_at: now.clone(),
+            updated_at: now.clone(),
+        };
+
+        let id = FileRepository::upsert_real_folder(tx.as_mut(), &data).await?;
+        current_parent_id = Some(id);
+    }
+
+    if let Some(id) = current_parent_id {
+        Ok(id)
+    } else {
+        Err(anyhow::anyhow!("Failed to create or find real_folder ID"))
+    }
 }
 
 #[cfg(unix)]
