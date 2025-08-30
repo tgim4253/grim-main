@@ -1,15 +1,6 @@
-use crate::{
-    bootstrap::PATH_MANAGER,
-    models::{
-        file::NodeFolder,
-        node::{Node, NodeData, NodeKind},
-    },
-    services::integrity,
-    utils::identifier::get_unique_id,
-};
-use anyhow::Result;
+use crate::{bootstrap::PATH_MANAGER, services::integrity};
 use once_cell::sync::Lazy;
-use sqlx::{Executor, Pool, Sqlite, Transaction};
+use sqlx::{Pool, Sqlite, Transaction};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 

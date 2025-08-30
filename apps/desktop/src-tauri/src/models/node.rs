@@ -39,7 +39,7 @@ impl FromStr for NodeKind {
 pub struct Node {
     pub id: String,
     pub kind: NodeKind,
-    pub data: NodeData,
+    pub data: Option<NodeData>,
     pub created_at: String,
     pub updated_at: String,
 }

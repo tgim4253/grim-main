@@ -2,6 +2,7 @@ use crate::bootstrap;
 use crate::db::repository::connection_repository::ConnectionRepository;
 use crate::db::repository::node_repository::NodeRepository;
 use crate::models::file::StorageRootInfo;
+use crate::models::graph::GraphResponse;
 use crate::models::node::{NodeKind, NodeWithConnections};
 use crate::services::db::DB_MANAGER;
 use crate::services::storage_root::enumerate_mounted_root;
@@ -163,9 +164,11 @@ fn emit(app_handle: &tauri::AppHandle, moa_id: &str, payload: impl Serialize + C
 pub async fn fetch_init_data_for_front(moa_id: String) -> Result<NodeWithConnections> {
     let mut tx = DB_MANAGER.create_new_tx(&moa_id).await?;
 
-    let folder_and_files =
-        NodeRepository::fetch_nodes(tx.as_mut(), HashSet::from([NodeKind::Folder, NodeKind::File]))
-            .await?;
+    let folder_and_files = NodeRepository::fetch_all_nodes_by_kind(
+        tx.as_mut(),
+        HashSet::from([NodeKind::Folder, NodeKind::File]),
+    )
+    .await?;
     let connections = ConnectionRepository::fetch_connections(
         tx.as_mut(),
         folder_and_files.iter().map(|f| f.id.clone()).collect(),

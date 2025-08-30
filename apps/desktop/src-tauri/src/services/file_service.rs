@@ -1,10 +1,8 @@
 use std::{
-    collections::HashSet,
-    fs::{self, DirEntry, File},
+    fs::File,
     hash::Hasher,
     io::{self, BufReader, Read},
-    path::{self, Path, PathBuf},
-    pin::Pin,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -19,14 +17,14 @@ use crate::{
         sroot_repository::SrootRepository,
     },
     models::{
-        file::{FileInfo, FileType, FolderData, RealFolderData, StorageRootInfo},
+        file::{FileInfo, FileType, FolderData, RealFolderData},
         node::Node,
     },
     services::{
-        db::{self, DB_MANAGER},
+        db::DB_MANAGER,
         storage_root::{self, ensure_storage_root_and_real_folder},
     },
-    utils::{date::get_now_date, file_utils::file_mtime_epoch, path_utils::normalize_path},
+    utils::{file_utils::file_mtime_epoch, path_utils::normalize_path},
 };
 
 pub async fn create_folder(moa_id: String, data: FolderData) -> Result<Node> {
@@ -51,7 +49,7 @@ pub async fn first_mount_folder(moa_id: String, node: Node, path: String) -> Res
     let real_folder_id =
         ensure_storage_root_and_real_folder(&mut tx, &sroot_info, &norm_path).await?;
 
-    let mount_id = FileRepository::create_virtual_folder_mount(
+    let _mount_id = FileRepository::create_virtual_folder_mount(
         tx.as_mut(),
         node.id.clone(),
         real_folder_id.clone(),
@@ -60,14 +58,14 @@ pub async fn first_mount_folder(moa_id: String, node: Node, path: String) -> Res
 
     upsert_folder(&mut tx, real_folder_id.clone(), node.id, &norm_path, true, Some(true)).await?;
 
-    let scan_id = start_scan_job(moa_id.clone(), real_folder_id).await?;
+    let _scan_id = start_scan_job(moa_id.clone(), real_folder_id).await?;
 
     tx.commit().await?;
 
     Ok(())
 }
 
-pub async fn start_scan_job(moa_id: String, real_folder_id: String) -> Result<String> {
+pub async fn start_scan_job(_moa_id: String, _real_folder_id: String) -> Result<String> {
     Ok("".to_string())
 }
 
@@ -315,6 +313,7 @@ pub fn check_is_hidden(path: &Path) -> bool {
 // -- hash --
 
 // sha256
+#[allow(dead_code)]
 fn sha256_of(path: &Path) -> Result<String> {
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
@@ -324,6 +323,7 @@ fn sha256_of(path: &Path) -> Result<String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
+#[allow(dead_code)]
 pub fn sha256_of_img(path: &Path) -> Result<String> {
     if !matches!(FileType::from(path), FileType::Image) {
         bail!("Not an image file: {}", path.display());
@@ -352,7 +352,7 @@ pub fn xxh3_64_of(path: &Path) -> Result<String> {
     Ok(format!("{:016x}", hasher.finish()))
 }
 
-pub fn xxh3_644_of_img(path: &Path) -> Result<String> {
+pub fn _xxh3_644_of_img(path: &Path) -> Result<String> {
     if !matches!(FileType::from(path), FileType::Image) {
         bail!("Not an image file: {}", path.display());
     }

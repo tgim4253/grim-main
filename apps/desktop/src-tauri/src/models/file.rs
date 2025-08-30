@@ -5,6 +5,7 @@ use std::{
     convert::{From, TryFrom},
     fs::{self, Metadata},
     path::Path,
+    str::FromStr,
     string,
     time::UNIX_EPOCH,
 };
@@ -27,6 +28,7 @@ pub struct FileContent {
     pub node_id: String,
     pub mime: String,
     pub size: i64,
+    pub kind: FileType,
     pub sha256: Option<String>,
     pub xxh3_64: String,
     pub file_name: String,
@@ -122,6 +124,21 @@ pub enum FileType {
     Unknown,
 }
 
+impl FromStr for FileType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "image" => Ok(Self::Image),
+            "video" => Ok(Self::Video),
+            "document" => Ok(Self::Document),
+            "graphictool" => Ok(Self::GraphicTool),
+            "audio" => Ok(Self::Audio),
+            "archive" => Ok(Self::Archive),
+            _ => Ok(Self::Unknown),
+        }
+    }
+}
 impl From<&Path> for FileType {
     fn from(path: &Path) -> Self {
         match path.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase().as_str() {

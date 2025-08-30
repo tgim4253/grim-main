@@ -8,13 +8,13 @@ pub struct Connection {
     pub dst_node_id: String,
     pub kind_rule_id: String,
     pub kind: String,
-    pub weight: i64,
+    pub level: i32,
 }
 
 pub struct ConnectionKind {
     pub kind_rule_id: String,
     pub kind: String,
-    pub default_weight: i64,
+    pub default_level: i32,
     pub editable: bool,
     pub description: Option<String>,
 }

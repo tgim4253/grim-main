@@ -89,19 +89,19 @@ pub async fn seed_initial_data(pool: &Pool<Sqlite>) -> Result<()> {
     if count_rules == 0 {
         // Define seed data without IDs
         let seed_data = vec![
-            ("contains", 3, 0, "General reference"),
-            ("containedIn", 1, 0, "Folder/file containment"),
+            ("contains", 1, 0, "General reference"),
+            ("containedIn", 3, 0, "Folder/file containment"),
         ];
 
-        for (kind, default_weight, editable, description) in seed_data {
+        for (kind, default_level, editable, description) in seed_data {
             sqlx::query(
                 r#"INSERT OR IGNORE INTO connection_kind_rule
-                   (id, kind, default_weight, editable, description)
+                   (id, kind, default_level, editable, description)
                    VALUES (?1, ?2, ?3, ?4, ?5);"#,
             )
             .bind(get_unique_id())
             .bind(kind)
-            .bind(default_weight)
+            .bind(default_level)
             .bind(editable)
             .bind(description)
             .execute(&mut *tx)

@@ -30,8 +30,8 @@ CREATE TABLE IF NOT EXISTS node_tag (
 
 CREATE TABLE IF NOT EXISTS connection_kind_rule (
   id             TEXT PRIMARY KEY NOT NULL,                  -- uuid
-  kind           TEXT UNIQUE,                                -- unique identifier
-  default_weight INTEGER,
+  kind           TEXT UNIQUE NOT NULL,                                -- unique identifier
+  default_level  INTEGER NOT NULL DEFAULT 0,
   editable       INTEGER,                                    -- boolean
   description    TEXT
 );

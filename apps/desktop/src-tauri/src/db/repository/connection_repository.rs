@@ -1,7 +1,7 @@
 use anyhow::Result;
 use sqlx::{Executor, Sqlite};
 
-use crate::models::connection::{Connection, ConnectionKind};
+use crate::models::connection::Connection;
 
 pub struct ConnectionRepository;
 
@@ -24,7 +24,7 @@ impl ConnectionRepository {
                 c.dst_node_id     AS "dst_node_id!",
                 c.kind_id         AS "kind_rule_id!",
                 ckr.kind          AS "kind!",
-                ckr.default_weight AS "weight!: i32"
+                ckr.default_level AS "level!: i32"
             FROM connection c
             LEFT JOIN connection_kind_rule ckr ON c.kind_id = ckr.id
             WHERE c.src_node_id IN (SELECT value FROM json_each(?1))

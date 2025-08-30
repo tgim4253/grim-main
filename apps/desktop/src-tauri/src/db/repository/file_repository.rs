@@ -90,11 +90,11 @@ impl FileRepository {
         Ok(Node {
             id: node_id.clone(),
             kind: NodeKind::Folder,
-            data: NodeData::Folder(NodeFolder {
+            data: Some(NodeData::Folder(NodeFolder {
                 folder_id,
                 node_id: node_id.clone(),
                 folder_name: name,
-            }),
+            })),
             created_at: now.clone(),
             updated_at: now,
         })

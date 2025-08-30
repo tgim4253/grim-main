@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT\n                c.id              AS \"id!\",\n                c.src_node_id     AS \"src_node_id!\",\n                c.dst_node_id     AS \"dst_node_id!\",\n                c.kind_id         AS \"kind_rule_id!\",\n                ckr.kind          AS \"kind!\",\n                ckr.default_weight AS \"weight!: i32\"\n            FROM connection c\n            LEFT JOIN connection_kind_rule ckr ON c.kind_id = ckr.id\n            WHERE c.src_node_id IN (SELECT value FROM json_each(?1))\n            ",
+  "query": "\n            SELECT\n                c.id              AS \"id!\",\n                c.src_node_id     AS \"src_node_id!\",\n                c.dst_node_id     AS \"dst_node_id!\",\n                c.kind_id         AS \"kind_rule_id!\",\n                ckr.kind          AS \"kind!\",\n                ckr.default_level AS \"level!: i32\"\n            FROM connection c\n            LEFT JOIN connection_kind_rule ckr ON c.kind_id = ckr.id\n            WHERE c.src_node_id IN (SELECT value FROM json_each(?1))\n            ",
   "describe": {
     "columns": [
       {
@@ -29,7 +29,7 @@
         "type_info": "Text"
       },
       {
-        "name": "weight!: i32",
+        "name": "level!: i32",
         "ordinal": 5,
         "type_info": "Integer"
       }
@@ -42,9 +42,9 @@
       false,
       false,
       true,
-      true,
-      true
+      false,
+      false
     ]
   },
-  "hash": "a6e3c2df42001e72452b1ea2be72d2f4d1f260c8dad48c6e82d3e737e135a47d"
+  "hash": "fb1e825e46836b3eb3bcc3cb8d726bb6f14b0ccd83cda33b95f9d9db22ac7b25"
 }
