@@ -1,18 +1,23 @@
 {
   "folders": [
     {
+      "name": "grim-main",
       "path": ".",
     },
     {
+      "name": "src",
       "path": "apps/desktop/src",
     },
     {
+      "name": "src-tauri",
       "path": "apps/desktop/src-tauri",
     },
     {
+      "name": "ui",
       "path": "packages/ui",
     },
     {
+      "name": "dnd",
       "path": "packages/dnd",
     },
   ],

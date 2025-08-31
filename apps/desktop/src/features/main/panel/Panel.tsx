@@ -1,16 +1,23 @@
 import { usePanelsStore } from '@tgim/stores/index';
-import { memo, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { shallow, useShallow } from 'zustand/shallow';
 import ReactDOM from 'react-dom';
 import { ipc } from '../../../lib/ipc';
 import { useMoa } from '@tgim/hooks/useMoa';
+import GraphView from './panels/GraphView';
+import { GraphData, GraphResponse } from '@tgim/types/graph';
 
 interface PanelProps {
   panelId: string;
   hidden?: boolean;
 }
 
+type ViewType = 'graph' | 'node';
+
 const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
+  const [viewType, setViewType] = useState<ViewType>('graph');
+  const [graphData, setGraphData] = useState<GraphData | null>(null);
+
   const { panel, containerId, isActive } = usePanelsStore(
     useShallow(state => ({
       panel: state.panelEntities[panelId],
@@ -25,9 +32,39 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     console.log(panelId, 'created');
     if (containerId) {
       const el = document.getElementById(containerId);
+
       if (el) setContainer(el);
     }
   }, [containerId]);
+
+  const transformData = useCallback((data: GraphResponse) => {
+    console.log(data);
+    const nodes = data.nodes.map(node => {
+      return {
+        id: node.id,
+        label: node.kind,
+        data: node,
+      };
+    });
+
+    console.log(data.connections);
+    const connections = data.connections.map(connection => {
+      console.log(connection);
+      return {
+        source: connection.src_node_id,
+        target: connection.dst_node_id,
+        label: connection.kind,
+        data: connection,
+      };
+    });
+
+    console.log(nodes, connections);
+
+    return {
+      nodes,
+      links: connections,
+    };
+  }, []);
 
   if (!panel || !container) return null;
 
@@ -40,13 +77,13 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         if (!moaId) return;
         try {
           const data = await ipc.graph.getGraphOne(moaId, panel.nodeId);
-          console.log(data);
+          setGraphData(transformData(data));
         } catch (e) {
           console.error(e);
         }
       }}
     >
-      {panel.nodeId}
+      {viewType === 'graph' ? graphData && <GraphView graphData={graphData} /> : null}
     </div>,
     container,
   );

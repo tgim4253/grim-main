@@ -62,7 +62,6 @@ function collectPanelsAtFirstDepth(nodes: React.ReactNode): React.ReactElement<S
   const result: React.ReactElement<SplitPanelProps>[] = [];
   while (level.length > 0) {
     const nextLevel: React.ReactElement[] = [];
-    console.log(level);
     for (const el of level) {
       if (isSplitPanelEl(el)) {
         if (!(el.props as SplitPanelProps).hidden) {
@@ -102,7 +101,6 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
     const panels = React.useMemo(() => {
       return collectPanelsAtFirstDepth(rendered);
     }, [rendered]);
-    console.log(panels);
     const containerRef = useRef<HTMLDivElement | null>(null);
 
     // panel sizes in % of container main axis

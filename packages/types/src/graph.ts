@@ -3,6 +3,25 @@ export interface GraphResponse {
   connections: Connection[];
 }
 
+export interface GraphData {
+  nodes: GraphNode[];
+  links: GraphConnection[];
+}
+
+export interface GraphNode {
+  id: string;
+  label: string;
+  data: Node;
+}
+
+export interface GraphConnection {
+  source: string;
+  target: string;
+  label: string;
+
+  data: Connection;
+}
+
 export interface Connection {
   id: string;
   src_node_id: string;

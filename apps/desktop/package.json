@@ -26,6 +26,8 @@
     "os": "link:@tauri-apps/api/os",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-force-graph": "^1.48.0",
+    "react-force-graph-2d": "^1.28.0",
     "react-i18next": "^15.6.1",
     "react-modal": "^3.16.3",
     "react-router-dom": "^7.7.1",

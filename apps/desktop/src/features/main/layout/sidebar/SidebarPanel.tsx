@@ -1,5 +1,5 @@
 import useSidebarStore from '@tgim/stores/sidebarStore';
-import FileTreeDemo from '../../panels/FileTreePanel';
+import FileTreeDemo from '../../panel/FileTreePanel';
 
 const SidebarPanel: React.FC<SidebarProps> = ({ sidebarPosition }) => {
   const activeTab = useSidebarStore(state => state.sidebars[sidebarPosition].activeTab);

@@ -16,7 +16,7 @@ import ProgressWindow from './ProgressWindow';
 
 import { debounce } from 'lodash';
 import usePanelsStore from '@tgim/stores/panelStore';
-import PanelContainer from './panels/Container';
+import PanelContainer from './panel/Container';
 
 interface LayoutPorps {
   layoutId: string;
