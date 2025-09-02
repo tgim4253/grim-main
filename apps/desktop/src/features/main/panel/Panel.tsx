@@ -76,7 +76,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       onClick={async () => {
         if (!moaId) return;
         try {
-          const data = await ipc.graph.getGraphOne(moaId, panel.nodeId);
+          const data = await ipc.graph.getGraphOne(moaId, panel.nodeId.toString());
           setGraphData(transformData(data));
         } catch (e) {
           console.error(e);

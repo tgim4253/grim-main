@@ -6,7 +6,7 @@ import { immer } from 'zustand/middleware/immer';
 
 interface PanelItem {
   id: string;
-  nodeId: string;
+  nodeId: string | number;
   name: string;
 }
 

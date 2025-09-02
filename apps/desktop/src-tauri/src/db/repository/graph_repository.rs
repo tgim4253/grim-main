@@ -21,8 +21,6 @@ impl GraphRepository {
     {
         let depth = depth.unwrap_or(100);
 
-        println!("depth: {:?}", depth);
-
         struct Row {
             id: String,
             src_node_id: String,
@@ -117,6 +115,10 @@ impl GraphRepository {
             NodeRepository::fetch_nodes_by_ids(&mut *executor, node_ids.into_iter().collect())
                 .await?;
 
-        Ok(GraphResponse { nodes: nodes, connections: connections, root_node_id: None })
+        Ok(GraphResponse {
+            nodes: nodes,
+            connections: connections,
+            root_node_id: Some(root_node_id),
+        })
     }
 }

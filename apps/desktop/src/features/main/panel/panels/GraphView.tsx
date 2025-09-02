@@ -1,6 +1,8 @@
+import usePanelsStore from '@tgim/stores/panelStore';
 import { GraphData } from '@tgim/types/graph';
-import { useEffect, useRef, useState } from 'react';
+import { use, useEffect, useRef, useState } from 'react';
 import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d';
+import { useShallow } from 'zustand/shallow';
 
 interface Props {
   graphData: GraphData;
@@ -41,6 +43,8 @@ const GraphView: React.FC<Props> = ({ graphData }) => {
       fgRef.current.d3Force('charge')?.strength(-150);
     }
   }, []);
+
+  const { openNode } = usePanelsStore(useShallow(s => ({ openNode: s.addPanelWithoutContainer })));
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%' }}>
       <ForceGraph2D
@@ -53,7 +57,11 @@ const GraphView: React.FC<Props> = ({ graphData }) => {
         linkDirectionalParticles={1}
         linkDirectionalParticleSpeed={0.005}
         onNodeClick={node => {
-          alert(`클릭한 노드: ${node.id}`);
+          node.id &&
+            openNode({
+              nodeId: node.id,
+              name: node.id + '',
+            });
         }}
       />
     </div>
