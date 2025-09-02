@@ -116,7 +116,7 @@ impl FileRepository {
                 (id, storage_root_id, parent_id, name, name_norm, root_rel_path, abs_path_cached, mtime, error_flag, error_msg, created_at, updated_at)
             VALUES
                 (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'success', NULL, ?9, ?10)
-            ON CONFLICT(storage_root_id, parent_id, name_norm) DO UPDATE SET
+            ON CONFLICT(storage_root_id, parent_key, name_norm) DO UPDATE SET
                 name        = excluded.name,
                 name_norm   = excluded.name_norm,
                 mtime       = excluded.mtime,

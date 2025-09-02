@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS real_folder (
   id                TEXT PRIMARY KEY NOT NULL,                         -- uuid
   storage_root_id   TEXT REFERENCES storage_root(id) ON DELETE SET NULL,
   parent_id         TEXT REFERENCES real_folder(id) ON DELETE CASCADE,
+  parent_key        TEXT GENERATED ALWAYS AS (COALESCE(parent_id, '_root_')) STORED,
   name              TEXT NOT NULL,                            -- single segment
   name_norm         TEXT NOT NULL,                                     -- lowercased for case-insensitive FS
   root_rel_path     TEXT,                                     -- optional cache
@@ -102,7 +103,7 @@ CREATE TABLE IF NOT EXISTS real_folder (
   created_at        TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
 
-  UNIQUE (storage_root_id, parent_id, name_norm)
+  UNIQUE (storage_root_id, parent_key, name_norm)
 );
 
 CREATE INDEX IF NOT EXISTS idx_real_folder_err    ON real_folder(error_flag);

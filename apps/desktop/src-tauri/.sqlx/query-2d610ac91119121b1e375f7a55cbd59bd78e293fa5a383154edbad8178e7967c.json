@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO real_folder\n                (id, storage_root_id, parent_id, name, name_norm, root_rel_path, abs_path_cached, mtime, error_flag, error_msg, created_at, updated_at)\n            VALUES\n                (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'success', NULL, ?9, ?10)\n            ON CONFLICT(storage_root_id, parent_key, name_norm) DO UPDATE SET\n                name        = excluded.name,\n                name_norm   = excluded.name_norm,\n                mtime       = excluded.mtime,\n                root_rel_path = excluded.root_rel_path,\n                abs_path_cached = excluded.abs_path_cached,\n                error_flag  = 'success',\n                error_msg   = NULL,\n                updated_at  = ?10\n            RETURNING id as \"id!: String\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2d610ac91119121b1e375f7a55cbd59bd78e293fa5a383154edbad8178e7967c"
+}
