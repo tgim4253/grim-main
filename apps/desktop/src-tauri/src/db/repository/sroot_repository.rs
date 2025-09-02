@@ -45,7 +45,6 @@ impl SrootRepository {
             ON CONFLICT(platform, stable_id) DO UPDATE SET
                 secondary_id = excluded.secondary_id,
                 kind         = excluded.kind,
-                label        = excluded.label,
                 is_available = excluded.is_available,
                 updated_at   = excluded.updated_at
             RETURNING id as "id!: String"
