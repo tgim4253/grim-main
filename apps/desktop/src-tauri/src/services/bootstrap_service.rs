@@ -323,6 +323,7 @@ async fn ensure_mounted_volume(moa_id: &str) -> Result<()> {
         }
 
         // refresh real_folder.abs_path_cached for this root
+        #[cfg(target_os = "macos")]
         sqlx::query(
             r#"
             UPDATE real_folder
@@ -332,6 +333,24 @@ async fn ensure_mounted_volume(moa_id: &str) -> Result<()> {
                END,
                    updated_at = $3
              WHERE storage_root_id = $1
+            "#,
+        )
+        .bind(rid)
+        .bind(&m.mount_path)
+        .bind(&now_s)
+        .execute(&mut *tx)
+        .await?;
+
+        #[cfg(windows)]
+        sqlx::query(
+            r#"
+            UPDATE real_folder
+                SET abs_path_cached = CASE
+                    WHEN root_rel_path IS NULL OR root_rel_path = '' THEN $2
+                    ELSE rtrim($2, '\') || '\' || ltrim(root_rel_path, '\')
+                END,
+                    updated_at = $3
+            WHERE storage_root_id = $1
             "#,
         )
         .bind(rid)

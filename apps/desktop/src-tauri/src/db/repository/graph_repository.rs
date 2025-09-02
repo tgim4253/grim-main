@@ -21,8 +21,6 @@ impl GraphRepository {
     {
         let depth = depth.unwrap_or(100);
 
-        println!("depth: {:?}", depth);
-
         struct Row {
             id: String,
             src_node_id: String,

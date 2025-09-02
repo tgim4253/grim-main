@@ -248,6 +248,7 @@ pub async fn ensure_real_folder(
 
     let mut rel_path = PathBuf::from("");
     let mut abs_path = PathBuf::from(&mount_path);
+
     let now = crate::utils::date::get_now_date();
 
     for component in components {

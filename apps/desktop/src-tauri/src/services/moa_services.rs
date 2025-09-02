@@ -74,7 +74,6 @@ pub fn save_moas(app: &tauri::AppHandle, moas: &Vec<Moa>) -> Result<(), String> 
         if let Some(parent) = moa_file_path.parent() {
             fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
-        println!("{}", moa_file_path.display());
         if let Err(e) = fs::write(&moa_file_path, file_content) {
             return Err(format!("Failed to save moas: {}", e));
         }

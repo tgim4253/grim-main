@@ -5114,6 +5114,8 @@ dependencies = [
  "tokio",
  "twox-hash",
  "uuid",
+ "winapi 0.3.9",
+ "windows 0.61.3",
 ]
 
 [[package]]
