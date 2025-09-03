@@ -67,7 +67,7 @@ impl GraphRepository {
                 c.src_node_id,
                 c.dst_node_id,
                 CAST(ck.default_level AS INTEGER)               AS path_level,
-                w.visited || ',' || CAST(c.dst_node_id AS TEXT) AS visited,
+                w.visited || ',' || CAST(c.src_node_id AS TEXT) AS visited,
                 CAST(c.kind_id AS TEXT)                         AS kind_rule_id,
                 CAST(ck.kind AS TEXT)                           AS kind,
                 w.depth + 1                                     AS depth
