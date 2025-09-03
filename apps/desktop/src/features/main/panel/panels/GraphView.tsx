@@ -4,13 +4,13 @@ import { NodeRenderer } from '@tgim/ui/index';
 import { use, useEffect, useRef, useState } from 'react';
 import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d';
 import { useShallow } from 'zustand/shallow';
+import * as d3 from 'd3-force';
 
 interface Props {
   graphData: GraphData;
 }
 
 const GraphView: React.FC<Props> = ({ graphData }) => {
-  console.log(graphData);
   const containerRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<ForceGraphMethods | undefined>(undefined);
 
@@ -41,7 +41,13 @@ const GraphView: React.FC<Props> = ({ graphData }) => {
 
   useEffect(() => {
     if (fgRef.current) {
-      fgRef.current.d3Force('charge')?.strength(-150);
+      fgRef.current.d3Force('charge')?.strength(-50);
+      fgRef.current.d3Force(
+        'collide',
+        d3.forceCollide(node => {
+          return node.size + 8; // node.size 속성값을 반지름으로 사용
+        }),
+      );
     }
   }, []);
 
@@ -53,14 +59,24 @@ const GraphView: React.FC<Props> = ({ graphData }) => {
         width={dimensions.width}
         height={dimensions.height}
         graphData={graphData}
-        nodeLabel="id"
+        nodeLabel="label"
         nodeAutoColorBy="group"
         linkDirectionalArrowLength={3.5}
-        linkDirectionalArrowRelPos={1}
-        linkCurvature={0.25}
+        linkDirectionalArrowRelPos={0.96}
+        linkColor={() => '#f3f3f3'}
+        linkWidth={0.1}
+        linkCurvature={0}
         nodeCanvasObject={(node, ctx, globalScale) => {
-          // @ts-ignore
-          NodeRenderer.circleRenderer(ctx, node, globalScale);
+          NodeRenderer(node.type)?.(
+            ctx,
+            {
+              x: node.x || 0,
+              y: node.y || 0,
+              size: node.size,
+              label: node.label,
+            },
+            globalScale,
+          );
         }}
         onNodeClick={node => {
           node.id &&

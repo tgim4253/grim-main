@@ -1,6 +1,7 @@
 export interface GraphResponse {
   nodes: Node[];
   connections: Connection[];
+  root_node_id: string | null;
 }
 
 export interface GraphData {
@@ -11,8 +12,11 @@ export interface GraphData {
 export interface GraphNode {
   id: string;
   label: string;
-  data: Node;
+  size: number;
+  type: GraphNodeType;
 }
+
+export type GraphNodeType = 'folder' | 'tag' | 'image' | 'document' | 'default' | string;
 
 export interface GraphConnection {
   source: string;
@@ -34,7 +38,10 @@ export interface Connection {
 export interface Node {
   id: string;
   kind: string;
-  data: any;
+  data: {
+    ['File']?: NodeFile;
+    ['Folder']?: NodeFolder;
+  };
   created_at: string;
   updated_at: string;
 }
@@ -43,12 +50,10 @@ export enum NodeKind {
   Folder = 'folder',
   File = 'file',
 }
-export type NodeData = NodeFolder | NodeFile;
 
 export interface NodeFolder {
   folder_id: string;
   node_id: string;
-  real_folder_id: string | null;
   folder_name: string | null;
 }
 
@@ -56,5 +61,18 @@ export interface NodeFile {
   file_id: string;
   node_id: string;
   sha256: string | null;
-  file_name: string | null;
+  xxh3_64: string;
+  kind: FileType;
+  file_name: string;
+  size: number;
+}
+
+export enum FileType {
+  Image = 'image',
+  Video = 'video',
+  Document = 'document',
+  GraphicTool = 'graphictool',
+  Audio = 'audio',
+  Archive = 'archive',
+  Unknown = 'unknown',
 }

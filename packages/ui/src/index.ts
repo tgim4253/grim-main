@@ -8,4 +8,4 @@ export * as Splitter from './Splitter';
 export * from './FileTree';
 export { default as Modal } from './Modal';
 export { default as Tab } from './Tab';
-export * as NodeRenderer from './Node';
+export { default as NodeRenderer } from './Node';
