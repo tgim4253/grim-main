@@ -1,5 +1,6 @@
 import usePanelsStore from '@tgim/stores/panelStore';
 import { GraphData } from '@tgim/types/graph';
+import { NodeRenderer } from '@tgim/ui/index';
 import { use, useEffect, useRef, useState } from 'react';
 import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d';
 import { useShallow } from 'zustand/shallow';
@@ -56,6 +57,10 @@ const GraphView: React.FC<Props> = ({ graphData }) => {
         nodeAutoColorBy="group"
         linkDirectionalParticles={1}
         linkDirectionalParticleSpeed={0.005}
+        nodeCanvasObject={(node, ctx, globalScale) => {
+          // @ts-ignore
+          NodeRenderer.tagRenderer(ctx, node, globalScale);
+        }}
         onNodeClick={node => {
           node.id &&
             openNode({
