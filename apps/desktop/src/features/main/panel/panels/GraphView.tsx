@@ -55,11 +55,12 @@ const GraphView: React.FC<Props> = ({ graphData }) => {
         graphData={graphData}
         nodeLabel="id"
         nodeAutoColorBy="group"
-        linkDirectionalParticles={1}
-        linkDirectionalParticleSpeed={0.005}
+        linkDirectionalArrowLength={3.5}
+        linkDirectionalArrowRelPos={1}
+        linkCurvature={0.25}
         nodeCanvasObject={(node, ctx, globalScale) => {
           // @ts-ignore
-          NodeRenderer.tagRenderer(ctx, node, globalScale);
+          NodeRenderer.circleRenderer(ctx, node, globalScale);
         }}
         onNodeClick={node => {
           node.id &&
