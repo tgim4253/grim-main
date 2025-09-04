@@ -29,10 +29,10 @@ impl NodeRepository {
             "#,
             file_content_id
         )
-        .fetch_one(executor)
+        .fetch_optional(executor)
         .await?;
 
-        Ok(Some(node_id))
+        Ok(node_id)
     }
     pub async fn fetch_all_nodes_by_kind<'a, E>(
         executor: &mut E,
