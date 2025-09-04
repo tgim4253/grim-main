@@ -209,6 +209,10 @@ async fn upsert_file_entry(
     // upsert file_content
     let file_content_id = FileRepository::upsert_file_content(tx.as_mut(), &file_info).await?;
 
+    if NodeRepository::exists_node_with_file_content(tx.as_mut(), file_content_id.clone()).await? {
+        return Ok(());
+    }
+
     NodeRepository::create_file_node(
         tx.as_mut(),
         parent_virtual_folder_id.to_string(),
