@@ -14,27 +14,25 @@ use crate::{
 pub struct NodeRepository;
 
 impl NodeRepository {
-    pub async fn exists_node_with_file_content<'a, E>(
+    pub async fn fetch_node_id_by_fc_id<'a, E>(
         executor: &mut E,
         file_content_id: String,
-    ) -> Result<bool>
+    ) -> Result<Option<String>>
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
     {
-        let exists = sqlx::query_scalar!(
+        let node_id = sqlx::query_scalar!(
             r#"
-            SELECT EXISTS(
-                SELECT 1
+                SELECT node_id
                 FROM node_file_binding
                 WHERE file_content_id = ?1
-            )
             "#,
             file_content_id
         )
         .fetch_one(executor)
         .await?;
 
-        Ok(exists != 0)
+        Ok(Some(node_id))
     }
     pub async fn fetch_all_nodes_by_kind<'a, E>(
         executor: &mut E,
@@ -409,7 +407,7 @@ impl NodeRepository {
         Ok(node_id)
     }
 
-    pub async fn create_file_node<'a, E>(
+    pub async fn upsert_file_node<'a, E>(
         executor: &mut E,
         parent_node_id: String,
         file_content_id: String,
@@ -419,17 +417,25 @@ impl NodeRepository {
     {
         let now = crate::utils::date::get_now_date();
 
-        let node_id = Self::insert_node(executor, NodeKind::File, &now).await?;
+        let node_id = if let Some(node_id) =
+            NodeRepository::fetch_node_id_by_fc_id(executor, file_content_id.clone()).await?
+        {
+            node_id
+        } else {
+            let node_id = Self::insert_node(executor, NodeKind::File, &now).await?;
+            Self::insert_node_file_binding(
+                executor,
+                node_id.clone(),
+                file_content_id.clone(),
+                now.clone(),
+            )
+            .await?;
+            node_id
+        };
 
-        Self::insert_node_file_binding(
-            executor,
-            node_id.clone(),
-            file_content_id.clone(),
-            now.clone(),
-        )
-        .await?;
-
-        Self::create_contains_edges(executor, parent_node_id, node_id, now).await?;
+        // todo: upsert containse_edges?
+        if let Err(e) = Self::create_contains_edges(executor, parent_node_id, node_id, now).await {
+        };
 
         Ok(())
     }
