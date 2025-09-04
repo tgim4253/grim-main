@@ -14,6 +14,28 @@ use crate::{
 pub struct NodeRepository;
 
 impl NodeRepository {
+    pub async fn exists_node_with_file_content<'a, E>(
+        executor: &mut E,
+        file_content_id: String,
+    ) -> Result<bool>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let exists = sqlx::query_scalar!(
+            r#"
+            SELECT EXISTS(
+                SELECT 1
+                FROM node_file_binding
+                WHERE file_content_id = ?1
+            )
+            "#,
+            file_content_id
+        )
+        .fetch_one(executor)
+        .await?;
+
+        Ok(exists != 0)
+    }
     pub async fn fetch_all_nodes_by_kind<'a, E>(
         executor: &mut E,
         kinds: HashSet<NodeKind>,
