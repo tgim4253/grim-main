@@ -8,9 +8,10 @@ import * as d3 from 'd3-force';
 
 interface Props {
   graphData: GraphData;
+  rootNodeId: string | null;
 }
 
-const GraphView: React.FC<Props> = ({ graphData }) => {
+const GraphView: React.FC<Props> = ({ graphData, rootNodeId }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<ForceGraphMethods | undefined>(undefined);
 
@@ -40,7 +41,7 @@ const GraphView: React.FC<Props> = ({ graphData }) => {
   }, []);
 
   useEffect(() => {
-    if (fgRef.current) {
+    if (fgRef && fgRef.current) {
       fgRef.current.d3Force('charge')?.strength(-50);
       fgRef.current.d3Force(
         'collide',

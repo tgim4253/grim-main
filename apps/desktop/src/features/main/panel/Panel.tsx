@@ -26,6 +26,7 @@ type ViewType = 'graph' | 'node';
 const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [viewType, setViewType] = useState<ViewType>('graph');
   const [graphData, setGraphData] = useState<GraphData | null>(null);
+  const [rootNodeId, setRootNodeId] = useState<string | null>(null);
 
   const { panel, containerId, isActive } = usePanelsStore(
     useShallow(state => ({
@@ -57,6 +58,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     as();
   }, [moaId]);
   const transformData = useCallback((graphData: GraphResponse): GraphData => {
+    setRootNodeId(graphData.root_node_id);
     console.log(graphData);
     const nodes: GraphNode[] = graphData.nodes.map(node => {
       const defaultSize = 10;
@@ -120,7 +122,9 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         ${isActive ? 'border-blue-500' : 'border-gray-300'} 
         ${hidden ? 'hidden' : ''}`}
     >
-      {viewType === 'graph' ? graphData && <GraphView graphData={graphData} /> : null}
+      {viewType === 'graph'
+        ? graphData && <GraphView rootNodeId={rootNodeId} graphData={graphData} />
+        : null}
     </div>,
     container,
   );
