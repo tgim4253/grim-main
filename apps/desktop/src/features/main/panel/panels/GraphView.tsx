@@ -82,7 +82,7 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId }) => {
         onNodeClick={node => {
           node.id &&
             openNode({
-              nodeId: node.id,
+              nodeId: node.nodeId,
               name: node.id + '',
             });
         }}

@@ -1,7 +1,7 @@
 export interface GraphResponse {
   nodes: Node[];
   connections: Connection[];
-  root_node_id: string | null;
+  root_node_id: string;
 }
 
 export interface GraphData {
@@ -11,6 +11,7 @@ export interface GraphData {
 
 export interface GraphNode {
   id: string;
+  nodeId: string;
   label: string;
   size: number;
   type: GraphNodeType;

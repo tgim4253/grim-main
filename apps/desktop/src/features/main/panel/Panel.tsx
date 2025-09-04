@@ -6,15 +6,19 @@ import { ipc } from '../../../lib/ipc';
 import { useMoa } from '@tgim/hooks/useMoa';
 import GraphView from './panels/GraphView';
 import {
+  Connection,
   FileType,
+  GraphConnection,
   GraphData,
   GraphNode,
   GraphNodeType,
   GraphResponse,
+  Node,
   NodeFile,
   NodeFolder,
   NodeKind,
 } from '@tgim/types/graph';
+import { createNewId } from '@tgim/utils/identifier';
 
 interface PanelProps {
   panelId: string;
@@ -59,10 +63,28 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   }, [moaId]);
   const transformData = useCallback((graphData: GraphResponse): GraphData => {
     setRootNodeId(graphData.root_node_id);
-    console.log(graphData);
-    const nodes: GraphNode[] = graphData.nodes.map(node => {
+
+    const nodesMap: Record<string, Node> = {};
+    graphData.nodes.forEach(node => {
+      nodesMap[node.id] = node;
+    });
+    const connectionsMap: Record<string, Connection[]> = {};
+    graphData.connections.forEach(connection => {
+      if (!connectionsMap[connection.src_node_id]) {
+        connectionsMap[connection.src_node_id] = [];
+      }
+      connectionsMap[connection.src_node_id].push(connection);
+    });
+
+    console.log(nodesMap);
+    console.log(connectionsMap);
+    const nodes: GraphNode[] = [];
+    const links: GraphConnection[] = [];
+
+    const getNodeData = (node: Node, graphNodeId?: string) => {
       const defaultSize = 10;
       const nodeSize = node.id == graphData.root_node_id ? defaultSize * 1.7 : defaultSize;
+      if (!graphNodeId) graphNodeId = createNewId();
 
       if (node.kind == NodeKind.File && node.data['File']) {
         let data = node.data['File'];
@@ -75,7 +97,8 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
           type = 'document';
         }
         return {
-          id: node.id,
+          id: graphNodeId,
+          nodeId: node.id,
           label: data.file_name ?? 'file',
           size: nodeSize,
           type: type,
@@ -84,7 +107,8 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         let data = node.data['Folder'];
 
         return {
-          id: node.id,
+          id: graphNodeId,
+          nodeId: node.id,
           label: data.folder_name ?? 'folder',
           size: nodeSize,
           type: 'folder',
@@ -92,25 +116,68 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       }
 
       return {
-        id: node.id,
+        id: graphNodeId,
+        nodeId: node.id,
         label: node.kind,
         size: nodeSize,
         type: 'default',
       };
-    });
+    };
 
-    const connections = graphData.connections.map(connection => {
-      return {
-        source: connection.src_node_id,
-        target: connection.dst_node_id,
-        label: connection.kind,
-        data: connection,
-      };
-    });
+    const createNode = (startNodeId: string): string => {
+      // Stack holds work items to expand, along with the parent relation
+      const stack: Array<{
+        origId: string; // original node id to materialize
+        parentNewId?: string; // newly created id of parent (if any)
+        via?: Connection; // connection from parent -> this node
+      }> = [{ origId: startNodeId }];
 
+      // We will create a brand-new node for EVERY stack item, even if origId repeats.
+      // This mirrors the original recursive function (children are not shared).
+      let rootNewId: string | undefined;
+
+      while (stack.length > 0) {
+        const { origId, parentNewId, via } = stack.pop()!;
+
+        // 1) Create a fresh node id and materialize the node
+        const newId = createNewId();
+        const node = nodesMap[origId];
+        nodes.push(getNodeData(node, newId));
+
+        // Capture root id (the very first item expanded has no parent)
+        if (!parentNewId && rootNewId === undefined) {
+          rootNewId = newId;
+        }
+
+        // 2) If we came from a parent, create the link now
+        if (parentNewId && via) {
+          links.push({
+            source: parentNewId,
+            target: newId,
+            label: via.kind,
+            data: via,
+          });
+        }
+
+        // 3) Enqueue children; they will each create brand-new nodes
+        const connections: Connection[] = connectionsMap[origId] ?? [];
+        for (const connection of connections) {
+          stack.push({
+            origId: connection.dst_node_id,
+            parentNewId: newId,
+            via: connection,
+          });
+        }
+      }
+
+      // rootNewId must exist because startNodeId produced at least one node
+      return rootNewId!;
+    };
+
+    createNode(graphData.root_node_id);
     return {
       nodes,
-      links: connections,
+      links,
     };
   }, []);
 

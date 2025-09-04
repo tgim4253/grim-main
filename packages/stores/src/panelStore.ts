@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { v4 as uuidv4 } from 'uuid';
+import { createNewId } from '@tgim/utils/index';
 import { immer } from 'zustand/middleware/immer';
 
 /* ---------- Types ---------- */
@@ -69,9 +69,6 @@ interface PanelsState {
   setActivePanel: (panelId: PanelId | null) => void;
   getFocusedContainerId: () => ContainerId | null;
 }
-
-/* ---------- Helpers ---------- */
-const createNewId = () => uuidv4();
 
 /* ---------- Store ---------- */
 

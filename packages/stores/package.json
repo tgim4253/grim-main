@@ -29,7 +29,6 @@
     "immer": "^10.1.1",
     "lucide-react": "^0.525.0",
     "react-arborist": "^3.4.3",
-    "uuid": "^11.1.0",
     "zustand": "^5.0.6"
   }
 }
