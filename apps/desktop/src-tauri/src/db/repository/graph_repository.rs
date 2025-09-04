@@ -115,10 +115,6 @@ impl GraphRepository {
             NodeRepository::fetch_nodes_by_ids(&mut *executor, node_ids.into_iter().collect())
                 .await?;
 
-        Ok(GraphResponse {
-            nodes: nodes,
-            connections: connections,
-            root_node_id: Some(root_node_id),
-        })
+        Ok(GraphResponse { nodes: nodes, connections: connections, root_node_id: root_node_id })
     }
 }
