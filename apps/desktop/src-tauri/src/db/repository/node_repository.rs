@@ -5,6 +5,7 @@ use std::{collections::HashSet, str::FromStr};
 use crate::{
     db::repository::connection_repository::ConnectionRepository,
     models::{
+        connection::{EdgeType, RelationType},
         file::{FileContent, FileType, NodeFolder},
         node::{Node, NodeData, NodeKind},
     },
@@ -402,7 +403,7 @@ impl NodeRepository {
         )
         .await?;
 
-        Self::create_contains_edges(executor, parent_node_id, node_id.clone(), now).await?;
+        Self::create_folder_to_folder_edges(executor, parent_node_id, node_id.clone(), now).await?;
 
         Ok(node_id)
     }
@@ -434,12 +435,13 @@ impl NodeRepository {
         };
 
         // todo: upsert containse_edges?
-        if let Err(e) = Self::create_contains_edges(executor, parent_node_id, node_id, now).await {
+        if let Err(e) = Self::create_folder_file_edges(executor, parent_node_id, node_id, now).await
+        {
         };
 
         Ok(())
     }
-    async fn create_contains_edges<'a, E>(
+    async fn create_folder_to_folder_edges<'a, E>(
         executor: &mut E,
         parent_node_id: String,
         child_node_id: String,
@@ -452,7 +454,7 @@ impl NodeRepository {
             executor,
             parent_node_id.clone(),
             child_node_id.clone(),
-            "contains".to_string(),
+            RelationType::ChildFolder,
             now.clone(),
         )
         .await?;
@@ -462,7 +464,38 @@ impl NodeRepository {
             executor,
             child_node_id.clone(),
             parent_node_id.clone(),
-            "containedIn".to_string(),
+            RelationType::ParentFolder,
+            now.clone(),
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    async fn create_folder_file_edges<'a, E>(
+        executor: &mut E,
+        folder_node_id: String,
+        file_node_id: String,
+        now: String,
+    ) -> Result<()>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let _ = ConnectionRepository::insert_connection(
+            executor,
+            folder_node_id.clone(),
+            file_node_id.clone(),
+            RelationType::ContainsFile,
+            now.clone(),
+        )
+        .await?;
+
+        // child -> parent (containedIn)
+        let _ = ConnectionRepository::insert_connection(
+            executor,
+            file_node_id.clone(),
+            folder_node_id.clone(),
+            RelationType::BelongToFolder,
             now.clone(),
         )
         .await?;

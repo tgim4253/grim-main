@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO connection_kind_rule\n                   (id, kind, default_level, editable, description)\n                   VALUES (?1, ?2, ?3, ?4, ?5);",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "845dd48d7f91fa6dd9bbb93471fcfe7615ab07f4ad77d40576de0d9e4b1aa7a8"
+}

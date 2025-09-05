@@ -17,6 +17,7 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId }) => {
 
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   useEffect(() => {
+    console.log(graphData);
     const updateDimensions = () => {
       if (containerRef.current) {
         setDimensions({
@@ -62,8 +63,10 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId }) => {
         graphData={graphData}
         nodeLabel="label"
         nodeAutoColorBy="group"
-        linkDirectionalArrowLength={3.5}
-        linkDirectionalArrowRelPos={0.96}
+        dagMode="radialout"
+        dagLevelDistance={80}
+        // linkDirectionalArrowLength={3.5}
+        // linkDirectionalArrowRelPos={0.96}
         linkColor={() => '#f3f3f3'}
         linkWidth={0.1}
         linkCurvature={0}

@@ -40,7 +40,6 @@ impl GraphRepository {
                 src_node_id,
                 dst_node_id,
                 path_level,   -- INTEGER
-                visited,      -- TEXT: comma-separated node ids
                 kind_rule_id, -- TEXT
                 kind,         -- TEXT
                 depth         -- INTEGER
@@ -51,7 +50,6 @@ impl GraphRepository {
                 c.src_node_id,
                 c.dst_node_id,
                 CAST(ck.default_level AS INTEGER)                 AS path_level,   -- 4
-                CAST(c.src_node_id AS TEXT)                       AS visited,      -- 5
                 CAST(c.kind_id AS TEXT)                           AS kind_rule_id, -- 6
                 CAST(ck.kind AS TEXT)                             AS kind,         -- 7
                 1                                                AS depth         -- 8
@@ -67,16 +65,15 @@ impl GraphRepository {
                 c.src_node_id,
                 c.dst_node_id,
                 CAST(ck.default_level AS INTEGER)               AS path_level,
-                w.visited || ',' || CAST(c.src_node_id AS TEXT) AS visited,
                 CAST(c.kind_id AS TEXT)                         AS kind_rule_id,
                 CAST(ck.kind AS TEXT)                           AS kind,
                 w.depth + 1                                     AS depth
                 FROM walk w
                 JOIN connection c ON c.src_node_id = w.dst_node_id
                 JOIN connection_kind_rule ck ON c.kind_id = ck.id
-                                        AND w.path_level != 3
+                                        AND w.path_level <> 3
                 WHERE w.depth < ?2
-                AND instr(',' || w.visited || ',', ',' || CAST(c.dst_node_id AS TEXT) || ',') = 0
+                    AND c.dst_node_id <> w.src_node_id
             )
             SELECT
             CAST(id AS TEXT)          AS "id!: String",

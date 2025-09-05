@@ -1,7 +1,7 @@
 use anyhow::Result;
 use sqlx::{Executor, Sqlite};
 
-use crate::models::connection::Connection;
+use crate::models::connection::{Connection, EdgeType, RelationType};
 
 pub struct ConnectionRepository;
 
@@ -41,7 +41,7 @@ impl ConnectionRepository {
         executor: &mut E,
         src_node_id: String,
         dst_node_id: String,
-        kind: String,
+        kind: RelationType,
         now: String,
     ) -> Result<String>
     where

@@ -6,7 +6,10 @@ use sqlx::{
 };
 use std::{fs, path::Path, str::FromStr};
 
-use crate::utils::{date::get_now_date, identifier::get_unique_id};
+use crate::{
+    models::connection::RelationType,
+    utils::{date::get_now_date, identifier::get_unique_id},
+};
 
 // Desired DB user_version for schema compatibility
 pub const TARGET_DB_VERSION: i32 = 1;
@@ -89,21 +92,24 @@ pub async fn seed_initial_data(pool: &Pool<Sqlite>) -> Result<()> {
     if count_rules == 0 {
         // Define seed data without IDs
         let seed_data = vec![
-            ("contains", 1, 0, "General reference"),
-            ("containedIn", 3, 0, "Folder/file containment"),
+            (RelationType::ContainsFile, 3, 0, "Folder -> File"),
+            (RelationType::BelongToFolder, 3, 0, "File -> Folder"),
+            (RelationType::ParentFolder, 3, 0, "Folder(child) -> Folder(parent)"),
+            (RelationType::ChildFolder, 1, 0, "Folder(parent) -> Folder(child)"),
         ];
 
         for (kind, default_level, editable, description) in seed_data {
-            sqlx::query(
+            let id = get_unique_id();
+            sqlx::query!(
                 r#"INSERT OR IGNORE INTO connection_kind_rule
                    (id, kind, default_level, editable, description)
                    VALUES (?1, ?2, ?3, ?4, ?5);"#,
+                id,
+                kind,
+                default_level,
+                editable,
+                description
             )
-            .bind(get_unique_id())
-            .bind(kind)
-            .bind(default_level)
-            .bind(editable)
-            .bind(description)
             .execute(&mut *tx)
             .await?;
         }

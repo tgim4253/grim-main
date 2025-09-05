@@ -15,6 +15,9 @@ export interface GraphNode {
   label: string;
   size: number;
   type: GraphNodeType;
+  depth?: number;
+  fx?: number;
+  fy?: number;
 }
 
 export type GraphNodeType = 'folder' | 'tag' | 'image' | 'document' | 'default' | string;
@@ -32,8 +35,8 @@ export interface Connection {
   src_node_id: string;
   dst_node_id: string;
   kind_rule_id: string;
-  kind: string;
-  weight: number;
+  kind: RelationType;
+  level: number;
 }
 
 export interface Node {
@@ -76,4 +79,11 @@ export enum FileType {
   Audio = 'audio',
   Archive = 'archive',
   Unknown = 'unknown',
+}
+
+export enum RelationType {
+  ContainsFile = 'containsfile',
+  BelongToFolder = 'belongtofolder',
+  ParentFolder = 'parentfolder',
+  ChildFolder = 'childfolder',
 }

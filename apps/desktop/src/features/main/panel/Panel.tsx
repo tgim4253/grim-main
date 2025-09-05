@@ -130,6 +130,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         origId: string; // original node id to materialize
         parentNewId?: string; // newly created id of parent (if any)
         via?: Connection; // connection from parent -> this node
+        prevLevel?: number;
       }> = [{ origId: startNodeId }];
 
       // We will create a brand-new node for EVERY stack item, even if origId repeats.
@@ -137,7 +138,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       let rootNewId: string | undefined;
 
       while (stack.length > 0) {
-        const { origId, parentNewId, via } = stack.pop()!;
+        const { origId, parentNewId, via, prevLevel } = stack.pop()!;
 
         // 1) Create a fresh node id and materialize the node
         const newId = createNewId();
@@ -151,22 +152,35 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
 
         // 2) If we came from a parent, create the link now
         if (parentNewId && via) {
-          links.push({
-            source: parentNewId,
-            target: newId,
-            label: via.kind,
-            data: via,
-          });
+          // backward
+          if (via.level == 3) {
+            links.push({
+              source: newId,
+              target: parentNewId,
+              label: via.kind,
+              data: via,
+            });
+          } else {
+            // foward or bidirectional
+            links.push({
+              source: parentNewId,
+              target: newId,
+              label: via.kind,
+              data: via,
+            });
+          }
         }
 
         // 3) Enqueue children; they will each create brand-new nodes
         const connections: Connection[] = connectionsMap[origId] ?? [];
         for (const connection of connections) {
-          stack.push({
-            origId: connection.dst_node_id,
-            parentNewId: newId,
-            via: connection,
-          });
+          if (prevLevel !== 3)
+            stack.push({
+              origId: connection.dst_node_id,
+              parentNewId: newId,
+              via: connection,
+              prevLevel: connection.level,
+            });
         }
       }
 

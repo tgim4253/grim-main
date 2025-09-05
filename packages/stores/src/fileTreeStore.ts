@@ -5,6 +5,7 @@ import {
   NodeFile,
   NodeFolder,
   NodeKind,
+  RelationType,
 } from '@tgim/types/index';
 
 interface FileTreeState {
@@ -131,21 +132,21 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
   treeData: [],
   setTreeData: data => set({ treeData: data }),
 
-  convertToTreeData: (data) => {
+  convertToTreeData: data => {
     const { nodes, connections } = data;
 
     const nodeMap = new Map<string, FileTreeData>();
-    const incoming = new Map<string, number>(); 
+    const incoming = new Map<string, number>();
 
     for (const n of nodes) {
-      const folderData = (n.data?.["Folder"] as NodeFolder) ?? undefined;
-      const fileData = (n.data?.["File"] as NodeFile) ?? undefined;
+      const folderData = (n.data?.['Folder'] as NodeFolder) ?? undefined;
+      const fileData = (n.data?.['File'] as NodeFile) ?? undefined;
       nodeMap.set(n.id, {
         id: n.id,
-        name: folderData?.folder_name ?? fileData?.file_name ?? "",
-        icon: n.kind === "folder" ? "folder" : "file",
-        type:  n.kind === "folder" ? NodeKind.Folder : NodeKind.File,
-        children: n.kind === "folder" ? [] : undefined,
+        name: folderData?.folder_name ?? fileData?.file_name ?? '',
+        icon: n.kind === 'folder' ? 'folder' : 'file',
+        type: n.kind === 'folder' ? NodeKind.Folder : NodeKind.File,
+        children: n.kind === 'folder' ? [] : undefined,
       });
 
       incoming.set(n.id, 0);
@@ -153,7 +154,8 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
     const childrenMap = new Map<string, FileTreeData[]>();
 
     for (const conn of connections) {
-      if (conn.kind !== "contains") continue;
+      if (conn.kind !== RelationType.ChildFolder && conn.kind !== RelationType.ContainsFile)
+        continue;
 
       const parent = nodeMap.get(conn.src_node_id);
       const child = nodeMap.get(conn.dst_node_id);
@@ -163,14 +165,14 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
       // if (parent.type !== "folder") continue;
 
       const arr = childrenMap.get(parent.id) ?? [];
-      if (!arr.some((c) => c.id === child.id)) arr.push(child);
+      if (!arr.some(c => c.id === child.id)) arr.push(child);
       childrenMap.set(parent.id, arr);
 
       incoming.set(child.id, (incoming.get(child.id) ?? 0) + 1);
     }
 
     for (const [id, node] of nodeMap) {
-      if (node.type === "folder") {
+      if (node.type === 'folder') {
         node.children = childrenMap.get(id) ?? [];
       } else {
         node.children = undefined;
@@ -187,7 +189,6 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
 
     return roots;
   },
-
 
   onMove: ({ dragIds, parentId }) => {
     if (!dragIds?.length) return;
