@@ -1,5 +1,5 @@
 import { usePanelsStore } from '@tgim/stores/index';
-import { memo, useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { shallow, useShallow } from 'zustand/shallow';
 import ReactDOM from 'react-dom';
 import { ipc } from '../../../lib/ipc';
@@ -81,7 +81,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     const nodes: GraphNode[] = [];
     const links: GraphConnection[] = [];
 
-    const getNodeData = (node: Node, graphNodeId?: string) => {
+    const getGraphNodeData = (node: Node, graphNodeId?: string): GraphNode => {
       const defaultSize = 10;
       const nodeSize = node.id == graphData.root_node_id ? defaultSize * 1.7 : defaultSize;
       if (!graphNodeId) graphNodeId = createNewId();
@@ -124,26 +124,30 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       };
     };
 
-    const createNode = (startNodeId: string): string => {
+    (function (startNodeId: string, maxDepth?: number): string {
       // Stack holds work items to expand, along with the parent relation
       const stack: Array<{
         origId: string; // original node id to materialize
         parentNewId?: string; // newly created id of parent (if any)
         via?: Connection; // connection from parent -> this node
+        depth: number;
         prevLevel?: number;
-      }> = [{ origId: startNodeId }];
+      }> = [{ origId: startNodeId, depth: 0 }];
 
       // We will create a brand-new node for EVERY stack item, even if origId repeats.
       // This mirrors the original recursive function (children are not shared).
       let rootNewId: string | undefined;
 
       while (stack.length > 0) {
-        const { origId, parentNewId, via, prevLevel } = stack.pop()!;
+        const { origId, parentNewId, via, prevLevel, depth } = stack.pop()!;
+
+        if (maxDepth && depth > maxDepth) continue;
 
         // 1) Create a fresh node id and materialize the node
         const newId = createNewId();
         const node = nodesMap[origId];
-        nodes.push(getNodeData(node, newId));
+        const newNode = getGraphNodeData(node, newId);
+        newNode.depth = depth;
 
         // Capture root id (the very first item expanded has no parent)
         if (!parentNewId && rootNewId === undefined) {
@@ -152,27 +156,19 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
 
         // 2) If we came from a parent, create the link now
         if (parentNewId && via) {
-          // backward
-          if (via.level == 3) {
-            links.push({
-              source: newId,
-              target: parentNewId,
-              label: via.kind,
-              data: via,
-            });
-          } else {
-            // foward or bidirectional
-            links.push({
-              source: parentNewId,
-              target: newId,
-              label: via.kind,
-              data: via,
-            });
-          }
+          links.push({
+            source: parentNewId,
+            target: newId,
+            label: via.kind,
+            data: via,
+          });
         }
 
         // 3) Enqueue children; they will each create brand-new nodes
         const connections: Connection[] = connectionsMap[origId] ?? [];
+        newNode.isLeaf = connections.length == 0;
+        nodes.push(newNode);
+
         for (const connection of connections) {
           if (prevLevel !== 3)
             stack.push({
@@ -180,21 +176,31 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
               parentNewId: newId,
               via: connection,
               prevLevel: connection.level,
+              depth: depth + 1,
             });
         }
       }
 
       // rootNewId must exist because startNodeId produced at least one node
       return rootNewId!;
-    };
+    })(graphData.root_node_id, 99);
 
-    createNode(graphData.root_node_id);
     return {
       nodes,
       links,
     };
   }, []);
-
+  const rootGraphNodeId = useMemo(() => {
+    if (!graphData) return null;
+    let id = null;
+    graphData.nodes.forEach(node => {
+      if (node.nodeId == rootNodeId) {
+        id = node.id;
+      }
+    });
+    console.log(id);
+    return id;
+  }, [graphData, rootNodeId]);
   if (!panel || !container) return null;
 
   return ReactDOM.createPortal(
@@ -204,7 +210,15 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         ${hidden ? 'hidden' : ''}`}
     >
       {viewType === 'graph'
-        ? graphData && <GraphView rootNodeId={rootNodeId} graphData={graphData} />
+        ? graphData &&
+          rootNodeId &&
+          rootGraphNodeId && (
+            <GraphView
+              rootNodeId={rootNodeId}
+              rootGraphNodeId={rootGraphNodeId}
+              graphData={graphData}
+            />
+          )
         : null}
     </div>,
     container,

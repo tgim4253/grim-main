@@ -1,23 +1,23 @@
 import usePanelsStore from '@tgim/stores/panelStore';
-import { GraphData } from '@tgim/types/graph';
+import { Connection, GraphConnection, GraphData } from '@tgim/types/graph';
 import { NodeRenderer } from '@tgim/ui/index';
-import { use, useEffect, useRef, useState } from 'react';
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d';
 import { useShallow } from 'zustand/shallow';
 import * as d3 from 'd3-force';
 
 interface Props {
   graphData: GraphData;
-  rootNodeId: string | null;
+  rootNodeId: string;
+  rootGraphNodeId: string;
 }
 
-const GraphView: React.FC<Props> = ({ graphData, rootNodeId }) => {
+const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<ForceGraphMethods | undefined>(undefined);
 
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   useEffect(() => {
-    console.log(graphData);
     const updateDimensions = () => {
       if (containerRef.current) {
         setDimensions({
@@ -41,17 +41,78 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId }) => {
     };
   }, []);
 
+  const nodesById = useMemo(() => {
+    const nodesById = Object.fromEntries(graphData.nodes.map(node => [node.id, node]));
+    graphData.nodes.forEach(node => {
+      node.isHidden = node.isLeaf;
+      node.childLinks = [];
+    });
+    graphData.links.forEach(link => nodesById[link.source].childLinks.push(link));
+    return nodesById;
+  }, [graphData.nodes]);
+
+  const GAP = 90;
+  const LEAF_OFFSET = 10;
+
+  const getPrunedTree = () => {
+    const visibleNodes = [];
+    const visibleLinks = [];
+    console.log(nodesById);
+    (function traverseTree(node = nodesById[rootGraphNodeId]) {
+      visibleNodes.push(node);
+      const filteredLinks = node.childLinks.filter((link: any) => {
+        const target = typeof link.target === 'object' ? link.target : nodesById[link.target];
+        return !target.isHidden;
+      });
+      visibleLinks.push(...filteredLinks);
+      filteredLinks
+        .map((link: any) =>
+          typeof link.target === 'object' ? link.target : nodesById[link.target],
+        )
+        .forEach(traverseTree);
+    })();
+    return { nodes: visibleNodes, links: visibleLinks };
+  };
+  const [prunedTree, setPrunedTree] = useState(getPrunedTree());
+
   useEffect(() => {
     if (fgRef && fgRef.current) {
-      fgRef.current.d3Force('charge')?.strength(-50);
-      fgRef.current.d3Force(
-        'collide',
-        d3.forceCollide(node => {
-          return node.size + 8; // node.size 속성값을 반지름으로 사용
-        }),
+      const fg = fgRef.current;
+      fg.d3Force(
+        'radial',
+        d3
+          .forceRadial(
+            (d: any) => {
+              if (!isFinite(d.depth)) return 0;
+              return d.depth * GAP;
+            },
+            0,
+            0,
+          )
+          .strength((d: any) => {
+            if (!d.isLeaf) return 0.9;
+            else return 0;
+          }),
       );
+      fg.d3Force('charge')?.strength(-50);
+      fg.d3Force('link')
+        ?.distance((l: any) =>
+          Math.abs((l.source.depth ?? 0) - (l.target.depth ?? 0)) <= 1 ? 40 : 110,
+        )
+        .strength(0.6);
+      fg.d3Force('collide', d3.forceCollide(10));
     }
+    setTimeout(() => {
+      showAllNode();
+    }, 300);
   }, []);
+
+  const showAllNode = () => {
+    graphData.nodes.forEach(node => {
+      node.isHidden = false;
+    });
+    setPrunedTree(getPrunedTree());
+  };
 
   const { openNode } = usePanelsStore(useShallow(s => ({ openNode: s.addPanelWithoutContainer })));
   return (
@@ -60,11 +121,10 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId }) => {
         ref={fgRef}
         width={dimensions.width}
         height={dimensions.height}
-        graphData={graphData}
+        graphData={prunedTree}
         nodeLabel="label"
         nodeAutoColorBy="group"
-        dagMode="radialout"
-        dagLevelDistance={80}
+        // onEngineStop={() => openAllNode()}
         // linkDirectionalArrowLength={3.5}
         // linkDirectionalArrowRelPos={0.96}
         linkColor={() => '#f3f3f3'}
@@ -83,6 +143,8 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId }) => {
           );
         }}
         onNodeClick={node => {
+          node.collapsed = false;
+          setPrunedTree(getPrunedTree());
           node.id &&
             openNode({
               nodeId: node.nodeId,

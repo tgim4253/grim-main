@@ -523,7 +523,7 @@ const imageRenderer: NodeRenderer = (ctx, node, globalScale) => {
     ctx.drawImage(placeholder, node.x - w / 2, node.y - h / 2, w, h);
   }
 
-  drawLabelCached(ctx, node);
+  // drawLabelCached(ctx, node);
 };
 
 // =========================

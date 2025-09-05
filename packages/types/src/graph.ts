@@ -10,12 +10,16 @@ export interface GraphData {
 }
 
 export interface GraphNode {
+  [others: string]: any;
   id: string;
   nodeId: string;
   label: string;
   size: number;
   type: GraphNodeType;
   depth?: number;
+  isLeaf?: boolean;
+  x?: number;
+  y?: number;
   fx?: number;
   fy?: number;
 }
