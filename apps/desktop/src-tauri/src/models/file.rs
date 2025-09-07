@@ -1,18 +1,20 @@
 use anyhow::{anyhow, Context, Result};
+use core::fmt;
+use image::error;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Type};
 use std::{
     convert::{From, TryFrom},
     fs::{self, Metadata},
-    path::Path,
+    path::{Path, PathBuf},
     str::FromStr,
     string,
     time::UNIX_EPOCH,
 };
 
 use crate::{
-    config::file::IntegrityCheckResult, services::file_service::xxh3_64_of,
-    utils::file_utils::guess_mime,
+    bootstrap::PATH_MANAGER, config::file::IntegrityCheckResult,
+    services::file_service::xxh3_64_of, utils::file_utils::guess_mime,
 };
 
 #[derive(Debug, FromRow, Serialize, Deserialize)]
@@ -41,7 +43,9 @@ pub struct FolderData {
     pub parent_id: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default,
+)]
 #[sqlx(type_name = "TEXT")]
 #[sqlx(rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
@@ -53,7 +57,9 @@ pub enum OsPlatform {
     Unknown,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default,
+)]
 #[sqlx(type_name = "TEXT")]
 #[sqlx(rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
@@ -109,7 +115,9 @@ pub struct StorageRootInfo {
     pub created_at: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default,
+)]
 #[sqlx(type_name = "TEXT")]
 #[sqlx(rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
@@ -141,30 +149,38 @@ impl FromStr for FileType {
 }
 impl From<&Path> for FileType {
     fn from(path: &Path) -> Self {
-        match path.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase().as_str() {
+        match path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_lowercase()
+            .as_str()
+        {
             // Image
-            "jpg" | "jpeg" | "png" | "gif" | "bmp" | "tiff" | "webp" | "heic" => FileType::Image,
+            "jpg" | "jpeg" | "png" | "gif" | "bmp" | "tiff" | "webp"
+            | "heic" => FileType::Image,
 
             // Video
-            "mp4" | "mov" | "avi" | "mkv" | "webm" | "flv" | "wmv" => FileType::Video,
+            "mp4" | "mov" | "avi" | "mkv" | "webm" | "flv" | "wmv" => {
+                FileType::Video
+            }
 
             // Audio
             "mp3" | "wav" | "flac" | "aac" | "ogg" | "m4a" => FileType::Audio,
 
             // Document
-            "pdf" | "txt" | "doc" | "docx" | "xls" | "xlsx" | "ppt" | "pptx" | "odt" | "md" => {
-                FileType::Document
-            }
+            "pdf" | "txt" | "doc" | "docx" | "xls" | "xlsx" | "ppt"
+            | "pptx" | "odt" | "md" => FileType::Document,
 
             // Graphic / Tool-specific (이미지 툴)
-            "psd" => FileType::GraphicTool,  // Photoshop
-            "ai" => FileType::GraphicTool,   // Illustrator
-            "xd" => FileType::GraphicTool,   // Adobe XD
-            "fig" => FileType::GraphicTool,  // Figma
+            "psd" => FileType::GraphicTool, // Photoshop
+            "ai" => FileType::GraphicTool,  // Illustrator
+            "xd" => FileType::GraphicTool,  // Adobe XD
+            "fig" => FileType::GraphicTool, // Figma
             "clip" => FileType::GraphicTool, // Clip Studio
-            "kra" => FileType::GraphicTool,  // Krita
-            "sai" => FileType::GraphicTool,  // Paint Tool SAI
-            "pur" => FileType::GraphicTool,  // PureRef
+            "kra" => FileType::GraphicTool, // Krita
+            "sai" => FileType::GraphicTool, // Paint Tool SAI
+            "pur" => FileType::GraphicTool, // PureRef
 
             // 압축파일
             "zip" | "rar" | "7z" | "tar" | "gz" => FileType::Archive,
@@ -182,15 +198,20 @@ impl FileType {
         const MAX_PIXELS: u64 = 400_000_000; // 400M px
 
         // 1) Size check via metadata (no need to open the file here)
-        let meta = fs::metadata(path)
-            .with_context(|| format!("Failed to read metadata: {}", path.display()))?;
+        let meta = fs::metadata(path).with_context(|| {
+            format!("Failed to read metadata: {}", path.display())
+        })?;
 
         let len = meta.len();
         if len == 0 {
             return Err(anyhow!("Empty file"));
         }
         if len > MAX_BYTES {
-            return Err(anyhow!("File too large: {} bytes > {}", len, MAX_BYTES));
+            return Err(anyhow!(
+                "File too large: {} bytes > {}",
+                len,
+                MAX_BYTES
+            ));
         }
 
         // 2) MIME magic (signature) check
@@ -205,8 +226,9 @@ impl FileType {
         }
 
         // 3) Pixel/Dimension check (uses 'image' crate)
-        let (w, h) = image::image_dimensions(path)
-            .with_context(|| format!("Failed to read image dimensions: {}", path.display()))?;
+        let (w, h) = image::image_dimensions(path).with_context(|| {
+            format!("Failed to read image dimensions: {}", path.display())
+        })?;
 
         let pixels = (w as u64)
             .checked_mul(h as u64)
@@ -216,7 +238,11 @@ impl FileType {
             return Err(anyhow!("Invalid image dimensions: {}x{}", w, h));
         }
         if pixels > MAX_PIXELS {
-            return Err(anyhow!("Image too large: {} pixels > {}", pixels, MAX_PIXELS));
+            return Err(anyhow!(
+                "Image too large: {} pixels > {}",
+                pixels,
+                MAX_PIXELS
+            ));
         }
 
         Ok(())
@@ -229,7 +255,7 @@ pub struct FileInfo {
     pub kind_guess: FileType,
 
     pub file_exists: bool,
-    pub file_size: Option<i64>,  // non-null if exists & accessible
+    pub file_size: Option<i64>, // non-null if exists & accessible
     pub file_mtime: Option<i64>, // non-null if exists & accessible
 
     pub xxh3_64: String,
@@ -242,27 +268,37 @@ pub struct FileInfo {
 }
 
 impl FileInfo {
-    pub async fn new(file_path: &Path, real_folder_id: String, file_name: String) -> Result<Self> {
+    pub async fn new(
+        file_path: &Path,
+        real_folder_id: String,
+        file_name: String,
+    ) -> Result<Self> {
         let file_name_norm = file_name.to_lowercase();
         let mime_guess = guess_mime(file_path);
         let kind_guess = FileType::from(file_path);
 
-        let meta = tokio::fs::metadata(file_path)
-            .await
-            .with_context(|| format!("Failed to read metadata: {}", file_path.display()))?;
+        let meta = tokio::fs::metadata(file_path).await.with_context(|| {
+            format!("Failed to read metadata: {}", file_path.display())
+        })?;
 
         let file_exists = meta.is_file();
-        let file_size = if file_exists { Some(meta.len() as i64) } else { None };
+        let file_size =
+            if file_exists { Some(meta.len() as i64) } else { None };
 
-        let file_mtime = if file_exists { Some(Self::file_mtime_epoch(&meta)?) } else { None };
+        let file_mtime = if file_exists {
+            Some(Self::file_mtime_epoch(&meta)?)
+        } else {
+            None
+        };
 
         // let sha256_image: Option<String> = if kind_guess == FileType::Image {
         //     Some(crate::services::file_service::sha256_of_img(file_path)?)
         // } else {
         //     None
         // };
-        let xxh3_64 = xxh3_64_of(&file_path)
-            .with_context(|| format!("Failed to calculate xxHash64 for {:?}", file_path))?;
+        let xxh3_64 = xxh3_64_of(&file_path).with_context(|| {
+            format!("Failed to calculate xxHash64 for {:?}", file_path)
+        })?;
 
         Ok(FileInfo {
             mime_guess,
@@ -317,4 +353,202 @@ pub struct RealFolderData {
     pub last_seen_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+// -- Thumb --
+
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default,
+)]
+#[sqlx(type_name = "TEXT")]
+#[sqlx(rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
+pub enum ResizeMode {
+    Upscale,
+    #[default]
+    Original,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ImageFmt {
+    Webp,
+    Jpeg,
+}
+
+impl ImageFmt {
+    /// Map to file extension (lowercase).
+    pub fn ext(self) -> &'static str {
+        match self {
+            ImageFmt::Webp => "webp",
+            ImageFmt::Jpeg => "jpeg",
+        }
+    }
+
+    /// File-name token; currently same as ext (kept for future-proofing).
+    pub fn token(self) -> &'static str {
+        self.ext()
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ThumbSpec {
+    pub width: u32,
+    pub height: u32,
+    pub dpr: Option<u8>,          // 1 | 2 | 3
+    pub fmt: Option<ImageFmt>,    // webp | jpeg
+    pub v: Option<u8>, // consider removing if schema_version is canonical
+    pub mode: Option<ResizeMode>, // optional file-name token
+    pub key: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ThumbReqInfo {
+    pub xxhs: String, // ASCII-hex (will be normalized to lowercase)
+    pub specs: Vec<ThumbSpec>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ThumbPath(pub PathBuf);
+
+impl ThumbPath {
+    /// path/to/ab/cd/<hash>/<hash>_<width>x<height>_dpr<1|2|3>[_modeToken].<ext>
+    pub async fn new(
+        moa_id: &String,
+        spec: ThumbSpec,
+        hash: String,
+        schema_version: u8,
+    ) -> Result<Self> {
+        // -- Validation --
+        // Validate hex
+        if hash.len() < 4 {
+            return Err(anyhow!("xxhs must be at least 4 chars long"));
+        }
+        if !is_ascii_hex(&hash) {
+            return Err(anyhow!("xxhs must be ASCII-hex [0-9a-fA-F]"));
+        }
+
+        // Normalize to lowercase for path stability
+        let xxhs = hash.to_ascii_lowercase();
+        // Dimensions
+        let width = spec.width;
+        let height = spec.height;
+        if width == 0 || height == 0 {
+            return Err(anyhow!(
+                "width/height must be > 0 (got {}x{})",
+                width,
+                height
+            ));
+        }
+
+        // DPR
+        let dpr = spec.dpr.unwrap_or(1);
+        if !(1..=3).contains(&dpr) {
+            return Err(anyhow!("dpr must be in 1..=3 (got {})", dpr));
+        }
+
+        // Format
+        let fmt = spec.fmt.unwrap_or(ImageFmt::Webp);
+
+        // --------------------------------------------------------------------
+
+        // First 4 chars -> "ab/cd"
+        let ab = &xxhs[0..2];
+        let cd = &xxhs[2..4];
+
+        let mode_token = match spec.mode.unwrap_or_default() {
+            ResizeMode::Original => None,
+            ResizeMode::Upscale => Some("upscale"),
+        };
+
+        // Filename core.
+        let mut core = format!(
+            "{}_{}x{}_dpr{}_v{}",
+            xxhs, width, height, dpr, schema_version
+        );
+
+        if let Some(tok) = mode_token {
+            core.push('_');
+            core.push_str(tok);
+        }
+
+        let filename = format!("{}.{}", core, fmt.ext());
+
+        // ab/cd/<xxhs>/<filename>
+        let mut path = PATH_MANAGER.get_or_add(&moa_id).await?.thumb_dir;
+        path.push(ab);
+        path.push(cd);
+        path.push(&xxhs);
+        path.push(filename);
+
+        Ok(ThumbPath(path))
+    }
+
+    pub fn as_path(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl fmt::Display for ThumbPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0.display())
+    }
+}
+
+impl AsRef<Path> for ThumbPath {
+    fn as_ref(&self) -> &Path {
+        self.as_path()
+    }
+}
+
+impl From<PathBuf> for ThumbPath {
+    fn from(p: PathBuf) -> Self {
+        ThumbPath(p)
+    }
+}
+
+impl From<ThumbPath> for PathBuf {
+    fn from(tp: ThumbPath) -> Self {
+        tp.0
+    }
+}
+
+/// Validate ASCII-hex quickly (0-9a-fA-F).
+fn is_ascii_hex(s: &str) -> bool {
+    !s.is_empty()
+        && s.bytes()
+            .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F'))
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ThumbRequest {
+    pub items: Vec<ThumbReqInfo>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ThumbStatus {
+    Hit,
+    Miss,
+    Error,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ThumbResSpec {
+    pub status: ThumbStatus,
+    pub url: Option<String>,
+    pub thumb_key: String,
+    pub enqueued: bool,
+    pub error_msg: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ThumbResInfo {
+    pub xxhs: String,
+    pub specs: Vec<ThumbResSpec>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ThumbResponse {
+    pub items: Vec<ThumbResInfo>,
 }

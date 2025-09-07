@@ -19,17 +19,22 @@ import {
   NodeKind,
 } from '@tgim/types/graph';
 import { createNewId } from '@tgim/utils/identifier';
+import GridView from './panels/GridView';
+import { GridData, ImageItem } from '@tgim/types/grid';
+import { listen } from '@tauri-apps/api/event';
+import { ThumbResSpec } from '@tgim/types/file';
 
 interface PanelProps {
   panelId: string;
   hidden?: boolean;
 }
 
-type ViewType = 'graph' | 'node';
+type ViewType = 'graph' | 'node' | 'grid';
 
 const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [viewType, setViewType] = useState<ViewType>('graph');
   const [graphData, setGraphData] = useState<GraphData | null>(null);
+  const [gridData, setGridData] = useState<GridData | null>(null);
   const [rootNodeId, setRootNodeId] = useState<string | null>(null);
 
   const { panel, containerId, isActive } = usePanelsStore(
@@ -54,14 +59,15 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     let as = async () => {
       try {
         const data = await ipc.graph.getGraphOne(moaId, panel.nodeId.toString());
-        setGraphData(transformData(data));
+        setGraphData(transformDataToGraphData(data));
+        setGridData(await transformDataToGridData(data));
       } catch (e) {
         console.error(e);
       }
     };
     as();
   }, [moaId]);
-  const transformData = useCallback((graphData: GraphResponse): GraphData => {
+  const transformDataToGraphData = useCallback((graphData: GraphResponse): GraphData => {
     setRootNodeId(graphData.root_node_id);
 
     const nodesMap: Record<string, Node> = {};
@@ -76,8 +82,6 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       connectionsMap[connection.src_node_id].push(connection);
     });
 
-    console.log(nodesMap);
-    console.log(connectionsMap);
     const nodes: GraphNode[] = [];
     const links: GraphConnection[] = [];
 
@@ -190,6 +194,63 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       links,
     };
   }, []);
+  const transformDataToGridData = useCallback(async (data: GraphResponse): Promise<GridData> => {
+    const items = data.nodes.filter(node => node.id !== data.root_node_id);
+    const imageItems: ImageItem[] = [];
+    items.forEach(item => {
+      if (item.kind == NodeKind.File && item.data['File']) {
+        let data = item.data['File'];
+        if (data.kind != FileType.Image) return;
+        imageItems.push({
+          id: createNewId(),
+          nodeId: item.id,
+          name: data.file_name,
+          type: data.kind,
+          size: data.size,
+          hash: data.xxh3_64,
+        });
+      }
+    });
+
+    return { images: imageItems };
+  }, []);
+
+  useEffect(() => {
+    const imageItems = gridData?.images ?? [];
+    if (imageItems.length > 0 && moaId) {
+      const hi = async () => {
+        const response = await ipc.file.getThumbnails(moaId, {
+          items: imageItems.map(item => ({
+            xxhs: item.hash,
+            specs: [
+              {
+                width: 128,
+                height: 128,
+                dpr: 1,
+                key: 'hihi',
+              },
+            ],
+          })),
+        });
+        console.log(response);
+      };
+
+      hi();
+    }
+    let unlisten: (() => void) | null = null;
+    const initListener = async () => {
+      unlisten = await listen<ThumbResSpec>(
+        `thumbnails://created`,
+        (event: { payload: ThumbResSpec }) => {
+          console.log(event.payload);
+        },
+      );
+    };
+    initListener();
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [gridData, moaId]);
   const rootGraphNodeId = useMemo(() => {
     if (!graphData) return null;
     let id = null;
@@ -198,7 +259,6 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         id = node.id;
       }
     });
-    console.log(id);
     return id;
   }, [graphData, rootNodeId]);
   if (!panel || !container) return null;
@@ -219,7 +279,9 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
               graphData={graphData}
             />
           )
-        : null}
+        : viewType === 'grid'
+          ? gridData && null
+          : null}
     </div>,
     container,
   );

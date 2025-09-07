@@ -1,6 +1,6 @@
 use crate::{
-    models::file::FolderData,
-    services::file_service::{self, first_mount_folder},
+    models::file::{FolderData, ThumbRequest, ThumbResponse},
+    services::file_service::{self, first_mount_folder, get_thumbs},
 };
 use anyhow::Result;
 
@@ -22,4 +22,15 @@ pub async fn create_folder(
         }
     }
     Ok(())
+}
+
+#[tauri::command]
+pub async fn get_thumbnails(
+    app_handle: tauri::AppHandle,
+    moa_id: String,
+    data: ThumbRequest,
+) -> Result<ThumbResponse, String> {
+    let response = get_thumbs(moa_id, data).await.map_err(|e| e.to_string())?;
+
+    Ok(response)
 }

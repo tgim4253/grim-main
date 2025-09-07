@@ -1,6 +1,6 @@
 # --- 기본 스타일 ---
 edition = "2021"        # Rust Edition
-max_width = 100         # 한 줄 최대 길이
+max_width = 80          # 한 줄 최대 길이
 hard_tabs = false       # 스페이스 사용
 tab_spaces = 4          # 들여쓰기 폭
 

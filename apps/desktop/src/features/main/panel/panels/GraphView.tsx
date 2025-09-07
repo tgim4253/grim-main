@@ -57,7 +57,6 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
   const getPrunedTree = () => {
     const visibleNodes = [];
     const visibleLinks = [];
-    console.log(nodesById);
     (function traverseTree(node = nodesById[rootGraphNodeId]) {
       visibleNodes.push(node);
       const filteredLinks = node.childLinks.filter((link: any) => {

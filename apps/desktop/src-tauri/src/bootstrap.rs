@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use crate::config::moa::MoaConfig;
@@ -9,12 +10,20 @@ use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 
+const MOA_DIR_NAME: &str = ".moa";
+const CACHED_DIR_NAME: &str = ".cached";
+const THUMBS_DIR_NAME: &str = "thumbs";
+const DB_FILE_NAME: &str = "grim.db";
+const CFG_FILE_NAME: &str = "config.json";
+
 #[derive(Clone)]
 pub struct MoaPaths {
-    pub base_dir: PathBuf, // path/name
-    pub moa_dir: PathBuf,  // path/name/.moa
-    pub db_path: PathBuf,  // path/name/.moa/grim.db
-    pub cfg_path: PathBuf, // path/name/.moa/config.json
+    pub base_dir: PathBuf,   // path/name
+    pub moa_dir: PathBuf,    // path/name/.moa
+    pub db_path: PathBuf,    // path/name/.moa/grim.db
+    pub cached_dir: PathBuf, // path/name/.moa/.chached
+    pub thumb_dir: PathBuf,  // path/name/.moa/.chached/thumbs
+    pub cfg_path: PathBuf,   // path/name/.moa/config.json
 }
 pub struct PathManager {
     paths: RwLock<HashMap<String, MoaPaths>>, // key = moa_id
@@ -49,30 +58,44 @@ pub fn build_paths(base: &str, name: &str) -> PathBuf {
 
 pub fn ensure_layout(base: &Path) -> Result<MoaPaths> {
     // .moa dir and files
-    let moa_dir = base.join(".moa");
-    // check .moa folder exists
-    if !moa_dir.exists() {
-        // creat .moa folder if not exists
-        fs::create_dir_all(&moa_dir)
-            .with_context(|| format!("Failed to create .moa at {}", moa_dir.display()))?;
-    }
+    let moa_dir = base.join(MOA_DIR_NAME);
+    fs::create_dir_all(&moa_dir)
+        .with_context(|| format!("Failed to create .moa at {}", moa_dir.display()))?;
 
-    // other files
-    let db_path = moa_dir.join("grim.db");
-    let cfg_path = moa_dir.join("config.json");
+    let db_path = moa_dir.join(DB_FILE_NAME);
+    let cfg_path = moa_dir.join(CFG_FILE_NAME);
 
     if !cfg_path.exists() {
-        // create initial config
+        // open with create_new to avoid races
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&cfg_path)
+            .with_context(|| format!("Failed to create {}", cfg_path.display()))?;
+
+        // build initial config
         let cfg = MoaConfig {
             app: "moa".to_string(),
             first: true,
             created_at: date::get_now_date(),
             database_version: crate::services::integrity::TARGET_DB_VERSION,
         };
-        fs::write(&cfg_path, serde_json::to_vec_pretty(&cfg)?)
-            .with_context(|| "Failed to write config.json")?;
+        let cfg_bytes =
+            serde_json::to_vec_pretty(&cfg).context("Failed to serialize initial config.json")?;
+
+        file.write_all(&cfg_bytes)
+            .with_context(|| format!("Failed to write {}", cfg_path.display()))?;
+        file.flush().ok();
     }
 
-    // db will be created later by integrity routine if missing
-    Ok(MoaPaths { base_dir: base.to_path_buf(), moa_dir, db_path, cfg_path })
+    // .moa/.cached and thumbs
+    let cached_dir = moa_dir.join(CACHED_DIR_NAME);
+    let thumb_dir = cached_dir.join(THUMBS_DIR_NAME);
+
+    fs::create_dir_all(&cached_dir)
+        .with_context(|| format!("Failed to create {}", cached_dir.display()))?;
+    fs::create_dir_all(&thumb_dir)
+        .with_context(|| format!("Failed to create {}", thumb_dir.display()))?;
+
+    Ok(MoaPaths { base_dir: base.to_path_buf(), moa_dir, db_path, cfg_path, thumb_dir, cached_dir })
 }

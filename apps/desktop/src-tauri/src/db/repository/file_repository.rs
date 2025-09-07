@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::{anyhow, Result};
 use sqlx::{Executor, Sqlite};
 
@@ -145,41 +147,6 @@ impl FileRepository {
         Ok(folder_id)
     }
 
-    pub async fn insert_file_path<'a, E>(executor: &mut E, file_info: &FileInfo) -> Result<String>
-    where
-        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
-    {
-        let file_path_id = get_unique_id();
-        let now = crate::utils::date::get_now_date();
-
-        let file_path_id: String = sqlx::query_scalar!(
-            r#"
-            INSERT INTO file_path
-                (id, folder_id, file_name, file_name_norm, mtime, is_found, last_seen_at)
-            VALUES
-                (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-            ON CONFLICT(folder_id, file_name_norm) DO UPDATE SET
-                file_name    = excluded.file_name,
-                mtime        = excluded.mtime,
-                is_found   = excluded.is_found,
-                last_seen_at = ?7
-            RETURNING id as "id!: String"
-            "#,
-            file_path_id,
-            file_info.real_folder_id,
-            file_info.file_name,
-            file_info.file_name_norm,
-            file_info.file_mtime,
-            file_info.file_exists,
-            now
-        )
-        .fetch_one(&mut *executor)
-        .await
-        .map_err(|e| anyhow!(format!("Failed to insert or update file_path: {}", e)))?;
-
-        Ok(file_path_id)
-    }
-
     pub async fn find_file_content_id<'a, E>(
         executor: &mut E,
         xxh3_64: String,
@@ -187,10 +154,12 @@ impl FileRepository {
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
     {
-        let id =
-            sqlx::query_scalar!("SELECT id AS 'id!' FROM file_content WHERE xxh3_64 = ?1", xxh3_64)
-                .fetch_optional(&mut *executor)
-                .await?;
+        let id = sqlx::query_scalar!(
+            "SELECT id AS 'id!' FROM file_content WHERE xxh3_64 = ?1",
+            xxh3_64
+        )
+        .fetch_optional(&mut *executor)
+        .await?;
         Ok(id)
     }
 
@@ -295,5 +264,130 @@ impl FileRepository {
         .execute(&mut *executor)
         .await?;
         Ok(())
+    }
+
+    // -- file path --
+    pub async fn insert_file_path<'a, E>(
+        executor: &mut E,
+        file_info: &FileInfo,
+    ) -> Result<String>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let file_path_id = get_unique_id();
+        let now = crate::utils::date::get_now_date();
+
+        let file_path_id: String = sqlx::query_scalar!(
+            r#"
+            INSERT INTO file_path
+                (id, folder_id, file_name, file_name_norm, mtime, is_found, last_seen_at)
+            VALUES
+                (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            ON CONFLICT(folder_id, file_name_norm) DO UPDATE SET
+                file_name    = excluded.file_name,
+                mtime        = excluded.mtime,
+                is_found   = excluded.is_found,
+                last_seen_at = ?7
+            RETURNING id as "id!: String"
+            "#,
+            file_path_id,
+            file_info.real_folder_id,
+            file_info.file_name,
+            file_info.file_name_norm,
+            file_info.file_mtime,
+            file_info.file_exists,
+            now
+        )
+        .fetch_one(&mut *executor)
+        .await
+        .map_err(|e| anyhow!(format!("Failed to insert or update file_path: {}", e)))?;
+
+        Ok(file_path_id)
+    }
+
+    pub async fn fetch_matched_file_path_ids<'a, E>(
+        executor: &mut E,
+        file_content_id: &str,
+    ) -> Result<Vec<String>>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let file_path_ids = sqlx::query_scalar!(
+            r#"
+            SELECT file_path_id AS "file_path_id!"
+            FROM file_path_content_binding
+            WHERE file_content_id = ?1 AND is_active = 1 AND match_states = 'match'
+            "#,
+            file_content_id
+        )
+        .fetch_all(&mut *executor)
+        .await
+        .map_err(|e| anyhow!(format!("Failed to fetch active file_path_ids: {}", e)))?;
+
+        Ok(file_path_ids)
+    }
+
+    pub async fn fetch_folder_abs_path_cached<'a, E>(
+        executor: &mut E,
+        folder_id: &str,
+    ) -> Result<Option<String>>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let abs_path_cached = sqlx::query_scalar!(
+            r#"
+            SELECT abs_path_cached AS "abs_path_cached!"
+            FROM real_folder
+            WHERE id = ?1
+            "#,
+            folder_id
+        )
+        .fetch_optional(&mut *executor)
+        .await
+        .map_err(|e| {
+            anyhow!(format!("Failed to fetch abs_path_cached: {}", e))
+        })?;
+
+        Ok(abs_path_cached)
+    }
+
+    pub async fn fetch_file_abs_path_cached<'a, E>(
+        executor: &mut E,
+        file_path_id: &str,
+    ) -> Result<Option<PathBuf>>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        struct FilePathRow {
+            file_name: String,
+            folder_id: String,
+        }
+
+        let row: FilePathRow = sqlx::query_as!(
+            FilePathRow,
+            r#"
+            SELECT file_name, folder_id
+            FROM file_path
+            WHERE id = ?1
+        "#,
+            file_path_id
+        )
+        .fetch_one(&mut *executor)
+        .await
+        .map_err(|e| anyhow!("Failed to fetch file_path: {}", e))?;
+
+        let folder_abs_path = FileRepository::fetch_folder_abs_path_cached(
+            executor,
+            &row.folder_id,
+        )
+        .await?;
+
+        if let Some(abs_path_cached) = folder_abs_path {
+            let mut final_path = PathBuf::from(abs_path_cached);
+            final_path.push(row.file_name);
+            return Ok(Some(final_path));
+        }
+
+        Ok(None)
     }
 }

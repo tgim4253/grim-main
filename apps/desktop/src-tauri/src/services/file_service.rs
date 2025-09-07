@@ -1,23 +1,34 @@
 use std::{
+    collections::VecDeque,
     fs::File,
     hash::Hasher,
     io::{self, BufReader, Read},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Ok, Result};
 use async_recursion::async_recursion;
+use image::{codecs::webp::WebPEncoder, GenericImageView};
+use once_cell::sync::{Lazy, OnceCell};
 use sha2::{Digest, Sha256};
 use sqlx::{Sqlite, Transaction};
+use tauri::{AppHandle, Emitter};
+use tokio::sync::{mpsc, Mutex};
 use twox_hash::XxHash64;
 
 use crate::{
+    bootstrap::PATH_MANAGER,
     db::repository::{
         file_repository::FileRepository, node_repository::NodeRepository,
         sroot_repository::SrootRepository,
     },
     models::{
-        file::{FileInfo, FileType, FolderData, RealFolderData},
+        file::{
+            FileInfo, FileType, FolderData, ImageFmt, RealFolderData,
+            ThumbPath, ThumbRequest, ThumbResInfo, ThumbResSpec, ThumbResponse,
+            ThumbSpec, ThumbStatus,
+        },
         node::Node,
     },
     services::{
@@ -28,17 +39,26 @@ use crate::{
 };
 
 pub async fn create_folder(moa_id: String, data: FolderData) -> Result<Node> {
-    let mut tx: Transaction<'_, Sqlite> = DB_MANAGER.create_new_tx(&moa_id).await?;
+    let mut tx: Transaction<'_, Sqlite> =
+        DB_MANAGER.create_new_tx(&moa_id).await?;
 
-    let node =
-        FileRepository::create_virtual_folder(tx.as_mut(), data.name, data.parent_id).await?;
+    let node = FileRepository::create_virtual_folder(
+        tx.as_mut(),
+        data.name,
+        data.parent_id,
+    )
+    .await?;
 
     tx.commit().await?;
 
     Ok(node)
 }
 
-pub async fn first_mount_folder(moa_id: String, node: Node, path: String) -> Result<()> {
+pub async fn first_mount_folder(
+    moa_id: String,
+    node: Node,
+    path: String,
+) -> Result<()> {
     let mut tx = DB_MANAGER.create_new_tx(&moa_id).await?;
 
     let norm_path = crate::utils::path_utils::normalize_path(&path);
@@ -47,7 +67,8 @@ pub async fn first_mount_folder(moa_id: String, node: Node, path: String) -> Res
     let sroot_info = storage_root::detect_storage_root(&norm_path)?;
 
     let real_folder_id =
-        ensure_storage_root_and_real_folder(&mut tx, &sroot_info, &norm_path).await?;
+        ensure_storage_root_and_real_folder(&mut tx, &sroot_info, &norm_path)
+            .await?;
 
     let _mount_id = FileRepository::create_virtual_folder_mount(
         tx.as_mut(),
@@ -56,7 +77,15 @@ pub async fn first_mount_folder(moa_id: String, node: Node, path: String) -> Res
     )
     .await?;
 
-    upsert_folder(&mut tx, real_folder_id.clone(), node.id, &norm_path, true, Some(true)).await?;
+    upsert_folder(
+        &mut tx,
+        real_folder_id.clone(),
+        node.id,
+        &norm_path,
+        true,
+        Some(true),
+    )
+    .await?;
 
     let _scan_id = start_scan_job(moa_id.clone(), real_folder_id).await?;
 
@@ -65,7 +94,10 @@ pub async fn first_mount_folder(moa_id: String, node: Node, path: String) -> Res
     Ok(())
 }
 
-pub async fn start_scan_job(_moa_id: String, _real_folder_id: String) -> Result<String> {
+pub async fn start_scan_job(
+    _moa_id: String,
+    _real_folder_id: String,
+) -> Result<String> {
     Ok("".to_string())
 }
 
@@ -105,10 +137,9 @@ async fn upsert_folder(
             continue;
         };
 
-        let file_type = entry
-            .file_type()
-            .await
-            .with_context(|| format!("failed to get file_type for {:?}", entry_path))?;
+        let file_type = entry.file_type().await.with_context(|| {
+            format!("failed to get file_type for {:?}", entry_path)
+        })?;
         // Avoid symlink loops (temp)
         if file_type.is_symlink() {
             continue;
@@ -127,12 +158,21 @@ async fn upsert_folder(
                     parent_virtual_folder_id.clone(),
                 )
                 .await
-                .with_context(|| format!("create_virtual_folder failed for {:?}", entry_path))?;
+                .with_context(|| {
+                    format!("create_virtual_folder failed for {:?}", entry_path)
+                })?;
             }
         } else if file_type.is_file() {
-            upsert_file_entry(tx, &parent_real_folder_id, &parent_virtual_folder_id, &entry)
-                .await
-                .map_err(|e| anyhow!("upsert_file_entry failed for {:?} {}", entry_path, e))?;
+            upsert_file_entry(
+                tx,
+                &parent_real_folder_id,
+                &parent_virtual_folder_id,
+                &entry,
+            )
+            .await
+            .map_err(|e| {
+                anyhow!("upsert_file_entry failed for {:?} {}", entry_path, e)
+            })?;
         } else {
             continue;
         }
@@ -146,7 +186,9 @@ async fn upsert_folder(
     .fetch_optional(tx.as_mut())
     .await
     .with_context(|| "failed to load storage_root for parent_real_folder_id")?
-    .ok_or_else(|| anyhow!("parent_real_folder_id not found: {}", parent_real_folder_id))?;
+    .ok_or_else(|| {
+        anyhow!("parent_real_folder_id not found: {}", parent_real_folder_id)
+    })?;
     if recursive {
         for (entry_path, name) in folder_entries {
             // create child virtual folder node under the parent virtual folder
@@ -156,7 +198,9 @@ async fn upsert_folder(
                 parent_virtual_folder_id.clone(),
             )
             .await
-            .with_context(|| format!("create_virtual_folder failed for {:?}", entry_path))?;
+            .with_context(|| {
+                format!("create_virtual_folder failed for {:?}", entry_path)
+            })?;
 
             // normalize child path
             let normalized = normalize_path(&entry_path);
@@ -171,7 +215,9 @@ async fn upsert_folder(
                 child_real_folder_id.clone(),
             )
             .await
-            .with_context(|| format!("mount vf<->rf failed for {:?}", entry_path))?;
+            .with_context(|| {
+                format!("mount vf<->rf failed for {:?}", entry_path)
+            })?;
 
             // recurse into the child directory
             if let Err(e) = upsert_folder(
@@ -202,12 +248,15 @@ async fn upsert_file_entry(
 
     let file_path = entry.path();
     let file_info: FileInfo =
-        FileInfo::new(&file_path, parent_real_folder_id.to_string(), file_name).await?;
+        FileInfo::new(&file_path, parent_real_folder_id.to_string(), file_name)
+            .await?;
 
-    let file_path_id = FileRepository::insert_file_path(tx.as_mut(), &file_info).await?;
+    let file_path_id =
+        FileRepository::insert_file_path(tx.as_mut(), &file_info).await?;
 
     // upsert file_content
-    let file_content_id = FileRepository::upsert_file_content(tx.as_mut(), &file_info).await?;
+    let file_content_id =
+        FileRepository::upsert_file_content(tx.as_mut(), &file_info).await?;
 
     NodeRepository::upsert_file_node(
         tx.as_mut(),
@@ -216,8 +265,12 @@ async fn upsert_file_entry(
     )
     .await?;
     // binding
-    FileRepository::upsert_file_path_content_binding(tx.as_mut(), &file_path_id, &file_content_id)
-        .await?;
+    FileRepository::upsert_file_path_content_binding(
+        tx.as_mut(),
+        &file_path_id,
+        &file_content_id,
+    )
+    .await?;
 
     Ok(())
 }
@@ -234,7 +287,11 @@ pub async fn ensure_real_folder(
         .ok_or_else(|| anyhow!("Failed to fetch mount path"))?;
 
     let components_path =
-        if let Ok(sub_path) = norm_path.strip_prefix(&mount_path) { sub_path } else { norm_path };
+        if let Result::Ok(sub_path) = norm_path.strip_prefix(&mount_path) {
+            sub_path
+        } else {
+            norm_path
+        };
 
     let components: Vec<&str> = if components_path.as_os_str().is_empty() {
         vec![""]
@@ -286,6 +343,333 @@ pub async fn ensure_real_folder(
     }
 }
 
+pub async fn fetch_one_file_path(
+    moa_id: String,
+    xxhs: String,
+) -> Result<PathBuf> {
+    let mut tx = DB_MANAGER.create_new_tx(&moa_id).await?;
+
+    let fc_id = FileRepository::find_file_content_id(tx.as_mut(), xxhs.clone())
+        .await?
+        .ok_or_else(|| {
+            anyhow!("No file content found for xxh3_64: {}", xxhs)
+        })?;
+
+    let active_path_ids =
+        FileRepository::fetch_matched_file_path_ids(tx.as_mut(), &fc_id)
+            .await?;
+
+    if active_path_ids.len() == 0 {
+        return Err(anyhow!(
+            "No active file path found for file content ID: {}",
+            fc_id
+        ));
+    }
+
+    // todo: select one path by some method
+    let file_path_id = active_path_ids.first().unwrap();
+
+    let Some(path) =
+        FileRepository::fetch_file_abs_path_cached(tx.as_mut(), file_path_id)
+            .await?
+    else {
+        return Err(anyhow!(
+            "No file path found for file content ID: {}",
+            fc_id
+        ));
+    };
+
+    Ok(path)
+}
+
+pub const SCHEMA_VERSION: u8 = 1;
+
+#[derive(Debug, Clone)]
+pub struct Job {
+    pub moa_id: String,
+    pub xxhs: String,
+    pub thumb_key: String,
+    pub spec: ThumbSpec,
+    pub out_path: PathBuf,
+    pub priority: u8, // 0 = high, 1 = low
+}
+
+// global state for queue
+#[derive(Default)]
+pub struct QueueState {
+    // simple two-priority queues
+    high: VecDeque<Job>,
+    low: VecDeque<Job>,
+}
+
+pub struct AppState {
+    pub q: tokio::sync::Mutex<QueueState>,
+    pub tx: OnceCell<mpsc::Sender<()>>,
+}
+
+pub static STATE: Lazy<Arc<AppState>> = Lazy::new(|| {
+    Arc::new(AppState {
+        q: Mutex::new(QueueState::default()),
+        tx: OnceCell::new(),
+    })
+});
+
+pub async fn get_thumbs(
+    moa_id: String,
+    data: ThumbRequest,
+) -> Result<ThumbResponse> {
+    let mut tx = DB_MANAGER.create_new_tx(&moa_id).await?;
+
+    let items = data.items;
+
+    let mut response = ThumbResponse { items: Vec::new() };
+
+    let mut to_generate: Vec<Job> = Vec::new();
+
+    for item in items {
+        let specs = item.specs;
+
+        let mut res_specs: Vec<ThumbResSpec> = Vec::new();
+
+        for spec in specs {
+            let ThumbPath(thumb_path) = match ThumbPath::new(
+                &moa_id,
+                spec.clone(),
+                item.xxhs.clone(),
+                SCHEMA_VERSION,
+            )
+            .await
+            {
+                Result::Ok(path) => path,
+                Err(e) => {
+                    // Push an error spec and skip to the next iteration.
+                    res_specs.push(ThumbResSpec {
+                        status: ThumbStatus::Error,
+                        url: None,
+                        thumb_key: spec.key.clone(),
+                        enqueued: false,
+                        error_msg: Some(e.to_string()),
+                    });
+                    continue;
+                }
+            };
+            if thumb_path.exists() {
+                res_specs.push(ThumbResSpec {
+                    status: ThumbStatus::Hit,
+                    url: Some(thumb_path.to_string_lossy().to_string()),
+                    thumb_key: spec.key.clone(),
+                    enqueued: false,
+                    error_msg: None,
+                });
+            } else {
+                to_generate.push(Job {
+                    moa_id: moa_id.clone(),
+                    xxhs: item.xxhs.clone(),
+                    thumb_key: spec.key.clone(),
+                    spec: spec.clone(),
+                    out_path: thumb_path,
+                    priority: 0, // high priority
+                });
+                res_specs.push(ThumbResSpec {
+                    status: ThumbStatus::Miss,
+                    url: None,
+                    thumb_key: spec.key.clone(),
+                    enqueued: true,
+                    error_msg: None,
+                });
+            }
+        }
+
+        response.items.push(ThumbResInfo { xxhs: item.xxhs, specs: res_specs });
+    }
+    enqueue_jobs(to_generate).await;
+
+    Ok(response)
+}
+
+async fn enqueue_jobs(mut jobs: Vec<Job>) {
+    // Stable output dirs per job
+    for j in &jobs {
+        if let Some(parent) = j.out_path.parent() {
+            let _ = tokio::fs::create_dir_all(parent).await;
+        }
+    }
+    let st = STATE.clone();
+    {
+        let mut q = st.q.lock().await;
+        // high first, then low
+        for j in jobs.drain(..) {
+            if j.priority == 0 {
+                q.high.push_back(j);
+            } else {
+                q.low.push_back(j);
+            }
+        }
+    }
+    if let Some(tx) = STATE.tx.get() {
+        let _ = tx.try_send(());
+    }
+}
+
+pub async fn worker_loop(
+    app: AppHandle,
+    mut rx: tokio::sync::mpsc::Receiver<()>,
+) {
+    loop {
+        // wait for signal
+        let _ = rx.recv().await;
+        loop {
+            let job_opt: Option<Job> = {
+                let mut q = STATE.q.lock().await;
+                if let Some(j) = q.high.pop_front() {
+                    Some(j)
+                } else if let Some(j) = q.low.pop_front() {
+                    Some(j)
+                } else {
+                    None
+                }
+            };
+            if let Some(job) = job_opt {
+                if let Err(err) = process_job(&app, job.clone()).await {
+                    // on error, emit "failed" event for this job
+                    let _ = emit_created(
+                        &app,
+                        vec![ThumbResSpec {
+                            thumb_key: job.thumb_key,
+                            status: ThumbStatus::Error,
+                            url: None,
+                            enqueued: false,
+                            error_msg: Some(err.to_string()),
+                        }],
+                    )
+                    .await;
+                }
+            } else {
+                break; // queue empty; wait for next signal
+            }
+            // small yield to avoid hogging
+            tokio::task::yield_now().await;
+        }
+    }
+}
+
+async fn process_job(app: &AppHandle, job: Job) -> Result<()> {
+    let src = fetch_one_file_path(job.moa_id.clone(), job.xxhs).await?;
+
+    // vaild
+    let data = tokio::fs::read(&src).await.context("read source failed")?;
+    let kind = infer::get(&data)
+        .map(|k| k.mime_type().to_string())
+        .unwrap_or_default();
+    if !kind.starts_with("image/") {
+        anyhow::bail!("not an image: {}", kind);
+    }
+    let out_path = job.out_path.clone(); // keep a local copy for later use
+    let tmp = out_path.with_extension("tmp"); // write to tmp first
+
+    // decode
+    let img =
+        tokio::task::spawn_blocking(move || -> Result<image::DynamicImage> {
+            // apply EXIF orientation if needed
+            let mut cursor = std::io::Cursor::new(data);
+            let mut img = image::load(
+                &mut cursor,
+                image::ImageFormat::from_mime_type(&kind)
+                    .unwrap_or(image::ImageFormat::Png),
+            )
+            .context("decode failed")?;
+            Ok(img)
+        })
+        .await??;
+
+    // resize & center-crop to WxH; prevent upscaling
+    let (tw, th) = (job.spec.width, job.spec.height);
+    let resized =
+        tokio::task::spawn_blocking(move || -> image::DynamicImage {
+            // keep aspect ratio, fit by longer edge, then center-crop to square WxH
+            let (w, h) = img.dimensions();
+            let target_w = tw.max(1);
+            let target_h = th.max(1);
+
+            // upscale
+            // todo: change
+            let scale =
+                (target_w as f32 / w as f32).max(target_h as f32 / h as f32);
+            let nw = (w as f32 * scale).round().max(target_w as f32) as u32;
+            let nh = (h as f32 * scale).round().max(target_h as f32) as u32;
+
+            let img2 =
+                img.resize(nw, nh, image::imageops::FilterType::Lanczos3);
+            let x = (nw.saturating_sub(target_w)) / 2;
+            let y = (nh.saturating_sub(target_h)) / 2;
+            image::imageops::crop_imm(&img2, x, y, target_w, target_h)
+                .to_image()
+                .into()
+        })
+        .await?;
+
+    // encode (webp or jpeg)
+    if let Some(parent) = job.out_path.parent() {
+        tokio::fs::create_dir_all(parent).await?
+    } else {
+        bail!("bad output path")
+    }
+    let tmp_path = tmp.clone();
+    tokio::task::spawn_blocking({
+        let img = resized.clone();
+        move || -> Result<()> {
+            let mut buf = Vec::new();
+            match job.spec.fmt {
+                Some(ImageFmt::Jpeg) => {
+                    let mut enc =
+                        image::codecs::jpeg::JpegEncoder::new_with_quality(
+                            &mut buf, 75,
+                        );
+                    enc.encode_image(&img).context("jpeg encode failed")?;
+                }
+                _ => {
+                    let encoder = WebPEncoder::new_lossless(&mut buf);
+                    img.write_with_encoder(encoder)
+                        .context("webp encode failed")?;
+                }
+            }
+            std::fs::write(&tmp_path, buf).context("write tmp failed")?;
+            Ok(())
+        }
+    })
+    .await??;
+
+    // atomic rename
+    tokio::fs::rename(&tmp, &out_path).await.context("rename failed")?;
+
+    // emit event
+    emit_created(
+        app,
+        vec![ThumbResSpec {
+            thumb_key: job.thumb_key,
+            status: ThumbStatus::Hit,
+            url: Some(out_path.to_string_lossy().to_string()),
+            enqueued: false,
+            error_msg: None,
+        }],
+    )
+    .await?;
+
+    Ok(())
+}
+
+async fn emit_created(app: &AppHandle, items: Vec<ThumbResSpec>) -> Result<()> {
+    #[derive(serde::Serialize, Clone)]
+    struct ThumbEvent {
+        items: Vec<ThumbResSpec>,
+    }
+    let payload = ThumbEvent { items };
+    app.emit("thumbnails://created", payload).context("emit failed")?;
+    Ok(())
+}
+
+// -- helper --
+
 #[cfg(unix)]
 pub fn check_is_hidden(path: &Path) -> bool {
     if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
@@ -301,7 +685,8 @@ pub fn check_is_hidden(path: &Path) -> bool {
     use winapi::um::fileapi::GetFileAttributesW;
     use winapi::um::winnt::FILE_ATTRIBUTE_HIDDEN;
 
-    let wide: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+    let wide: Vec<u16> =
+        path.as_os_str().encode_wide().chain(Some(0)).collect();
     unsafe {
         let attrs = GetFileAttributesW(wide.as_ptr());
         if attrs == u32::MAX {

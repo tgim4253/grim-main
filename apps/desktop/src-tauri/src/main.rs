@@ -13,9 +13,12 @@ mod utils;
 use std::sync::Arc;
 
 use services::moa_services;
-use tokio::sync::Mutex;
+use tokio::sync::{mpsc, Mutex};
 
-use crate::services::bootstrap_service::{AppState, AppStatus};
+use crate::services::{
+    bootstrap_service::{AppState, AppStatus},
+    file_service::{worker_loop, STATE},
+};
 
 fn main() {
     tauri::Builder::default()
@@ -27,6 +30,7 @@ fn main() {
             commands::file::create_folder,
             commands::moa::bootstrap_status,
             commands::graph::get_graph_one,
+            commands::file::get_thumbnails,
         ])
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_decorum::init())
@@ -37,12 +41,23 @@ fn main() {
 
             match moa {
                 Some(moa) => {
-                    app_launcher::grim::launch_moa(&app.handle(), moa.moa_id.clone())?;
+                    app_launcher::grim::launch_moa(
+                        &app.handle(),
+                        moa.moa_id.clone(),
+                    )?;
                 }
                 None => {
                     app_launcher::moa::launch_moa_selector(&app.handle())?;
                 }
             }
+
+            let (tx, rx) = mpsc::channel::<()>(64);
+            STATE.tx.set(tx).map_err(|_| {
+                anyhow::anyhow!("thumbnail worker already initialized")
+            })?;
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(worker_loop(app_handle, rx));
+
             Ok(())
         })
         .run(tauri::generate_context!())

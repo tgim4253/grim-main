@@ -1,6 +1,7 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { GraphResponse } from '@tgim/types/graph';
+import { ThumbJobStatus, ThumbRequest, ThumbResponse } from '@tgim/types/file';
 const appWindow = getCurrentWindow();
 
 const windowControllerIpc = {
@@ -50,10 +51,15 @@ const graphIpc = {
     invoke('create_folder', { moaId, data });
   },
   async getGraphOne(moaId: string, nodeId: string): Promise<GraphResponse> {
-    console.log(moaId, nodeId);
     const response = await invoke('get_graph_one', { moaId, nodeId });
-    console.log(response);
     return response as GraphResponse;
+  },
+};
+
+const fileIpc = {
+  async getThumbnails(moaId: String, data: ThumbRequest) {
+    const response = await invoke('get_thumbnails', { data, moaId });
+    return response as ThumbResponse;
   },
 };
 
@@ -61,4 +67,5 @@ export const ipc = {
   windowController: windowControllerIpc,
   moa: moaIpc,
   graph: graphIpc,
+  file: fileIpc,
 };
