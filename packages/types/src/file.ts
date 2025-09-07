@@ -35,7 +35,6 @@ export interface ThumbSpec {
   height: number;
   dpr?: 1 | 2 | 3;
   fmt?: ImageFmt; // default webp
-  v?: number; // schema version
   mode?: ResizeMode; // default Original
   key: string; // client-defined identifier to correlate
 }
