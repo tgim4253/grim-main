@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { ThumbEntry } from '@tgim/types/file';
+import { ThumbEntry, ThumbSpec } from '@tgim/types/file';
 
 /**
  * key_format:
@@ -22,23 +22,20 @@ type Hash = string;
 interface ThumbState {
   byKey: Record<ThumbKey, ThumbEntry>;
   byHash: Record<Hash, ThumbKey[]>; // hash -> set of key
-  inflight: Record<ThumbKey, Promise<void>>; // inflight = map of ongoing requests (thumbKey -> Promise)
   lru: ThumbKey[]; // least resently used cache. (oldest first, least end)
 
-  enqueueLow: (jobs: Array<{ thumbKey: ThumbKey; req: any }>) => void;
   upsert: (thumbKey: ThumbKey, patch: Partial<ThumbEntry>) => void;
   touch: (thumbKey: ThumbKey) => void;
-  markInflight: (thumbKey: ThumbKey, p: Promise<void>) => void;
-  clearInflight: (thumbKey: ThumbKey) => void;
   attach: (hash: string, thumbKey: ThumbKey) => void;
   evictLRU: (max: number) => void;
+
+  getThumbPathByKey: (key: ThumbKey) => string | undefined;
 }
 
 export const useThumbStore = create<ThumbState>()(
   immer((set, get) => ({
     byKey: {},
     byHash: {},
-    inflight: {},
     lru: [],
 
     upsert: (key, patch) => {
@@ -56,7 +53,7 @@ export const useThumbStore = create<ThumbState>()(
           } catch {}
         }
       });
-
+      console.log(key, patch);
       // Move to MRU only when entry becomes ready
       if (next.status === 'ready') {
         set(s => {
@@ -83,21 +80,7 @@ export const useThumbStore = create<ThumbState>()(
         s.byHash[hash] = setForHash;
       });
     },
-    markInflight: (key, p) =>
-      set(s => {
-        s.inflight[key] = p;
-      }),
-    clearInflight: key => {
-      set(s => {
-        delete s.inflight[key];
-      });
-    },
 
-    enqueueLow: jobs => {
-      // TODO: implement a low-priority queue with a max concurrency.
-      // e.g., keep a module-scoped scheduler and push jobs here.
-      void jobs;
-    },
     evictLRU: max => {
       const { lru, byKey } = get();
       if (lru.length <= max) return;
@@ -127,6 +110,23 @@ export const useThumbStore = create<ThumbState>()(
         }
       });
     },
+
+    getThumbPathByKey: key => {
+      const thumb = get().byKey[key];
+      if (thumb && thumb.status === 'ready') {
+        get().touch(key);
+        return thumb.url;
+      }
+      return undefined;
+    },
   })),
 );
+
+export const convertToThumbKey = (hash: string, spec: Partial<ThumbSpec>) => {
+  const { width, height, dpr, mode } = spec;
+  const result = `${hash}_${width}x${height}_dpr${dpr}_${mode}`;
+
+  return result;
+};
+
 export default useThumbStore;

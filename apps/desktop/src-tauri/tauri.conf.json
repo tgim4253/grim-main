@@ -1,5 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
+  
   "productName": "grim-app",
   "version": "0.1.0",
   "identifier": "grim-app",
@@ -12,7 +13,25 @@
   "app": {
     "windows": [],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$DOCUMENT/**",
+          "$HOME/**",
+
+          "/Volumes/**",
+
+          "$APPCACHE/**",
+
+          "/media/**",
+          "/run/media/**",
+
+          "D:/**",
+          "E:/**",
+          "F:/**"
+        ]
+      }
     }
   },
   "bundle": {

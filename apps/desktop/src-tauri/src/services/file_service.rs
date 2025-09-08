@@ -14,7 +14,7 @@ use once_cell::sync::{Lazy, OnceCell};
 use sha2::{Digest, Sha256};
 use sqlx::{Sqlite, Transaction};
 use tauri::{AppHandle, Emitter};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{mpsc, Mutex, Semaphore};
 use twox_hash::XxHash64;
 
 use crate::{
@@ -415,6 +415,7 @@ pub static STATE: Lazy<Arc<AppState>> = Lazy::new(|| {
 });
 
 pub async fn get_thumbs(
+    app: &AppHandle,
     moa_id: String,
     data: ThumbRequest,
 ) -> Result<ThumbResponse> {
@@ -433,6 +434,7 @@ pub async fn get_thumbs(
 
         for spec in specs {
             let ThumbPath(thumb_path) = match ThumbPath::new(
+                app,
                 &moa_id,
                 spec.clone(),
                 item.xxhs.clone(),
@@ -510,30 +512,31 @@ async fn enqueue_jobs(mut jobs: Vec<Job>) {
         let _ = tx.try_send(());
     }
 }
+pub async fn worker_loop(app: AppHandle, mut rx: mpsc::Receiver<()>) {
+    // allow N concurrent jobs (tune N per CPU & IO)
+    let sem = Arc::new(Semaphore::new(num_cpus::get().max(2)));
 
-pub async fn worker_loop(
-    app: AppHandle,
-    mut rx: tokio::sync::mpsc::Receiver<()>,
-) {
     loop {
-        // wait for signal
         let _ = rx.recv().await;
+
         loop {
-            let job_opt: Option<Job> = {
+            let job_opt = {
                 let mut q = STATE.q.lock().await;
-                if let Some(j) = q.high.pop_front() {
-                    Some(j)
-                } else if let Some(j) = q.low.pop_front() {
-                    Some(j)
-                } else {
-                    None
-                }
+                q.high.pop_front().or_else(|| q.low.pop_front())
             };
-            if let Some(job) = job_opt {
-                if let Err(err) = process_job(&app, job.clone()).await {
-                    // on error, emit "failed" event for this job
+
+            let Some(job) = job_opt else {
+                break;
+            };
+
+            let app_cloned = app.clone();
+            let sem_cloned = sem.clone();
+
+            tokio::spawn(async move {
+                let _permit = sem_cloned.acquire().await.unwrap();
+                if let Err(err) = process_job(&app_cloned, job.clone()).await {
                     let _ = emit_created(
-                        &app,
+                        &app_cloned,
                         vec![ThumbResSpec {
                             thumb_key: job.thumb_key,
                             status: ThumbStatus::Error,
@@ -544,10 +547,9 @@ pub async fn worker_loop(
                     )
                     .await;
                 }
-            } else {
-                break; // queue empty; wait for next signal
-            }
-            // small yield to avoid hogging
+            });
+
+            // small yield is not strictly needed when spawning
             tokio::task::yield_now().await;
         }
     }
@@ -599,7 +601,7 @@ async fn process_job(app: &AppHandle, job: Job) -> Result<()> {
             let nh = (h as f32 * scale).round().max(target_h as f32) as u32;
 
             let img2 =
-                img.resize(nw, nh, image::imageops::FilterType::Lanczos3);
+                img.resize(nw, nh, image::imageops::FilterType::Triangle);
             let x = (nw.saturating_sub(target_w)) / 2;
             let y = (nh.saturating_sub(target_h)) / 2;
             image::imageops::crop_imm(&img2, x, y, target_w, target_h)
@@ -628,6 +630,7 @@ async fn process_job(app: &AppHandle, job: Job) -> Result<()> {
                     enc.encode_image(&img).context("jpeg encode failed")?;
                 }
                 _ => {
+                    // too slow
                     let encoder = WebPEncoder::new_lossless(&mut buf);
                     img.write_with_encoder(encoder)
                         .context("webp encode failed")?;

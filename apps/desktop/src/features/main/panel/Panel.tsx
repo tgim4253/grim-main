@@ -215,42 +215,6 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     return { images: imageItems };
   }, []);
 
-  useEffect(() => {
-    const imageItems = gridData?.images ?? [];
-    if (imageItems.length > 0 && moaId) {
-      const hi = async () => {
-        const response = await ipc.file.getThumbnails(moaId, {
-          items: imageItems.map(item => ({
-            xxhs: item.hash,
-            specs: [
-              {
-                width: 128,
-                height: 128,
-                dpr: 1,
-                key: 'hihi',
-              },
-            ],
-          })),
-        });
-        console.log(response);
-      };
-
-      hi();
-    }
-    let unlisten: (() => void) | null = null;
-    const initListener = async () => {
-      unlisten = await listen<ThumbResSpec>(
-        `thumbnails://created`,
-        (event: { payload: ThumbResSpec }) => {
-          console.log(event.payload);
-        },
-      );
-    };
-    initListener();
-    return () => {
-      if (unlisten) unlisten();
-    };
-  }, [gridData, moaId]);
   const rootGraphNodeId = useMemo(() => {
     if (!graphData) return null;
     let id = null;
@@ -269,6 +233,8 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         ${isActive ? 'border-blue-500' : 'border-gray-300'} 
         ${hidden ? 'hidden' : ''}`}
     >
+      <div onClick={() => setViewType('graph')}>graph</div>
+      <div onClick={() => setViewType('grid')}>grid</div>
       {viewType === 'graph'
         ? graphData &&
           rootNodeId &&
@@ -280,7 +246,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
             />
           )
         : viewType === 'grid'
-          ? gridData && null
+          ? gridData && <GridView gridData={gridData} />
           : null}
     </div>,
     container,

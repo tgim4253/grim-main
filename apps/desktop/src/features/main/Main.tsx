@@ -17,6 +17,8 @@ import ProgressWindow from './ProgressWindow';
 import { debounce } from 'lodash';
 import usePanelsStore from '@tgim/stores/panelStore';
 import PanelContainer from './panel/Container';
+import { ThumbResSpec } from '@tgim/types/file';
+import useThumbStore, { convertToThumbKey } from '@tgim/stores/thumbStore';
 
 interface LayoutPorps {
   layoutId: string;
@@ -145,6 +147,35 @@ const Main: React.FC = () => {
       leftSidebar: state.sidebars.left,
     })),
   );
+  const { upsertThumb } = useThumbStore(
+    useShallow(state => ({
+      upsertThumb: state.upsert,
+    })),
+  );
+  useEffect(() => {
+    if (!moaId) return;
+
+    let unlisten: (() => void) | null = null;
+    const initListener = async () => {
+      unlisten = await listen<{ items: ThumbResSpec[] }>(
+        `thumbnails://created`,
+        (event: { payload: { items: ThumbResSpec[] } }) => {
+          event.payload.items.forEach(item => {
+            const key = item.thumb_key;
+            upsertThumb(key, {
+              status: 'ready',
+              url: item.url,
+              updatedAt: Date.now(),
+            });
+          });
+        },
+      );
+    };
+    initListener();
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [moaId]);
 
   useEffect(() => {
     if (!moaId) return;

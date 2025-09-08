@@ -11,6 +11,7 @@ use std::{
     string,
     time::UNIX_EPOCH,
 };
+use tauri::{path::BaseDirectory, AppHandle, Manager};
 
 use crate::{
     bootstrap::PATH_MANAGER, config::file::IntegrityCheckResult,
@@ -414,6 +415,7 @@ pub struct ThumbPath(pub PathBuf);
 impl ThumbPath {
     /// path/to/ab/cd/<hash>/<hash>_<width>x<height>_dpr<1|2|3>[_modeToken].<ext>
     pub async fn new(
+        app: &AppHandle,
         moa_id: &String,
         spec: ThumbSpec,
         hash: String,
@@ -475,12 +477,13 @@ impl ThumbPath {
         let filename = format!("{}.{}", core, fmt.ext());
 
         // ab/cd/<xxhs>/<filename>
-        let mut path = PATH_MANAGER.get_or_add(&moa_id).await?.thumb_dir;
-        path.push(ab);
-        path.push(cd);
-        path.push(&xxhs);
-        path.push(filename);
+        let rel_path = PathBuf::from("thumbs")
+            .join(ab)
+            .join(cd)
+            .join(&xxhs)
+            .join(filename);
 
+        let path = app.path().resolve(rel_path, BaseDirectory::AppCache)?;
         Ok(ThumbPath(path))
     }
 

@@ -6,7 +6,6 @@ export type ThumbEntry = {
   placeholder?: string;
   error?: string;
   updatedAt: number;
-  v: number; // transform schema version
 };
 
 /** Resize behavior for thumbnails. */
@@ -50,10 +49,10 @@ export interface ThumbRequest {
 
 export interface ThumbResSpec {
   status: ThumbStatus;
-  url?: string | null;
+  url?: string;
   thumb_key: string;
   enqueued: boolean;
-  error_msg?: string | null;
+  error_msg?: string;
 }
 
 export interface ThumbResInfo {

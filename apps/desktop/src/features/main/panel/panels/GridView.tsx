@@ -1,8 +1,12 @@
 import { listen } from '@tauri-apps/api/event';
 import { useMoa } from '@tgim/hooks/useMoa';
-import { GridData, ImageItem, ThumbnailData, ThumbnailType } from '@tgim/types/grid';
+import { GridData, ImageItem } from '@tgim/types/grid';
 import { ipc } from '../../../../lib/ipc';
 import React, { useEffect, useMemo, useState } from 'react';
+import useThumbStore, { convertToThumbKey } from '@tgim/stores/thumbStore';
+import { ResizeMode } from '@tgim/types/file';
+import { useShallow } from 'zustand/shallow';
+import { convertFileSrc } from '@tauri-apps/api/core';
 
 interface Props {
   gridData: GridData;
@@ -23,37 +27,55 @@ const GridView: React.FC<Props> = ({ gridData }) => {
     return map;
   }, [images]);
 
+  const { upsertThumb } = useThumbStore(
+    useShallow(state => ({
+      upsertThumb: state.upsert,
+    })),
+  );
   useEffect(() => {
-    let unlisten: (() => void) | null = null;
     (async function () {
-      const responses = await ipc.file.getThumbnails(images.map(img => img.hash));
-      responses.forEach(res => {
-        const img = hashToImgMap[res.hash];
-        if (res.thumbnail)
-          Object.entries(res.thumbnail).forEach(([key, value]) => {
-            const size = Number(key) as ThumbnailType;
-            img.thumbnail[size] = value;
-          });
+      if (moaId === null) return;
+
+      const responses = await ipc.file.getThumbnails(moaId, {
+        items: images.map(img => ({
+          xxhs: img.hash,
+          specs: [
+            {
+              width: 128,
+              height: 128,
+              dpr: 1,
+              mode: ResizeMode.Original,
+              key: convertToThumbKey(img.hash, {
+                width: 128,
+                height: 128,
+                dpr: 1,
+                mode: ResizeMode.Original,
+              }),
+            },
+          ],
+        })),
       });
+      responses.items.forEach(item => {
+        const img = hashToImgMap[item.xxhs];
+        if (!img) return;
 
-      const initListener = async () => {
-        unlisten = await listen<{ hash: string; url?: string; size: 64 | 128 | 256 | 512 }>(
-          `bootstrap://thumbnail/${moaId}`,
-          (event: { payload: { hash: string; url?: string; size: ThumbnailType } }) => {
-            const payload = event.payload;
-
-            if (hashToImgMap[payload.hash] && hashToImgMap[payload.hash].thumbnail)
-              hashToImgMap[payload.hash].thumbnail[payload.size.toString()] = payload.url;
-          },
-        );
-      };
-      initListener();
+        item.specs.forEach(spec => {
+          if (spec.status === 'hit') {
+            upsertThumb(spec.thumb_key, {
+              status: 'ready',
+              url: spec.url,
+              updatedAt: Date.now(),
+            });
+          } else {
+            upsertThumb(spec.thumb_key, {
+              status: 'pending',
+              updatedAt: Date.now(),
+            });
+          }
+        });
+      });
     })();
-
-    return () => {
-      if (unlisten) unlisten();
-    };
-  });
+  }, [moaId]);
 
   const widthSize = useMemo(() => {
     switch (size) {
@@ -105,21 +127,22 @@ const GridView: React.FC<Props> = ({ gridData }) => {
 
       {/* Content */}
       <div className="flex-1 overflow-auto px-4 pb-8 bg-background-0">
-        {layout === 'grid' ? (
-          <GridLayout
-            images={images}
-            sizeClass={sizeClass}
-            selectMode={selectMode}
-            onItemClick={img => console.log(img)}
-          />
-        ) : (
-          <MarsornyLayout
-            images={images}
-            size={size}
-            selectMode={selectMode}
-            onItemClick={img => console.log(img)}
-          />
-        )}
+        {
+          layout === 'grid' ? (
+            <GridLayout
+              images={images}
+              sizeClass={widthSize}
+              selectMode={selectMode}
+              onItemClick={img => console.log(img)}
+            />
+          ) : null
+          // <MarsornyLayout
+          //   images={images}
+          //   size={size}
+          //   selectMode={selectMode}
+          //   onItemClick={img => console.log(img)}
+          // />
+        }
       </div>
     </div>
   );
@@ -154,33 +177,33 @@ function GridLayout({
   );
 }
 
-function MarsornyLayout({
-  images,
-  onItemClick,
-  sizeClass,
-  selectMode,
-}: {
-  images: ImageItem[];
-  onItemClick: (f: ImageItem) => void;
-  selected: Record<string, boolean>;
-  sizeClass: string;
-  selectMode: boolean;
-}) {
-  return (
-    <div className="gap-4" style={{ columnGap: 16 }}>
-      {images.map(img => (
-        <div key={img.id} className="mb-4 break-inside-avoid">
-          <ThumbCard
-            img={img}
-            onClick={() => onItemClick(img)}
-            sizeClass="max-w-full"
-            showCheckbox={selectMode}
-          />
-        </div>
-      ))}
-    </div>
-  );
-}
+// function MarsornyLayout({
+//   images,
+//   onItemClick,
+//   sizeClass,
+//   selectMode,
+// }: {
+//   images: ImageItem[];
+//   onItemClick: (f: ImageItem) => void;
+//   selected: Record<string, boolean>;
+//   sizeClass: string;
+//   selectMode: boolean;
+// }) {
+//   return (
+//     <div className="gap-4" style={{ columnGap: 16 }}>
+//       {images.map(img => (
+//         <div key={img.id} className="mb-4 break-inside-avoid">
+//           <ThumbCard
+//             img={img}
+//             onClick={() => onItemClick(img)}
+//             sizeClass="max-w-full"
+//             showCheckbox={selectMode}
+//           />
+//         </div>
+//       ))}
+//     </div>
+//   );
+// }
 
 function ThumbCard({
   img,
@@ -195,6 +218,26 @@ function ThumbCard({
 }) {
   const [loaded, setLoaded] = useState(false);
 
+  const key = useMemo(() => {
+    return convertToThumbKey(img.hash, {
+      width: 128,
+      height: 128,
+      dpr: 1,
+      mode: ResizeMode.Original,
+    });
+  }, [img.hash]);
+
+  const { entry } = useThumbStore(
+    useShallow(state => ({
+      entry: state.byKey[key],
+    })),
+  );
+  const thumbPath = useMemo(() => {
+    if (!entry) return undefined;
+    if (entry.status === 'pending') return undefined;
+    if (!entry.url) return undefined;
+    return convertFileSrc(entry.url);
+  }, [key, entry]);
   return (
     <div
       className={`group relative rounded-2xl border border-outline bg-surface p-2 shadow-sm hover:shadow-md transition ${sizeClass}`}
@@ -204,14 +247,14 @@ function ThumbCard({
     >
       {showCheckbox && (
         <div className="absolute left-3 top-3 z-10">
-          <input type="checkbox" readOnly checked={checked} />
+          <input type="checkbox" readOnly />
         </div>
       )}
 
       <div className="relative w-full overflow-hidden rounded-xl">
         {!loaded && <div className="aspect-square w-full animate-pulse bg-background-2" />}
         <img
-          src={img.url}
+          src={thumbPath}
           alt={img.name}
           className="w-full h-auto object-cover"
           onLoad={() => setLoaded(true)}
@@ -219,7 +262,7 @@ function ThumbCard({
         />
       </div>
       <div className="mt-2 flex items-center justify-between text-xs text-foreground">
-        <span className="truncate" title={img.path}>
+        <span className="truncate" title={thumbPath}>
           {img.name}
         </span>
         <span>{Math.round(img.size / 1024)} KB</span>

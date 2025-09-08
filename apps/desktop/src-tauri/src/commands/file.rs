@@ -30,7 +30,9 @@ pub async fn get_thumbnails(
     moa_id: String,
     data: ThumbRequest,
 ) -> Result<ThumbResponse, String> {
-    let response = get_thumbs(moa_id, data).await.map_err(|e| e.to_string())?;
+    let response = get_thumbs(&app_handle, moa_id, data)
+        .await
+        .map_err(|e| e.to_string())?;
 
     Ok(response)
 }
