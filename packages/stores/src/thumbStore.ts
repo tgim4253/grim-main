@@ -53,7 +53,6 @@ export const useThumbStore = create<ThumbState>()(
           } catch {}
         }
       });
-      console.log(key, patch);
       // Move to MRU only when entry becomes ready
       if (next.status === 'ready') {
         set(s => {
