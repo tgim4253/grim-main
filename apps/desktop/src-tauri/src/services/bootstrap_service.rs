@@ -50,7 +50,10 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub async fn get_or_insert_status(&self, moa_id: &str) -> Arc<Mutex<AppStatus>> {
+    pub async fn get_or_insert_status(
+        &self,
+        moa_id: &str,
+    ) -> Arc<Mutex<AppStatus>> {
         {
             let rd = self.statuses.read().await;
             if let Some(s) = rd.get(moa_id) {
@@ -80,12 +83,17 @@ pub async fn bootstrap_moa_service(
     let state = state.inner().clone();
 
     tauri::async_runtime::spawn(async move {
-        if let Err(e) =
-            run_bootstrap_pipeline(app_handle.clone(), state.clone(), moa_id.clone()).await
+        if let Err(e) = run_bootstrap_pipeline(
+            app_handle.clone(),
+            state.clone(),
+            moa_id.clone(),
+        )
+        .await
         {
             println!("Bootstrap failed: {}", e);
             // set error status
-            set_status(&state, &moa_id, Stage::Error, 0, Some(e.to_string())).await;
+            set_status(&state, &moa_id, Stage::Error, 0, Some(e.to_string()))
+                .await;
             emit(
                 &app_handle,
                 &moa_id,
@@ -106,18 +114,35 @@ async fn run_bootstrap_pipeline(
     moa_id: String,
 ) -> anyhow::Result<()> {
     let t0 = Instant::now();
-    step(&app, &state, &moa_id, Stage::Migrating, 0, Some("Applying DB migrations")).await;
+    step(
+        &app,
+        &state,
+        &moa_id,
+        Stage::Migrating,
+        0,
+        Some("Applying DB migrations"),
+    )
+    .await;
     apply_migrations(&moa_id).await?;
     println!("Migrating took: {:?} ms", t0.elapsed().as_millis());
 
     let t1 = Instant::now();
-    step(&app, &state, &moa_id, Stage::RefreshingMounts, 15, Some("Enumerating volumes")).await;
+    step(
+        &app,
+        &state,
+        &moa_id,
+        Stage::RefreshingMounts,
+        15,
+        Some("Enumerating volumes"),
+    )
+    .await;
     ensure_mounted_volume(&moa_id).await?;
     println!("RefreshingMounts took: {:?} ms", t1.elapsed().as_millis());
 
     step(&app, &state, &moa_id, Stage::ResolvingAnchors, 40, None).await;
 
-    step(&app, &state, &moa_id, Stage::InitialScan, 60, Some("Indexing files")).await;
+    step(&app, &state, &moa_id, Stage::InitialScan, 60, Some("Indexing files"))
+        .await;
 
     step(&app, &state, &moa_id, Stage::Ready, 100, Some("Done")).await;
 
@@ -132,11 +157,16 @@ async fn step(
     pct: u8,
     note: Option<&str>,
 ) {
-    set_status(state, moa_id, stage.clone(), pct, note.map(|s| s.to_string())).await;
+    set_status(state, moa_id, stage.clone(), pct, note.map(|s| s.to_string()))
+        .await;
     emit(
         app_handle,
         moa_id,
-        ProgressEvent { stage: stage.clone(), percent: pct, note: note.map(|s| s.to_string()) },
+        ProgressEvent {
+            stage: stage.clone(),
+            percent: pct,
+            note: note.map(|s| s.to_string()),
+        },
     );
 }
 
@@ -156,12 +186,18 @@ async fn set_status(
     }
 }
 
-fn emit(app_handle: &tauri::AppHandle, moa_id: &str, payload: impl Serialize + Clone) {
+fn emit(
+    app_handle: &tauri::AppHandle,
+    moa_id: &str,
+    payload: impl Serialize + Clone,
+) {
     let topic = format!("bootstrap://progress/{}", moa_id);
     let _ = app_handle.emit(&topic, payload);
 }
 
-pub async fn fetch_init_data_for_front(moa_id: String) -> Result<NodeWithConnections> {
+pub async fn fetch_init_data_for_front(
+    moa_id: String,
+) -> Result<NodeWithConnections> {
     let mut tx = DB_MANAGER.create_new_tx(&moa_id).await?;
 
     let folder_and_files = NodeRepository::fetch_all_nodes_by_kind(
@@ -177,11 +213,15 @@ pub async fn fetch_init_data_for_front(moa_id: String) -> Result<NodeWithConnect
 
     tx.commit().await?;
 
-    Ok(NodeWithConnections { nodes: folder_and_files, connections: connections })
+    Ok(NodeWithConnections {
+        nodes: folder_and_files,
+        connections: connections,
+    })
 }
 
 async fn apply_migrations(moa_id: &str) -> Result<()> {
-    let moa = moa_services::MOA_DATA.read().unwrap().get_by_id(&moa_id).unwrap();
+    let moa =
+        moa_services::MOA_DATA.read().unwrap().get_by_id(&moa_id).unwrap();
 
     let name = moa.name;
     let path = moa.path;
@@ -195,11 +235,13 @@ async fn apply_migrations(moa_id: &str) -> Result<()> {
 
     let pool = db::DB_MANAGER.get_or_open(&moa_id).await?;
 
-    integrity::ensure_schema(&pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to ensure database schema: {}", e))?;
+    integrity::ensure_schema(&pool).await.map_err(|e| {
+        anyhow::anyhow!("Failed to ensure database schema: {}", e)
+    })?;
 
-    integrity::seed_initial_data(&pool).await.context("Failed to seed initial database data")?;
+    integrity::seed_initial_data(&pool)
+        .await
+        .context("Failed to seed initial database data")?;
     Ok(())
 }
 

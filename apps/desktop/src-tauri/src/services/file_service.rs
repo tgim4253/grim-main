@@ -1,15 +1,24 @@
 use std::{
-    collections::VecDeque,
+    collections::{HashSet, VecDeque},
+    fmt::Debug,
     fs::File,
-    hash::Hasher,
+    hash::{Hash, Hasher},
     io::{self, BufReader, Read},
     path::{Path, PathBuf},
     sync::Arc,
+    time::Instant,
 };
 
 use anyhow::{anyhow, bail, Context, Ok, Result};
 use async_recursion::async_recursion;
-use image::{codecs::webp::WebPEncoder, GenericImageView};
+use fast_image_resize::{
+    images::Image, FilterType, MulDiv, PixelType, ResizeAlg, ResizeOptions,
+    Resizer,
+};
+use image::{
+    codecs::webp::WebPEncoder, DynamicImage, GenericImageView, ImageBuffer,
+    ImageReader, Rgba,
+};
 use once_cell::sync::{Lazy, OnceCell};
 use sha2::{Digest, Sha256};
 use sqlx::{Sqlite, Transaction};
@@ -384,6 +393,31 @@ pub async fn fetch_one_file_path(
 
 pub const SCHEMA_VERSION: u8 = 1;
 
+#[derive(Debug, Clone, Eq)]
+struct JobKey {
+    xxhs: String,
+    thumb_key: String,
+}
+
+impl PartialEq for JobKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.xxhs == other.xxhs && self.thumb_key == other.thumb_key
+    }
+}
+
+impl Hash for JobKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.xxhs.hash(state);
+        self.thumb_key.hash(state);
+    }
+}
+
+impl From<&Job> for JobKey {
+    fn from(j: &Job) -> Self {
+        Self { xxhs: j.xxhs.clone(), thumb_key: j.thumb_key.clone() }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Job {
     pub moa_id: String,
@@ -400,6 +434,9 @@ pub struct QueueState {
     // simple two-priority queues
     high: VecDeque<Job>,
     low: VecDeque<Job>,
+
+    pending: HashSet<JobKey>, // jobs enqueued but not yet started
+    inflight: HashSet<JobKey>, // jobs currently being processed
 }
 
 pub struct AppState {
@@ -501,6 +538,15 @@ async fn enqueue_jobs(mut jobs: Vec<Job>) {
         let mut q = st.q.lock().await;
         // high first, then low
         for j in jobs.drain(..) {
+            let key: JobKey = (&j).into();
+
+            // skip if already pending or inflight
+            if q.pending.contains(&key) || q.inflight.contains(&key) {
+                continue;
+            }
+
+            // mark as pending and push to the appropriate queue
+            q.pending.insert(key);
             if j.priority == 0 {
                 q.high.push_back(j);
             } else {
@@ -522,7 +568,15 @@ pub async fn worker_loop(app: AppHandle, mut rx: mpsc::Receiver<()>) {
         loop {
             let job_opt = {
                 let mut q = STATE.q.lock().await;
-                q.high.pop_front().or_else(|| q.low.pop_front())
+                let job = q.high.pop_front().or_else(|| q.low.pop_front());
+
+                if let Some(ref j) = job {
+                    let key: JobKey = j.into();
+                    // move from pending -> inflight
+                    q.pending.remove(&key);
+                    q.inflight.insert(key);
+                }
+                job
             };
 
             let Some(job) = job_opt else {
@@ -534,7 +588,17 @@ pub async fn worker_loop(app: AppHandle, mut rx: mpsc::Receiver<()>) {
 
             tokio::spawn(async move {
                 let _permit = sem_cloned.acquire().await.unwrap();
-                if let Err(err) = process_job(&app_cloned, job.clone()).await {
+                let key: JobKey = (&job).into();
+
+                let res = process_job(&app_cloned, job.clone()).await;
+
+                // on finish, drop from inflight and emit error if any
+                {
+                    let mut q = STATE.q.lock().await;
+                    q.inflight.remove(&key);
+                }
+
+                if let Err(err) = res {
                     let _ = emit_created(
                         &app_cloned,
                         vec![ThumbResSpec {
@@ -556,83 +620,140 @@ pub async fn worker_loop(app: AppHandle, mut rx: mpsc::Receiver<()>) {
 }
 
 async fn process_job(app: &AppHandle, job: Job) -> Result<()> {
+    let t1 = Instant::now();
+
     let src = fetch_one_file_path(job.moa_id.clone(), job.xxhs).await?;
 
     // vaild
-    let data = tokio::fs::read(&src).await.context("read source failed")?;
-    let kind = infer::get(&data)
-        .map(|k| k.mime_type().to_string())
-        .unwrap_or_default();
-    if !kind.starts_with("image/") {
-        anyhow::bail!("not an image: {}", kind);
-    }
+    let data: Vec<u8> =
+        tokio::fs::read(&src).await.context("read source failed")?;
+    let kind = infer::get_from_path(&src)
+        .context("failed to read file")?
+        .ok_or_else(|| anyhow::anyhow!("unknown file type"))?;
+    if !infer::is_image(kind.mime_type().as_bytes()) { /* ... */ }
     let out_path = job.out_path.clone(); // keep a local copy for later use
     let tmp = out_path.with_extension("tmp"); // write to tmp first
 
     // decode
-    let img =
-        tokio::task::spawn_blocking(move || -> Result<image::DynamicImage> {
-            // apply EXIF orientation if needed
-            let mut cursor = std::io::Cursor::new(data);
-            let mut img = image::load(
-                &mut cursor,
-                image::ImageFormat::from_mime_type(&kind)
-                    .unwrap_or(image::ImageFormat::Png),
-            )
-            .context("decode failed")?;
-            Ok(img)
-        })
-        .await??;
+    let img: DynamicImage = tokio::task::spawn_blocking({
+        let data = data.clone(); // move into blocking task
+        move || {
+            // decode in blocking thread
+            // image crate will guess the format from the bytes
+            image::load_from_memory(&data).context("image decode failed")
+        }
+    })
+    .await
+    .context("join error")??;
+
+    println!("get took: {:?} ms", t1.elapsed().as_millis());
+    let t1 = Instant::now();
 
     // resize & center-crop to WxH; prevent upscaling
     let (tw, th) = (job.spec.width, job.spec.height);
-    let resized =
-        tokio::task::spawn_blocking(move || -> image::DynamicImage {
-            // keep aspect ratio, fit by longer edge, then center-crop to square WxH
+    let (output_buf, out_w, out_h) =
+        tokio::task::spawn_blocking(move || -> (Vec<u8>, u32, u32) {
+            // keep aspect ratio, fit by longer edge, then center-crop; never upscale
+            let t1 = Instant::now();
+
             let (w, h) = img.dimensions();
             let target_w = tw.max(1);
             let target_h = th.max(1);
+            let rgba = img.to_rgba8();
+            let (w, h) = rgba.dimensions();
 
-            // upscale
-            // todo: change
-            let scale =
-                (target_w as f32 / w as f32).max(target_h as f32 / h as f32);
-            let nw = (w as f32 * scale).round().max(target_w as f32) as u32;
-            let nh = (h as f32 * scale).round().max(target_h as f32) as u32;
+            let scale = ((target_w as f32 / w as f32)
+                .max(target_h as f32 / h as f32))
+            .min(1.0);
 
-            let img2 =
-                img.resize(nw, nh, image::imageops::FilterType::Triangle);
-            let x = (nw.saturating_sub(target_w)) / 2;
-            let y = (nh.saturating_sub(target_h)) / 2;
-            image::imageops::crop_imm(&img2, x, y, target_w, target_h)
-                .to_image()
-                .into()
+            // If the image is already smaller than target, scale becomes 1.0 (no upscaling).
+            let nw = ((w as f32 * scale).round() as u32).max(1);
+            let nh = ((h as f32 * scale).round() as u32).max(1);
+
+            // --- build fir images ---
+            // Source
+            let mut src_image = Image::from_vec_u8(
+                w,
+                h,
+                rgba.into_raw(),
+                PixelType::U8x4, // RGBA8 interleaved
+            )
+            .expect("Invalid source buffer");
+
+            let crop_w = target_w.min(nw);
+            let crop_h = target_h.min(nh);
+            let x = (nw.saturating_sub(crop_w)) / 2;
+            let y = (nh.saturating_sub(crop_h)) / 2;
+
+            // Destination
+            let mut dst_image =
+                Image::new(crop_w, crop_h, src_image.pixel_type());
+
+            let mut resizer = Resizer::new();
+            println!("resize pre took: {:?} ms", t1.elapsed().as_millis());
+
+            // crop window centered in the resized image
+
+            // --- perform resize (SIMD accelerated if available) ---
+            resizer
+                .resize(
+                    &src_image,
+                    &mut dst_image,
+                    &ResizeOptions::new()
+                        .crop(x as f64, y as f64, crop_w as f64, crop_h as f64)
+                        .resize_alg(ResizeAlg::Nearest),
+                )
+                .expect("resize failed");
+
+            // return raw RGBA buffer and its final dimensions
+            (dst_image.into_vec(), crop_w, crop_h)
         })
         .await?;
+    println!("resize took: {:?} ms", t1.elapsed().as_millis());
+    let t1 = Instant::now();
 
-    // encode (webp or jpeg)
+    // --- (아래) 인코딩 태스크: output_buf 사용으로 변경 ---
     if let Some(parent) = job.out_path.parent() {
         tokio::fs::create_dir_all(parent).await?
     } else {
         bail!("bad output path")
     }
     let tmp_path = tmp.clone();
+
     tokio::task::spawn_blocking({
-        let img = resized.clone();
+        // move necessary data into the blocking task
+        let output_buf = output_buf; // raw RGBA8 buffer
+        let (w, h) = (out_w, out_h); // final dimensions after resize/crop
         move || -> Result<()> {
             let mut buf = Vec::new();
             match job.spec.fmt {
                 Some(ImageFmt::Jpeg) => {
+                    // Encode RGBA8 buffer to JPEG with given quality
                     let mut enc =
                         image::codecs::jpeg::JpegEncoder::new_with_quality(
                             &mut buf, 75,
                         );
-                    enc.encode_image(&img).context("jpeg encode failed")?;
+                    enc.encode(
+                        &output_buf,
+                        w,
+                        h,
+                        image::ExtendedColorType::Rgba8,
+                    )
+                    .context("jpeg encode failed")?;
                 }
                 _ => {
-                    // too slow
-                    let encoder = WebPEncoder::new_lossless(&mut buf);
-                    img.write_with_encoder(encoder)
+                    // Encode as WebP (lossless) from RGBA8 buffer
+                    let mut encoder =
+                        image::codecs::webp::WebPEncoder::new_lossless(
+                            &mut buf,
+                        );
+                    encoder
+                        .encode(
+                            &output_buf,
+                            w,
+                            h,
+                            image::ExtendedColorType::Rgba8,
+                        )
                         .context("webp encode failed")?;
                 }
             }
@@ -644,6 +765,7 @@ async fn process_job(app: &AppHandle, job: Job) -> Result<()> {
 
     // atomic rename
     tokio::fs::rename(&tmp, &out_path).await.context("rename failed")?;
+    println!("down took: {:?} ms", t1.elapsed().as_millis());
 
     // emit event
     emit_created(

@@ -11,7 +11,7 @@ import Masonry from 'react-masonry-css';
 import { FixedSizeGrid as WindowGrid } from 'react-window';
 
 /* ---------------------------------------------
- * Helper Icon Components (변경 없음)
+ * Helper Icon Components (unchanged)
  * --------------------------------------------- */
 const GridIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
@@ -54,12 +54,13 @@ const MasonryIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 /* ---------------------------------------------
- * Types, Constants, Hooks (변경 없음)
+ * Types, Constants, Hooks (unchanged)
  * --------------------------------------------- */
 
 interface Props {
   gridData: GridData;
 }
+
 type Size = 'small' | 'medium' | 'large';
 type Layout = 'grid' | 'masonry';
 
@@ -68,7 +69,7 @@ const LAYOUTS: Layout[] = ['grid', 'masonry'];
 const MAX_ITEMS_PER_REQ = 100;
 const INITIAL_FETCH_COUNT = 50;
 
-// Debounce Hook (변경 없음)
+// Debounce Hook (unchanged)
 function useDebouncedEffect(fn: () => void, deps: React.DependencyList, delay: number) {
   useEffect(() => {
     const handler = setTimeout(() => fn(), delay);
@@ -76,7 +77,7 @@ function useDebouncedEffect(fn: () => void, deps: React.DependencyList, delay: n
   }, [fn, ...deps]);
 }
 
-// Visibility Hook (변경 없음)
+// Visibility Hook (unchanged)
 function useVisibilityMap(rootRef: React.RefObject<HTMLElement>, overscanPx = 600) {
   const ioRef = useRef<IntersectionObserver | null>(null);
   const [visible, setVisible] = useState<Record<string, boolean>>({});
@@ -139,7 +140,7 @@ function useVisibilityMap(rootRef: React.RefObject<HTMLElement>, overscanPx = 60
   return { visible, observe, unobserve };
 }
 
-// Element Size Hook (변경 없음)
+// Element Size Hook (unchanged)
 function useElementSize<T extends HTMLElement>(ref: React.RefObject<T>) {
   const [size, setSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   useEffect(() => {
@@ -165,6 +166,7 @@ const GridView: React.FC<Props> = ({ gridData }) => {
   const [selectMode, setSelectMode] = useState(false);
   const [images] = useState(gridData.images);
 
+  // Map for quick lookup by hash
   const hashToImgMap = useMemo(() => {
     const map: Record<string, ImageItem> = {};
     images.forEach(img => (map[img.hash] = img));
@@ -191,6 +193,10 @@ const GridView: React.FC<Props> = ({ gridData }) => {
     }
   }, [size]);
 
+  /* -------------------------------------------------
+   * Thumbnail fetcher
+   * NOTE: Prevent duplicate work by checking store.
+   * ------------------------------------------------- */
   const fetchThumbnails = useCallback(
     async (itemsToFetch: ImageItem[]) => {
       if (moaId === null || itemsToFetch.length === 0) return;
@@ -205,6 +211,7 @@ const GridView: React.FC<Props> = ({ gridData }) => {
             dpr: 1,
             mode: ResizeMode.Original,
           });
+          // Skip if already ready
           if (currentThumbs[key]?.status === 'ready') return null;
           return {
             xxhs: img.hash,
@@ -238,16 +245,22 @@ const GridView: React.FC<Props> = ({ gridData }) => {
     [moaId, thumbSize, upsertThumb],
   );
 
+  // Stable ref to avoid stale closure
   const stableFetchThumbnails = useRef(fetchThumbnails);
   useEffect(() => {
     stableFetchThumbnails.current = fetchThumbnails;
   }, [fetchThumbnails]);
 
+  // Initial warm-up
   useEffect(() => {
     const initialItems = images.slice(0, INITIAL_FETCH_COUNT);
     stableFetchThumbnails.current(initialItems);
   }, [images]);
 
+  /* -------------------------------------------------
+   * Fetch for Masonry via IntersectionObserver
+   * (Grid uses react-window onItemsRendered; see below)
+   * ------------------------------------------------- */
   const visibleItems = useMemo(() => {
     return Object.keys(visible)
       .filter(k => visible[k])
@@ -257,13 +270,18 @@ const GridView: React.FC<Props> = ({ gridData }) => {
 
   useDebouncedEffect(
     () => {
-      if (visibleItems.length > 0) {
+      if (layout === 'masonry' && visibleItems.length > 0) {
         stableFetchThumbnails.current(visibleItems);
       }
     },
-    [visibleItems],
-    150,
+    [visibleItems, layout],
+    120,
   );
+
+  // Handler for grid layout to request thumbs by index ranges
+  const handleNeedThumbs = useCallback((items: ImageItem[]) => {
+    if (items.length) stableFetchThumbnails.current(items);
+  }, []);
 
   const gridItemSizeClass = useMemo(() => {
     if (layout === 'masonry') {
@@ -324,10 +342,12 @@ const GridView: React.FC<Props> = ({ gridData }) => {
             images={images}
             size={size}
             onItemClick={handleItemClick}
-            observe={observe}
-            unobserve={unobserve}
+            // For grid we *don't* rely on IO to fetch; pass no-op to avoid overhead
+            observe={() => {}}
+            unobserve={() => {}}
             selectMode={selectMode}
             thumbSize={thumbSize}
+            onNeedThumbs={handleNeedThumbs}
           />
         ) : (
           <MasonryLayout
@@ -347,16 +367,31 @@ const GridView: React.FC<Props> = ({ gridData }) => {
 
 /* ---------------------------------------------
  * Virtualized Grid (react-window)
+ *
+ * IMPORTANT CHANGE:
+ *  - Use react-window's onItemsRendered to proactively request thumbnails
+ *    for the overscanned rows. This prevents "blank rows" on very fast scrolls
+ *    where IntersectionObserver might miss transient intersections.
  * --------------------------------------------- */
 function VirtualGridLayout({
   images,
   size,
   onItemClick,
-  observe,
-  unobserve,
+  observe, // no-op in grid path
+  unobserve, // no-op in grid path
   selectMode,
   thumbSize,
-}: any) {
+  onNeedThumbs,
+}: {
+  images: ImageItem[];
+  size: Size;
+  onItemClick: (img: ImageItem) => void;
+  observe: (el: Element | null, key: string) => void;
+  unobserve: (el: Element | null) => void;
+  selectMode: boolean;
+  thumbSize: number;
+  onNeedThumbs: (items: ImageItem[]) => void;
+}) {
   const itemW = size === 'small' ? 96 : size === 'large' ? 192 : 144;
   const itemH = itemW;
   const gap = 16;
@@ -365,6 +400,36 @@ function VirtualGridLayout({
 
   const cols = Math.max(1, Math.floor((width + gap) / (itemW + gap)));
   const rowCount = Math.ceil(images.length / cols);
+
+  // Request thumbs for rows/cols in overscan range (debounced via RAF)
+  const rafRef = useRef<number | null>(null);
+  const pendingRangeRef = useRef<{ rs: number; re: number } | null>(null);
+
+  const scheduleFetchForRange = useCallback(
+    (rs: number, re: number) => {
+      // Merge with pending range to reduce calls
+      if (!pendingRangeRef.current) {
+        pendingRangeRef.current = { rs, re };
+      } else {
+        pendingRangeRef.current = {
+          rs: Math.min(pendingRangeRef.current.rs, rs),
+          re: Math.max(pendingRangeRef.current.re, re),
+        };
+      }
+      if (rafRef.current != null) return;
+      rafRef.current = requestAnimationFrame(() => {
+        const r = pendingRangeRef.current;
+        rafRef.current = null;
+        pendingRangeRef.current = null;
+        if (!r) return;
+        const startIdx = r.rs * cols;
+        const endIdxExclusive = Math.min(images.length, (r.re + 1) * cols);
+        const slice = images.slice(startIdx, endIdxExclusive);
+        onNeedThumbs(slice);
+      });
+    },
+    [cols, images, onNeedThumbs],
+  );
 
   const Cell = useCallback(
     ({ columnIndex, rowIndex, style }: any) => {
@@ -375,8 +440,8 @@ function VirtualGridLayout({
         <div
           style={{
             ...style,
-            left: style.left + gap,
-            top: style.top + gap,
+            left: (style.left as number) + gap,
+            top: (style.top as number) + gap,
             width: itemW,
             height: itemH,
           }}
@@ -406,7 +471,12 @@ function VirtualGridLayout({
           rowCount={rowCount}
           rowHeight={itemH + gap}
           width={width}
-          overscanRowCount={3}
+          overscanRowCount={5} // ↑ a bit more generous overscan to hide fetch latency
+          overscanColumnCount={1}
+          onItemsRendered={({ overscanRowStartIndex, overscanRowStopIndex }) => {
+            // Proactively fetch thumbnails for overscanned rows
+            scheduleFetchForRange(overscanRowStartIndex, overscanRowStopIndex);
+          }}
         >
           {Cell}
         </WindowGrid>
@@ -416,7 +486,8 @@ function VirtualGridLayout({
 }
 
 /* ---------------------------------------------
- * Non-virtual Masonry
+ * Non-virtual Masonry (unchanged behavior)
+ * Uses IO-based visibility to decide fetches.
  * --------------------------------------------- */
 function MasonryLayout({
   images,
@@ -434,8 +505,8 @@ function MasonryLayout({
       className="flex w-auto -ml-4"
       columnClassName="pl-4 bg-clip-padding"
     >
-      {images.map(img => (
-        <div key={img.id} className="mb-4">
+      {images.map((img: ImageItem) => (
+        <div key={img.id ?? img.hash} className="mb-4">
           <ThumbCard
             img={img}
             onClick={onItemClick}
@@ -501,6 +572,7 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
 
   useEffect(() => {
     const el = containerRef.current;
+    // Observe by hash to match visibility map keys
     observe(el, img.hash);
     return () => unobserve(el);
   }, [img.hash, observe, unobserve]);
@@ -529,7 +601,7 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
         {!stableSrc && <div className="w-full h-full animate-pulse bg-background-2" />}
         {stableSrc && (
           <img
-            src={stableSrc}
+            src={''}
             alt={img.name}
             className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
             onLoad={handleImageLoad}
