@@ -5,6 +5,8 @@ import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d';
 import { useShallow } from 'zustand/shallow';
 import * as d3 from 'd3-force';
+import useThumbStore from '@tgim/stores/thumbStore';
+import { useMoa } from '@tgim/hooks/useMoa';
 
 interface Props {
   graphData: GraphData;
@@ -40,16 +42,34 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
       }
     };
   }, []);
+  const { upsertThumb, thumb } = useThumbStore(
+    useShallow(s => ({
+      upsertThumb: s.upsert,
+      thumb: s.byKey,
+    })),
+  );
 
   const nodesById = useMemo(() => {
+    if (!graphData) return {};
     const nodesById = Object.fromEntries(graphData.nodes.map(node => [node.id, node]));
     graphData.nodes.forEach(node => {
       node.isHidden = node.isLeaf;
       node.childLinks = [];
     });
-    graphData.links.forEach(link => nodesById[link.source].childLinks.push(link));
+    graphData.links.forEach(link => {
+      const source = typeof link.source === 'object' ? (link.source as any).id : link.source;
+      nodesById[source].childLinks.push(link);
+    });
     return nodesById;
   }, [graphData.nodes]);
+  const { moaId } = useMoa(location);
+
+  useEffect(() => {
+    graphData.nodes.forEach(node => {
+      if (node.type == 'image' && !node.url) {
+      }
+    });
+  }, [moaId, graphData.nodes]);
 
   const GAP = 90;
   const LEAF_OFFSET = 10;

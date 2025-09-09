@@ -18,6 +18,7 @@ export interface GraphNode {
   type: GraphNodeType;
   depth?: number;
   isLeaf?: boolean;
+  url?: string;
   x?: number;
   y?: number;
   fx?: number;
