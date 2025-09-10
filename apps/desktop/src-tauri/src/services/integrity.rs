@@ -21,7 +21,9 @@ pub async fn open_or_create_db(db_path: &Path) -> Result<Pool<Sqlite>> {
         // Convert the path to a string, replacing any invalid UTF-8 characters with a replacement character
         &format!("sqlite://{}", db_path.to_string_lossy()),
     )
-    .with_context(|| format!("Failed to parse sqlite URL for {}", db_path.display()))?
+    .with_context(|| {
+        format!("Failed to parse sqlite URL for {}", db_path.display())
+    })?
     .create_if_missing(true)
     .read_only(false)
     .journal_mode(SqliteJournalMode::Wal)
@@ -36,46 +38,57 @@ pub async fn open_or_create_db(db_path: &Path) -> Result<Pool<Sqlite>> {
         .after_connect(|conn, _meta| {
             Box::pin(async move {
                 // Enforce FK integrity for this connection
-                sqlx::query("PRAGMA foreign_keys = ON;").execute(&mut *conn).await?;
+                sqlx::query("PRAGMA foreign_keys = ON;")
+                    .execute(&mut *conn)
+                    .await?;
                 // Journaling and sync are already set above; executing again is harmless.
-                sqlx::query("PRAGMA journal_mode = WAL;").execute(&mut *conn).await?;
-                sqlx::query("PRAGMA synchronous = NORMAL;").execute(&mut *conn).await?;
+                sqlx::query("PRAGMA journal_mode = WAL;")
+                    .execute(&mut *conn)
+                    .await?;
+                sqlx::query("PRAGMA synchronous = NORMAL;")
+                    .execute(&mut *conn)
+                    .await?;
                 Ok::<_, sqlx::Error>(())
             })
         })
         .connect_with(options)
         .await
-        .with_context(|| format!("Failed to open/create sqlite at {}", db_path.display()))?;
+        .with_context(|| {
+            format!("Failed to open/create sqlite at {}", db_path.display())
+        })?;
 
     Ok(pool)
 }
 
 /// Create tables and indexes exactly matching the provided DBML (SQLite dialect).
 pub async fn ensure_schema(pool: &Pool<Sqlite>) -> Result<()> {
-    let schema_sql = fs::read_to_string("schema.sql")?;
+    sqlx::migrate!().run(pool).await?;
 
-    let mut tx = pool.begin().await?;
+    // let mut tx = pool.begin().await?;
 
-    for stmt in schema_sql.split(';') {
-        let trimmed = stmt.trim();
-        if !trimmed.is_empty() {
-            sqlx::query(trimmed).execute(&mut *tx).await?;
-        }
-    }
+    // for stmt in schema_sql.split(';') {
+    //     let trimmed = stmt.trim();
+    //     if !trimmed.is_empty() {
+    //         sqlx::query(trimmed).execute(&mut *tx).await?;
+    //     }
+    // }
 
-    tx.commit().await?;
+    // tx.commit().await?;
     Ok(())
 }
 
 /// Validate PRAGMA user_version and migrate if necessary.
 pub async fn check_version(pool: &Pool<Sqlite>) -> Result<()> {
     // Read user_version
-    let ver: i32 = sqlx::query("PRAGMA user_version;").fetch_one(pool).await?.get::<i32, _>(0);
+    let ver: i32 = sqlx::query("PRAGMA user_version;")
+        .fetch_one(pool)
+        .await?
+        .get::<i32, _>(0);
 
     if ver != TARGET_DB_VERSION {
-        migrate(pool, ver, TARGET_DB_VERSION)
-            .await
-            .with_context(|| format!("Migration from {} to {} failed", ver, TARGET_DB_VERSION))?;
+        migrate(pool, ver, TARGET_DB_VERSION).await.with_context(|| {
+            format!("Migration from {} to {} failed", ver, TARGET_DB_VERSION)
+        })?;
     }
 
     Ok(())
@@ -87,15 +100,27 @@ pub async fn seed_initial_data(pool: &Pool<Sqlite>) -> Result<()> {
     let mut tx = pool.begin().await?;
     // Seed connection_kind_rule if empty
     let (count_rules,): (i64,) =
-        sqlx::query_as("SELECT COUNT(*) FROM connection_kind_rule;").fetch_one(&mut *tx).await?;
+        sqlx::query_as("SELECT COUNT(*) FROM connection_kind_rule;")
+            .fetch_one(&mut *tx)
+            .await?;
 
     if count_rules == 0 {
         // Define seed data without IDs
         let seed_data = vec![
             (RelationType::ContainsFile, 3, 0, "Folder -> File"),
             (RelationType::BelongToFolder, 3, 0, "File -> Folder"),
-            (RelationType::ParentFolder, 3, 0, "Folder(child) -> Folder(parent)"),
-            (RelationType::ChildFolder, 1, 0, "Folder(parent) -> Folder(child)"),
+            (
+                RelationType::ParentFolder,
+                3,
+                0,
+                "Folder(child) -> Folder(parent)",
+            ),
+            (
+                RelationType::ChildFolder,
+                1,
+                0,
+                "Folder(parent) -> Folder(child)",
+            ),
         ];
 
         for (kind, default_level, editable, description) in seed_data {
@@ -116,9 +141,10 @@ pub async fn seed_initial_data(pool: &Pool<Sqlite>) -> Result<()> {
     }
 
     // Seed one root folder node if none exists
-    let (has_root,): (i64,) = sqlx::query_as(r#"SELECT COUNT(*) FROM node WHERE kind = 'folder';"#)
-        .fetch_one(&mut *tx)
-        .await?;
+    let (has_root,): (i64,) =
+        sqlx::query_as(r#"SELECT COUNT(*) FROM node WHERE kind = 'folder';"#)
+            .fetch_one(&mut *tx)
+            .await?;
     if has_root == 0 {
         let root_id = "root";
         sqlx::query(
@@ -149,12 +175,18 @@ async fn migrate(pool: &Pool<Sqlite>, from: i32, to: i32) -> Result<()> {
     if from < to {
         // TODO: apply stepwise DDL changes here; wrap in transaction
         let mut tx = pool.begin().await?;
-        sqlx::query(&format!("PRAGMA user_version = {};", to)).execute(&mut *tx).await?;
+        sqlx::query(&format!("PRAGMA user_version = {};", to))
+            .execute(&mut *tx)
+            .await?;
         tx.commit().await?;
         Ok(())
     } else if from > to {
         // Downgrade not supported
-        anyhow::bail!("Database version {} is newer than supported {}", from, to);
+        anyhow::bail!(
+            "Database version {} is newer than supported {}",
+            from,
+            to
+        );
     } else {
         Ok(())
     }

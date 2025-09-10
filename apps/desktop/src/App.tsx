@@ -11,8 +11,7 @@ function App() {
     <div className="flex flex-col h-screen">
       <HashRouter>
         <Routes>
-          <Route path="/" element={<Main />} />
-          <Route path="/moa" element={<Moa />} />
+          <Route path="/moa/*" element={<Main />} />
           <Route path="/create-moa/*" element={<Moa></Moa>} />
         </Routes>
       </HashRouter>

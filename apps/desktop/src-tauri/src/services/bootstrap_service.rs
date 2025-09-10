@@ -100,7 +100,7 @@ pub async fn bootstrap_moa_service(
                 ProgressEvent {
                     stage: Stage::Error,
                     percent: 0,
-                    note: Some("Bootstrap failed".into()),
+                    note: Some(format!("Bootstrap failed {}", e).into()),
                 },
             );
         }

@@ -4,7 +4,9 @@ export function useMoa(location: Location) {
   const [moaId, setMoaId] = useState<string | null>(null);
 
   useEffect(() => {
-    const queryParams = new URLSearchParams(location.search);
+    const hash = location.hash;
+    const queryString = hash.split('?')[1];
+    const queryParams = new URLSearchParams(queryString);
     const moa_id = queryParams.get('moa_id') as string;
 
     setMoaId(moa_id);

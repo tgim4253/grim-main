@@ -6,7 +6,7 @@ pub fn launch_moa(
     app: &tauri::AppHandle,
     moa_id: String,
 ) -> Result<(), String> {
-    let uri = format!("?moa_id={}", moa_id.clone());
+    let uri = format!("moa?moa_id={}", moa_id.clone());
 
     #[cfg(debug_assertions)]
     let url = WebviewUrl::App(format!("index.html#{uri}").into());
@@ -49,6 +49,8 @@ pub fn launch_moa(
             .and_then(|w| w.make_transparent()) // acrylic background
             .map_err(|e| e.to_string())?;
     }
+
+    window.open_devtools();
 
     Ok(())
 }
