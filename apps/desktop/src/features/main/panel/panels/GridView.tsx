@@ -180,6 +180,7 @@ const GridView: React.FC<Props> = ({ gridData }) => {
   );
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  // @ts-expect-error.
   const { visible, observe, unobserve } = useVisibilityMap(scrollRef, 800);
 
   const thumbSize = useMemo(() => {
@@ -396,6 +397,8 @@ function VirtualGridLayout({
   const itemH = itemW;
   const gap = 16;
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // @ts-expect-error.
   const { width, height } = useElementSize(containerRef);
 
   const cols = Math.max(1, Math.floor((width + gap) / (itemW + gap)));

@@ -620,7 +620,7 @@ pub async fn worker_loop(app: AppHandle, mut rx: mpsc::Receiver<()>) {
 }
 
 async fn process_job(app: &AppHandle, job: Job) -> Result<()> {
-    let t1 = Instant::now();
+    let t_all = Instant::now();
 
     let src = fetch_one_file_path(job.moa_id.clone(), job.xxhs).await?;
 
@@ -631,31 +631,24 @@ async fn process_job(app: &AppHandle, job: Job) -> Result<()> {
         .context("failed to read file")?
         .ok_or_else(|| anyhow::anyhow!("unknown file type"))?;
     if !infer::is_image(kind.mime_type().as_bytes()) { /* ... */ }
-    let out_path = job.out_path.clone(); // keep a local copy for later use
-    let tmp = out_path.with_extension("tmp"); // write to tmp first
+    let out_path = job.out_path.clone();
+    let tmp = out_path.with_extension("tmp");
 
     // decode
+    let t_decode_start = Instant::now();
     let img: DynamicImage = tokio::task::spawn_blocking({
-        let data = data.clone(); // move into blocking task
-        move || {
-            // decode in blocking thread
-            // image crate will guess the format from the bytes
-            image::load_from_memory(&data).context("image decode failed")
-        }
+        let data = data.clone();
+        move || image::load_from_memory(&data).context("image decode failed")
     })
     .await
     .context("join error")??;
+    let t_decode = t_decode_start.elapsed();
 
-    println!("get took: {:?} ms", t1.elapsed().as_millis());
-    let t1 = Instant::now();
-
-    // resize & center-crop to WxH; prevent upscaling
+    // resize & crop
+    let t_resize_start = Instant::now();
     let (tw, th) = (job.spec.width, job.spec.height);
     let (output_buf, out_w, out_h) =
         tokio::task::spawn_blocking(move || -> (Vec<u8>, u32, u32) {
-            // keep aspect ratio, fit by longer edge, then center-crop; never upscale
-            let t1 = Instant::now();
-
             let (w, h) = img.dimensions();
             let target_w = tw.max(1);
             let target_h = th.max(1);
@@ -666,53 +659,38 @@ async fn process_job(app: &AppHandle, job: Job) -> Result<()> {
                 .max(target_h as f32 / h as f32))
             .min(1.0);
 
-            // If the image is already smaller than target, scale becomes 1.0 (no upscaling).
             let nw = ((w as f32 * scale).round() as u32).max(1);
             let nh = ((h as f32 * scale).round() as u32).max(1);
 
-            // --- build fir images ---
-            // Source
-            let mut src_image = Image::from_vec_u8(
-                w,
-                h,
-                rgba.into_raw(),
-                PixelType::U8x4, // RGBA8 interleaved
-            )
-            .expect("Invalid source buffer");
+            let mut src_image =
+                Image::from_vec_u8(w, h, rgba.into_raw(), PixelType::U8x4)
+                    .expect("Invalid source buffer");
 
             let crop_w = target_w.min(nw);
             let crop_h = target_h.min(nh);
             let x = (nw.saturating_sub(crop_w)) / 2;
             let y = (nh.saturating_sub(crop_h)) / 2;
 
-            // Destination
             let mut dst_image =
                 Image::new(crop_w, crop_h, src_image.pixel_type());
 
             let mut resizer = Resizer::new();
-            println!("resize pre took: {:?} ms", t1.elapsed().as_millis());
-
-            // crop window centered in the resized image
-
-            // --- perform resize (SIMD accelerated if available) ---
             resizer
                 .resize(
                     &src_image,
                     &mut dst_image,
                     &ResizeOptions::new()
                         .crop(x as f64, y as f64, crop_w as f64, crop_h as f64)
-                        .resize_alg(ResizeAlg::Nearest),
+                        .resize_alg(ResizeAlg::Convolution(FilterType::Box)),
                 )
                 .expect("resize failed");
 
-            // return raw RGBA buffer and its final dimensions
             (dst_image.into_vec(), crop_w, crop_h)
         })
         .await?;
-    println!("resize took: {:?} ms", t1.elapsed().as_millis());
-    let t1 = Instant::now();
+    let t_resize = t_resize_start.elapsed();
 
-    // --- (아래) 인코딩 태스크: output_buf 사용으로 변경 ---
+    // encode
     if let Some(parent) = job.out_path.parent() {
         tokio::fs::create_dir_all(parent).await?
     } else {
@@ -720,15 +698,14 @@ async fn process_job(app: &AppHandle, job: Job) -> Result<()> {
     }
     let tmp_path = tmp.clone();
 
+    let t_encode_start = Instant::now();
     tokio::task::spawn_blocking({
-        // move necessary data into the blocking task
-        let output_buf = output_buf; // raw RGBA8 buffer
-        let (w, h) = (out_w, out_h); // final dimensions after resize/crop
+        let output_buf = output_buf;
+        let (w, h) = (out_w, out_h);
         move || -> Result<()> {
             let mut buf = Vec::new();
             match job.spec.fmt {
                 Some(ImageFmt::Jpeg) => {
-                    // Encode RGBA8 buffer to JPEG with given quality
                     let mut enc =
                         image::codecs::jpeg::JpegEncoder::new_with_quality(
                             &mut buf, 75,
@@ -742,7 +719,6 @@ async fn process_job(app: &AppHandle, job: Job) -> Result<()> {
                     .context("jpeg encode failed")?;
                 }
                 _ => {
-                    // Encode as WebP (lossless) from RGBA8 buffer
                     let mut encoder =
                         image::codecs::webp::WebPEncoder::new_lossless(
                             &mut buf,
@@ -762,10 +738,10 @@ async fn process_job(app: &AppHandle, job: Job) -> Result<()> {
         }
     })
     .await??;
+    let t_encode = t_encode_start.elapsed();
 
     // atomic rename
     tokio::fs::rename(&tmp, &out_path).await.context("rename failed")?;
-    println!("down took: {:?} ms", t1.elapsed().as_millis());
 
     // emit event
     emit_created(
@@ -779,6 +755,15 @@ async fn process_job(app: &AppHandle, job: Job) -> Result<()> {
         }],
     )
     .await?;
+
+    // --- 최종 성능 로그 ---
+    println!(
+        "[perf] decode: {:?} ms | resize: {:?} ms | encode: {:?} ms | total: {:?} ms",
+        t_decode.as_millis(),
+        t_resize.as_millis(),
+        t_encode.as_millis(),
+        t_all.elapsed().as_millis()
+    );
 
     Ok(())
 }

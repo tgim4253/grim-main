@@ -3,19 +3,23 @@ use tauri::WebviewUrl;
 use tauri_plugin_decorum::WebviewWindowExt; // decorum helpers
 
 pub fn launch_moa_selector(app: &tauri::AppHandle) -> Result<(), String> {
-    let web_builder = tauri::WebviewWindowBuilder::new(
-        app,
-        "moa-create",
-        WebviewUrl::App("index/#/create-moa".into()),
-    )
-    .title("Create Moa")
-    .inner_size(800.0, 600.0)
-    .resizable(false)
-    .maximizable(false);
+    #[cfg(debug_assertions)]
+    let url =
+        WebviewUrl::External("http://localhost:1420/#/moa".parse().unwrap());
+
+    #[cfg(not(debug_assertions))]
+    let url = WebviewUrl::App("index.html#create-moa".into());
+
+    let web_builder = tauri::WebviewWindowBuilder::new(app, "moa-create", url)
+        .title("Create Moa")
+        .inner_size(800.0, 600.0)
+        .resizable(false)
+        .maximizable(false);
 
     // keep overlay on macOS
     #[cfg(target_os = "macos")]
-    let web_builder = web_builder.title_bar_style(tauri::TitleBarStyle::Overlay);
+    let web_builder =
+        web_builder.title_bar_style(tauri::TitleBarStyle::Overlay);
 
     #[cfg(not(target_os = "macos"))]
     let web_builder = web_builder.decorations(false);

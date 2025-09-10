@@ -2,18 +2,34 @@ use tauri::WebviewUrl;
 #[cfg(target_os = "macos")]
 use tauri_plugin_decorum::WebviewWindowExt; // decorum helpers
 
-pub fn launch_moa(app: &tauri::AppHandle, moa_id: String) -> Result<(), String> {
-    let uri = format!("/moa?moa_id={}", moa_id.clone());
-    let moa = crate::services::moa_services::MOA_DATA.read().unwrap().get_by_id(&moa_id).unwrap();
+pub fn launch_moa(
+    app: &tauri::AppHandle,
+    moa_id: String,
+) -> Result<(), String> {
+    let uri = format!("?moa_id={}", moa_id.clone());
 
-    let web_builder =
-        tauri::WebviewWindowBuilder::new(app, "moa-main", WebviewUrl::App(uri.into()))
-            .title(moa.name.clone())
-            .inner_size(1200.0, 600.0);
+    #[cfg(debug_assertions)]
+    let url = WebviewUrl::App(format!("index.html#{uri}").into());
+    // let url =
+    //     // WebviewUrl::External("http://localhost:1420/#/moa".parse().unwrap());
+
+    #[cfg(not(debug_assertions))]
+    let url = WebviewUrl::App(format!("index.html#{uri}").into());
+
+    let moa = crate::services::moa_services::MOA_DATA
+        .read()
+        .unwrap()
+        .get_by_id(&moa_id)
+        .unwrap();
+
+    let web_builder = tauri::WebviewWindowBuilder::new(app, "moa-main", url)
+        .title(moa.name.clone())
+        .inner_size(1200.0, 600.0);
 
     // keep overlay on macOS too
     #[cfg(target_os = "macos")]
-    let web_builder = web_builder.title_bar_style(tauri::TitleBarStyle::Overlay);
+    let web_builder =
+        web_builder.title_bar_style(tauri::TitleBarStyle::Overlay);
 
     #[cfg(not(target_os = "macos"))]
     let web_builder = web_builder.decorations(false);
