@@ -4,10 +4,8 @@ use tauri_plugin_decorum::WebviewWindowExt; // decorum helpers
 
 pub fn launch_moa_selector(app: &tauri::AppHandle) -> Result<(), String> {
     #[cfg(debug_assertions)]
-    let url = WebviewUrl::App("index.html#create-moa".into());
-
-    // let url =
-    //     WebviewUrl::External("http://localhost:1420/#/moa".parse().unwrap());
+    let url =
+        WebviewUrl::External("http://localhost:1420/#/moa".parse().unwrap());
 
     #[cfg(not(debug_assertions))]
     let url = WebviewUrl::App("index.html#create-moa".into());

@@ -604,7 +604,7 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
         {!stableSrc && <div className="w-full h-full animate-pulse bg-background-2" />}
         {stableSrc && (
           <img
-            src={''}
+            src={stableSrc}
             alt={img.name}
             className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
             onLoad={handleImageLoad}

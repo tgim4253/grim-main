@@ -50,7 +50,7 @@ pub fn launch_moa(
             .map_err(|e| e.to_string())?;
     }
 
-    window.open_devtools();
+    // window.open_devtools();
 
     Ok(())
 }
