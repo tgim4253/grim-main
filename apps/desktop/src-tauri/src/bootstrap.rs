@@ -54,7 +54,6 @@ impl PathManager {
         } {
             return Ok(existing);
         }
-
         let moa = {
             let moa_data = moa_services::MOA_DATA
                 .read()
