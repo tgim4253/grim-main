@@ -1,6 +1,6 @@
 import { Button, LanguageSwitcher } from '@tgim/ui';
 import { ipc } from '../../../lib/ipc';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { MoreVertical } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -23,14 +23,18 @@ const MoaIcon = () => (
   </svg>
 );
 
+// Sidebar for switching between existing MOAs and language preferences.
 const ManageMoaSideBar: React.FC = () => {
   const [moas, setMoas] = useState<{ name: string; path: string; moa_id: string }[]>([]);
 
-  const { t, i18n } = useTranslation(['common', 'moa']);
+  const { i18n } = useTranslation(['common', 'moa']);
 
-  const changeLanguage = (lng: string) => {
-    i18n.changeLanguage(lng);
-  };
+  const changeLanguage = useCallback(
+    (lng: string) => {
+      void i18n.changeLanguage(lng);
+    },
+    [i18n],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -39,24 +43,24 @@ const ManageMoaSideBar: React.FC = () => {
       try {
         const data = await ipc.moa.loadMoas();
         if (!mounted) return;
-        setMoas(prev => data);
-      } catch (err) {
-        console.error(err);
+        setMoas(data);
+      } catch (error) {
+        console.error('Failed to load recent MOAs', error);
       }
     };
 
-    load();
+    void load();
 
     return () => {
       mounted = false;
     };
   }, []);
-  const handleMoaClick = (moa_id: string) => {
-    ipc.moa.openMoa(moa_id);
-  };
+  const handleMoaClick = useCallback(async (moaId: string) => {
+    await ipc.moa.openMoa(moaId);
+  }, []);
   return (
     <div
-      className="h-full border-r border-outline bg-background-8 text-foreground pt-10 flex flex-col"
+      className="flex flex-col h-full pt-10 border-r border-border-sidebar bg-sidebar text-text"
       style={{ WebkitAppRegion: 'drag', width: '300px' } as React.CSSProperties}
     >
       {/* Item list */}
@@ -66,7 +70,9 @@ const ManageMoaSideBar: React.FC = () => {
             <Button
               variant="list-item"
               key={moa.name + moa.path}
-              onClick={() => handleMoaClick(moa.moa_id)}
+              onClick={() => {
+                void handleMoaClick(moa.moa_id);
+              }}
               className="flex items-start justify-between p-2 rounded-lg "
             >
               <div className="flex items-center space-x-2 flex-1 min-w-0">
@@ -78,7 +84,7 @@ const ManageMoaSideBar: React.FC = () => {
                     <span className="font-semibold break-words max-w-full truncate">
                       {moa.name}
                     </span>
-                    <span className="text-sm text-foreground break-words max-w-full">
+                    <span className="text-sm text-text break-words max-w-full">
                       {moa.path}
                     </span>
                   </div>

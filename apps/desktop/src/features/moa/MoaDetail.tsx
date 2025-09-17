@@ -30,7 +30,7 @@ const MoaDetail: React.FC<Props> = ({ type }) => {
   const { t } = useTranslation(['common']);
   const navigate = useNavigate();
   return (
-    <div className="relative flex flex-col items-center justify-center h-full bg-background text-foreground ">
+    <div className="relative flex flex-col items-center justify-center h-full bg-surface text-text ">
       <Button
         variant="icon"
         className="absolute top-1 left-4 text-icon-main hover:text-icon-hover-main"
