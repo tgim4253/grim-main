@@ -1,12 +1,14 @@
 use std::path::{Path, PathBuf};
 use tauri::{path::BaseDirectory, AppHandle, Manager};
 
+/// Compute the on-disk path that stores the persisted Moa list.
 pub fn get_moa_file_path(app: &AppHandle) -> PathBuf {
     app.path()
         .resolve("moa.json", BaseDirectory::AppData)
         .unwrap_or_else(|_| std::env::current_dir().unwrap().join("moa.json"))
 }
 
+/// Normalize a filesystem path and apply platform-specific casing rules.
 pub fn normalize_path<P>(path: P) -> PathBuf
 where
     P: AsRef<Path>,
@@ -33,6 +35,7 @@ where
     abs
 }
 
+/// Concatenate a sequence of path segments into a single `PathBuf`.
 pub fn concat_paths(paths: &[PathBuf]) -> PathBuf {
     let mut result = PathBuf::new();
     for path in paths {

@@ -5,12 +5,14 @@ use sqlx::{Executor, Sqlite};
 
 use crate::{
     db::repository::node_repository::NodeRepository,
-    models::{connection::Connection, graph::GraphResponse, node},
+    models::{connection::Connection, graph::GraphResponse},
 };
 
+/// Query helpers for retrieving connection graphs.
 pub struct GraphRepository;
 
 impl GraphRepository {
+    /// Perform a recursive query to fetch a graph starting at the provided root node.
     pub async fn get_graph_from_root<'a, E>(
         executor: &mut E,
         root_node_id: String,
@@ -108,10 +110,16 @@ impl GraphRepository {
             });
         }
 
-        let nodes =
-            NodeRepository::fetch_nodes_by_ids(&mut *executor, node_ids.into_iter().collect())
-                .await?;
+        let nodes = NodeRepository::fetch_nodes_by_ids(
+            &mut *executor,
+            node_ids.into_iter().collect(),
+        )
+        .await?;
 
-        Ok(GraphResponse { nodes: nodes, connections: connections, root_node_id: root_node_id })
+        Ok(GraphResponse {
+            nodes: nodes,
+            connections: connections,
+            root_node_id: root_node_id,
+        })
     }
 }
