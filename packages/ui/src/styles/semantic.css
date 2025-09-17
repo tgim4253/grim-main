@@ -81,8 +81,16 @@
   --ds-graph-node-default-border: color-mix(in srgb, var(--ds-accent) 65%, transparent);
   --ds-graph-node-tag-stroke: color-mix(in srgb, var(--ds-accent) 55%, var(--ds-text-primary) 45%);
   --ds-graph-node-folder-back: color-mix(in srgb, var(--ds-accent) 14%, var(--ds-surface-muted));
-  --ds-graph-node-folder-front-light: color-mix(in srgb, var(--ds-accent) 12%, var(--ds-surface-raised));
-  --ds-graph-node-folder-front-dark: color-mix(in srgb, var(--ds-accent) 18%, var(--ds-surface-active));
+  --ds-graph-node-folder-front-light: color-mix(
+    in srgb,
+    var(--ds-accent) 12%,
+    var(--ds-surface-raised)
+  );
+  --ds-graph-node-folder-front-dark: color-mix(
+    in srgb,
+    var(--ds-accent) 18%,
+    var(--ds-surface-active)
+  );
   --ds-graph-node-folder-edge: color-mix(in srgb, var(--ds-accent) 45%, transparent);
   --ds-graph-node-document-paper: var(--ds-surface-base);
   --ds-graph-node-document-edge: var(--ds-border-subtle);
@@ -191,6 +199,7 @@
   --input-titlebar-bg-hover: var(--btn-titlebar-bg-hover);
   --input-list-bg: var(--btn-list-bg);
   --input-list-bg-hover: var(--btn-list-bg-hover);
+}
 
 :root[data-theme='dark'],
 [data-theme='dark'],
@@ -267,8 +276,16 @@
   --ds-graph-node-default-border: color-mix(in srgb, var(--ds-accent) 68%, transparent);
   --ds-graph-node-tag-stroke: color-mix(in srgb, var(--ds-accent) 52%, var(--ds-text-primary) 48%);
   --ds-graph-node-folder-back: color-mix(in srgb, var(--ds-accent) 18%, var(--ds-surface-muted));
-  --ds-graph-node-folder-front-light: color-mix(in srgb, var(--ds-accent) 16%, var(--ds-surface-raised));
-  --ds-graph-node-folder-front-dark: color-mix(in srgb, var(--ds-accent) 22%, var(--ds-surface-active));
+  --ds-graph-node-folder-front-light: color-mix(
+    in srgb,
+    var(--ds-accent) 16%,
+    var(--ds-surface-raised)
+  );
+  --ds-graph-node-folder-front-dark: color-mix(
+    in srgb,
+    var(--ds-accent) 22%,
+    var(--ds-surface-active)
+  );
   --ds-graph-node-folder-edge: color-mix(in srgb, var(--ds-accent) 48%, transparent);
   --ds-graph-node-document-paper: var(--ds-surface-base);
   --ds-graph-node-document-edge: var(--ds-border-subtle);
