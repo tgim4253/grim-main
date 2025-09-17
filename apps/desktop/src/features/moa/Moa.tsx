@@ -7,9 +7,11 @@ import MoaDetail from './MoaDetail';
 import { ToastContainer } from 'react-toastify';
 import { platform } from '@tauri-apps/plugin-os';
 import { useEffect, useState } from 'react';
+import { useTheme } from '../../theme/ThemeProvider';
 
 const Moa: React.FC = () => {
   const [isMac, setIsMac] = useState(false);
+  const { theme } = useTheme();
 
   useEffect(() => {
     let mounted = true;
@@ -35,7 +37,7 @@ const Moa: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex w-full h-full bg-shell-base text-text overflow-hidden" data-theme="dark">
+    <div className="flex w-full h-full bg-shell-base text-text overflow-hidden" data-theme={theme}>
       <ManageMoaSidebar />
       {!isMac && (
         <div className="fixed w-full top-0 z-50">

@@ -16,6 +16,7 @@ import usePanelsStore from '@tgim/stores/panelStore';
 import PanelContainer from './panel/Container';
 import { ThumbResSpec } from '@tgim/types/file';
 import useThumbStore from '@tgim/stores/thumbStore';
+import { useTheme } from '../../theme/ThemeProvider';
 
 interface LayoutPorps {
   layoutId: string;
@@ -61,6 +62,7 @@ const Layout: React.FC<LayoutPorps> = ({ layoutId }) => {
 // Bootstraps the main workspace once backend bootstrap has finished.
 const Main: React.FC = () => {
   const { moaId } = useMoa(location);
+  const { theme } = useTheme();
   const [progress, setProgress] = useState<AppProgressEvent>({
     stage: 'Migrating',
     percent: 0,
@@ -237,7 +239,7 @@ const Main: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col w-full h-full bg-shell-base text-text overflow-hidden" data-theme="dark">
+    <div className="flex flex-col w-full h-full bg-shell-base text-text overflow-hidden" data-theme={theme}>
       {!isMac && (
         <div className="fixed w-full top-0 z-50">
           <TitleBar />

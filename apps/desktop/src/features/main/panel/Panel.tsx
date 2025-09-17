@@ -230,7 +230,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   return ReactDOM.createPortal(
     <div
       className={`p-2 rounded border w-full h-full 
-        ${isActive ? 'border-blue-500' : 'border-gray-300'} 
+        ${isActive ? 'border-accent' : 'border-border'}
         ${hidden ? 'hidden' : ''}`}
     >
       <div onClick={() => setViewType('graph')}>graph</div>
