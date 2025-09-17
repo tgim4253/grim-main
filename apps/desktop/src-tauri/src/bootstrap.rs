@@ -54,13 +54,15 @@ impl PathManager {
         } {
             return Ok(existing);
         }
-
-        let moa_data = moa_services::MOA_DATA
-            .read()
-            .map_err(|_| anyhow!("Failed to access cached moa data"))?;
-        let moa = moa_data
-            .get_by_id(moa_id)
-            .ok_or_else(|| anyhow!("Unknown moa id: {moa_id}"))?;
+        let moa = {
+            let moa_data = moa_services::MOA_DATA
+                .read()
+                .map_err(|_| anyhow!("Failed to access cached moa data"))?;
+            // Release the read lock before awaiting filesystem work.
+            moa_data
+                .get_by_id(moa_id)
+                .ok_or_else(|| anyhow!("Unknown moa id: {moa_id}"))?
+        };
 
         let path = build_paths(&moa.path, &moa.name);
         let moa_paths = ensure_layout(&path).await?;
