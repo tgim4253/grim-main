@@ -6,7 +6,9 @@ use tauri_plugin_decorum::WebviewWindowExt;
 pub fn launch_moa_selector(app: &tauri::AppHandle) -> Result<(), String> {
     #[cfg(debug_assertions)]
     let url = WebviewUrl::External(
-        "http://localhost:1420/#/moa".parse().map_err(|err| err.to_string())?,
+        "http://localhost:1420/#/create-moa"
+            .parse()
+            .map_err(|_| "error parsing uri")?,
     );
 
     #[cfg(not(debug_assertions))]
