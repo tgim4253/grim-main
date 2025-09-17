@@ -1,5 +1,3 @@
-@layer components {
-  .splitter:hover {
-    background-color: var(--ds-accent);
-  }
+.splitter:hover {
+  background-color: var(--ds-accent);
 }
