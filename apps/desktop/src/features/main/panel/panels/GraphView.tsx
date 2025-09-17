@@ -1,6 +1,6 @@
 import usePanelsStore from '@tgim/stores/panelStore';
 import { Connection, GraphConnection, GraphData } from '@tgim/types/graph';
-import { NodeRenderer } from '@tgim/ui/index';
+import { NodeRenderer, getGraphPalette } from '@tgim/ui/index';
 import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d';
 import { useShallow } from 'zustand/shallow';
@@ -146,7 +146,7 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
         // onEngineStop={() => openAllNode()}
         // linkDirectionalArrowLength={3.5}
         // linkDirectionalArrowRelPos={0.96}
-        linkColor={() => '#f3f3f3'}
+        linkColor={() => getGraphPalette().link}
         linkWidth={0.1}
         linkCurvature={0}
         nodeCanvasObject={(node, ctx, globalScale) => {

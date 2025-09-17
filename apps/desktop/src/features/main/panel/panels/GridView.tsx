@@ -621,8 +621,8 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
         )}
       </div>
       {layout === 'grid' && (
-        <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
-          <p className="text-white text-xs font-medium truncate" title={img.name}>
+        <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-[color-mix(in_srgb,var(--ds-overlay)_85%,transparent)] via-[color-mix(in_srgb,var(--ds-overlay)_35%,transparent)] to-transparent">
+          <p className="text-text-inverse text-xs font-medium truncate" title={img.name}>
             {img.name}
           </p>
         </div>

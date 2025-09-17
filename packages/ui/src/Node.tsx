@@ -4,6 +4,185 @@
 
 import { GraphNodeType } from '@tgim/types/graph';
 
+type GraphPalette = {
+  label: string;
+  circleFill: string;
+  circleStroke: string;
+  tagStroke: string;
+  folderBack: string;
+  folderFrontLight: string;
+  folderFrontDark: string;
+  folderEdge: string;
+  documentPaper: string;
+  documentEdge: string;
+  documentShadow: string;
+  documentLine: string;
+  imageBg: string;
+  imageBorder: string;
+  placeholderStroke: string;
+  placeholderAccent: string;
+  placeholderFill: string;
+  link: string;
+};
+
+const FALLBACK_PALETTE: GraphPalette = {
+  label: '#111827',
+  circleFill: '#6366f1',
+  circleStroke: '#4338ca',
+  tagStroke: '#4338ca',
+  folderBack: '#bfdbfe',
+  folderFrontLight: '#dbeafe',
+  folderFrontDark: '#bfdbfe',
+  folderEdge: '#2563eb',
+  documentPaper: '#f7fafc',
+  documentEdge: '#a0aec0',
+  documentShadow: '#e2e8f0',
+  documentLine: '#94a3b8',
+  imageBg: '#dbeafe',
+  imageBorder: '#60a5fa',
+  placeholderStroke: 'rgba(255, 255, 255, 0.9)',
+  placeholderAccent: 'rgba(255, 255, 255, 0.85)',
+  placeholderFill: 'rgba(255, 255, 255, 0.75)',
+  link: '#94a3b8',
+};
+
+let graphPalette: GraphPalette = FALLBACK_PALETTE;
+
+const COLOR_TOKENS: Array<[keyof GraphPalette, string]> = [
+  ['label', '--ds-graph-node-label'],
+  ['circleFill', '--ds-graph-node-default-bg'],
+  ['circleStroke', '--ds-graph-node-default-border'],
+  ['tagStroke', '--ds-graph-node-tag-stroke'],
+  ['folderBack', '--ds-graph-node-folder-back'],
+  ['folderFrontLight', '--ds-graph-node-folder-front-light'],
+  ['folderFrontDark', '--ds-graph-node-folder-front-dark'],
+  ['folderEdge', '--ds-graph-node-folder-edge'],
+  ['documentPaper', '--ds-graph-node-document-paper'],
+  ['documentEdge', '--ds-graph-node-document-edge'],
+  ['documentShadow', '--ds-graph-node-document-shadow'],
+  ['documentLine', '--ds-graph-node-document-line'],
+  ['imageBg', '--ds-graph-node-image-bg'],
+  ['imageBorder', '--ds-graph-node-image-border'],
+  ['placeholderStroke', '--ds-graph-node-placeholder-stroke'],
+  ['placeholderAccent', '--ds-graph-node-placeholder-accent'],
+  ['placeholderFill', '--ds-graph-node-placeholder-fill'],
+  ['link', '--ds-graph-link'],
+];
+
+const readToken = (styles: CSSStyleDeclaration, token: string, fallback: string) => {
+  const value = styles.getPropertyValue(token).trim();
+  return value || fallback;
+};
+
+const updateGraphPalette = () => {
+  if (typeof window === 'undefined') {
+    graphPalette = FALLBACK_PALETTE;
+    return;
+  }
+
+  const styles = getComputedStyle(document.documentElement);
+  const next: GraphPalette = { ...FALLBACK_PALETTE };
+  COLOR_TOKENS.forEach(([key, token]) => {
+    next[key] = readToken(styles, token, FALLBACK_PALETTE[key]);
+  });
+  graphPalette = next;
+};
+
+const ensurePaletteObservers = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  updateGraphPalette();
+
+  if (typeof MutationObserver === 'undefined') {
+    return;
+  }
+
+  const observer = new MutationObserver(updateGraphPalette);
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class', 'data-theme'],
+  });
+
+  const attachBodyObserver = () => {
+    if (!document.body) return;
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class', 'data-theme'],
+    });
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      updateGraphPalette();
+      attachBodyObserver();
+    });
+  } else {
+    attachBodyObserver();
+  }
+
+  const media = window.matchMedia?.('(prefers-color-scheme: dark)');
+  if (media) {
+    if ('addEventListener' in media) {
+      media.addEventListener('change', updateGraphPalette);
+    } else if ('addListener' in media) {
+      media.addListener(updateGraphPalette);
+    }
+  }
+};
+
+ensurePaletteObservers();
+
+const getGraphPaletteInternal = () => graphPalette;
+
+const colorParsingCtx =
+  typeof document !== 'undefined'
+    ? document.createElement('canvas').getContext('2d')
+    : null;
+
+const normalizeColor = (value: string) => {
+  if (!colorParsingCtx) return value;
+  try {
+    colorParsingCtx.fillStyle = '#000000';
+    colorParsingCtx.fillStyle = value;
+    return colorParsingCtx.fillStyle;
+  } catch (error) {
+    return value;
+  }
+};
+
+const hexToRgba = (hex: string, alpha: number) => {
+  let normalized = hex.replace('#', '');
+  if (normalized.length === 3) {
+    normalized = normalized
+      .split('')
+      .map(ch => ch + ch)
+      .join('');
+  }
+  if (normalized.length !== 6) return hex;
+
+  const r = parseInt(normalized.substring(0, 2), 16);
+  const g = parseInt(normalized.substring(2, 4), 16);
+  const b = parseInt(normalized.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const withAlpha = (color: string, alpha: number) => {
+  const normalized = normalizeColor(color);
+  if (normalized.startsWith('#')) {
+    return hexToRgba(normalized, alpha);
+  }
+  const match = normalized
+    .replace(/\s+/g, '')
+    .match(/^rgba?\((\d+),(\d+),(\d+)(?:,(\d*\.?\d+))?\)$/i);
+  if (match) {
+    const [, r, g, b] = match;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  return color;
+};
+
 type NodeProp = {
   [key: string]: any; // extensible payload
   x: number;
@@ -153,7 +332,8 @@ function getLabelSprite(
 
 function drawLabelCached(ctx: CanvasRenderingContext2D, node: NodeProp) {
   const font = '7px sans-serif';
-  const color = node.fgColor ?? '#e0f2fe';
+  const palette = getGraphPaletteInternal();
+  const color = node.fgColor ?? palette.label;
   const maxWidth = node.size * 4;
   const text = String(node.label ?? '');
 
@@ -200,8 +380,9 @@ function getCircleSpriteNode(node: NodeProp, globalScale: number) {
   const h = r * 2;
 
   const scaleB = bucketScale(globalScale);
-  const bg = node.color ?? node.bgColor ?? '#60a5fa';
-  const fg = node.fgColor ?? '#1e3a8a';
+  const palette = getGraphPaletteInternal();
+  const bg = node.color ?? node.bgColor ?? palette.circleFill;
+  const fg = node.fgColor ?? palette.circleStroke;
   const key = `circle|${w}|${h}|${bg}|${fg}|${scaleB}`;
 
   return getOrCreateSprite(key, w, h, g => {
@@ -223,7 +404,8 @@ function getTagSpriteNode(node: NodeProp, globalScale: number) {
   const h = s;
 
   const scaleB = bucketScale(globalScale);
-  const fg = node.fgColor ?? '#e0f2fe';
+  const palette = getGraphPaletteInternal();
+  const fg = node.fgColor ?? palette.tagStroke;
   const key = `tag|${w}|${h}|${fg}|${scaleB}`;
 
   return getOrCreateSprite(key, w, h, g => {
@@ -257,10 +439,11 @@ function getFolderSpriteNode(node: NodeProp, globalScale: number) {
   const h = r * 2.0 * 1.0;
 
   const scaleB = bucketScale(globalScale);
-  const bgBack = '#4299e1';
-  const frontLight = '#63b3ed';
-  const frontDark = '#3182ce';
-  const edge = '#2c5282';
+  const palette = getGraphPaletteInternal();
+  const bgBack = palette.folderBack;
+  const frontLight = palette.folderFrontLight;
+  const frontDark = palette.folderFrontDark;
+  const edge = palette.folderEdge;
   const key = `folder|${w}|${h}|${bgBack}|${frontLight}|${frontDark}|${edge}|${scaleB}`;
 
   return getOrCreateSprite(key, w, h, g => {
@@ -270,7 +453,7 @@ function getFolderSpriteNode(node: NodeProp, globalScale: number) {
     const x = 0,
       y = 0;
 
-    g.shadowColor = 'rgba(0,0,0,0.2)';
+    g.shadowColor = withAlpha(edge, 0.28);
     g.shadowBlur = 10;
     g.shadowOffsetY = 4;
 
@@ -309,7 +492,7 @@ function getFolderSpriteNode(node: NodeProp, globalScale: number) {
     g.beginPath();
     g.moveTo(x + cornerRadius, frontY);
     g.lineTo(x + w - cornerRadius, frontY);
-    g.strokeStyle = 'rgba(255,255,255,0.4)';
+    g.strokeStyle = withAlpha(palette.label, 0.35);
     g.lineWidth = Math.max(1, 2 / Math.max(0.001, scaleB));
     g.stroke();
   });
@@ -321,10 +504,11 @@ function getDocumentSpriteNode(node: NodeProp, globalScale: number) {
   const h = r * 2.0 * 1.3;
 
   const scaleB = bucketScale(globalScale);
-  const paper = '#f7fafc';
-  const edge = '#a0aec0';
-  const shadow = '#e2e8f0';
-  const line = '#cbd5e0';
+  const palette = getGraphPaletteInternal();
+  const paper = palette.documentPaper;
+  const edge = palette.documentEdge;
+  const shadow = palette.documentShadow;
+  const line = palette.documentLine;
   const key = `document|${w}|${h}|${paper}|${edge}|${shadow}|${line}|${scaleB}`;
 
   return getOrCreateSprite(key, w, h, g => {
@@ -332,7 +516,7 @@ function getDocumentSpriteNode(node: NodeProp, globalScale: number) {
     const x = 0,
       y = 0;
 
-    g.shadowColor = 'rgba(0,0,0,0.15)';
+    g.shadowColor = withAlpha(edge, 0.25);
     g.shadowBlur = 12;
     g.shadowOffsetY = 4;
 
@@ -472,8 +656,9 @@ const imageRenderer: NodeRenderer = (ctx, node, globalScale) => {
   const radius = 8;
 
   // backplate sprite
-  const bg = node.bgColor ?? '#0ea5e9';
-  const fg = node.fgColor ?? '#0c4a6e';
+  const palette = getGraphPaletteInternal();
+  const bg = node.bgColor ?? palette.imageBg;
+  const fg = node.fgColor ?? palette.imageBorder;
   const scaleB = bucketScale(globalScale);
   const backKey = `imgback|${w}|${h}|${radius}|${bg}|${fg}|${scaleB}`;
   const backplate = getOrCreateSprite(backKey, w, h, g => {
@@ -499,13 +684,13 @@ const imageRenderer: NodeRenderer = (ctx, node, globalScale) => {
     const phKey = `imgph|${w}|${h}|${radius}|${scaleB}`;
     const placeholder = getOrCreateSprite(phKey, w, h, g => {
       roundRect(g, 4, 4, w - 8, h - 8, 6);
-      g.strokeStyle = 'rgba(255,255,255,0.9)';
+      g.strokeStyle = palette.placeholderStroke;
       g.lineWidth = Math.max(1, 1.5 / Math.max(0.001, scaleB));
       g.stroke();
 
       g.beginPath();
       g.arc(w * 0.25, h * 0.32, Math.min(w, h) * 0.07, 0, Math.PI * 2);
-      g.fillStyle = 'rgba(255,255,255,0.85)';
+      g.fillStyle = palette.placeholderAccent;
       g.fill();
 
       g.beginPath();
@@ -517,7 +702,7 @@ const imageRenderer: NodeRenderer = (ctx, node, globalScale) => {
       g.lineTo(w * 0.7, h * 0.55);
       g.lineTo(w * 0.88, baseY);
       g.closePath();
-      g.fillStyle = 'rgba(255,255,255,0.75)';
+      g.fillStyle = palette.placeholderFill;
       g.fill();
     });
     ctx.drawImage(placeholder, node.x - w / 2, node.y - h / 2, w, h);
@@ -531,6 +716,8 @@ const imageRenderer: NodeRenderer = (ctx, node, globalScale) => {
 // =========================
 
 type NodeRendererType = { [key in GraphNodeType]: NodeRenderer };
+
+export const getGraphPalette = () => graphPalette;
 
 export default (key: GraphNodeType): NodeRenderer => {
   const map: Partial<NodeRendererType> = {

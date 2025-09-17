@@ -28,6 +28,11 @@
   --ds-indigo-500: #6366f1;
   --ds-indigo-600: #4f46e5;
 
+  /* Supporting accents */
+  --ds-red-400: #f87171;
+  --ds-red-500: #ef4444;
+  --ds-red-600: #dc2626;
+
   /* Neutral anchors */
   --ds-white: #ffffff;
   --ds-black: #000000;
