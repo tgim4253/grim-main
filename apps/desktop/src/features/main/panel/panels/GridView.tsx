@@ -303,26 +303,26 @@ const GridView: React.FC<Props> = ({ gridData }) => {
   }, []);
 
   return (
-    <div className="w-full h-full flex flex-col bg-background-0 text-foreground font-sans">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-outline bg-background-1 flex-shrink-0">
+    <div className="flex flex-col w-full h-full bg-surface text-text font-sans">
+      <div className="flex items-center justify-between flex-shrink-0 px-4 py-2 border-b border-border bg-surface-raised">
         <div className="flex items-center gap-6">
-          <div className="flex items-center gap-1 p-1 rounded-lg bg-background-2">
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-surface-muted">
             {SIZES.map(s => (
               <button
                 key={s}
                 onClick={() => setSize(s)}
-                className={`px-3 py-1 text-sm rounded-md transition-colors ${size === s ? 'bg-accent text-white shadow-sm' : 'text-foreground/70 hover:bg-background-hover hover:text-foreground'}`}
+                className={`px-3 py-1 text-sm rounded-md transition-colors ${size === s ? 'bg-accent text-white shadow-sm' : 'text-text-soft hover:bg-surface-hover hover:text-text'}`}
               >
                 {s.charAt(0).toUpperCase() + s.slice(1)}
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-1 p-1 rounded-lg bg-background-2">
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-surface-muted">
             {LAYOUTS.map(l => (
               <button
                 key={l}
                 onClick={() => setLayout(l)}
-                className={`p-2 rounded-md transition-colors ${layout === l ? 'bg-accent text-white' : 'text-foreground/70 hover:bg-background-hover hover:text-foreground'}`}
+                className={`p-2 rounded-md transition-colors ${layout === l ? 'bg-accent text-white' : 'text-text-soft hover:bg-surface-hover hover:text-text'}`}
               >
                 {l === 'grid' ? <GridIcon /> : <MasonryIcon />}
               </button>
@@ -331,7 +331,7 @@ const GridView: React.FC<Props> = ({ gridData }) => {
         </div>
         <button
           onClick={() => setSelectMode(v => !v)}
-          className={`px-4 py-2 text-sm rounded-lg border transition-colors ${selectMode ? 'bg-accent text-white border-accent' : 'bg-background-2 border-outline hover:bg-background-hover'}`}
+          className={`px-4 py-2 text-sm rounded-lg border transition-colors ${selectMode ? 'bg-accent text-white border-accent' : 'bg-surface-muted border-border hover:bg-surface-hover'}`}
         >
           {selectMode ? 'Done' : 'Select'}
         </button>
@@ -586,7 +586,7 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`group relative w-full h-full overflow-hidden rounded-lg border border-outline bg-surface shadow-sm transition-all duration-200 hover:border-accent hover:shadow-lg hover:-translate-y-1 cursor-pointer ${sizeClass ?? ''}`}
+      className={`group relative w-full h-full overflow-hidden rounded-lg border border-border bg-surface shadow-sm transition-all duration-200 hover:border-accent hover:shadow-lg hover:-translate-y-1 cursor-pointer ${sizeClass ?? ''}`}
       onClick={handleCardClick}
       role="button"
       tabIndex={0}
@@ -595,13 +595,13 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
         <div className="absolute left-2 top-2 z-10">
           <input
             type="checkbox"
-            className="w-4 h-4 rounded text-accent bg-background-2 border-outline focus:ring-accent"
+            className="w-4 h-4 rounded text-accent bg-surface-muted border-border focus:ring-accent"
             readOnly
           />
         </div>
       )}
       <div className="relative w-full h-full">
-        {!stableSrc && <div className="w-full h-full animate-pulse bg-background-2" />}
+        {!stableSrc && <div className="w-full h-full bg-surface-muted animate-pulse" />}
         {stableSrc && (
           <img
             src={stableSrc}
@@ -621,11 +621,11 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
         </div>
       )}
       {layout === 'masonry' && (
-        <div className="p-2 border-t border-outline">
-          <p className="text-foreground text-xs font-medium truncate" title={img.name}>
+        <div className="p-2 border-t border-border">
+          <p className="text-text text-xs font-medium truncate" title={img.name}>
             {img.name}
           </p>
-          <p className="text-foreground/60 text-xs">{Math.round(img.size / 1024)} KB</p>
+          <p className="text-xs text-text-soft opacity-80">{Math.round(img.size / 1024)} KB</p>
         </div>
       )}
     </div>

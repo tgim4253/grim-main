@@ -128,7 +128,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       };
     };
 
-    (function (startNodeId: string, maxDepth?: number): string {
+    ((startNodeId: string, maxDepth?: number): string => {
       // Stack holds work items to expand, along with the parent relation
       const stack: Array<{
         origId: string; // original node id to materialize

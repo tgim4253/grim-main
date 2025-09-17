@@ -1,7 +1,6 @@
-@import './colors.css';
+@import './foundations.css';
 @import './tokens.css';
-@import './components.css';
-@import './background.css';
+@import './semantic.css';
 
 @import './components/button.css';
 @import './components/input.css';

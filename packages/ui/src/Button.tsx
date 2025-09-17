@@ -16,6 +16,7 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   size?: 'sm' | 'md' | 'lg';
 };
 
+// Token-driven button variants mapped to utility classes.
 const variantClasses: Record<NonNullable<ButtonProps['variant']>, string> = {
   default: 'btn-default',
   titlebar: 'btn-titlebar',

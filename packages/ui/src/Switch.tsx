@@ -1,5 +1,5 @@
+import React, { useCallback } from 'react';
 import cn from '@tgim/utils/cn';
-import React from 'react';
 
 type SwitchProps<T> = {
   variant?: 'default' | 'language';
@@ -17,16 +17,20 @@ const variantClasses: Record<NonNullable<SwitchProps<unknown>['variant']>, strin
   language: 'switch-language',
 };
 
-function Switch<T extends string | number>({
+// Small select element that reuses button tokens for consistent styling.
+const Switch = <T extends string | number>({
   current,
   variant = 'default',
   onChanged,
   className,
   options,
-}: SwitchProps<T>) {
-  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    onChanged?.(e.target.value as T);
-  };
+}: SwitchProps<T>) => {
+  const handleChange = useCallback(
+    (event: React.ChangeEvent<HTMLSelectElement>) => {
+      onChanged?.(event.target.value as T);
+    },
+    [onChanged],
+  );
 
   return (
     <label>
@@ -35,7 +39,7 @@ function Switch<T extends string | number>({
         onChange={handleChange}
         className={cn('btn', 'switch', variantClasses[variant], className)}
       >
-        {options.map((option, i) => (
+        {options.map(option => (
           <option key={option.value + option.name} value={option.value}>
             {option.name}
           </option>
@@ -43,6 +47,6 @@ function Switch<T extends string | number>({
       </select>
     </label>
   );
-}
+};
 
 export default Switch;

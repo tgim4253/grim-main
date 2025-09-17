@@ -1,114 +1,141 @@
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.875rem;
-  font-weight: 500;
-  transition: all 0.2s ease-in-out;
-}
+@layer components {
+  .btn {
+    --_btn-bg: transparent;
+    --_btn-hover-bg: var(--_btn-bg);
+    --_btn-color: var(--color-text);
+    --_btn-hover-color: var(--_btn-color);
+    --_btn-border: transparent;
+    --_btn-hover-border: var(--_btn-border);
+    --_btn-radius: 0.5rem;
+    --_btn-padding-y: 0.5rem;
+    --_btn-padding-x: 1rem;
+    --_btn-gap: 0.25rem;
+    --_btn-width: auto;
+    --_btn-justify: center;
 
-/* Default Button Style */
-.btn-default {
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem; /* Reduced border-radius for a sharper look */
-}
+    display: inline-flex;
+    align-items: center;
+    justify-content: var(--_btn-justify);
+    width: var(--_btn-width);
+    gap: var(--_btn-gap);
+    padding-block: var(--_btn-padding-y);
+    padding-inline: var(--_btn-padding-x);
+    border-radius: var(--_btn-radius);
+    border: 1px solid var(--_btn-border);
+    background-color: var(--_btn-bg);
+    color: var(--_btn-color);
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease,
+      box-shadow 150ms ease, transform 150ms ease;
+    cursor: pointer;
+  }
 
-.btn-default:hover {
-}
+  .btn:hover {
+    background-color: var(--_btn-hover-bg);
+    color: var(--_btn-hover-color);
+    border-color: var(--_btn-hover-border);
+  }
 
-/* Titlebar Button Style - more subtle */
-.btn-titlebar {
-  background-color: var(--btn-titlebar-bg);
-  color: var(--color-text);
-  padding: 0.5rem 1rem;
-  border-color: transparent;
-  border-radius: 0;
-  justify-content: flex-end; /* Align to the right */
-  width: 100%; /* Take full width */
-}
+  .btn:focus-visible {
+    outline: none;
+    box-shadow: var(--_btn-focus-ring, 0 0 0 3px var(--btn-default-ring, transparent));
+  }
 
-.btn-titlebar:hover {
-  background-color: var(--btn-titlebar-bg-hover);
-}
+  .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
 
-/* List Button Style - more subtle */
-.btn-list {
-  justify-content: start;
-  color: var(--color-text);
-  background-color: var(--btn-list-bg);
-  white-space: pre-wrap;
-  border-color: transparent;
-  border-radius: 0;
-  overflow-wrap: break-word;
-  width: 100%; /* Take full width */
-}
+  .btn-default {
+    --_btn-bg: var(--btn-default-bg);
+    --_btn-hover-bg: var(--btn-default-bg-hover);
+    --_btn-color: var(--btn-default-fg);
+    --_btn-focus-ring: 0 0 0 3px var(--btn-default-ring);
+  }
 
-.btn-list:hover {
-  background-color: var(--btn-list-bg-hover);
-}
+  .btn-titlebar {
+    --_btn-bg: var(--btn-titlebar-bg);
+    --_btn-hover-bg: var(--btn-titlebar-bg-hover);
+    --_btn-color: var(--btn-titlebar-fg);
+    --_btn-border: transparent;
+    --_btn-hover-border: transparent;
+    --_btn-radius: 0;
+    --_btn-justify: flex-end;
+    --_btn-width: 100%;
+  }
 
-/* Icon Button Style - more subtle */
+  .btn-list {
+    --_btn-bg: var(--btn-list-bg);
+    --_btn-hover-bg: var(--btn-list-bg-hover);
+    --_btn-color: var(--btn-list-fg);
+    --_btn-border: transparent;
+    --_btn-hover-border: transparent;
+    --_btn-radius: 0;
+    --_btn-justify: flex-start;
+    --_btn-width: 100%;
 
-.btn-icon {
-  aspect-ratio: 1 / 1;
-  color: var(--btn-icon-color);
-}
+    white-space: pre-wrap;
+    text-align: left;
+    overflow-wrap: break-word;
+  }
 
-.btn-icon:hover {
-  color: var(--btn-icon-hover-color);
-}
+  .btn-icon {
+    --_btn-bg: transparent;
+    --_btn-hover-bg: transparent;
+    --_btn-color: var(--btn-icon-color);
+    --_btn-hover-color: var(--btn-icon-hover-color);
+    --_btn-border: transparent;
+    --_btn-hover-border: transparent;
+    --_btn-padding-y: 0.5rem;
+    --_btn-padding-x: 0.5rem;
+    --_btn-radius: 0.5rem;
 
-.btn-icon.selected {
-  color: var(--btn-icon-hover-color);
-}
+    aspect-ratio: 1 / 1;
+  }
 
-/* Card Button Style - more subtle */
-.btn-card {
-  background-color: var(--btn-card-bg);
-}
+  .btn-icon.selected {
+    color: var(--btn-icon-hover-color);
+  }
 
-.btn-card:hover {
-  background-color: var(--btn-card-bg-hover);
-}
+  .btn-card {
+    --_btn-bg: var(--btn-card-bg);
+    --_btn-hover-bg: var(--btn-card-bg-hover);
+    --_btn-color: var(--btn-card-fg);
+    --_btn-border: transparent;
+    --_btn-hover-border: transparent;
+  }
 
-.btn-primary {
-  background-color: var(--brand-500);
-  color: var(--color-text);
-  padding: 0.5rem 1rem;
-}
+  .btn-primary {
+    --_btn-bg: var(--color-brand);
+    --_btn-hover-bg: var(--color-brand-hover);
+    --_btn-color: var(--color-text-inverse);
+    --_btn-border: transparent;
+    --_btn-hover-border: transparent;
+    --_btn-focus-ring: 0 0 0 3px var(--btn-default-ring);
+  }
 
-.btn-primary:hover {
-  background-color: var(--brand-600);
-}
+  .btn-secondary {
+    --_btn-bg: transparent;
+    --_btn-hover-bg: var(--color-surface-hover);
+    --_btn-color: var(--color-text);
+    --_btn-border: var(--color-border);
+    --_btn-hover-border: var(--color-border-hover);
+  }
 
-/* Secondary Button Style */
-.btn-secondary {
-  background-color: transparent;
-  color: var(--color-text);
-  padding: 0.5rem 1rem;
-  border-color: var(--color-border);
-}
+  .btn-panel-tab {
+    --_btn-bg: var(--btn-panel-tab-bg);
+    --_btn-hover-bg: var(--btn-panel-tab-bg-hover);
+    --_btn-color: var(--btn-panel-tab-fg);
+    --_btn-border: transparent;
+    --_btn-hover-border: transparent;
+    --_btn-padding-y: 0.625rem;
+    --_btn-padding-x: 1.25rem;
+    --_btn-radius: 0.625rem;
+  }
 
-.btn-secondary:hover {
-  background-color: var(--color-surface-hover);
-  border-color: var(--color-border-hover);
-}
-
-/* panel tab btn */
-
-.btn-panel-tab {
-  padding: 10px 20px;
-  cursor: pointer;
-
-  background-color: var(--btn-panel-tab-bg);
-  color: var(--btn-panel-tab-fg);
-}
-
-.btn-panel-tab:hover {
-  background-color: var(--btn-panel-tab-bg-hover);
-}
-
-.btn-panel-tab.selected {
-  background-color: var(--btn-panel-tab-bg-selected);
-  color: var(--btn-panel-tab-fg);
+  .btn-panel-tab.selected {
+    --_btn-bg: var(--btn-panel-tab-bg-selected);
+  }
 }

@@ -1,0 +1,36 @@
+/* Base design system palette other layers build upon. */
+@layer base {
+  :root {
+    /* Neutral grayscale */
+    --ds-gray-25: #fcfcfd;
+    --ds-gray-50: #f9fafb;
+    --ds-gray-75: #f8fafc;
+    --ds-gray-100: #f3f4f6;
+    --ds-gray-150: #f0f0f0;
+    --ds-gray-200: #e5e7eb;
+    --ds-gray-250: #e0e0e0;
+    --ds-gray-300: #d1d5db;
+    --ds-gray-400: #9ca3af;
+    --ds-gray-500: #6b7280;
+    --ds-gray-550: #666e80;
+    --ds-gray-600: #4b5563;
+    --ds-gray-650: #434c5a;
+    --ds-gray-700: #374151;
+    --ds-gray-750: #2d3648;
+    --ds-gray-800: #1f2937;
+    --ds-gray-850: #1e1e1e;
+    --ds-gray-900: #111827;
+    --ds-gray-950: #020617;
+
+    /* Accent palette */
+    --ds-blue-500: #3b82f6;
+    --ds-blue-600: #2563eb;
+    --ds-indigo-400: #818cf8;
+    --ds-indigo-500: #6366f1;
+    --ds-indigo-600: #4f46e5;
+
+    /* Neutral anchors */
+    --ds-white: #ffffff;
+    --ds-black: #000000;
+  }
+}

@@ -1,0 +1,228 @@
+/* Theme layer that projects the palette into semantic design tokens. */
+@layer base {
+  :root {
+    color-scheme: light;
+
+    /* Text + icon tokens */
+    --ds-text-primary: var(--ds-gray-900);
+    --ds-text-soft: var(--ds-gray-600);
+    --ds-text-placeholder: var(--ds-gray-500);
+    --ds-text-inverse: var(--ds-white);
+    --ds-icon-subtle: var(--ds-gray-500);
+
+    /* Application surfaces */
+    --ds-surface-base: var(--ds-white);
+    --ds-surface-raised: var(--ds-gray-50);
+    --ds-surface-muted: var(--ds-gray-100);
+    --ds-surface-hover: var(--ds-gray-150);
+    --ds-surface-active: var(--ds-gray-200);
+
+    --ds-shell-surface: var(--ds-gray-100);
+    --ds-shell-contrast: var(--ds-gray-200);
+
+    --ds-sidebar-surface: var(--ds-gray-100);
+    --ds-sidebar-hover: var(--ds-gray-200);
+    --ds-sidebar-border: var(--ds-gray-200);
+    --ds-sidebar-icon: var(--ds-gray-500);
+    --ds-sidebar-icon-hover: var(--ds-gray-700);
+
+    --ds-main-surface: var(--ds-gray-50);
+    --ds-main-hover: var(--ds-gray-150);
+    --ds-main-icon: var(--ds-gray-500);
+    --ds-main-icon-hover: var(--ds-gray-400);
+
+    --ds-modal-surface: var(--ds-white);
+    --ds-modal-input: var(--ds-gray-100);
+    --ds-modal-input-hover: var(--ds-gray-150);
+
+    /* Borders + outlines */
+    --ds-border-subtle: var(--ds-gray-200);
+    --ds-border-strong: var(--ds-gray-300);
+    --ds-border-focus: color-mix(in srgb, var(--ds-indigo-500) 40%, transparent);
+
+    /* Accents */
+    --ds-accent: var(--ds-indigo-500);
+    --ds-accent-hover: var(--ds-indigo-600);
+    --ds-accent-ring: color-mix(in srgb, var(--ds-indigo-500) 35%, transparent);
+    --ds-brand: var(--ds-blue-500);
+
+    /* Stateful layers */
+    --ds-overlay: rgba(15, 23, 42, 0.45);
+
+    /* Component-specific helpers */
+    --ds-button-filled-fg: var(--ds-text-inverse);
+    --ds-button-muted-fg: var(--ds-text-primary);
+    --ds-button-muted-bg: var(--ds-sidebar-surface);
+    --ds-button-muted-hover: var(--ds-sidebar-hover);
+    --ds-button-outline-border: var(--ds-border-subtle);
+    --ds-button-outline-hover-border: var(--ds-border-strong);
+    --ds-button-card-bg: var(--ds-surface-muted);
+    --ds-button-card-hover: var(--ds-surface-hover);
+    --ds-button-tab-selected: var(--ds-surface-active);
+
+    --ds-switch-track-bg: var(--ds-sidebar-surface);
+    --ds-switch-track-hover: var(--ds-sidebar-hover);
+
+    --ds-input-bg: var(--ds-surface-base);
+    --ds-input-border: var(--ds-border-subtle);
+    --ds-input-focus-border: var(--ds-border-focus);
+    --ds-input-focus-ring: color-mix(in srgb, var(--ds-indigo-500) 22%, transparent);
+    --ds-input-placeholder: var(--ds-text-placeholder);
+    --ds-input-invalid-border: #e5484d;
+
+    /* Legacy + Tailwind aliases so existing components keep working */
+    --color-text: var(--ds-text-primary);
+    --color-text-soft: var(--ds-text-soft);
+    --color-text-inverse: var(--ds-text-inverse);
+    --color-text-placeholder: var(--ds-text-placeholder);
+
+    --color-surface: var(--ds-surface-base);
+    --color-surface-soft: var(--ds-surface-raised);
+    --color-surface-hover: var(--ds-surface-hover);
+    --color-surface-active: var(--ds-surface-active);
+
+    --color-border: var(--ds-border-subtle);
+    --color-border-hover: var(--ds-border-strong);
+
+    --color-brand: var(--ds-accent);
+    --color-brand-hover: var(--ds-accent-hover);
+    --color-primary: var(--ds-accent);
+
+    --color-bg-0: var(--ds-surface-base);
+    --color-bg-1: var(--ds-surface-raised);
+    --color-bg-2: var(--ds-surface-muted);
+    --color-bg-3: var(--ds-surface-hover);
+    --color-bg-4: var(--ds-surface-active);
+    --color-bg-5: var(--ds-shell-surface);
+    --color-bg-6: var(--ds-shell-surface);
+    --color-bg-7: var(--ds-shell-contrast);
+    --color-bg-8: var(--ds-sidebar-surface);
+    --color-bg-9: var(--ds-sidebar-hover);
+    --color-bg-10: var(--ds-sidebar-hover);
+    --color-bg-hover: var(--ds-surface-hover);
+
+    --color-modal-bg: var(--ds-modal-surface);
+    --color-modal-hover-bg: var(--ds-modal-input-hover);
+    --color-modal-input-bg: var(--ds-modal-input);
+    --color-modal-input-hover-bg: var(--ds-modal-input-hover);
+    --color-modal-input-placeholder: var(--ds-input-placeholder);
+
+    --color-main-bg: var(--ds-main-surface);
+    --color-main-hover-bg: var(--ds-main-hover);
+
+    --color-sidebar-light: var(--ds-sidebar-surface);
+    --color-sidebar-dark: var(--ds-sidebar-surface);
+    --color-sidebar-bg: var(--ds-sidebar-surface);
+    --color-sidebar-hover-bg: var(--ds-sidebar-hover);
+    --color-sidebar-border-light: var(--ds-sidebar-border);
+    --color-sidebar-border-dark: var(--ds-sidebar-border);
+    --color-sidebar-border: var(--ds-sidebar-border);
+
+    --color-icon-sidebar: var(--ds-sidebar-icon);
+    --color-icon-sidebar-hover: var(--ds-sidebar-icon-hover);
+    --color-icon-main: var(--ds-main-icon);
+    --color-icon-main-hover: var(--ds-main-icon-hover);
+
+    --btn-default-bg: var(--ds-accent);
+    --btn-default-bg-hover: var(--ds-accent-hover);
+    --btn-default-fg: var(--ds-button-filled-fg);
+    --btn-default-ring: var(--ds-accent-ring);
+
+    --btn-titlebar-bg: var(--ds-shell-surface);
+    --btn-titlebar-bg-hover: var(--ds-shell-contrast);
+    --btn-titlebar-fg: var(--ds-text-primary);
+
+    --btn-list-bg: var(--ds-sidebar-surface);
+    --btn-list-bg-hover: var(--ds-sidebar-hover);
+    --btn-list-fg: var(--ds-text-primary);
+
+    --btn-icon-color: var(--ds-sidebar-icon);
+    --btn-icon-hover-color: var(--ds-sidebar-icon-hover);
+
+    --btn-card-bg: var(--ds-button-card-bg);
+    --btn-card-bg-hover: var(--ds-button-card-hover);
+    --btn-card-fg: var(--ds-text-primary);
+
+    --btn-panel-tab-bg: var(--ds-button-muted-bg);
+    --btn-panel-tab-bg-hover: var(--ds-button-muted-hover);
+    --btn-panel-tab-bg-selected: var(--ds-button-tab-selected);
+    --btn-panel-tab-fg: var(--ds-text-primary);
+
+    --switch-language-bg: var(--ds-switch-track-bg);
+    --switch-language-bg-hover: var(--ds-switch-track-hover);
+    --switch-language-fg: var(--ds-text-primary);
+
+    --input-default-bg: var(--ds-input-bg);
+    --input-border: var(--ds-input-border);
+    --input-focus-border: var(--ds-input-focus-border);
+    --input-focus-ring: var(--ds-input-focus-ring);
+    --input-invalid-border: var(--ds-input-invalid-border);
+    --input-titlebar-bg: var(--btn-titlebar-bg);
+    --input-titlebar-bg-hover: var(--btn-titlebar-bg-hover);
+    --input-list-bg: var(--btn-list-bg);
+    --input-list-bg-hover: var(--btn-list-bg-hover);
+  }
+
+  [data-theme='dark'] {
+    color-scheme: dark;
+
+    --ds-text-primary: var(--ds-gray-100);
+    --ds-text-soft: var(--ds-gray-400);
+    --ds-text-placeholder: var(--ds-gray-500);
+    --ds-text-inverse: var(--ds-gray-950);
+    --ds-icon-subtle: var(--ds-gray-400);
+
+    --ds-surface-base: var(--ds-gray-850);
+    --ds-surface-raised: var(--ds-gray-800);
+    --ds-surface-muted: var(--ds-gray-750);
+    --ds-surface-hover: var(--ds-gray-750);
+    --ds-surface-active: var(--ds-gray-700);
+
+    --ds-shell-surface: var(--ds-gray-850);
+    --ds-shell-contrast: var(--ds-gray-800);
+
+    --ds-sidebar-surface: var(--ds-gray-850);
+    --ds-sidebar-hover: var(--ds-gray-800);
+    --ds-sidebar-border: var(--ds-gray-700);
+    --ds-sidebar-icon: rgba(255, 255, 255, 0.65);
+    --ds-sidebar-icon-hover: rgba(255, 255, 255, 0.95);
+
+    --ds-main-surface: var(--ds-gray-850);
+    --ds-main-hover: var(--ds-gray-800);
+    --ds-main-icon: var(--ds-gray-400);
+    --ds-main-icon-hover: var(--ds-gray-300);
+
+    --ds-modal-surface: var(--ds-gray-850);
+    --ds-modal-input: var(--ds-gray-800);
+    --ds-modal-input-hover: var(--ds-gray-750);
+
+    --ds-border-subtle: var(--ds-gray-700);
+    --ds-border-strong: var(--ds-gray-600);
+    --ds-border-focus: color-mix(in srgb, var(--ds-indigo-500) 45%, transparent);
+
+    --ds-accent: var(--ds-indigo-500);
+    --ds-accent-hover: var(--ds-indigo-400);
+    --ds-accent-ring: color-mix(in srgb, var(--ds-indigo-500) 30%, transparent);
+
+    --ds-overlay: rgba(2, 6, 23, 0.7);
+
+    --ds-button-filled-fg: var(--ds-text-primary);
+    --ds-button-muted-fg: var(--ds-text-primary);
+    --ds-button-muted-bg: var(--ds-gray-800);
+    --ds-button-muted-hover: var(--ds-gray-700);
+    --ds-button-outline-border: var(--ds-gray-700);
+    --ds-button-outline-hover-border: var(--ds-gray-600);
+    --ds-button-card-bg: var(--ds-gray-800);
+    --ds-button-card-hover: var(--ds-gray-750);
+    --ds-button-tab-selected: var(--ds-gray-750);
+
+    --ds-switch-track-bg: var(--ds-gray-800);
+    --ds-switch-track-hover: var(--ds-gray-700);
+
+    --ds-input-bg: var(--ds-gray-850);
+    --ds-input-border: var(--ds-gray-700);
+    --ds-input-focus-border: color-mix(in srgb, var(--ds-indigo-500) 45%, transparent);
+    --ds-input-focus-ring: color-mix(in srgb, var(--ds-indigo-500) 25%, transparent);
+    --ds-input-placeholder: var(--ds-gray-500);
+  }
+}
