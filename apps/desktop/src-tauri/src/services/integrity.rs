@@ -4,14 +4,14 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
     Pool, Row, Sqlite,
 };
-use std::{fs, path::Path, str::FromStr};
+use std::{path::Path, str::FromStr};
 
 use crate::{
     models::connection::RelationType,
     utils::{date::get_now_date, identifier::get_unique_id},
 };
 
-// Desired DB user_version for schema compatibility
+/// Desired `PRAGMA user_version` for schema compatibility.
 pub const TARGET_DB_VERSION: i32 = 1;
 
 /// Open or create DB with a pool and per-connection PRAGMAs.

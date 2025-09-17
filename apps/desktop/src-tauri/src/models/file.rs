@@ -18,6 +18,7 @@ use crate::{
     services::file_service::xxh3_64_of, utils::file_utils::guess_mime,
 };
 
+/// Folder node metadata fetched from the database.
 #[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct NodeFolder {
     pub folder_id: String,
@@ -25,6 +26,7 @@ pub struct NodeFolder {
     pub folder_name: String,
 }
 
+/// File content metadata persisted in the database.
 #[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct FileContent {
     pub file_id: String,
@@ -37,6 +39,7 @@ pub struct FileContent {
     pub file_name: String,
 }
 
+/// Parameters required to create a new virtual folder.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FolderData {
     pub name: String,
@@ -44,6 +47,7 @@ pub struct FolderData {
     pub parent_id: String,
 }
 
+/// Supported operating systems for storage roots.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default,
 )]
@@ -58,6 +62,7 @@ pub enum OsPlatform {
     Unknown,
 }
 
+/// Classification for the type of storage volume backing a root path.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default,
 )]
@@ -102,6 +107,7 @@ impl From<&str> for OsPlatform {
         }
     }
 }
+/// Metadata describing a discovered storage root.
 #[derive(Debug, Clone, FromRow, Serialize)]
 pub struct StorageRootInfo {
     pub platform: OsPlatform,
@@ -116,6 +122,7 @@ pub struct StorageRootInfo {
     pub created_at: String,
 }
 
+/// Logical file types derived from file extensions.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default,
 )]
@@ -250,6 +257,7 @@ impl FileType {
     }
 }
 
+/// Computed metadata used when ingesting file paths.
 #[derive(Debug, Clone, FromRow, Serialize)]
 pub struct FileInfo {
     pub mime_guess: String,
@@ -269,6 +277,7 @@ pub struct FileInfo {
 }
 
 impl FileInfo {
+    /// Build a `FileInfo` record by reading metadata from disk.
     pub async fn new(
         file_path: &Path,
         real_folder_id: String,
@@ -297,7 +306,7 @@ impl FileInfo {
         // } else {
         //     None
         // };
-        let xxh3_64 = xxh3_64_of(&file_path).with_context(|| {
+        let xxh3_64 = xxh3_64_of(file_path).await.with_context(|| {
             format!("Failed to calculate xxHash64 for {:?}", file_path)
         })?;
 
@@ -339,6 +348,7 @@ impl FileInfo {
 //     folders: Vec<DirectoryInfo>,
 // }
 
+/// Payload used to upsert real-folder records in the database.
 pub struct RealFolderData {
     pub id: String,
     pub storage_root_id: Option<String>,
@@ -358,6 +368,7 @@ pub struct RealFolderData {
 
 // -- Thumb --
 
+/// Resize strategy that controls how thumbnails are generated.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default,
 )]
@@ -370,6 +381,7 @@ pub enum ResizeMode {
     Original,
 }
 
+/// Output image formats supported for thumbnail generation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ImageFmt {
@@ -392,6 +404,7 @@ impl ImageFmt {
     }
 }
 
+/// Thumbnail specification describing dimensions and encoding.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ThumbSpec {
     pub width: u32,
@@ -403,12 +416,14 @@ pub struct ThumbSpec {
     pub key: String,
 }
 
+/// Request payload containing thumbnail requirements per file.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ThumbReqInfo {
     pub xxhs: String, // ASCII-hex (will be normalized to lowercase)
     pub specs: Vec<ThumbSpec>,
 }
 
+/// Wrapper representing the resolved thumbnail path on disk.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ThumbPath(pub PathBuf);
 
@@ -516,18 +531,20 @@ impl From<ThumbPath> for PathBuf {
     }
 }
 
-/// Validate ASCII-hex quickly (0-9a-fA-F).
+/// Validate ASCII-hex strings (0-9a-fA-F) quickly.
 fn is_ascii_hex(s: &str) -> bool {
     !s.is_empty()
         && s.bytes()
             .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F'))
 }
 
+/// Batch thumbnail request submitted from the frontend.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ThumbRequest {
     pub items: Vec<ThumbReqInfo>,
 }
 
+/// Status markers for thumbnail availability.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ThumbStatus {
@@ -536,6 +553,7 @@ pub enum ThumbStatus {
     Error,
 }
 
+/// Result entry for a single thumbnail specification.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ThumbResSpec {
     pub status: ThumbStatus,
@@ -545,12 +563,14 @@ pub struct ThumbResSpec {
     pub error_msg: Option<String>,
 }
 
+/// Aggregated thumbnail results for a single file hash.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ThumbResInfo {
     pub xxhs: String,
     pub specs: Vec<ThumbResSpec>,
 }
 
+/// Response returned to the renderer containing thumbnail states.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ThumbResponse {
     pub items: Vec<ThumbResInfo>,
