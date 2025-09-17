@@ -27,7 +27,7 @@ const MoaIcon = () => (
 const ManageMoaSideBar: React.FC = () => {
   const [moas, setMoas] = useState<{ name: string; path: string; moa_id: string }[]>([]);
 
-  const { i18n } = useTranslation(['common', 'moa']);
+  const { t, i18n } = useTranslation(['common', 'moa']);
 
   const changeLanguage = useCallback(
     (lng: string) => {
@@ -64,47 +64,47 @@ const ManageMoaSideBar: React.FC = () => {
       style={{ WebkitAppRegion: 'drag', width: '300px' } as React.CSSProperties}
     >
       {/* Item list */}
-      <div className="flex flex-col" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-        {moas.map(moa => {
-          return (
-            <Button
-              variant="list-item"
-              key={moa.name + moa.path}
-              onClick={() => {
-                void handleMoaClick(moa.moa_id);
-              }}
-              className="flex items-start justify-between p-2 rounded-lg "
-            >
-              <div className="flex items-center space-x-2 flex-1 min-w-0">
-                <div className="w-fit flex-shrink-0">
-                  <MoaIcon />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-col items-start whitespace-pre-wrap break-words">
-                    <span className="font-semibold break-words max-w-full truncate">
-                      {moa.name}
-                    </span>
-                    <span className="text-sm text-text break-words max-w-full">
-                      {moa.path}
-                    </span>
+      <div className="flex flex-col gap-1 px-4" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        {moas.length === 0 ? (
+          <div className="mt-6 rounded-lg border border-dashed border-border-sidebar bg-surface-muted px-4 py-6 text-sm text-text-soft">
+            {t('moa:empty_recent', { defaultValue: '최근에 연 보관함이 없습니다.' })}
+          </div>
+        ) : (
+          moas.map(moa => {
+            return (
+              <Button
+                variant="list-item"
+                key={moa.name + moa.path}
+                onClick={() => {
+                  void handleMoaClick(moa.moa_id);
+                }}
+                className="flex items-start justify-between rounded-lg px-3 py-2 transition-colors"
+              >
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-surface-muted text-icon-sidebar">
+                    <MoaIcon />
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col text-left">
+                    <span className="font-semibold text-text truncate">{moa.name}</span>
+                    <span className="text-xs text-text-soft truncate">{moa.path}</span>
                   </div>
                 </div>
-              </div>
-              <div className="w-fit flex-shrink-0 items-center pl-2">
-                <Button
-                  variant="icon"
-                  onClick={event => {
-                    event.stopPropagation();
-                  }}
-                  asChild
-                  className="text-icon-sidebar hover:text-icon-hover-sidebar"
-                >
-                  <MoreVertical />
-                </Button>
-              </div>
-            </Button>
-          );
-        })}
+                <div className="flex flex-shrink-0 items-center pl-2">
+                  <Button
+                    variant="icon"
+                    onClick={event => {
+                      event.stopPropagation();
+                    }}
+                    asChild
+                    className="text-icon-sidebar hover:text-icon-hover-sidebar"
+                  >
+                    <MoreVertical />
+                  </Button>
+                </div>
+              </Button>
+            );
+          })
+        )}
       </div>
 
       <div

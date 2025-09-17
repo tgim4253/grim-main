@@ -36,6 +36,7 @@ const SidebarTabs: React.FC<SidebarProps> = ({ sidebarPosition }) => {
           <Button
             variant="icon"
             key={tab.name}
+            active={activeTab === tab.name}
             onClick={() => {
               if (!tab.name) return;
               if (tab.name === activeTab) {
@@ -46,8 +47,8 @@ const SidebarTabs: React.FC<SidebarProps> = ({ sidebarPosition }) => {
               setHiddenPanel(false);
             }}
             className={cn(
-              'p-2 w-full hover:text-icon-hover-sidebar hover:bg-sidebar-hover',
-              activeTab === tab.name ? 'selected bg-sidebar-hover' : 'text-icon-sidebar',
+              'w-full p-2 transition-colors hover:text-icon-hover-sidebar hover:bg-sidebar-hover',
+              activeTab === tab.name ? 'text-icon-hover-sidebar' : 'text-icon-sidebar',
             )}
           >
             {<tab.icon />}
