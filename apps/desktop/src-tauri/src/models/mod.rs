@@ -1,5 +1,3 @@
-//! Core data models shared across services and commands.
-
 pub mod connection;
 pub mod file;
 pub mod graph;
