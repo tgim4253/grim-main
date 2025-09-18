@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::Type, FromRow};
 
+/// Directed edge connecting two nodes in the graph.
 #[derive(Debug, FromRow, Serialize)]
 pub struct Connection {
     pub id: String,
@@ -11,6 +12,7 @@ pub struct Connection {
     pub level: i32,
 }
 
+/// Relationship type assigned to an edge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[sqlx(type_name = "TEXT")]
 #[sqlx(rename_all = "lowercase")]
@@ -22,18 +24,17 @@ pub enum RelationType {
     ChildFolder,
 }
 
-///
-/// EdgeType defines how edges are treated during graph traversal.
-/// - Forward: traversal continues
-/// - Reverse: traversal stops (edge ignored)
-/// - Bidirectional: traversal continues but may be hidden later in UI
-///
+/// Describes how edges are treated during graph traversal.
+/// - `Forward`: traversal continues.
+/// - `Reverse`: traversal stops (edge ignored).
+/// - `Bidirectional`: traversal continues but the edge may be hidden later.
 pub enum EdgeType {
     Forward = 1,       // Normal forward edge, expand during traversal
     Bidirectional = 2, // Expand during traversal, but can be hidden in UI
     Reverse = 3,       // Do not expand, stop traversal at this edge
 }
 
+/// Connection kind metadata loaded from the rule table.
 pub struct ConnectionKind {
     pub kind_rule_id: String,
     pub kind: RelationType,

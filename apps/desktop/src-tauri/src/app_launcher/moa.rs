@@ -1,11 +1,14 @@
 use tauri::WebviewUrl;
 #[cfg(target_os = "macos")]
-use tauri_plugin_decorum::WebviewWindowExt; // decorum helpers
+use tauri_plugin_decorum::WebviewWindowExt;
 
+/// Launch the workspace selector window used to create or pick a Moa project.
 pub fn launch_moa_selector(app: &tauri::AppHandle) -> Result<(), String> {
     #[cfg(debug_assertions)]
     let url = WebviewUrl::External(
-        "http://localhost:1420/#/create-moa".parse().unwrap(),
+        "http://localhost:1420/#/create-moa"
+            .parse()
+            .map_err(|_| "error parsing uri")?,
     );
 
     #[cfg(not(debug_assertions))]
@@ -17,7 +20,6 @@ pub fn launch_moa_selector(app: &tauri::AppHandle) -> Result<(), String> {
         .resizable(false)
         .maximizable(false);
 
-    // keep overlay on macOS
     #[cfg(target_os = "macos")]
     let web_builder =
         web_builder.title_bar_style(tauri::TitleBarStyle::Overlay);
@@ -28,15 +30,13 @@ pub fn launch_moa_selector(app: &tauri::AppHandle) -> Result<(), String> {
     let window = web_builder.build().map_err(|e| e.to_string())?;
 
     #[cfg(target_os = "macos")]
-    window
-        .create_overlay_titlebar() // remove native bar, add draggable overlay
-        .map_err(|e| e.to_string())?;
+    window.create_overlay_titlebar().map_err(|e| e.to_string())?;
 
     #[cfg(target_os = "macos")]
     {
         window
-            .set_traffic_lights_inset(12.0, 16.0) // move traffic-lights
-            .and_then(|w| w.make_transparent()) // acrylic background
+            .set_traffic_lights_inset(12.0, 16.0)
+            .and_then(|w| w.make_transparent())
             .map_err(|e| e.to_string())?;
     }
 

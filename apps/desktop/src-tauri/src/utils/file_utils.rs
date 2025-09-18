@@ -2,8 +2,10 @@ use std::{fs, path::Path};
 
 use anyhow::Result;
 
+/// Guess a MIME type based on the file extension, defaulting to octet-stream.
 pub fn guess_mime(path: &Path) -> String {
-    let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+    let ext =
+        path.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
 
     match ext.as_str() {
         // Images
@@ -71,6 +73,7 @@ pub fn guess_mime(path: &Path) -> String {
     }
 }
 
+/// Convert a file modification time into Unix epoch seconds.
 pub fn file_mtime_epoch(meta: &fs::Metadata) -> Result<i64> {
     let modified = meta.modified()?;
     let duration = modified
@@ -79,6 +82,7 @@ pub fn file_mtime_epoch(meta: &fs::Metadata) -> Result<i64> {
     Ok(duration.as_secs() as i64)
 }
 
+/// Lowercase a file name for normalized comparisons.
 pub fn normailze_file_name(name: &str) -> String {
     name.to_lowercase()
 }
