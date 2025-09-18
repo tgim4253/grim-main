@@ -98,7 +98,7 @@ const ManageMoaSideBar: React.FC = () => {
                     asChild
                     className="text-icon-sidebar hover:text-icon-hover-sidebar"
                   >
-                    <MoreVertical />
+                    <MoreVertical className="h-5 w-5" strokeWidth={1.75} />
                   </Button>
                 </div>
               </Button>

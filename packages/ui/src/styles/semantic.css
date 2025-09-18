@@ -76,32 +76,33 @@
   --ds-input-placeholder: var(--ds-text-placeholder);
 
   /* Graph view helpers */
-  --ds-graph-node-label: var(--ds-text-primary);
-  --ds-graph-node-default-bg: color-mix(in srgb, var(--ds-accent) 28%, var(--ds-surface-base));
-  --ds-graph-node-default-border: color-mix(in srgb, var(--ds-accent) 65%, transparent);
-  --ds-graph-node-tag-stroke: color-mix(in srgb, var(--ds-accent) 55%, var(--ds-text-primary) 45%);
-  --ds-graph-node-folder-back: color-mix(in srgb, var(--ds-accent) 14%, var(--ds-surface-muted));
+  --ds-graph-canvas: color-mix(in srgb, var(--ds-surface-muted) 72%, var(--ds-white));
+  --ds-graph-node-label: var(--ds-text-inverse);
+  --ds-graph-node-default-bg: color-mix(in srgb, var(--ds-accent) 76%, var(--ds-surface-base));
+  --ds-graph-node-default-border: color-mix(in srgb, var(--ds-accent) 96%, transparent);
+  --ds-graph-node-tag-stroke: color-mix(in srgb, var(--ds-accent) 88%, var(--ds-text-inverse) 12%);
+  --ds-graph-node-folder-back: color-mix(in srgb, var(--ds-accent) 45%, var(--ds-surface-muted));
   --ds-graph-node-folder-front-light: color-mix(
     in srgb,
-    var(--ds-accent) 12%,
+    var(--ds-accent) 42%,
     var(--ds-surface-raised)
   );
   --ds-graph-node-folder-front-dark: color-mix(
     in srgb,
-    var(--ds-accent) 18%,
+    var(--ds-accent) 50%,
     var(--ds-surface-active)
   );
-  --ds-graph-node-folder-edge: color-mix(in srgb, var(--ds-accent) 45%, transparent);
-  --ds-graph-node-document-paper: var(--ds-surface-base);
-  --ds-graph-node-document-edge: var(--ds-border-subtle);
-  --ds-graph-node-document-shadow: color-mix(in srgb, var(--ds-surface-hover) 80%, transparent);
-  --ds-graph-node-document-line: color-mix(in srgb, var(--ds-text-soft) 92%, transparent);
-  --ds-graph-node-image-bg: color-mix(in srgb, var(--ds-accent) 18%, var(--ds-surface-active));
-  --ds-graph-node-image-border: color-mix(in srgb, var(--ds-accent) 55%, transparent);
-  --ds-graph-node-placeholder-stroke: color-mix(in srgb, var(--ds-text-inverse) 92%, transparent);
-  --ds-graph-node-placeholder-accent: color-mix(in srgb, var(--ds-text-inverse) 82%, transparent);
-  --ds-graph-node-placeholder-fill: color-mix(in srgb, var(--ds-text-inverse) 70%, transparent);
-  --ds-graph-link: color-mix(in srgb, var(--ds-border-subtle) 65%, transparent);
+  --ds-graph-node-folder-edge: color-mix(in srgb, var(--ds-accent) 96%, transparent);
+  --ds-graph-node-document-paper: color-mix(in srgb, var(--ds-surface-base) 88%, var(--ds-accent) 12%);
+  --ds-graph-node-document-edge: color-mix(in srgb, var(--ds-accent) 60%, transparent);
+  --ds-graph-node-document-shadow: color-mix(in srgb, var(--ds-accent) 30%, var(--ds-surface-hover));
+  --ds-graph-node-document-line: color-mix(in srgb, var(--ds-text-inverse) 60%, var(--ds-accent) 40%);
+  --ds-graph-node-image-bg: color-mix(in srgb, var(--ds-accent) 60%, var(--ds-surface-active));
+  --ds-graph-node-image-border: color-mix(in srgb, var(--ds-accent) 96%, transparent);
+  --ds-graph-node-placeholder-stroke: color-mix(in srgb, var(--ds-text-inverse) 96%, transparent);
+  --ds-graph-node-placeholder-accent: color-mix(in srgb, var(--ds-text-inverse) 88%, transparent);
+  --ds-graph-node-placeholder-fill: color-mix(in srgb, var(--ds-text-inverse) 78%, transparent);
+  --ds-graph-link: color-mix(in srgb, var(--ds-accent) 90%, transparent);
   --ds-input-invalid-border: #e5484d;
 
   /* Legacy + Tailwind aliases so existing components keep working */
@@ -271,30 +272,31 @@
   --ds-input-placeholder: var(--ds-gray-500);
 
   /* Graph view helpers */
+  --ds-graph-canvas: color-mix(in srgb, var(--ds-surface-muted) 70%, black);
   --ds-graph-node-label: var(--ds-text-primary);
-  --ds-graph-node-default-bg: color-mix(in srgb, var(--ds-accent) 32%, var(--ds-surface-base));
-  --ds-graph-node-default-border: color-mix(in srgb, var(--ds-accent) 68%, transparent);
-  --ds-graph-node-tag-stroke: color-mix(in srgb, var(--ds-accent) 52%, var(--ds-text-primary) 48%);
-  --ds-graph-node-folder-back: color-mix(in srgb, var(--ds-accent) 18%, var(--ds-surface-muted));
+  --ds-graph-node-default-bg: color-mix(in srgb, var(--ds-accent) 74%, var(--ds-surface-base));
+  --ds-graph-node-default-border: color-mix(in srgb, var(--ds-accent) 96%, transparent);
+  --ds-graph-node-tag-stroke: color-mix(in srgb, var(--ds-accent) 90%, var(--ds-text-primary) 10%);
+  --ds-graph-node-folder-back: color-mix(in srgb, var(--ds-accent) 50%, var(--ds-surface-muted));
   --ds-graph-node-folder-front-light: color-mix(
     in srgb,
-    var(--ds-accent) 16%,
+    var(--ds-accent) 48%,
     var(--ds-surface-raised)
   );
   --ds-graph-node-folder-front-dark: color-mix(
     in srgb,
-    var(--ds-accent) 22%,
+    var(--ds-accent) 56%,
     var(--ds-surface-active)
   );
-  --ds-graph-node-folder-edge: color-mix(in srgb, var(--ds-accent) 48%, transparent);
-  --ds-graph-node-document-paper: var(--ds-surface-base);
-  --ds-graph-node-document-edge: var(--ds-border-subtle);
-  --ds-graph-node-document-shadow: color-mix(in srgb, var(--ds-surface-hover) 78%, transparent);
-  --ds-graph-node-document-line: color-mix(in srgb, var(--ds-text-soft) 88%, transparent);
-  --ds-graph-node-image-bg: color-mix(in srgb, var(--ds-accent) 20%, var(--ds-surface-active));
-  --ds-graph-node-image-border: color-mix(in srgb, var(--ds-accent) 58%, transparent);
-  --ds-graph-node-placeholder-stroke: color-mix(in srgb, var(--ds-text-inverse) 94%, transparent);
-  --ds-graph-node-placeholder-accent: color-mix(in srgb, var(--ds-text-inverse) 86%, transparent);
-  --ds-graph-node-placeholder-fill: color-mix(in srgb, var(--ds-text-inverse) 74%, transparent);
-  --ds-graph-link: color-mix(in srgb, var(--ds-border-subtle) 70%, transparent);
+  --ds-graph-node-folder-edge: color-mix(in srgb, var(--ds-accent) 98%, transparent);
+  --ds-graph-node-document-paper: color-mix(in srgb, var(--ds-surface-base) 84%, var(--ds-accent) 16%);
+  --ds-graph-node-document-edge: color-mix(in srgb, var(--ds-accent) 66%, transparent);
+  --ds-graph-node-document-shadow: color-mix(in srgb, var(--ds-accent) 32%, var(--ds-surface-hover));
+  --ds-graph-node-document-line: color-mix(in srgb, var(--ds-text-primary) 55%, var(--ds-accent) 45%);
+  --ds-graph-node-image-bg: color-mix(in srgb, var(--ds-accent) 64%, var(--ds-surface-active));
+  --ds-graph-node-image-border: color-mix(in srgb, var(--ds-accent) 98%, transparent);
+  --ds-graph-node-placeholder-stroke: color-mix(in srgb, var(--ds-text-primary) 92%, transparent);
+  --ds-graph-node-placeholder-accent: color-mix(in srgb, var(--ds-text-primary) 84%, transparent);
+  --ds-graph-node-placeholder-fill: color-mix(in srgb, var(--ds-text-primary) 72%, transparent);
+  --ds-graph-link: color-mix(in srgb, var(--ds-accent) 92%, var(--ds-text-soft) 8%);
 }

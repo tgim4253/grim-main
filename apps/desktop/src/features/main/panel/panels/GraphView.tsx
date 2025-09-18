@@ -1,12 +1,13 @@
 import usePanelsStore from '@tgim/stores/panelStore';
 import { Connection, GraphConnection, GraphData } from '@tgim/types/graph';
-import { NodeRenderer, getGraphPalette } from '@tgim/ui/index';
-import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { NodeRenderer, clearNodeSpriteCaches, getGraphPalette } from '@tgim/ui/index';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d';
 import { useShallow } from 'zustand/shallow';
 import * as d3 from 'd3-force';
 import useThumbStore from '@tgim/stores/thumbStore';
 import { useMoa } from '@tgim/hooks/useMoa';
+import { useTheme } from '../../../../theme/ThemeProvider';
 
 interface Props {
   graphData: GraphData;
@@ -17,6 +18,8 @@ interface Props {
 const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<ForceGraphMethods | undefined>(undefined);
+  const { theme } = useTheme();
+  const [linkStroke, setLinkStroke] = useState(() => getGraphPalette().link);
 
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   useEffect(() => {
@@ -134,20 +137,43 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
   };
 
   const { openNode } = usePanelsStore(useShallow(s => ({ openNode: s.addPanelWithoutContainer })));
+  useEffect(() => {
+    let refreshFrame: number | null = null;
+    const frame = requestAnimationFrame(() => {
+      clearNodeSpriteCaches();
+      setLinkStroke(getGraphPalette().link);
+      refreshFrame = requestAnimationFrame(() => {
+        fgRef.current?.refresh();
+      });
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      if (refreshFrame !== null) {
+        cancelAnimationFrame(refreshFrame);
+      }
+    };
+  }, [theme]);
+
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%' }}>
+    <div
+      ref={containerRef}
+      className="transition-colors"
+      style={{ width: '100%', height: '100%', background: 'var(--ds-graph-canvas)' }}
+    >
       <ForceGraph2D
         ref={fgRef}
         width={dimensions.width}
         height={dimensions.height}
         graphData={prunedTree}
+        backgroundColor="rgba(0,0,0,0)"
         nodeLabel="label"
         nodeAutoColorBy="group"
         // onEngineStop={() => openAllNode()}
         // linkDirectionalArrowLength={3.5}
         // linkDirectionalArrowRelPos={0.96}
-        linkColor={() => getGraphPalette().link}
-        linkWidth={0.1}
+        linkColor={linkStroke}
+        linkWidth={1.5}
+        linkOpacity={0.95}
         linkCurvature={0}
         nodeCanvasObject={(node, ctx, globalScale) => {
           NodeRenderer(node.type)?.(
