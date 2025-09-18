@@ -23,6 +23,9 @@ import GridView from './panels/GridView';
 import { GridData, ImageItem } from '@tgim/types/grid';
 import { listen } from '@tauri-apps/api/event';
 import { ThumbResSpec } from '@tgim/types/file';
+import { Button } from '@tgim/ui';
+import cn from '@tgim/utils/cn';
+import { GitBranch, LayoutGrid } from 'lucide-react';
 
 interface PanelProps {
   panelId: string;
@@ -86,8 +89,9 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     const links: GraphConnection[] = [];
 
     const getGraphNodeData = (node: Node, graphNodeId?: string): GraphNode => {
-      const defaultSize = 10;
-      const nodeSize = node.id == graphData.root_node_id ? defaultSize * 1.7 : defaultSize;
+      const defaultSize = 14;
+      const nodeSize =
+        node.id == graphData.root_node_id ? defaultSize * 1.6 : defaultSize;
       if (!graphNodeId) graphNodeId = createNewId();
 
       if (node.kind == NodeKind.File && node.data['File']) {
@@ -227,27 +231,57 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   }, [graphData, rootNodeId]);
   if (!panel || !container) return null;
 
+  const showGraph =
+    viewType === 'graph' && graphData && rootNodeId && rootGraphNodeId;
+  const showGrid = viewType === 'grid' && !!gridData;
+
   return ReactDOM.createPortal(
     <div
-      className={`p-2 rounded border w-full h-full 
-        ${isActive ? 'border-accent' : 'border-border'}
-        ${hidden ? 'hidden' : ''}`}
+      className={cn(
+        'flex h-full w-full flex-col overflow-hidden rounded-xl border bg-surface shadow-sm transition-colors',
+        isActive ? 'border-accent' : 'border-border',
+        hidden && 'hidden',
+      )}
     >
-      <div onClick={() => setViewType('graph')}>graph</div>
-      <div onClick={() => setViewType('grid')}>grid</div>
-      {viewType === 'graph'
-        ? graphData &&
-          rootNodeId &&
-          rootGraphNodeId && (
-            <GraphView
-              rootNodeId={rootNodeId}
-              rootGraphNodeId={rootGraphNodeId}
-              graphData={graphData}
-            />
-          )
-        : viewType === 'grid'
-          ? gridData && <GridView gridData={gridData} />
-          : null}
+      <div className="flex items-center justify-end border-b border-border bg-surface-raised px-3 py-2">
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-muted p-1 shadow-inner">
+          <Button
+            type="button"
+            variant="icon"
+            active={viewType === 'graph'}
+            aria-pressed={viewType === 'graph'}
+            aria-label="그래프 보기"
+            title="그래프 보기"
+            onClick={() => setViewType('graph')}
+            className="h-8 w-8"
+          >
+            <GitBranch className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="icon"
+            active={viewType === 'grid'}
+            aria-pressed={viewType === 'grid'}
+            aria-label="그리드 보기"
+            title="그리드 보기"
+            onClick={() => setViewType('grid')}
+            className="h-8 w-8"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      <div className="relative flex-1 min-h-0 bg-surface">
+        {showGraph ? (
+          <GraphView
+            rootNodeId={rootNodeId}
+            rootGraphNodeId={rootGraphNodeId}
+            graphData={graphData}
+          />
+        ) : showGrid && gridData ? (
+          <GridView gridData={gridData} />
+        ) : null}
+      </div>
     </div>,
     container,
   );
