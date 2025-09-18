@@ -457,9 +457,9 @@ impl ThumbPath {
         // Dimensions
         let width = spec.width;
         let height = spec.height;
-        if width == 0 || height == 0 {
+        if width == 0 {
             return Err(anyhow!(
-                "width/height must be > 0 (got {}x{})",
+                "width must be > 0 (got {}x{})",
                 width,
                 height
             ));

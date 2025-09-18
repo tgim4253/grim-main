@@ -360,11 +360,15 @@ async fn process_job(app: &AppHandle, job: ThumbnailJob) -> Result<()> {
     let (target_width, target_height) = (job.spec.width, job.spec.height);
     let (output_buf, out_w, out_h) =
         task::spawn_blocking(move || -> (Vec<u8>, u32, u32) {
-            let target_w = target_width.max(1);
-            let target_h = target_height.max(1);
-
             let rgba = image.to_rgba8();
             let (w, h) = rgba.dimensions();
+
+            let target_w = target_width.max(1);
+            let target_h = if target_height == 0 {
+                h * target_width / w
+            } else {
+                target_height
+            };
 
             let target_ar = target_w as f32 / target_h as f32;
             let src_ar = w as f32 / h as f32;
