@@ -25,7 +25,10 @@ use crate::models::file::{
 
 use super::{
     folder::fetch_one_file_path,
-    job_queue::{enqueue_jobs, finish_job, take_next_job, ThumbnailJob},
+    job_queue::{
+        cancel_pending_base_job, enqueue_jobs, finish_base_job, finish_job,
+        take_next_base_job, take_next_job, BaseThumbnailJob, ThumbnailJob,
+    },
 };
 
 /// Version tag embedded in generated thumbnail paths.
@@ -238,36 +241,64 @@ pub async fn worker_loop(app: AppHandle, mut rx: mpsc::Receiver<()>) {
         let _ = rx.recv().await;
 
         loop {
-            let Some(job) = take_next_job().await else {
+            let mut made_progress = false;
+
+            if let Some(base_job) = take_next_base_job().await {
+                let app_cloned = app.clone();
+                let semaphore_cloned = semaphore.clone();
+
+                tokio::spawn(async move {
+                    let _permit = semaphore_cloned.acquire().await.unwrap();
+                    let job_clone = base_job.clone();
+                    let result = process_base_job(&app_cloned, base_job).await;
+
+                    finish_base_job(&job_clone).await;
+
+                    if let Err(error) = result {
+                        warn!(
+                            "failed to precache base thumbnail for {}: {}",
+                            job_clone.xxhs, error
+                        );
+                    }
+                });
+
+                task::yield_now().await;
+                made_progress = true;
+            }
+
+            if let Some(job) = take_next_job().await {
+                let app_cloned = app.clone();
+                let semaphore_cloned = semaphore.clone();
+
+                tokio::spawn(async move {
+                    let _permit = semaphore_cloned.acquire().await.unwrap();
+                    let job_clone = job.clone();
+                    let result = process_job(&app_cloned, job).await;
+
+                    finish_job(&job_clone).await;
+
+                    if let Err(error) = result {
+                        let _ = emit_created(
+                            &app_cloned,
+                            vec![ThumbResSpec {
+                                thumb_key: job_clone.thumb_key,
+                                status: ThumbStatus::Error,
+                                url: None,
+                                enqueued: false,
+                                error_msg: Some(error.to_string()),
+                            }],
+                        )
+                        .await;
+                    }
+                });
+
+                task::yield_now().await;
+                made_progress = true;
+            }
+
+            if !made_progress {
                 break;
-            };
-
-            let app_cloned = app.clone();
-            let semaphore_cloned = semaphore.clone();
-
-            tokio::spawn(async move {
-                let _permit = semaphore_cloned.acquire().await.unwrap();
-                let job_clone = job.clone();
-                let result = process_job(&app_cloned, job).await;
-
-                finish_job(&job_clone).await;
-
-                if let Err(error) = result {
-                    let _ = emit_created(
-                        &app_cloned,
-                        vec![ThumbResSpec {
-                            thumb_key: job_clone.thumb_key,
-                            status: ThumbStatus::Error,
-                            url: None,
-                            enqueued: false,
-                            error_msg: Some(error.to_string()),
-                        }],
-                    )
-                    .await;
-                }
-            });
-
-            task::yield_now().await;
+            }
         }
     }
 }
@@ -278,6 +309,8 @@ async fn process_job(app: &AppHandle, job: ThumbnailJob) -> Result<()> {
 
     let source_path =
         fetch_one_file_path(job.moa_id.clone(), job.xxhs.clone()).await?;
+
+    cancel_pending_base_job(&job.xxhs).await;
 
     let file_kind = infer::get_from_path(&source_path)
         .context("failed to read file")?
@@ -450,6 +483,28 @@ async fn process_job(app: &AppHandle, job: ThumbnailJob) -> Result<()> {
         timer_all.elapsed().as_millis(),
         if used_cache { "cache" } else { "original" }
     );
+
+    Ok(())
+}
+
+/// Generate a base thumbnail for the provided job.
+async fn process_base_job(
+    app: &AppHandle,
+    job: BaseThumbnailJob,
+) -> Result<()> {
+    if !job.source_path.exists() {
+        bail!("base source missing: {}", job.source_path.display());
+    }
+
+    let file_kind = infer::get_from_path(&job.source_path)
+        .context("failed to read file")?
+        .ok_or_else(|| anyhow!("unknown file type"))?;
+    if !file_kind.mime_type().starts_with("image/") {
+        bail!("unsupported mime type for base thumbnail generation");
+    }
+
+    ensure_base_thumbnail(app, &job.moa_id, &job.xxhs, &job.source_path)
+        .await?;
 
     Ok(())
 }
