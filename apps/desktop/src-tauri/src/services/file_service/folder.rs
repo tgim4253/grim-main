@@ -26,7 +26,10 @@ use crate::{
     utils::{file_utils::file_mtime_epoch, path_utils::normalize_path},
 };
 
-use super::{thumbnail::ensure_base_thumbnail, utils::check_is_hidden};
+use super::{
+    job_queue::{enqueue_base_job, BaseThumbnailJob},
+    utils::check_is_hidden,
+};
 
 #[derive(Default)]
 struct UpsertFolderMetrics {
@@ -35,8 +38,6 @@ struct UpsertFolderMetrics {
     folder_creation_count: u64,
     tree_scanning: Duration,
     tree_scanning_count: u64,
-    base_thumbnail: Duration,
-    base_thumbnail_count: u64,
     upsert_file: Duration,
     upsert_file_count: u64,
     file_size_buckets: HashMap<FileSizeBucket, BucketStats>,
@@ -51,11 +52,6 @@ impl UpsertFolderMetrics {
     fn record_tree_scanning(&mut self, elapsed: Duration) {
         self.tree_scanning += elapsed;
         self.tree_scanning_count += 1;
-    }
-
-    fn record_base_thumbnail(&mut self, elapsed: Duration) {
-        self.base_thumbnail += elapsed;
-        self.base_thumbnail_count += 1;
     }
 
     fn record_upsert_file(&mut self, size: Option<i64>, elapsed: Duration) {
@@ -100,7 +96,6 @@ impl UpsertFolderMetrics {
                 tree_scan          : {} ms ({} runs)
                 folder_creation    : {} ms ({} runs)
                 upsert_file        : {} ms ({} runs)
-                base_thumbnail     : {} ms ({} runs)
                 file_size_buckets  : {}
             ",
             root_dir.display(),
@@ -111,8 +106,6 @@ impl UpsertFolderMetrics {
             self.folder_creation_count,
             self.upsert_file.as_millis(),
             self.upsert_file_count,
-            self.base_thumbnail.as_millis(),
-            self.base_thumbnail_count,
             bucket_summary,
         );
     }
@@ -442,22 +435,12 @@ async fn upsert_file_entry(
     .await?;
 
     if file_info.file_exists && file_info.kind_guess == FileType::Image {
-        let base_timer = Instant::now();
-        let base_result = ensure_base_thumbnail(
-            app,
-            moa_id,
-            &file_info.xxh3_64,
-            file_path.as_path(),
-        )
+        enqueue_base_job(BaseThumbnailJob {
+            moa_id: moa_id.to_string(),
+            xxhs: file_info.xxh3_64.clone(),
+            source_path: file_path.clone(),
+        })
         .await;
-        metrics.record_base_thumbnail(base_timer.elapsed());
-
-        if let Err(err) = base_result {
-            warn!(
-                "failed to precache base thumbnail for {:?}: {}",
-                file_path, err
-            );
-        }
     }
     metrics.record_upsert_file(file_info.file_size, file_timer.elapsed());
 

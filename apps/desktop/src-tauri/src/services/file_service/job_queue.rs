@@ -13,6 +13,14 @@ use tokio::{
 
 use crate::models::file::ThumbSpec;
 
+/// Background job used to pre-render base thumbnails for file hashes.
+#[derive(Debug, Clone)]
+pub struct BaseThumbnailJob {
+    pub moa_id: String,
+    pub xxhs: String,
+    pub source_path: PathBuf,
+}
+
 /// Key used to track pending and inflight jobs.
 #[derive(Debug, Clone, Eq)]
 struct ThumbnailJobKey {
@@ -58,9 +66,17 @@ struct ThumbnailQueue {
     inflight: HashSet<ThumbnailJobKey>,
 }
 
+#[derive(Default)]
+struct BaseThumbnailQueue {
+    queue: VecDeque<BaseThumbnailJob>,
+    pending: HashSet<String>,
+    inflight: HashSet<String>,
+}
+
 /// Shared state for the thumbnail worker queue.
 pub struct ThumbnailWorkerState {
     pub queue: Mutex<ThumbnailQueue>,
+    pub base_queue: Mutex<BaseThumbnailQueue>,
     pub signal: OnceCell<mpsc::Sender<()>>,
 }
 
@@ -68,6 +84,7 @@ impl Default for ThumbnailWorkerState {
     fn default() -> Self {
         Self {
             queue: Mutex::new(ThumbnailQueue::default()),
+            base_queue: Mutex::new(BaseThumbnailQueue::default()),
             signal: OnceCell::new(),
         }
     }
@@ -107,6 +124,35 @@ pub async fn enqueue_jobs(mut jobs: Vec<ThumbnailJob>) {
     }
 }
 
+/// Queue a base thumbnail job if one is not already pending or in-flight.
+pub async fn enqueue_base_job(job: BaseThumbnailJob) {
+    let state = THUMBNAIL_WORKER_STATE.clone();
+
+    {
+        let mut queue = state.base_queue.lock().await;
+
+        if queue.inflight.contains(&job.xxhs) {
+            return;
+        }
+
+        if queue.pending.contains(&job.xxhs) {
+            if let Some(existing) =
+                queue.queue.iter_mut().find(|item| item.xxhs == job.xxhs)
+            {
+                *existing = job;
+            }
+            return;
+        }
+
+        queue.pending.insert(job.xxhs.clone());
+        queue.queue.push_back(job);
+    }
+
+    if let Some(tx) = state.signal.get() {
+        let _ = tx.try_send(());
+    }
+}
+
 /// Take the next job from the queue, prioritising high priority jobs.
 pub async fn take_next_job() -> Option<ThumbnailJob> {
     let mut queue = THUMBNAIL_WORKER_STATE.queue.lock().await;
@@ -126,4 +172,32 @@ pub async fn finish_job(job: &ThumbnailJob) {
     let key: ThumbnailJobKey = job.into();
     let mut queue = THUMBNAIL_WORKER_STATE.queue.lock().await;
     queue.inflight.remove(&key);
+}
+
+/// Take the next base thumbnail job from the queue.
+pub async fn take_next_base_job() -> Option<BaseThumbnailJob> {
+    let mut queue = THUMBNAIL_WORKER_STATE.base_queue.lock().await;
+    let job = queue.queue.pop_front();
+
+    if let Some(ref job) = job {
+        queue.pending.remove(&job.xxhs);
+        queue.inflight.insert(job.xxhs.clone());
+    }
+
+    job
+}
+
+/// Mark a base thumbnail job as finished.
+pub async fn finish_base_job(job: &BaseThumbnailJob) {
+    let mut queue = THUMBNAIL_WORKER_STATE.base_queue.lock().await;
+    queue.inflight.remove(&job.xxhs);
+}
+
+/// Cancel a pending base thumbnail job for the provided hash if it exists.
+pub async fn cancel_pending_base_job(hash: &str) {
+    let mut queue = THUMBNAIL_WORKER_STATE.base_queue.lock().await;
+
+    if queue.pending.remove(hash) {
+        queue.queue.retain(|job| job.xxhs != hash);
+    }
 }
