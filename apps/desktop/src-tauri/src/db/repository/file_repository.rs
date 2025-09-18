@@ -13,11 +13,9 @@ use crate::{
     utils::{date::get_now_date, identifier::get_unique_id},
 };
 
-/// Repository for file and folder persistence logic.
 pub struct FileRepository;
 
 impl FileRepository {
-    /// Create a mount entry linking a virtual folder node to a real folder.
     pub async fn create_virtual_folder_mount<'a, E>(
         executor: &mut E,
         virtual_node_id: String,
@@ -47,7 +45,6 @@ impl FileRepository {
         Ok(mount_id)
     }
 
-    /// Look up a real-folder identifier by normalized path components.
     pub async fn _find_folder_id<'a, E>(
         executor: &mut E,
         sroot_id: String,
@@ -73,7 +70,6 @@ impl FileRepository {
         Ok(folder_id)
     }
 
-    /// Create a virtual folder node under the specified parent.
     pub async fn create_virtual_folder<'a, E>(
         executor: &mut E,
         name: String,
@@ -106,7 +102,6 @@ impl FileRepository {
         })
     }
 
-    /// Upsert metadata for a real folder associated with a storage root.
     pub async fn upsert_real_folder<'a, E>(
         executor: &mut E,
         folder_info: &RealFolderData,
@@ -152,7 +147,6 @@ impl FileRepository {
         Ok(folder_id)
     }
 
-    /// Fetch a file-content identifier by xxHash digest.
     pub async fn find_file_content_id<'a, E>(
         executor: &mut E,
         xxh3_64: String,
@@ -169,7 +163,6 @@ impl FileRepository {
         Ok(id)
     }
 
-    /// Upsert file-content metadata and return its identifier.
     pub async fn upsert_file_content<'a, E>(
         executor: &mut E,
         file_info: &FileInfo,
@@ -213,7 +206,6 @@ impl FileRepository {
         Ok(file_content_id)
     }
 
-    /// Bind a file path to a file content record, marking it as active.
     pub async fn upsert_file_path_content_binding<'a, E>(
         executor: &mut E,
         file_path_id: &str,
@@ -249,7 +241,6 @@ impl FileRepository {
         Ok(new_id)
     }
 
-    /// Mark competing file-path bindings as unknown while keeping the winner matched.
     pub async fn set_other_path_content_binding_unknown<'a, E>(
         executor: &mut E,
         binding_id: &str,
@@ -276,7 +267,6 @@ impl FileRepository {
     }
 
     // -- file path --
-    /// Upsert a file-path row for the given file information.
     pub async fn insert_file_path<'a, E>(
         executor: &mut E,
         file_info: &FileInfo,
@@ -315,7 +305,6 @@ impl FileRepository {
         Ok(file_path_id)
     }
 
-    /// Fetch active file-path identifiers bound to the provided file content.
     pub async fn fetch_matched_file_path_ids<'a, E>(
         executor: &mut E,
         file_content_id: &str,
@@ -338,7 +327,6 @@ impl FileRepository {
         Ok(file_path_ids)
     }
 
-    /// Retrieve the cached absolute path for a real folder, if available.
     pub async fn fetch_folder_abs_path_cached<'a, E>(
         executor: &mut E,
         folder_id: &str,
@@ -363,7 +351,6 @@ impl FileRepository {
         Ok(abs_path_cached)
     }
 
-    /// Resolve the absolute file path for a stored file-path identifier.
     pub async fn fetch_file_abs_path_cached<'a, E>(
         executor: &mut E,
         file_path_id: &str,

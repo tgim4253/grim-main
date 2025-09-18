@@ -5149,7 +5149,6 @@ dependencies = [
  "tauri-plugin-os",
  "tauri-utils",
  "tokio",
- "tracing",
  "twox-hash",
  "uuid",
  "winapi 0.3.9",

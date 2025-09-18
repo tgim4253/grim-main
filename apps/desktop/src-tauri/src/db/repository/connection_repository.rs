@@ -1,13 +1,11 @@
 use anyhow::Result;
 use sqlx::{Executor, Sqlite};
 
-use crate::models::connection::{Connection, RelationType};
+use crate::models::connection::{Connection, EdgeType, RelationType};
 
-/// Persistence helpers for working with graph connections.
 pub struct ConnectionRepository;
 
 impl ConnectionRepository {
-    /// Load all connections associated with the provided node ids.
     pub async fn fetch_connections<'a, E>(
         executor: &mut E,
         ids: Vec<String>,
@@ -39,7 +37,6 @@ impl ConnectionRepository {
         Ok(connections)
     }
 
-    /// Insert a new connection edge between two nodes.
     pub async fn insert_connection<'a, E>(
         executor: &mut E,
         src_node_id: String,

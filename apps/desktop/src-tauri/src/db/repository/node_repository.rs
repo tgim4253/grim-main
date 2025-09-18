@@ -5,18 +5,16 @@ use std::{collections::HashSet, str::FromStr};
 use crate::{
     db::repository::connection_repository::ConnectionRepository,
     models::{
-        connection::RelationType,
+        connection::{EdgeType, RelationType},
         file::{FileContent, FileType, NodeFolder},
         node::{Node, NodeData, NodeKind},
     },
     utils::identifier::get_unique_id,
 };
 
-/// Repository responsible for loading and mutating node metadata.
 pub struct NodeRepository;
 
 impl NodeRepository {
-    /// Fetch the node identifier associated with a given file-content id.
     pub async fn fetch_node_id_by_fc_id<'a, E>(
         executor: &mut E,
         file_content_id: String,
@@ -37,8 +35,6 @@ impl NodeRepository {
 
         Ok(node_id)
     }
-
-    /// Load nodes for the provided set of kinds.
     pub async fn fetch_all_nodes_by_kind<'a, E>(
         executor: &mut E,
         kinds: HashSet<NodeKind>,
@@ -61,11 +57,7 @@ impl NodeRepository {
         Ok(rows)
     }
 
-    /// Fetch file node data for the specified node identifier.
-    pub async fn fetch_file_node_data<'a, E>(
-        executor: &mut E,
-        node_id: String,
-    ) -> Result<NodeData>
+    pub async fn fetch_file_node_data<'a, E>(executor: &mut E, node_id: String) -> Result<NodeData>
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
     {
@@ -111,7 +103,6 @@ impl NodeRepository {
         }))
     }
 
-    /// Fetch folder node data for the specified node identifier.
     pub async fn fetch_folder_node_data<'a, E>(
         executor: &mut E,
         node_id: String,
@@ -145,11 +136,7 @@ impl NodeRepository {
         }))
     }
 
-    /// Fetch node records and their data for the provided identifiers.
-    pub async fn fetch_nodes_by_ids<'a, E>(
-        executor: &mut E,
-        ids: Vec<String>,
-    ) -> Result<Vec<Node>>
+    pub async fn fetch_nodes_by_ids<'a, E>(executor: &mut E, ids: Vec<String>) -> Result<Vec<Node>>
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
     {
@@ -182,17 +169,12 @@ impl NodeRepository {
         for node in nodes.iter() {
             let kind = NodeKind::from_str(&node.kind)?; // propagate parse error if any
             let data = match kind {
-                NodeKind::Folder => Some(
-                    Self::fetch_folder_node_data(
-                        &mut *executor,
-                        node.id.clone(),
-                    )
-                    .await?,
-                ),
-                NodeKind::File => Some(
-                    Self::fetch_file_node_data(&mut *executor, node.id.clone())
-                        .await?,
-                ),
+                NodeKind::Folder => {
+                    Some(Self::fetch_folder_node_data(&mut *executor, node.id.clone()).await?)
+                }
+                NodeKind::File => {
+                    Some(Self::fetch_file_node_data(&mut *executor, node.id.clone()).await?)
+                }
                 _ => None,
             };
             out.push(Node {
@@ -260,7 +242,6 @@ impl NodeRepository {
         Ok(nodes)
     }
 
-    /// Retrieve all nodes that represent files.
     pub async fn fetch_file_nodes<'a, E>(executor: &mut E) -> Result<Vec<Node>>
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
@@ -326,12 +307,7 @@ impl NodeRepository {
         Ok(nodes)
     }
 
-    /// Insert a bare node record with the provided kind.
-    pub async fn insert_node<'a, E>(
-        executor: &mut E,
-        kind: NodeKind,
-        now: &str,
-    ) -> Result<String>
+    pub async fn insert_node<'a, E>(executor: &mut E, kind: NodeKind, now: &str) -> Result<String>
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
     {
@@ -379,8 +355,6 @@ impl NodeRepository {
 
         Ok(binding_id)
     }
-
-    /// Insert a row linking a folder node to folder metadata.
     pub async fn insert_node_folder_binding<'a, E>(
         executor: &mut E,
         node_id: String,
@@ -407,7 +381,6 @@ impl NodeRepository {
         Ok(folder_id)
     }
 
-    /// Create a new folder node under the provided parent node.
     pub async fn create_folder_node<'a, E>(
         executor: &mut E,
         parent_node_id: String,
@@ -419,8 +392,7 @@ impl NodeRepository {
     {
         let now = crate::utils::date::get_now_date();
 
-        let node_id =
-            Self::insert_node(executor, NodeKind::Folder, &now).await?;
+        let node_id = Self::insert_node(executor, NodeKind::Folder, &now).await?;
 
         Self::insert_node_folder_binding(
             executor,
@@ -431,18 +403,11 @@ impl NodeRepository {
         )
         .await?;
 
-        Self::create_folder_to_folder_edges(
-            executor,
-            parent_node_id,
-            node_id.clone(),
-            now,
-        )
-        .await?;
+        Self::create_folder_to_folder_edges(executor, parent_node_id, node_id.clone(), now).await?;
 
         Ok(node_id)
     }
 
-    /// Ensure a file node exists for the provided content identifier.
     pub async fn upsert_file_node<'a, E>(
         executor: &mut E,
         parent_node_id: String,
@@ -454,16 +419,11 @@ impl NodeRepository {
         let now = crate::utils::date::get_now_date();
 
         let node_id = if let Some(node_id) =
-            NodeRepository::fetch_node_id_by_fc_id(
-                executor,
-                file_content_id.clone(),
-            )
-            .await?
+            NodeRepository::fetch_node_id_by_fc_id(executor, file_content_id.clone()).await?
         {
             node_id
         } else {
-            let node_id =
-                Self::insert_node(executor, NodeKind::File, &now).await?;
+            let node_id = Self::insert_node(executor, NodeKind::File, &now).await?;
             Self::insert_node_file_binding(
                 executor,
                 node_id.clone(),
@@ -475,18 +435,12 @@ impl NodeRepository {
         };
 
         // todo: upsert containse_edges?
-        if let Err(e) = Self::create_folder_file_edges(
-            executor,
-            parent_node_id,
-            node_id,
-            now,
-        )
-        .await
-        {};
+        if let Err(e) = Self::create_folder_file_edges(executor, parent_node_id, node_id, now).await
+        {
+        };
 
         Ok(())
     }
-    /// Create bidirectional edges between parent and child folder nodes.
     async fn create_folder_to_folder_edges<'a, E>(
         executor: &mut E,
         parent_node_id: String,
@@ -518,7 +472,6 @@ impl NodeRepository {
         Ok(())
     }
 
-    /// Create bidirectional edges between a folder node and a file node.
     async fn create_folder_file_edges<'a, E>(
         executor: &mut E,
         folder_node_id: String,
