@@ -282,7 +282,7 @@ async fn process_job(app: &AppHandle, job: ThumbnailJob) -> Result<()> {
     let file_kind = infer::get_from_path(&source_path)
         .context("failed to read file")?
         .ok_or_else(|| anyhow!("unknown file type"))?;
-    if !infer::is_image(file_kind.mime_type().as_bytes()) {
+    if !file_kind.mime_type().starts_with("image/") {
         bail!("unsupported mime type for thumbnail generation");
     }
 
@@ -327,30 +327,42 @@ async fn process_job(app: &AppHandle, job: ThumbnailJob) -> Result<()> {
     let (target_width, target_height) = (job.spec.width, job.spec.height);
     let (output_buf, out_w, out_h) =
         task::spawn_blocking(move || -> (Vec<u8>, u32, u32) {
-            let (w, h) = image.dimensions();
             let target_w = target_width.max(1);
             let target_h = target_height.max(1);
+
             let rgba = image.to_rgba8();
             let (w, h) = rgba.dimensions();
 
-            let scale = ((target_w as f32 / w as f32)
-                .max(target_h as f32 / h as f32))
-            .min(1.0);
+            let target_ar = target_w as f32 / target_h as f32;
+            let src_ar = w as f32 / h as f32;
 
-            let nw = ((w as f32 * scale).round() as u32).max(1);
-            let nh = ((h as f32 * scale).round() as u32).max(1);
+            let (left, top, crop_w, crop_h) = if src_ar > target_ar {
+                let crop_w_f = (h as f32 * target_ar).round().max(1.0);
+                let crop_w = crop_w_f as u32;
+                let left = ((w.saturating_sub(crop_w)) / 2) as u32;
+                (left, 0u32, crop_w, h)
+            } else if src_ar < target_ar {
+                let crop_h_f = (w as f32 / target_ar).round().max(1.0);
+                let crop_h = crop_h_f as u32;
+                let top = ((h.saturating_sub(crop_h)) / 2) as u32;
+                (0u32, top, w, crop_h)
+            } else {
+                (0u32, 0u32, w, h)
+            };
 
-            let mut src_image =
+            let src_image =
                 Image::from_vec_u8(w, h, rgba.into_raw(), PixelType::U8x4)
                     .expect("Invalid source");
 
-            let crop_w = target_w.min(nw);
-            let crop_h = target_h.min(nh);
-            let x = (nw.saturating_sub(crop_w)) / 2;
-            let y = (nh.saturating_sub(crop_h)) / 2;
+            let scale_w = target_w as f32 / crop_w as f32;
+            let scale_h = target_h as f32 / crop_h as f32;
+            let scale = scale_w.min(scale_h).min(1.0).max(0.0);
+
+            let dst_w = ((crop_w as f32 * scale).round() as u32).max(1);
+            let dst_h = ((crop_h as f32 * scale).round() as u32).max(1);
 
             let mut dst_image =
-                Image::new(crop_w, crop_h, src_image.pixel_type());
+                Image::new(dst_w, dst_h, src_image.pixel_type());
 
             let mut resizer = Resizer::new();
             resizer
@@ -358,12 +370,18 @@ async fn process_job(app: &AppHandle, job: ThumbnailJob) -> Result<()> {
                     &src_image,
                     &mut dst_image,
                     &ResizeOptions::new()
-                        .crop(x as f64, y as f64, crop_w as f64, crop_h as f64)
+                        .crop(
+                            left as f64,
+                            top as f64,
+                            crop_w as f64,
+                            crop_h as f64,
+                        )
                         .resize_alg(ResizeAlg::Convolution(FilterType::Box)),
                 )
                 .expect("resize failed");
 
-            (dst_image.into_vec(), crop_w, crop_h)
+            let out = dst_image.buffer().to_vec();
+            (out, dst_w, dst_h)
         })
         .await?;
     let resize_elapsed = resize_start.elapsed();
