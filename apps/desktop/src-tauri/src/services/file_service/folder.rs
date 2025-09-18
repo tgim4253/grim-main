@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, bail, Context, Result};
 use async_recursion::async_recursion;
 use sqlx::{Sqlite, Transaction};
+use tauri::AppHandle;
 use tokio::fs;
+use tracing::warn;
 
 use crate::{
     db::repository::{
@@ -11,7 +13,7 @@ use crate::{
         sroot_repository::SrootRepository,
     },
     models::{
-        file::{FileInfo, FolderData, RealFolderData},
+        file::{FileInfo, FileType, FolderData, RealFolderData},
         node::Node,
     },
     services::{
@@ -21,7 +23,7 @@ use crate::{
     utils::{file_utils::file_mtime_epoch, path_utils::normalize_path},
 };
 
-use super::utils::check_is_hidden;
+use super::{thumbnail::ensure_base_thumbnail, utils::check_is_hidden};
 
 /// Create a new virtual folder inside a transaction.
 pub async fn create_folder(moa_id: String, data: FolderData) -> Result<Node> {
@@ -42,6 +44,7 @@ pub async fn create_folder(moa_id: String, data: FolderData) -> Result<Node> {
 
 /// Mount the first physical folder selected by the user into the virtual tree.
 pub async fn first_mount_folder(
+    app: AppHandle,
     moa_id: String,
     node: Node,
     path: String,
@@ -65,6 +68,8 @@ pub async fn first_mount_folder(
 
     upsert_folder(
         &mut tx,
+        &app,
+        &moa_id,
         real_folder_id.clone(),
         node.id,
         &norm_path,
@@ -92,6 +97,8 @@ pub async fn start_scan_job(
 #[async_recursion]
 async fn upsert_folder(
     tx: &mut Transaction<'_, Sqlite>,
+    app: &AppHandle,
+    moa_id: &str,
     parent_real_folder_id: String,
     parent_virtual_folder_id: String,
     abs_dir: &Path,
@@ -143,6 +150,8 @@ async fn upsert_folder(
         } else if file_type.is_file() {
             upsert_file_entry(
                 tx,
+                app,
+                moa_id,
                 &parent_real_folder_id,
                 &parent_virtual_folder_id,
                 &entry,
@@ -192,6 +201,8 @@ async fn upsert_folder(
 
             if let Err(e) = upsert_folder(
                 tx,
+                app,
+                moa_id,
                 child_real_folder_id,
                 child_vf.id,
                 &entry_path,
@@ -200,7 +211,7 @@ async fn upsert_folder(
             )
             .await
             {
-                tracing::warn!("upsert_folder error: {e}");
+                warn!("upsert_folder error: {e}");
             };
         }
     }
@@ -211,6 +222,8 @@ async fn upsert_folder(
 /// Upsert file metadata and associations for a single discovered entry.
 async fn upsert_file_entry(
     tx: &mut Transaction<'_, Sqlite>,
+    app: &AppHandle,
+    moa_id: &str,
     parent_real_folder_id: &str,
     parent_virtual_folder_id: &str,
     entry: &fs::DirEntry,
@@ -241,6 +254,22 @@ async fn upsert_file_entry(
         &file_content_id,
     )
     .await?;
+
+    if file_info.file_exists && file_info.kind_guess == FileType::Image {
+        if let Err(err) = ensure_base_thumbnail(
+            app,
+            moa_id,
+            &file_info.xxh3_64,
+            file_path.as_path(),
+        )
+        .await
+        {
+            warn!(
+                "failed to precache base thumbnail for {:?}: {}",
+                file_path, err
+            );
+        }
+    }
 
     Ok(())
 }
