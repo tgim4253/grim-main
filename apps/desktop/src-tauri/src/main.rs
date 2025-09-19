@@ -13,20 +13,24 @@ mod utils;
 use services::moa_services;
 use tokio::sync::mpsc;
 
+use tracing::error;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+
 use crate::services::{
     bootstrap_service::AppState,
-    file_service::{worker_loop, STATE},
+    file_service::{worker_loop, THUMBNAIL_WORKER_STATE},
 };
 
 fn main() {
-    // Print any startup errors to stderr so they surface in system logs.
-    if let Err(error) = run() {
-        eprintln!("failed to start tauri application: {error:?}");
-    }
-}
+    let filter = EnvFilter::try_from_default_env()
+        .or_else(|_| EnvFilter::try_new("info"))
+        .unwrap();
 
-/// Bootstraps the Tauri builder, wiring commands, plugins, and background tasks.
-fn run() -> tauri::Result<()> {
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(fmt::layer().with_target(true))
+        .init();
+
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             commands::moa::list_moas,
@@ -48,7 +52,10 @@ fn run() -> tauri::Result<()> {
             // Restore the last session if available, otherwise open the selector.
             match latest_moa {
                 Some(moa) => {
-                    app_launcher::grim::launch_moa(&app.handle(), moa.moa_id.clone())?;
+                    app_launcher::grim::launch_moa(
+                        &app.handle(),
+                        moa.moa_id.clone(),
+                    )?;
                 }
                 None => {
                     app_launcher::moa::launch_moa_selector(&app.handle())?;
