@@ -9,19 +9,7 @@ use crate::models::{
     file::{FileContent, NodeFolder},
 };
 
-/// Kind of node stored in the workspace graph.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    Type,
-    Hash,
-    Default,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Hash, Default)]
 #[sqlx(type_name = "TEXT")] // SQLite TEXT
 #[sqlx(rename_all = "lowercase")] // Folder → "folder"
 #[serde(rename_all = "lowercase")] // JSON 직렬화용(선택)
@@ -47,7 +35,6 @@ impl FromStr for NodeKind {
     }
 }
 
-/// Node record returned to the renderer.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Node {
     pub id: String,
@@ -57,14 +44,12 @@ pub struct Node {
     pub updated_at: String,
 }
 
-/// Associated data for a node depending on its kind.
 #[derive(Debug, Serialize, Deserialize)]
 pub enum NodeData {
     Folder(NodeFolder),
     File(FileContent),
 }
 
-/// Wrapper bundling nodes and their connections.
 #[derive(Debug, FromRow, Serialize)]
 pub struct NodeWithConnections {
     pub nodes: Vec<Node>,
