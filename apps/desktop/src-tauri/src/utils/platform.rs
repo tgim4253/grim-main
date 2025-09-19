@@ -1,6 +1,5 @@
 use crate::models::file::OsPlatform;
 
-/// Return the enumerated platform for the current build target.
 pub fn get_current_platfrom() -> OsPlatform {
     #[cfg(target_os = "windows")]
     let platform = OsPlatform::Windows;
@@ -11,11 +10,7 @@ pub fn get_current_platfrom() -> OsPlatform {
     #[cfg(target_os = "linux")]
     let platform = OsPlatform::Linux;
 
-    #[cfg(not(any(
-        target_os = "windows",
-        target_os = "macos",
-        target_os = "linux"
-    )))]
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     let platform = OsPlatform::Unknown;
 
     platform

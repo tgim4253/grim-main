@@ -1,5 +1,3 @@
-//! Repository modules encapsulating database access patterns.
-
 pub mod connection_repository;
 pub mod file_repository;
 pub mod graph_repository;
