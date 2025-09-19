@@ -1,3 +1,5 @@
+//! Backend services that power the desktop application.
+
 pub mod bootstrap_service;
 pub mod db;
 pub mod file_service;
