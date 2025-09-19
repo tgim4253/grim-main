@@ -10,6 +10,8 @@ mod models;
 mod services;
 mod utils;
 
+use std::sync::Arc;
+
 use services::moa_services;
 use tokio::sync::mpsc;
 use tracing::error;
@@ -20,7 +22,6 @@ use crate::services::{
     file_service::{worker_loop, THUMBNAIL_WORKER_STATE},
 };
 
-/// Entry point for the Grim desktop application.
 fn main() {
     let filter = EnvFilter::try_from_default_env()
         .or_else(|_| EnvFilter::try_new("info"))
@@ -47,13 +48,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
         .setup(|app| {
-            let moa = tauri::async_runtime::block_on(async {
-                moa_services::load_latest_moas(&app.handle()).await
-            })
-            .unwrap_or_else(|err| {
-                error!("Failed to load recent MOA: {err}");
-                None
-            });
+            let moa = moa_services::load_latest_moas(&app.handle());
 
             match moa {
                 Some(moa) => {
@@ -68,7 +63,7 @@ fn main() {
             }
 
             let (tx, rx) = mpsc::channel::<()>(64);
-            THUMBNAIL_WORKER_STATE.signal.set(tx).map_err(|_| {
+            STATE.tx.set(tx).map_err(|_| {
                 anyhow::anyhow!("thumbnail worker already initialized")
             })?;
             let app_handle = app.handle().clone();
