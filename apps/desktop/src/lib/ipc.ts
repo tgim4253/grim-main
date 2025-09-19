@@ -5,10 +5,10 @@ import { ThumbJobStatus, ThumbRequest, ThumbResponse } from '@tgim/types/file';
 const appWindow = getCurrentWindow();
 
 const windowControllerIpc = {
-  minimize() {
+  minimize: () => {
     appWindow.minimize();
   },
-  async maximize() {
+  maximize: async () => {
     const isMaximized = await appWindow.isMaximized();
     if (isMaximized) {
       await appWindow.unmaximize();
@@ -16,20 +16,24 @@ const windowControllerIpc = {
       await appWindow.maximize();
     }
   },
-  close() {
+  close: () => {
     appWindow.close();
   },
 };
 
 const moaIpc = {
-  async loadMoas() {
-    const a = (await invoke('list_moas')) as { name: string; path: string; moa_id: string }[];
-    return a;
+  loadMoas: async () => {
+    const response = (await invoke('list_moas')) as {
+      name: string;
+      path: string;
+      moa_id: string;
+    }[];
+    return response;
   },
-  async createMoa(data: {
+  createMoa: async (data: {
     name: string;
     path: string;
-  }): Promise<{ name: string; path: string; moaId: string }> {
+  }): Promise<{ name: string; path: string; moaId: string }> => {
     const response = (await invoke('create_moa', { moa: data })) as {
       name: string;
       path: string;
@@ -37,27 +41,27 @@ const moaIpc = {
     };
     return response;
   },
-  async openMoa(moaId: string) {
+  openMoa: async (moaId: string) => {
     await invoke('open_moa', { moaId });
   },
-  async bootsrapMoa(moaId: string): Promise<GraphResponse> {
+  bootsrapMoa: async (moaId: string): Promise<GraphResponse> => {
     const response = (await invoke('bootstrap_moa', { moaId })) as GraphResponse;
     return response;
   },
 };
 
 const graphIpc = {
-  createFolder(moaId: string, data: { name: string; path: string; parent_id: string }) {
+  createFolder: (moaId: string, data: { name: string; path: string; parent_id: string }) => {
     invoke('create_folder', { moaId, data });
   },
-  async getGraphOne(moaId: string, nodeId: string): Promise<GraphResponse> {
+  getGraphOne: async (moaId: string, nodeId: string): Promise<GraphResponse> => {
     const response = await invoke('get_graph_one', { moaId, nodeId });
     return response as GraphResponse;
   },
 };
 
 const fileIpc = {
-  async getThumbnails(moaId: String, data: ThumbRequest) {
+  getThumbnails: async (moaId: String, data: ThumbRequest) => {
     const response = await invoke('get_thumbnails', { data, moaId });
     return response as ThumbResponse;
   },
