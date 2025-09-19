@@ -21,6 +21,7 @@ use crate::services::{
     file_service::{worker_loop, THUMBNAIL_WORKER_STATE},
 };
 
+/// Entry point for the Grim desktop application.
 fn main() {
     let filter = EnvFilter::try_from_default_env()
         .or_else(|_| EnvFilter::try_new("info"))
@@ -47,7 +48,13 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
         .setup(|app| {
-            let latest_moa = moa_services::load_latest_moas(&app.handle());
+            let moa = tauri::async_runtime::block_on(async {
+                moa_services::load_latest_moas(&app.handle()).await
+            })
+            .unwrap_or_else(|err| {
+                error!("Failed to load recent MOA: {err}");
+                None
+            });
 
             // Restore the last session if available, otherwise open the selector.
             match latest_moa {
@@ -63,7 +70,7 @@ fn main() {
             }
 
             let (tx, rx) = mpsc::channel::<()>(64);
-            STATE.tx.set(tx).map_err(|_| {
+            THUMBNAIL_WORKER_STATE.signal.set(tx).map_err(|_| {
                 anyhow::anyhow!("thumbnail worker already initialized")
             })?;
             let app_handle = app.handle().clone();

@@ -1,55 +1,71 @@
 use crate::bootstrap;
 use crate::db::repository::connection_repository::ConnectionRepository;
 use crate::db::repository::node_repository::NodeRepository;
-use crate::models::file::StorageRootInfo;
-use crate::models::graph::GraphResponse;
 use crate::models::node::{NodeKind, NodeWithConnections};
 use crate::services::db::DB_MANAGER;
 use crate::services::storage_root::enumerate_mounted_root;
 use crate::services::{db, integrity, moa_services};
 use crate::utils::date::get_now_date;
-use crate::utils::identifier::{get_unique_id, IdType};
+use crate::utils::identifier::get_unique_id;
 use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
-use std::hash::Hash;
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::{Emitter, State};
 use tokio::sync::{Mutex, RwLock};
+use tracing::{error, info};
 
+/// Progress payload emitted to the renderer while bootstrapping a workspace.
 #[derive(Clone, Serialize)]
 struct ProgressEvent {
-    stage: Stage, // "Migrating", "RefreshingMounts", ...
-    percent: u8,  // 0..100 (best-effort)
+    /// Current pipeline stage ("Migrating", "RefreshingMounts", etc.).
+    stage: Stage,
+    /// Percentage completion (best-effort approximation).
+    percent: u8,
+    /// Optional human-readable note describing the action.
     note: Option<String>,
 }
 
+/// Individual stages that compose the bootstrap pipeline.
 #[derive(Clone, Serialize, Default)]
 pub enum Stage {
+    /// Running database migrations to ensure schema compatibility.
     Migrating,
+    /// Refreshing mounted storage roots to detect availability changes.
     RefreshingMounts,
+    /// Resolving anchor metadata and related relationships.
     ResolvingAnchors,
+    /// Performing the initial filesystem scan after bootstrap.
     InitialScan,
 
     #[default]
+    /// Bootstrap has completed successfully.
     Ready,
+    /// Bootstrap failed with an unrecoverable error.
     Error,
 }
 
+/// High-level bootstrap status shared with the renderer.
 #[derive(Clone, Default, Serialize)]
 pub struct AppStatus {
+    /// Current stage in the bootstrap pipeline.
     stage: Stage,
+    /// Percentage completion for the stage.
     percent: u8,
+    /// Most recent error message, if any.
     last_error: Option<String>,
 }
 
+/// Application state shared across bootstrap invocations.
 #[derive(Default, Clone)]
 pub struct AppState {
+    /// Cached bootstrap status keyed by Moa identifier.
     pub statuses: Arc<RwLock<HashMap<String, Arc<Mutex<AppStatus>>>>>,
 }
 
 impl AppState {
+    /// Fetch an existing bootstrap status for the given Moa id or insert a new entry.
     pub async fn get_or_insert_status(
         &self,
         moa_id: &str,
@@ -68,12 +84,9 @@ impl AppState {
         wr.insert(moa_id.to_string(), s.clone());
         s
     }
-    // pub async fn remove(&self, moa_id: &str) {
-    //     let mut wr = self.statuses.write().await;
-    //     wr.remove(moa_id);
-    // }
 }
 
+/// Spawn the asynchronous bootstrap pipeline for a given Moa workspace.
 pub async fn bootstrap_moa_service(
     app_handle: &tauri::AppHandle,
     state: &State<'_, AppState>,
@@ -90,8 +103,7 @@ pub async fn bootstrap_moa_service(
         )
         .await
         {
-            println!("Bootstrap failed: {}", e);
-            // set error status
+            error!("Bootstrap failed: {}", e);
             set_status(&state, &moa_id, Stage::Error, 0, Some(e.to_string()))
                 .await;
             emit(
@@ -108,6 +120,7 @@ pub async fn bootstrap_moa_service(
     Ok(())
 }
 
+/// Execute the bootstrap pipeline sequentially while updating progress.
 async fn run_bootstrap_pipeline(
     app: tauri::AppHandle,
     state: AppState,
@@ -124,7 +137,7 @@ async fn run_bootstrap_pipeline(
     )
     .await;
     apply_migrations(&moa_id).await?;
-    println!("Migrating took: {:?} ms", t0.elapsed().as_millis());
+    info!("Migrating took: {:?} ms", t0.elapsed().as_millis());
 
     let t1 = Instant::now();
     step(
@@ -137,7 +150,7 @@ async fn run_bootstrap_pipeline(
     )
     .await;
     ensure_mounted_volume(&moa_id).await?;
-    println!("RefreshingMounts took: {:?} ms", t1.elapsed().as_millis());
+    info!("RefreshingMounts took: {:?} ms", t1.elapsed().as_millis());
 
     step(&app, &state, &moa_id, Stage::ResolvingAnchors, 40, None).await;
 
@@ -149,6 +162,7 @@ async fn run_bootstrap_pipeline(
     Ok(())
 }
 
+/// Update status for the provided stage and emit a progress event.
 async fn step(
     app_handle: &tauri::AppHandle,
     state: &AppState,
@@ -170,6 +184,7 @@ async fn step(
     );
 }
 
+/// Persist the current progress into shared state if it has advanced.
 async fn set_status(
     state: &AppState,
     moa_id: &str,
@@ -186,6 +201,7 @@ async fn set_status(
     }
 }
 
+/// Emit a serialized progress event to the renderer.
 fn emit(
     app_handle: &tauri::AppHandle,
     moa_id: &str,
@@ -195,6 +211,7 @@ fn emit(
     let _ = app_handle.emit(&topic, payload);
 }
 
+/// Fetch the initial node graph needed by the renderer after bootstrap.
 pub async fn fetch_init_data_for_front(
     moa_id: String,
 ) -> Result<NodeWithConnections> {
@@ -219,6 +236,7 @@ pub async fn fetch_init_data_for_front(
     })
 }
 
+/// Ensure the workspace database is created and migrated before use.
 async fn apply_migrations(moa_id: &str) -> Result<()> {
     let moa =
         moa_services::MOA_DATA.read().unwrap().get_by_id(&moa_id).unwrap();
@@ -231,7 +249,8 @@ async fn apply_migrations(moa_id: &str) -> Result<()> {
         return Err(anyhow!("Moa Base Folder not found"));
     }
 
-    let _ = bootstrap::ensure_layout(&base).context("Failed to prepare .moa");
+    let _ =
+        bootstrap::ensure_layout(&base).await.context("Failed to prepare .moa");
 
     let pool = db::DB_MANAGER.get_or_open(&moa_id).await?;
 
@@ -245,6 +264,7 @@ async fn apply_migrations(moa_id: &str) -> Result<()> {
     Ok(())
 }
 
+/// Mark mounted storage roots as available and update cached metadata.
 async fn ensure_mounted_volume(moa_id: &str) -> Result<()> {
     let mounted = enumerate_mounted_root()?;
 
