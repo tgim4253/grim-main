@@ -48,7 +48,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
         .setup(|app| {
-            let moa = tauri::async_runtime::block_on(async {
+            let latest_moa = tauri::async_runtime::block_on(async {
                 moa_services::load_latest_moas(&app.handle()).await
             })
             .unwrap_or_else(|err| {
@@ -78,7 +78,6 @@ fn main() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())?;
-
-    Ok(())
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }
