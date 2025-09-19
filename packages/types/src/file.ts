@@ -1,4 +1,4 @@
-export type ThumbJobStatus = 'ready' | 'pending' | 'error';
+export type ThumbJobStatus = 'ready' | 'pending' | 'error' | 'missing';
 
 export type ThumbEntry = {
   status: ThumbJobStatus;

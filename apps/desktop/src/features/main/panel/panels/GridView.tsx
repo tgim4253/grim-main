@@ -1,15 +1,13 @@
-import { listen } from '@tauri-apps/api/event';
 import { useMoa } from '@tgim/hooks/useMoa';
 import { GridData, ImageItem } from '@tgim/types/grid';
-import { ipc } from '../../../../lib/ipc';
-import React, { useEffect, useMemo, useRef, useState, useCallback, CSSProperties } from 'react';
-import useThumbStore, { convertToThumbKey } from '@tgim/stores/thumbStore';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useThumb, type ThumbFetcher } from '@tgim/hooks/useThumb';
 import { ResizeMode } from '@tgim/types/file';
-import { useShallow } from 'zustand/shallow';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import Masonry from 'react-masonry-css';
 import { FixedSizeGrid as WindowGrid } from 'react-window';
 import { Button } from '@tgim/ui';
+import { makeThumbFetcher } from '../../../../hooks/thumbs';
 
 /* ---------------------------------------------
  * Helper Icon Components (unchanged)
@@ -67,17 +65,6 @@ type Layout = 'grid' | 'masonry';
 
 const SIZES: Size[] = ['small', 'medium', 'large'];
 const LAYOUTS: Layout[] = ['grid', 'masonry'];
-const MAX_ITEMS_PER_REQ = 100;
-const INITIAL_FETCH_COUNT = 50;
-
-// Debounce Hook (unchanged)
-function useDebouncedEffect(fn: () => void, deps: React.DependencyList, delay: number) {
-  useEffect(() => {
-    const handler = setTimeout(() => fn(), delay);
-    return () => clearTimeout(handler);
-  }, [fn, ...deps]);
-}
-
 // Visibility Hook (unchanged)
 function useVisibilityMap(rootRef: React.RefObject<HTMLElement>, overscanPx = 600) {
   const ioRef = useRef<IntersectionObserver | null>(null);
@@ -168,21 +155,14 @@ const GridView: React.FC<Props> = ({ gridData }) => {
   const [images] = useState(gridData.images);
 
   // Map for quick lookup by hash
-  const hashToImgMap = useMemo(() => {
-    const map: Record<string, ImageItem> = {};
-    images.forEach(img => (map[img.hash] = img));
-    return map;
-  }, [images]);
-
-  const { upsertThumb } = useThumbStore(
-    useShallow(state => ({
-      upsertThumb: state.upsert,
-    })),
-  );
-
   const scrollRef = useRef<HTMLDivElement>(null);
   // @ts-expect-error.
   const { visible, observe, unobserve } = useVisibilityMap(scrollRef, 800);
+
+  const [dpr] = useState(() =>
+    typeof window !== 'undefined' ? Math.min(2, Math.round(window.devicePixelRatio || 1)) : 1,
+  );
+  const thumbFetcher = useMemo(() => makeThumbFetcher(moaId), [moaId]);
 
   const thumbSize = useMemo(() => {
     switch (size) {
@@ -194,96 +174,6 @@ const GridView: React.FC<Props> = ({ gridData }) => {
         return 128;
     }
   }, [size]);
-
-  /* -------------------------------------------------
-   * Thumbnail fetcher
-   * NOTE: Prevent duplicate work by checking store.
-   * ------------------------------------------------- */
-  const fetchThumbnails = useCallback(
-    async (itemsToFetch: ImageItem[]) => {
-      if (moaId === null || itemsToFetch.length === 0) return;
-
-      const currentThumbs = useThumbStore.getState().byKey;
-
-      const toRequest = itemsToFetch
-        .map(img => {
-          const key = convertToThumbKey(img.hash, {
-            width: thumbSize,
-            height: thumbSize,
-            dpr: 1,
-            mode: ResizeMode.Original,
-          });
-          // Skip if already ready
-          if (currentThumbs[key]?.status === 'ready') return null;
-          return {
-            xxhs: img.hash,
-            specs: [
-              { width: thumbSize, height: thumbSize, dpr: 1, mode: ResizeMode.Original, key },
-            ],
-          };
-        })
-        .filter(Boolean) as any[];
-
-      if (toRequest.length === 0) return;
-
-      for (let i = 0; i < toRequest.length; i += MAX_ITEMS_PER_REQ) {
-        const chunk = toRequest.slice(i, i + MAX_ITEMS_PER_REQ);
-        try {
-          const responses = await ipc.file.getThumbnails(moaId, { items: chunk });
-          responses.items.forEach((item: any) => {
-            item.specs.forEach((spec: any) => {
-              upsertThumb(spec.thumb_key ?? spec.key, {
-                status: spec.status === 'hit' ? 'ready' : 'pending',
-                url: spec.status === 'hit' ? spec.url : undefined,
-                updatedAt: Date.now(),
-              });
-            });
-          });
-        } catch (error) {
-          console.error('Failed to fetch thumbnails:', error);
-        }
-      }
-    },
-    [moaId, thumbSize, upsertThumb],
-  );
-
-  // Stable ref to avoid stale closure
-  const stableFetchThumbnails = useRef(fetchThumbnails);
-  useEffect(() => {
-    stableFetchThumbnails.current = fetchThumbnails;
-  }, [fetchThumbnails]);
-
-  // Initial warm-up
-  useEffect(() => {
-    const initialItems = images.slice(0, INITIAL_FETCH_COUNT);
-    stableFetchThumbnails.current(initialItems);
-  }, [images]);
-
-  /* -------------------------------------------------
-   * Fetch for Masonry via IntersectionObserver
-   * (Grid uses react-window onItemsRendered; see below)
-   * ------------------------------------------------- */
-  const visibleItems = useMemo(() => {
-    return Object.keys(visible)
-      .filter(k => visible[k])
-      .map(hash => hashToImgMap[hash])
-      .filter(Boolean);
-  }, [visible, hashToImgMap]);
-
-  useDebouncedEffect(
-    () => {
-      if (layout === 'masonry' && visibleItems.length > 0) {
-        stableFetchThumbnails.current(visibleItems);
-      }
-    },
-    [visibleItems, layout],
-    120,
-  );
-
-  // Handler for grid layout to request thumbs by index ranges
-  const handleNeedThumbs = useCallback((items: ImageItem[]) => {
-    if (items.length) stableFetchThumbnails.current(items);
-  }, []);
 
   const gridItemSizeClass = useMemo(() => {
     if (layout === 'masonry') {
@@ -309,12 +199,7 @@ const GridView: React.FC<Props> = ({ gridData }) => {
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-1 rounded-full border border-border bg-surface-muted p-1 shadow-inner">
             {SIZES.map(s => (
-              <Button
-                key={s}
-                variant="toggle"
-                active={size === s}
-                onClick={() => setSize(s)}
-              >
+              <Button key={s} variant="toggle" active={size === s} onClick={() => setSize(s)}>
                 {s.charAt(0).toUpperCase() + s.slice(1)}
               </Button>
             ))}
@@ -355,7 +240,8 @@ const GridView: React.FC<Props> = ({ gridData }) => {
             unobserve={() => {}}
             selectMode={selectMode}
             thumbSize={thumbSize}
-            onNeedThumbs={handleNeedThumbs}
+            fetcher={thumbFetcher}
+            dpr={dpr}
           />
         ) : (
           <MasonryLayout
@@ -366,6 +252,9 @@ const GridView: React.FC<Props> = ({ gridData }) => {
             observe={observe}
             unobserve={unobserve}
             thumbSize={thumbSize}
+            fetcher={thumbFetcher}
+            dpr={dpr}
+            visibleMap={visible}
           />
         )}
       </div>
@@ -389,7 +278,8 @@ function VirtualGridLayout({
   unobserve, // no-op in grid path
   selectMode,
   thumbSize,
-  onNeedThumbs,
+  fetcher,
+  dpr,
 }: {
   images: ImageItem[];
   size: Size;
@@ -398,7 +288,8 @@ function VirtualGridLayout({
   unobserve: (el: Element | null) => void;
   selectMode: boolean;
   thumbSize: number;
-  onNeedThumbs: (items: ImageItem[]) => void;
+  fetcher: ThumbFetcher;
+  dpr: number;
 }) {
   const itemW = size === 'small' ? 96 : size === 'large' ? 192 : 144;
   const itemH = itemW;
@@ -410,36 +301,6 @@ function VirtualGridLayout({
 
   const cols = Math.max(1, Math.floor((width + gap) / (itemW + gap)));
   const rowCount = Math.ceil(images.length / cols);
-
-  // Request thumbs for rows/cols in overscan range (debounced via RAF)
-  const rafRef = useRef<number | null>(null);
-  const pendingRangeRef = useRef<{ rs: number; re: number } | null>(null);
-
-  const scheduleFetchForRange = useCallback(
-    (rs: number, re: number) => {
-      // Merge with pending range to reduce calls
-      if (!pendingRangeRef.current) {
-        pendingRangeRef.current = { rs, re };
-      } else {
-        pendingRangeRef.current = {
-          rs: Math.min(pendingRangeRef.current.rs, rs),
-          re: Math.max(pendingRangeRef.current.re, re),
-        };
-      }
-      if (rafRef.current != null) return;
-      rafRef.current = requestAnimationFrame(() => {
-        const r = pendingRangeRef.current;
-        rafRef.current = null;
-        pendingRangeRef.current = null;
-        if (!r) return;
-        const startIdx = r.rs * cols;
-        const endIdxExclusive = Math.min(images.length, (r.re + 1) * cols);
-        const slice = images.slice(startIdx, endIdxExclusive);
-        onNeedThumbs(slice);
-      });
-    },
-    [cols, images, onNeedThumbs],
-  );
 
   const Cell = useCallback(
     ({ columnIndex, rowIndex, style }: any) => {
@@ -464,11 +325,27 @@ function VirtualGridLayout({
             observe={observe}
             unobserve={unobserve}
             thumbSize={thumbSize}
+            fetcher={fetcher}
+            dpr={dpr}
+            isVisible
           />
         </div>
       );
     },
-    [cols, images, itemW, itemH, onItemClick, selectMode, observe, unobserve, gap, thumbSize],
+    [
+      cols,
+      images,
+      itemW,
+      itemH,
+      onItemClick,
+      selectMode,
+      observe,
+      unobserve,
+      gap,
+      thumbSize,
+      fetcher,
+      dpr,
+    ],
   );
 
   return (
@@ -483,10 +360,6 @@ function VirtualGridLayout({
           width={width}
           overscanRowCount={5} // ↑ a bit more generous overscan to hide fetch latency
           overscanColumnCount={1}
-          onItemsRendered={({ overscanRowStartIndex, overscanRowStopIndex }) => {
-            // Proactively fetch thumbnails for overscanned rows
-            scheduleFetchForRange(overscanRowStartIndex, overscanRowStopIndex);
-          }}
         >
           {Cell}
         </WindowGrid>
@@ -507,7 +380,21 @@ function MasonryLayout({
   observe,
   unobserve,
   thumbSize,
-}: any) {
+  fetcher,
+  dpr,
+  visibleMap,
+}: {
+  images: ImageItem[];
+  onItemClick: (img: ImageItem) => void;
+  sizeClass: string;
+  selectMode: boolean;
+  observe: (el: Element | null, key: string) => void;
+  unobserve: (el: Element | null) => void;
+  thumbSize: number;
+  fetcher: ThumbFetcher;
+  dpr: number;
+  visibleMap: Record<string, boolean>;
+}) {
   const breakpointColumnsObj = { default: 6, 1536: 6, 1280: 5, 1024: 4, 768: 3, 640: 2 };
   return (
     <Masonry
@@ -526,6 +413,9 @@ function MasonryLayout({
             observe={observe}
             unobserve={unobserve}
             thumbSize={thumbSize}
+            fetcher={fetcher}
+            dpr={dpr}
+            isVisible={!!visibleMap[img.hash]}
           />
         </div>
       ))}
@@ -545,6 +435,9 @@ type ThumbCardProps = {
   unobserve: (el: Element | null) => void;
   thumbSize: number;
   sizeClass?: string;
+  fetcher: ThumbFetcher;
+  dpr: number;
+  isVisible?: boolean;
 };
 
 const ThumbCardComponent: React.FC<ThumbCardProps> = ({
@@ -556,29 +449,42 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
   unobserve,
   sizeClass,
   thumbSize,
+  fetcher,
+  dpr,
+  isVisible = false,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [loaded, setLoaded] = useState(false);
 
-  const key = useMemo(
-    () =>
-      convertToThumbKey(img.hash, {
-        width: thumbSize,
-        height: thumbSize,
-        dpr: 1,
-        mode: ResizeMode.Original,
-      }),
-    [img.hash, thumbSize],
+  const spec = useMemo(
+    () => ({
+      width: thumbSize,
+      height: layout === 'masonry' ? 0 : thumbSize,
+      dpr,
+      mode: ResizeMode.Original,
+    }),
+    [thumbSize, layout, dpr],
   );
 
-  const { entry } = useThumbStore(useShallow(state => ({ entry: state.byKey[key] })));
+  const { url, status, refetch } = useThumb(img.hash, spec, {
+    fetcher,
+    attach: true,
+    retryOnError: true,
+    autoFetch: layout !== 'masonry',
+  });
+
   const [stableSrc, setStableSrc] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    if (entry?.status === 'ready' && entry.url) {
-      setStableSrc(convertFileSrc(entry.url));
+    if (!url) {
+      setStableSrc(undefined);
+      setLoaded(false);
+      return;
     }
-  }, [entry]);
+    const resolved = url.startsWith('blob:') ? url : convertFileSrc(url);
+    setStableSrc(resolved);
+    setLoaded(false);
+  }, [url]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -587,13 +493,36 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
     return () => unobserve(el);
   }, [img.hash, observe, unobserve]);
 
+  useEffect(() => {
+    if (layout !== 'masonry') return;
+    if (!isVisible) return;
+    if (status === 'ready' || status === 'pending') return;
+    refetch();
+  }, [layout, isVisible, status, refetch]);
+
   const handleImageLoad = useCallback(() => setLoaded(true), []);
   const handleCardClick = useCallback(() => onClick(img), [onClick, img]);
+
+  const containerClasses = `group relative w-full ${
+    layout === 'masonry' ? 'h-auto' : 'h-full'
+  } overflow-hidden rounded-lg border border-border bg-surface shadow-sm transition-all duration-200 hover:border-accent hover:shadow-lg hover:-translate-y-1 cursor-pointer ${
+    sizeClass ?? ''
+  }`;
+
+  const imageWrapperClass = `relative w-full ${
+    layout === 'masonry' ? 'h-auto min-h-[6rem]' : 'h-full'
+  }`;
+
+  const imageClass = `w-full ${
+    layout === 'masonry' ? 'h-auto' : 'h-full'
+  } object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`;
+
+  const showPlaceholder = !stableSrc || !loaded;
 
   return (
     <div
       ref={containerRef}
-      className={`group relative w-full h-full overflow-hidden rounded-lg border border-border bg-surface shadow-sm transition-all duration-200 hover:border-accent hover:shadow-lg hover:-translate-y-1 cursor-pointer ${sizeClass ?? ''}`}
+      className={containerClasses}
       onClick={handleCardClick}
       role="button"
       tabIndex={0}
@@ -607,13 +536,13 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
           />
         </div>
       )}
-      <div className="relative w-full h-full">
-        {!stableSrc && <div className="w-full h-full bg-surface-muted animate-pulse" />}
+      <div className={imageWrapperClass}>
+        {showPlaceholder && <div className="w-full h-full bg-surface-muted animate-pulse" />}
         {stableSrc && (
           <img
             src={stableSrc}
             alt={img.name}
-            className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+            className={imageClass}
             onLoad={handleImageLoad}
             loading="lazy"
             decoding="async"

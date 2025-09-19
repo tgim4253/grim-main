@@ -3,11 +3,14 @@ import { Connection, GraphConnection, GraphData } from '@tgim/types/graph';
 import { NodeRenderer, clearNodeSpriteCaches, getGraphPalette } from '@tgim/ui/index';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d';
-import { useShallow } from 'zustand/shallow';
 import * as d3 from 'd3-force';
-import useThumbStore from '@tgim/stores/thumbStore';
+import useThumbStore, { convertToThumbKey } from '@tgim/stores/thumbStore';
 import { useMoa } from '@tgim/hooks/useMoa';
 import { useTheme } from '../../../../theme/ThemeProvider';
+import { prefetchThumbs } from '@tgim/hooks/useThumb';
+import { ResizeMode } from '@tgim/types/file';
+import { makeThumbFetcher } from '../../../../hooks/thumbs';
+import { useShallow } from 'zustand/shallow';
 
 interface Props {
   graphData: GraphData;
@@ -45,13 +48,6 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
       }
     };
   }, []);
-  const { upsertThumb, thumb } = useThumbStore(
-    useShallow(s => ({
-      upsertThumb: s.upsert,
-      thumb: s.byKey,
-    })),
-  );
-
   const nodesById = useMemo(() => {
     if (!graphData) return {};
     const nodesById = Object.fromEntries(graphData.nodes.map(node => [node.id, node]));
@@ -67,12 +63,42 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
   }, [graphData.nodes]);
   const { moaId } = useMoa(location);
 
+  const [dpr] = useState(() =>
+    typeof window !== 'undefined' ? Math.min(2, Math.round(window.devicePixelRatio || 1)) : 1,
+  );
+  const thumbFetcher = useMemo(() => makeThumbFetcher(moaId), [moaId]);
+
   useEffect(() => {
-    graphData.nodes.forEach(node => {
-      if (node.type == 'image' && !node.url) {
-      }
+    if (!moaId) {
+      return;
+    }
+    const imageNodes = graphData.nodes.filter(node => node.type === 'image' && (node as any).hash);
+    if (imageNodes.length === 0) {
+      return;
+    }
+
+    imageNodes.forEach(node => {
+      const hash = (node as any).hash;
+      if (!hash) return;
+      node.thumbKey = convertToThumbKey(hash, {
+        width: 64,
+        height: 64,
+        dpr,
+        mode: ResizeMode.Original,
+      });
     });
-  }, [moaId, graphData.nodes]);
+
+    void prefetchThumbs(
+      imageNodes.map(node => ({
+        hash: (node as any).hash,
+        spec: { width: 64, height: 64, dpr, mode: ResizeMode.Original },
+      })),
+      thumbFetcher,
+      { attach: true },
+    ).then(() => {
+      fgRef.current?.refresh();
+    });
+  }, [graphData.nodes, thumbFetcher, dpr, moaId]);
 
   const GAP = 90;
   const LEAF_OFFSET = 10;
@@ -135,6 +161,18 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
     });
     setPrunedTree(getPrunedTree());
   };
+
+  useEffect(() => {
+    const unsubscribe = useThumbStore.subscribe(
+      state => state.lru,
+      () => {
+        fgRef.current?.refresh();
+      },
+    );
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const { openNode } = usePanelsStore(useShallow(s => ({ openNode: s.addPanelWithoutContainer })));
   useEffect(() => {

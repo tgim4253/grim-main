@@ -3,6 +3,8 @@
 // =========================
 
 import { GraphNodeType } from '@tgim/types/graph';
+import useThumbStore from '@tgim/stores/thumbStore';
+import { convertFileSrc } from '@tauri-apps/api/core';
 
 type GraphPalette = {
   label: string;
@@ -137,9 +139,7 @@ ensurePaletteObservers();
 const getGraphPaletteInternal = () => graphPalette;
 
 const colorParsingCtx =
-  typeof document !== 'undefined'
-    ? document.createElement('canvas').getContext('2d')
-    : null;
+  typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
 
 const normalizeColor = (value: string) => {
   if (!colorParsingCtx) return value;
@@ -353,7 +353,21 @@ function drawLabelCached(ctx: CanvasRenderingContext2D, node: NodeProp) {
 // =========================
 
 function resolveImageSrc(_node: NodeProp): string | undefined {
-  // TODO: Implement project-specific mapping from node payload to URL
+  const node: any = _node;
+  const store = useThumbStore.getState();
+  const key: string | undefined = node.thumbKey;
+  if (key) {
+    const path = store.getThumbPathByKey(key);
+    if (path) {
+      return path.startsWith('blob:') ? path : convertFileSrc(path);
+    }
+  }
+
+  const directUrl: string | undefined = node.url;
+  if (typeof directUrl === 'string' && directUrl.length > 0) {
+    return directUrl.startsWith('blob:') ? directUrl : convertFileSrc(directUrl);
+  }
+
   return undefined;
 }
 
