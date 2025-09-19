@@ -45,6 +45,65 @@ pub struct FolderData {
     pub name: String,
     pub path: Option<String>,
     pub parent_id: String,
+    pub selection: Option<FolderSelection>,
+}
+
+/// Describes the folder/file-type filters chosen by the user before import.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderSelection {
+    #[serde(default)]
+    pub entries: Vec<FolderSelectionEntry>,
+}
+
+/// Specific folder override provided by the user.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderSelectionEntry {
+    pub relative_path: String,
+    pub include: bool,
+    #[serde(default)]
+    pub file_types: Option<Vec<FileType>>,
+}
+
+/// Aggregated file statistics grouped by file type.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderPreviewFileStat {
+    pub file_type: FileType,
+    pub count: u64,
+    pub bytes: u64,
+}
+
+/// Preview information about a folder and its descendants.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderPreviewNode {
+    pub name: String,
+    pub path: String,
+    pub relative_path: String,
+    pub total_files: u64,
+    pub total_bytes: u64,
+    pub file_stats: Vec<FolderPreviewFileStat>,
+    pub children: Vec<FolderPreviewNode>,
+}
+
+/// Summary of the entire preview tree.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderPreviewSummary {
+    pub total_folders: u64,
+    pub total_files: u64,
+    pub total_bytes: u64,
+    pub file_type_totals: Vec<FolderPreviewFileStat>,
+}
+
+/// Full preview payload returned to the renderer before import.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderPreview {
+    pub root: FolderPreviewNode,
+    pub summary: FolderPreviewSummary,
 }
 
 /// Supported operating systems for storage roots.

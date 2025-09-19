@@ -196,16 +196,18 @@ export const FileTree = () => {
         <Modal onClose={() => setIsFolderModal(false)} className="bg-modal-bg">
           <NewFolderModal
             onClose={() => setIsFolderModal(false)}
-            onSubmit={d => {
+            onSubmit={async d => {
               if (!moaId) return;
               try {
-                ipc.graph.createFolder(moaId, {
+                await ipc.graph.createFolder(moaId, {
                   name: d.name,
                   path: d.path,
                   parent_id: optionNode?.id ?? 'root',
+                  selection: d.selection,
                 });
               } catch (err) {
                 console.error(err);
+                throw err;
               }
             }}
           />

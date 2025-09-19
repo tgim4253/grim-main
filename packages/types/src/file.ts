@@ -1,3 +1,5 @@
+import { FileType } from './graph';
+
 export type ThumbJobStatus = 'ready' | 'pending' | 'error';
 
 export type ThumbEntry = {
@@ -62,4 +64,49 @@ export interface ThumbResInfo {
 
 export interface ThumbResponse {
   items: ThumbResInfo[];
+}
+
+export interface FolderPreviewFileStat {
+  fileType: FileType;
+  count: number;
+  bytes: number;
+}
+
+export interface FolderPreviewNode {
+  name: string;
+  path: string;
+  relativePath: string;
+  totalFiles: number;
+  totalBytes: number;
+  fileStats: FolderPreviewFileStat[];
+  children: FolderPreviewNode[];
+}
+
+export interface FolderPreviewSummary {
+  totalFolders: number;
+  totalFiles: number;
+  totalBytes: number;
+  fileTypeTotals: FolderPreviewFileStat[];
+}
+
+export interface FolderPreview {
+  root: FolderPreviewNode;
+  summary: FolderPreviewSummary;
+}
+
+export interface FolderSelectionEntry {
+  relativePath: string;
+  include: boolean;
+  fileTypes?: FileType[];
+}
+
+export interface FolderSelection {
+  entries: FolderSelectionEntry[];
+}
+
+export interface CreateFolderPayload {
+  name: string;
+  path: string;
+  parent_id: string;
+  selection?: FolderSelection;
 }
