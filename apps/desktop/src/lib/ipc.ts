@@ -8,10 +8,7 @@ const appWindow = getCurrentWindow();
 const windowControllerIpc = {
   minimize: async () => {
     await appWindow.minimize();
-  minimize: () => {
-    appWindow.minimize();
   },
-  maximize: async () => {
   maximize: async () => {
     const isMaximized = await appWindow.isMaximized();
     if (isMaximized) {
@@ -22,8 +19,6 @@ const windowControllerIpc = {
   },
   close: async () => {
     await appWindow.close();
-  close: () => {
-    appWindow.close();
   },
 };
 
@@ -45,6 +40,7 @@ const moaIpc = {
       path: string;
       moaId: string;
     };
+    return response;
   },
   openMoa: async (moaId: string) => {
     await invoke('open_moa', { moaId });
