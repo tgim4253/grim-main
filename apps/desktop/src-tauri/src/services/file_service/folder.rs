@@ -1,9 +1,14 @@
-use std::path::{Path, PathBuf};
-
 use anyhow::{anyhow, bail, Context, Result};
 use async_recursion::async_recursion;
 use sqlx::{Sqlite, Transaction};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    time::{Duration, Instant},
+};
+use tauri::AppHandle;
 use tokio::fs;
+use tracing::{info, warn};
 
 use crate::{
     db::repository::{
@@ -11,7 +16,7 @@ use crate::{
         sroot_repository::SrootRepository,
     },
     models::{
-        file::{FileInfo, FolderData, RealFolderData},
+        file::{FileInfo, FileType, FolderData, RealFolderData},
         node::Node,
     },
     services::{
@@ -21,7 +26,139 @@ use crate::{
     utils::{file_utils::file_mtime_epoch, path_utils::normalize_path},
 };
 
-use super::utils::check_is_hidden;
+use super::{
+    job_queue::{enqueue_base_job, BaseThumbnailJob},
+    utils::check_is_hidden,
+};
+
+#[derive(Default)]
+struct UpsertFolderMetrics {
+    total_elapsed: Duration,
+    folder_creation: Duration,
+    folder_creation_count: u64,
+    tree_scanning: Duration,
+    tree_scanning_count: u64,
+    upsert_file: Duration,
+    upsert_file_count: u64,
+    file_size_buckets: HashMap<FileSizeBucket, BucketStats>,
+}
+
+impl UpsertFolderMetrics {
+    fn record_folder_creation(&mut self, elapsed: Duration) {
+        self.folder_creation += elapsed;
+        self.folder_creation_count += 1;
+    }
+
+    fn record_tree_scanning(&mut self, elapsed: Duration) {
+        self.tree_scanning += elapsed;
+        self.tree_scanning_count += 1;
+    }
+
+    fn record_upsert_file(&mut self, size: Option<i64>, elapsed: Duration) {
+        self.upsert_file += elapsed;
+        self.upsert_file_count += 1;
+
+        let bucket = FileSizeBucket::from_size(size);
+        let entry = self
+            .file_size_buckets
+            .entry(bucket)
+            .or_insert_with(BucketStats::default);
+        entry.duration += elapsed;
+        entry.count += 1;
+    }
+
+    fn log(&self, root_dir: &Path) {
+        let mut bucket_entries: Vec<_> =
+            self.file_size_buckets.iter().collect();
+        bucket_entries.sort_by_key(|(bucket, _)| bucket.order());
+        let bucket_summary = bucket_entries
+            .into_iter()
+            .map(|(bucket, stats)| {
+                format!(
+                    "{}: {}ms/{}",
+                    bucket.label(),
+                    stats.duration.as_millis(),
+                    stats.count
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let bucket_summary = if bucket_summary.is_empty() {
+            "none".to_string()
+        } else {
+            bucket_summary
+        };
+
+        info!(
+            "Upsert Folder Metrics
+                dir                : {}
+                total_ms           : {}
+                tree_scan          : {} ms ({} runs)
+                folder_creation    : {} ms ({} runs)
+                upsert_file        : {} ms ({} runs)
+                file_size_buckets  : {}
+            ",
+            root_dir.display(),
+            self.total_elapsed.as_millis(),
+            self.tree_scanning.as_millis(),
+            self.tree_scanning_count,
+            self.folder_creation.as_millis(),
+            self.folder_creation_count,
+            self.upsert_file.as_millis(),
+            self.upsert_file_count,
+            bucket_summary,
+        );
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum FileSizeBucket {
+    Unknown,
+    UpTo1Mb,
+    OneToTenMb,
+    TenToHundredMb,
+    OverHundredMb,
+}
+
+impl FileSizeBucket {
+    fn from_size(size: Option<i64>) -> Self {
+        match size {
+            None => FileSizeBucket::Unknown,
+            Some(bytes) if bytes < 1_000_000 => FileSizeBucket::UpTo1Mb,
+            Some(bytes) if bytes < 10_000_000 => FileSizeBucket::OneToTenMb,
+            Some(bytes) if bytes < 100_000_000 => {
+                FileSizeBucket::TenToHundredMb
+            }
+            Some(_) => FileSizeBucket::OverHundredMb,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            FileSizeBucket::Unknown => "unknown",
+            FileSizeBucket::UpTo1Mb => "<1MB",
+            FileSizeBucket::OneToTenMb => "1-10MB",
+            FileSizeBucket::TenToHundredMb => "10-100MB",
+            FileSizeBucket::OverHundredMb => ">=100MB",
+        }
+    }
+
+    fn order(self) -> u8 {
+        match self {
+            FileSizeBucket::Unknown => 0,
+            FileSizeBucket::UpTo1Mb => 1,
+            FileSizeBucket::OneToTenMb => 2,
+            FileSizeBucket::TenToHundredMb => 3,
+            FileSizeBucket::OverHundredMb => 4,
+        }
+    }
+}
+
+#[derive(Default)]
+struct BucketStats {
+    duration: Duration,
+    count: u64,
+}
 
 /// Create a new virtual folder inside a transaction.
 pub async fn create_folder(moa_id: String, data: FolderData) -> Result<Node> {
@@ -42,6 +179,7 @@ pub async fn create_folder(moa_id: String, data: FolderData) -> Result<Node> {
 
 /// Mount the first physical folder selected by the user into the virtual tree.
 pub async fn first_mount_folder(
+    app: AppHandle,
     moa_id: String,
     node: Node,
     path: String,
@@ -65,6 +203,8 @@ pub async fn first_mount_folder(
 
     upsert_folder(
         &mut tx,
+        &app,
+        &moa_id,
         real_folder_id.clone(),
         node.id,
         &norm_path,
@@ -89,17 +229,54 @@ pub async fn start_scan_job(
 }
 
 /// Recursively upsert folder and file information.
-#[async_recursion]
 async fn upsert_folder(
     tx: &mut Transaction<'_, Sqlite>,
+    app: &AppHandle,
+    moa_id: &str,
     parent_real_folder_id: String,
     parent_virtual_folder_id: String,
     abs_dir: &Path,
     recursive: bool,
     make_virtual_folder: Option<bool>,
 ) -> Result<()> {
+    let mut metrics = UpsertFolderMetrics::default();
+    let total_timer = Instant::now();
+
+    upsert_folder_impl(
+        tx,
+        app,
+        moa_id,
+        parent_real_folder_id,
+        parent_virtual_folder_id,
+        abs_dir,
+        recursive,
+        make_virtual_folder,
+        &mut metrics,
+    )
+    .await?;
+
+    metrics.total_elapsed = total_timer.elapsed();
+    metrics.log(abs_dir);
+
+    Ok(())
+}
+
+/// Internal recursive implementation that accumulates metrics across the traversal.
+#[async_recursion]
+async fn upsert_folder_impl(
+    tx: &mut Transaction<'_, Sqlite>,
+    app: &AppHandle,
+    moa_id: &str,
+    parent_real_folder_id: String,
+    parent_virtual_folder_id: String,
+    abs_dir: &Path,
+    recursive: bool,
+    make_virtual_folder: Option<bool>,
+    metrics: &mut UpsertFolderMetrics,
+) -> Result<()> {
     let make_vf = make_virtual_folder.unwrap_or(true);
 
+    let tree_scan_timer = Instant::now();
     let mut dir = fs::read_dir(abs_dir)
         .await
         .with_context(|| format!("failed to read_dir {:?}", abs_dir))?;
@@ -130,6 +307,7 @@ async fn upsert_folder(
             if recursive {
                 folder_entries.push((entry_path, name));
             } else if make_vf {
+                let folder_timer = Instant::now();
                 FileRepository::create_virtual_folder(
                     tx.as_mut(),
                     name,
@@ -139,13 +317,17 @@ async fn upsert_folder(
                 .with_context(|| {
                     format!("create_virtual_folder failed for {:?}", entry_path)
                 })?;
+                metrics.record_folder_creation(folder_timer.elapsed());
             }
         } else if file_type.is_file() {
             upsert_file_entry(
                 tx,
+                app,
+                moa_id,
                 &parent_real_folder_id,
                 &parent_virtual_folder_id,
                 &entry,
+                metrics,
             )
             .await
             .with_context(|| {
@@ -153,6 +335,7 @@ async fn upsert_folder(
             })?;
         }
     }
+    metrics.record_tree_scanning(tree_scan_timer.elapsed());
 
     let sroot_id: String = sqlx::query_scalar(
         "SELECT storage_root_id FROM real_folder\n                     WHERE id = ?",
@@ -165,6 +348,7 @@ async fn upsert_folder(
 
     if recursive {
         for (entry_path, name) in folder_entries {
+            let folder_timer = Instant::now();
             let child_vf = FileRepository::create_virtual_folder(
                 tx.as_mut(),
                 name.clone(),
@@ -189,18 +373,22 @@ async fn upsert_folder(
             .with_context(|| {
                 format!("mount vf<->rf failed for {:?}", entry_path)
             })?;
+            metrics.record_folder_creation(folder_timer.elapsed());
 
-            if let Err(e) = upsert_folder(
+            if let Err(e) = upsert_folder_impl(
                 tx,
+                app,
+                moa_id,
                 child_real_folder_id,
                 child_vf.id,
                 &entry_path,
                 recursive,
                 Some(make_vf),
+                metrics,
             )
             .await
             {
-                tracing::warn!("upsert_folder error: {e}");
+                warn!("upsert_folder error: {e}");
             };
         }
     }
@@ -211,10 +399,14 @@ async fn upsert_folder(
 /// Upsert file metadata and associations for a single discovered entry.
 async fn upsert_file_entry(
     tx: &mut Transaction<'_, Sqlite>,
+    app: &AppHandle,
+    moa_id: &str,
     parent_real_folder_id: &str,
     parent_virtual_folder_id: &str,
     entry: &fs::DirEntry,
+    metrics: &mut UpsertFolderMetrics,
 ) -> Result<()> {
+    let file_timer = Instant::now();
     let file_name = entry.file_name().to_string_lossy().to_string();
 
     let file_path = entry.path();
@@ -241,6 +433,16 @@ async fn upsert_file_entry(
         &file_content_id,
     )
     .await?;
+
+    if file_info.file_exists && file_info.kind_guess == FileType::Image {
+        enqueue_base_job(BaseThumbnailJob {
+            moa_id: moa_id.to_string(),
+            xxhs: file_info.xxh3_64.clone(),
+            source_path: file_path.clone(),
+        })
+        .await;
+    }
+    metrics.record_upsert_file(file_info.file_size, file_timer.elapsed());
 
     Ok(())
 }

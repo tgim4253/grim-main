@@ -427,6 +427,13 @@ pub struct ThumbReqInfo {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ThumbPath(pub PathBuf);
 
+/// Width of the cached base thumbnail used for downstream resizing.
+pub const THUMB_BASE_WIDTH: u32 = 512;
+
+/// Path to the cached base thumbnail for a file hash.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ThumbBasePath(pub PathBuf);
+
 impl ThumbPath {
     /// path/to/ab/cd/<hash>/<hash>_<width>x<height>_dpr<1|2|3>[_modeToken].<ext>
     pub async fn new(
@@ -450,9 +457,9 @@ impl ThumbPath {
         // Dimensions
         let width = spec.width;
         let height = spec.height;
-        if width == 0 || height == 0 {
+        if width == 0 {
             return Err(anyhow!(
-                "width/height must be > 0 (got {}x{})",
+                "width must be > 0 (got {}x{})",
                 width,
                 height
             ));
@@ -504,6 +511,65 @@ impl ThumbPath {
 
     pub fn as_path(&self) -> &Path {
         &self.0
+    }
+}
+
+impl ThumbBasePath {
+    /// Cached base thumbnail path "thumbs/base/vX/ab/cd/<hash>/<hash>_w512_auto_vX.webp".
+    pub fn new(
+        app: &AppHandle,
+        _moa_id: &str,
+        hash: &str,
+        schema_version: u8,
+    ) -> Result<Self> {
+        if hash.len() < 4 {
+            return Err(anyhow!("xxhs must be at least 4 chars long"));
+        }
+        if !is_ascii_hex(hash) {
+            return Err(anyhow!("xxhs must be ASCII-hex [0-9a-fA-F]"));
+        }
+
+        let xxhs = hash.to_ascii_lowercase();
+        let ab = &xxhs[0..2];
+        let cd = &xxhs[2..4];
+
+        let filename = format!(
+            "{}_w{}_auto_v{}.webp",
+            xxhs, THUMB_BASE_WIDTH, schema_version
+        );
+
+        let rel_path = PathBuf::from("thumbs")
+            .join("base")
+            .join(format!("v{}", schema_version))
+            .join(ab)
+            .join(cd)
+            .join(&xxhs)
+            .join(filename);
+
+        let path = app.path().resolve(rel_path, BaseDirectory::AppCache)?;
+        Ok(ThumbBasePath(path))
+    }
+
+    pub fn as_path(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl fmt::Display for ThumbBasePath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0.display())
+    }
+}
+
+impl AsRef<Path> for ThumbBasePath {
+    fn as_ref(&self) -> &Path {
+        self.as_path()
+    }
+}
+
+impl From<ThumbBasePath> for PathBuf {
+    fn from(tp: ThumbBasePath) -> Self {
+        tp.0
     }
 }
 
