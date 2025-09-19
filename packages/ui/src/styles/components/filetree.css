@@ -1,39 +1,32 @@
 :root {
-  --tree-font:
-    ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple SD Gothic Neo',
-    'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  --tree-font: ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+    'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  --tree-icon-size: 16px;
+  --tree-toggle-size: 20px;
+  --tree-row-vpad: 6px;
+  --tree-row-hpad: 8px;
+  --tree-depth-unit: 16px;
+  --tree-muted: var(--color-text-soft);
+  --tree-row-hover-bg: color-mix(in srgb, var(--ds-main-hover) 65%, transparent);
+  --tree-row-selected-bg: color-mix(in srgb, var(--ds-accent) 18%, transparent);
+  --tree-row-selected-border: color-mix(in srgb, var(--ds-accent) 35%, transparent);
+  --tree-row-highlight-bg: color-mix(in srgb, var(--ds-accent) 12%, transparent);
+  --tree-row-dragging-bg: color-mix(in srgb, var(--ds-main-hover) 50%, transparent);
+}
 
-  /* Light theme */
-  --bg: #ffffff;
-  --fg: #1f2328;
-  --muted-500: #6b7280;
-  --muted-600: #525866;
-  --muted-700: #3f4553;
-
-  /* Obsidian-ish accent (purple/indigo) */
-  --accent-400: #8b7bff;
-  --accent-300: #b1a9ff;
-
-  /* Row states (light) */
-  --row-hover: #f6f7fb;
-  --row-selected: #eef0ff;
-  --row-selected-border: #cfd6ff;
-  --row-highlight-bg: #f0f2ff; /* drag-over / hover highlight */
-  --row-dragging: #f7f7ff;
-
-  /* Icon/button sizes */
-  --icon-size: 16px;
-  --toggle-size: 20px;
-
-  --row-vpad: 6px;
-  --row-hpad: 8px;
-  --depth-unit: 16px; /* indent width per depth level */
+[data-theme='dark'] {
+  --tree-row-hover-bg: color-mix(in srgb, var(--ds-main-hover) 40%, transparent);
+  --tree-row-selected-bg: color-mix(in srgb, var(--ds-accent) 26%, transparent);
+  --tree-row-selected-border: color-mix(in srgb, var(--ds-accent) 40%, transparent);
+  --tree-row-highlight-bg: color-mix(in srgb, var(--ds-accent) 18%, transparent);
+  --tree-row-dragging-bg: color-mix(in srgb, var(--ds-main-hover) 30%, transparent);
 }
 
 .tree {
   margin: 0;
   padding: 6px;
   background-color: transparent;
+  font-family: var(--tree-font);
 }
 
 .tree-node {
@@ -51,86 +44,80 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: var(--row-vpad) var(--row-hpad);
-
-  background: transparent;
+  padding: var(--tree-row-vpad) var(--tree-row-hpad);
+  background-color: transparent;
   user-select: none;
-
   cursor: default;
+  border-radius: 0.5rem;
+  transition: background-color 120ms ease, color 120ms ease;
 }
 
 .tree-row:hover {
-  background-color: rgba(255, 255, 255, 0.3);
+  background-color: var(--tree-row-hover-bg);
   cursor: pointer;
 }
 
 .tree-row.is-selected {
-  background-color: rgba(255, 255, 255, 0.5);
+  background-color: var(--tree-row-selected-bg);
+  box-shadow: inset 0 0 0 1px var(--tree-row-selected-border);
 }
 
 .tree-row.is-highlighted {
-  background-color: rgba(255, 255, 255, 0.5);
+  background-color: var(--tree-row-highlight-bg);
 }
 
 .tree-row.is-dragging {
-  background-color: rgba(255, 255, 255, 0);
+  background-color: var(--tree-row-dragging-bg);
   cursor: grabbing;
 }
 
 .tree-row .toggle {
-  width: var(--toggle-size);
-  height: var(--toggle-size);
+  width: var(--tree-toggle-size);
+  height: var(--tree-toggle-size);
   display: grid;
   place-items: center;
   border: none;
   background: transparent;
   padding: 0;
+  color: inherit;
 }
 
 .tree-row .indent {
-  min-width: calc(var(--depth, 0) * var(--depth-unit) + var(--row-hpad));
+  min-width: calc(var(--depth, 0) * var(--tree-depth-unit) + var(--tree-row-hpad));
 }
 
-.tree-row .toggle:hover {
-}
-
-/* Spacer used when there is no toggle (files) */
 .tree-row .spacer {
-  min-width: var(--toggle-size);
-  min-height: var(--toggle-size);
+  min-width: var(--tree-toggle-size);
+  min-height: var(--tree-toggle-size);
   display: inline-block;
 }
 
-/* File/Folder icon */
 .tree-row .icon {
-  width: var(--icon-size);
-  height: var(--icon-size);
+  width: var(--tree-icon-size);
+  height: var(--tree-icon-size);
   flex: 0 0 auto;
 }
 
-/* Name text */
 .tree-row .name {
   flex: 1 1 auto;
-  min-width: 0; /* enables ellipsis */
-  font-size: 14px;
+  min-width: 0;
+  font-size: 0.875rem;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: inherit;
 }
 
-/* “More” (kebab) button */
 .tree-row .more {
   border: none;
   background: transparent;
   padding: 0;
-  opacity: 0; /* hidden by default */
+  opacity: 0;
   transition: opacity 140ms ease;
+  color: var(--tree-muted);
 }
 
 .tree-row:hover .more {
-  opacity: 1; /* show on hover (Obsidian-like subtlety) */
-}
-
-.tree-row .more:hover {
+  opacity: 1;
 }

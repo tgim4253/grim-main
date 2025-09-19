@@ -1,10 +1,10 @@
 import { Button } from '@tgim/ui/index';
-import * as Icons from 'lucide-react';
 import { useSidebarStore } from '@tgim/stores/index';
-import { shallow, useShallow } from 'zustand/shallow';
+import { useShallow } from 'zustand/shallow';
 import { useCallback } from 'react';
 import cn from '@tgim/utils/cn';
 
+// Vertical tab list that mirrors VS Code style sidebars.
 const SidebarTabs: React.FC<SidebarProps> = ({ sidebarPosition }) => {
   const { activeTab, tabs } = useSidebarStore(
     useShallow(state => ({
@@ -30,15 +30,16 @@ const SidebarTabs: React.FC<SidebarProps> = ({ sidebarPosition }) => {
   );
 
   return (
-    <div className="min-w-8 w-fit flex flex-col bg-sidebar-bg border-r border-t rounded-tr-md border-border-sidebar h-full overflow-hidden">
+    <div className="flex flex-col min-w-8 w-fit h-full overflow-hidden border-t border-r border-border-sidebar bg-sidebar text-text">
       {tabs.map(tab => {
         return (
           <Button
             variant="icon"
             key={tab.name}
+            active={activeTab === tab.name}
             onClick={() => {
               if (!tab.name) return;
-              if (tab.name == activeTab) {
+              if (tab.name === activeTab) {
                 toggleHiddenPanel();
                 return;
               }
@@ -46,8 +47,8 @@ const SidebarTabs: React.FC<SidebarProps> = ({ sidebarPosition }) => {
               setHiddenPanel(false);
             }}
             className={cn(
-              'p-2 w-full hover:text-icon-hover-sidebar hover:bg-sidebar-hover ',
-              activeTab === tab.name ? 'selected bg-sidebar-hover' : 'text-icon-sidebar',
+              'w-full p-2 transition-colors hover:text-icon-hover-sidebar hover:bg-sidebar-hover',
+              activeTab === tab.name ? 'text-icon-hover-sidebar' : 'text-icon-sidebar',
             )}
           >
             {<tab.icon />}

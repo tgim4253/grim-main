@@ -1,21 +1,27 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { GraphResponse } from '@tgim/types/graph';
-import { ThumbJobStatus, ThumbRequest, ThumbResponse } from '@tgim/types/file';
+import { ThumbRequest, ThumbResponse } from '@tgim/types/file';
 const appWindow = getCurrentWindow();
 
+// Thin wrappers around Tauri invoke calls to keep React components lean.
 const windowControllerIpc = {
+  minimize: async () => {
+    await appWindow.minimize();
   minimize: () => {
     appWindow.minimize();
   },
   maximize: async () => {
+  maximize: async () => {
     const isMaximized = await appWindow.isMaximized();
     if (isMaximized) {
       await appWindow.unmaximize();
-    } else {
-      await appWindow.maximize();
+      return;
     }
+    await appWindow.maximize();
   },
+  close: async () => {
+    await appWindow.close();
   close: () => {
     appWindow.close();
   },
@@ -39,7 +45,6 @@ const moaIpc = {
       path: string;
       moaId: string;
     };
-    return response;
   },
   openMoa: async (moaId: string) => {
     await invoke('open_moa', { moaId });

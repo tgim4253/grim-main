@@ -56,8 +56,10 @@ export interface SplitterProps {
 const isSplitPanelEl = (el: React.ReactElement<any>) =>
   (el.type as any) === SplitPanel || (el.type as any)?.displayName === 'SplitPanel';
 
-function collectPanelsAtFirstDepth(nodes: React.ReactNode): React.ReactElement<SplitPanelProps>[] {
-  // start from the current children level
+const collectPanelsAtFirstDepth = (
+  nodes: React.ReactNode,
+): React.ReactElement<SplitPanelProps>[] => {
+  // Crawl the tree until the first SplitPanel layer so layout math stays predictable.
   let level = React.Children.toArray(nodes).filter(React.isValidElement) as React.ReactElement[];
   const result: React.ReactElement<SplitPanelProps>[] = [];
   while (level.length > 0) {
@@ -79,7 +81,7 @@ function collectPanelsAtFirstDepth(nodes: React.ReactNode): React.ReactElement<S
     level = nextLevel;
   }
   return result;
-}
+};
 
 // ---- Component -----------------------------------------------------------
 export const Split = forwardRef<HTMLDivElement, SplitProps>(

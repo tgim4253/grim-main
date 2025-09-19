@@ -12,6 +12,7 @@ mod utils;
 
 use services::moa_services;
 use tokio::sync::mpsc;
+
 use tracing::error;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
@@ -55,7 +56,8 @@ fn main() {
                 None
             });
 
-            match moa {
+            // Restore the last session if available, otherwise open the selector.
+            match latest_moa {
                 Some(moa) => {
                     app_launcher::grim::launch_moa(
                         &app.handle(),
@@ -76,6 +78,7 @@ fn main() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .run(tauri::generate_context!())?;
+
+    Ok(())
 }

@@ -1,12 +1,10 @@
-import { use, useEffect, useState } from 'react';
-import { Routes, Route, useSearchParams } from 'react-router-dom';
-import { ToastContainer } from 'react-toastify';
+import { useEffect, useState } from 'react';
 import { ipc } from '../../lib/ipc';
 import TitleBar from './layout/TitleBar';
 import { platform } from '@tauri-apps/plugin-os';
 import SidebarTabs from './layout/sidebar/SidebarTabs';
 import SidebarPanel from './layout/sidebar/SidebarPanel';
-import { Split, SplitPanel } from '@tgim/ui/Splitter';
+import { Split } from '@tgim/ui/Splitter';
 import useSidebarStore from '@tgim/stores/sidebarStore';
 import { useShallow } from 'zustand/shallow';
 import useFileTreeStore from '@tgim/stores/fileTreeStore';
@@ -14,25 +12,21 @@ import { useMoa } from '@tgim/hooks';
 import { listen } from '@tauri-apps/api/event';
 import ProgressWindow from './ProgressWindow';
 
-import { debounce } from 'lodash';
 import usePanelsStore from '@tgim/stores/panelStore';
 import PanelContainer from './panel/Container';
 import { ThumbResSpec } from '@tgim/types/file';
-import useThumbStore, { convertToThumbKey } from '@tgim/stores/thumbStore';
+import useThumbStore from '@tgim/stores/thumbStore';
+import { useTheme } from '../../theme/ThemeProvider';
 
 interface LayoutPorps {
   layoutId: string;
 }
+// Recursively render nested splits declared in the layout store.
 const Layout: React.FC<LayoutPorps> = ({ layoutId }) => {
-  const {
-    containers,
-    layout: layoutData,
-    splitContainer,
-  } = usePanelsStore(
+  const { containers, layout: layoutData } = usePanelsStore(
     useShallow(s => ({
       containers: s.containers,
       layout: s.layout[layoutId],
-      splitContainer: s.splitContainer,
     })),
   );
 
@@ -48,7 +42,7 @@ const Layout: React.FC<LayoutPorps> = ({ layoutId }) => {
           if (container) {
             return (
               <Panel key={childId}>
-                <PanelContainer containerId={childId}></PanelContainer>
+                <PanelContainer containerId={childId} />
               </Panel>
             );
           }
@@ -65,8 +59,10 @@ const Layout: React.FC<LayoutPorps> = ({ layoutId }) => {
   );
 };
 
+// Bootstraps the main workspace once backend bootstrap has finished.
 const Main: React.FC = () => {
   const { moaId } = useMoa(location);
+  const { theme } = useTheme();
   const [progress, setProgress] = useState<AppProgressEvent>({
     stage: 'Migrating',
     percent: 0,
@@ -85,46 +81,56 @@ const Main: React.FC = () => {
   const rootLayout = layout[rootLayoutId ?? ''];
 
   useEffect(() => {
-    console.log(rootLayout);
-  }, [rootLayout]);
-  useEffect(() => {
-    console.log(progress);
-    if (progress.stage === 'Ready') {
-      const timer = setTimeout(() => {
-        setReady(true);
-      }, 100);
-      return () => clearTimeout(timer);
-    } else {
+    if (progress.stage !== 'Ready') {
       setReady(false);
+      return;
     }
+
+    // Delay rendering to let the final progress frame settle.
+    const timer = window.setTimeout(() => {
+      setReady(true);
+    }, 100);
+
+    return () => window.clearTimeout(timer);
   }, [progress.stage]);
 
   useEffect(() => {
-    if (processing || progressQueue.length === 0) return;
+    if (processing || progressQueue.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    const timers: number[] = [];
+    const queue = [...progressQueue];
 
     setProcessing(true);
 
-    const tick = () => {
-      setProgressQueue(prev => {
-        if (prev.length === 0) {
-          setProcessing(false);
-          return prev;
-        }
+    const run = () => {
+      const next = queue.shift();
+      if (!next || cancelled) {
+        setProcessing(false);
+        return;
+      }
 
-        const [next, ...rest] = prev;
-        setProgress(next);
-        if (rest.length > 0) {
-          setTimeout(tick, 50);
-        } else {
-          setProcessing(false);
-        }
+      setProgress(next);
+      setProgressQueue(prev => prev.slice(1));
 
-        return rest;
-      });
+      if (queue.length > 0) {
+        const id = window.setTimeout(run, 50);
+        timers.push(id);
+      } else {
+        setProcessing(false);
+      }
     };
 
-    tick();
-  }, [progressQueue.length, processing]);
+    run();
+
+    return () => {
+      cancelled = true;
+      timers.forEach(id => window.clearTimeout(id));
+      setProcessing(false);
+    };
+  }, [processing, progressQueue]);
 
   const { setSidebarHidden, setSidebarSize } = useSidebarStore(
     useShallow(state => {
@@ -152,17 +158,19 @@ const Main: React.FC = () => {
       upsertThumb: state.upsert,
     })),
   );
+  // React to thumbnail worker updates to keep local caches in sync.
   useEffect(() => {
-    if (!moaId) return;
+    if (!moaId) {
+      return undefined;
+    }
 
-    let unlisten: (() => void) | null = null;
+    let unlisten: (() => void) | undefined;
     const initListener = async () => {
       unlisten = await listen<{ items: ThumbResSpec[] }>(
-        `thumbnails://created`,
-        (event: { payload: { items: ThumbResSpec[] } }) => {
+        'thumbnails://created',
+        event => {
           event.payload.items.forEach(item => {
-            const key = item.thumb_key;
-            upsertThumb(key, {
+            upsertThumb(item.thumb_key, {
               status: 'ready',
               url: item.url,
               updatedAt: Date.now(),
@@ -171,42 +179,49 @@ const Main: React.FC = () => {
         },
       );
     };
-    initListener();
+
+    void initListener();
+
     return () => {
-      if (unlisten) unlisten();
+      unlisten?.();
     };
-  }, [moaId]);
+  }, [moaId, upsertThumb]);
 
+  // Load the initial graph and subscribe to bootstrap progress events.
   useEffect(() => {
-    if (!moaId) return;
+    if (!moaId) {
+      return undefined;
+    }
 
-    let unlisten: (() => void) | null = null;
+    let unlisten: (() => void) | undefined;
 
     const load = async () => {
       try {
         const data = await ipc.moa.bootsrapMoa(moaId);
         const treeData = convertToTreeData(data);
         setTreeData(treeData);
-      } catch (err) {
-        console.error(err);
+      } catch (error) {
+        console.error('Failed to bootstrap MOA graph', error);
       }
     };
 
-    load();
+    void load();
 
     const initListener = async () => {
       unlisten = await listen<AppProgressEvent>(
         `bootstrap://progress/${moaId}`,
-        (event: { payload: AppProgressEvent }) => {
+        event => {
           setProgressQueue(prev => [...prev, event.payload]);
         },
       );
     };
-    initListener();
+
+    void initListener();
+
     return () => {
-      if (unlisten) unlisten();
+      unlisten?.();
     };
-  }, [moaId]);
+  }, [convertToTreeData, moaId, setTreeData]);
 
   useEffect(() => {
     let mounted = true;
@@ -224,7 +239,7 @@ const Main: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col w-full h-full bg-background-6 overflow-hidden" data-theme="dark">
+    <div className="flex flex-col w-full h-full bg-shell-base text-text overflow-hidden" data-theme={theme}>
       {!isMac && (
         <div className="fixed w-full top-0 z-50">
           <TitleBar />

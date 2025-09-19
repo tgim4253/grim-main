@@ -1,5 +1,6 @@
 import { sharedConfig } from '../../.config/tailwind-css/base';
 export default {
+  darkMode: ['class', '[data-theme="dark"]'],
   content: [
     './index.html',
     './src/**/*.{js,ts,jsx,tsx}',
@@ -12,45 +13,65 @@ export default {
 
         /* ---------- Semantic Colors ---------- */
         background: {
-          0: 'var(--color-bg-0)', // base background
-          1: 'var(--color-bg-1)', // subtle background
-          2: 'var(--color-bg-2)', // UI component background
-          3: 'var(--color-bg-3)', // UI component background
-          4: 'var(--color-bg-4)', // UI component background
-          5: 'var(--color-bg-5)', // UI component background
-          6: 'var(--color-bg-6)', // UI component background
-          7: 'var(--color-bg-7)', // UI component background
-          8: 'var(--color-bg-8)', // UI component background
-          9: 'var(--color-bg-9)', // UI component background
-          10: 'var(--color-bg-10)', // UI component background
+          0: 'var(--color-bg-0)',
+          1: 'var(--color-bg-1)',
+          2: 'var(--color-bg-2)',
+          3: 'var(--color-bg-3)',
+          4: 'var(--color-bg-4)',
+          5: 'var(--color-bg-5)',
+          6: 'var(--color-bg-6)',
+          7: 'var(--color-bg-7)',
+          8: 'var(--color-bg-8)',
+          9: 'var(--color-bg-9)',
+          10: 'var(--color-bg-10)',
+        },
+        surface: {
+          DEFAULT: 'var(--ds-surface-base)',
+          raised: 'var(--ds-surface-raised)',
+          muted: 'var(--ds-surface-muted)',
+          hover: 'var(--ds-surface-hover)',
+          active: 'var(--ds-surface-active)',
+        },
+        shell: {
+          base: 'var(--ds-shell-surface)',
+          contrast: 'var(--ds-shell-contrast)',
         },
         border: {
+          DEFAULT: 'var(--color-border)',
+          strong: 'var(--color-border-hover)',
+          focus: 'var(--ds-border-focus)',
           sidebar: 'var(--color-sidebar-border)',
         },
-        'sidebar-light': 'var(--color-sidebar-light)', // sidebar background
-        'sidebar-dark': 'var(--color-sidebar-dark)', // sidebar background
+        text: {
+          DEFAULT: 'var(--color-text)',
+          soft: 'var(--color-text-soft)',
+          inverse: 'var(--color-text-inverse)',
+          placeholder: 'var(--color-text-placeholder)',
+        },
         sidebar: {
+          DEFAULT: 'var(--color-sidebar-bg)',
           bg: 'var(--color-sidebar-bg)',
+          hover: 'var(--color-sidebar-hover-bg)',
+          border: 'var(--color-sidebar-border)',
           text: 'var(--color-text)',
           icon: 'var(--color-icon-sidebar)',
-          hover: 'var(--color-sidebar-hover-bg)',
-        }, // sidebar background',
+          'icon-hover': 'var(--color-icon-sidebar-hover)',
+        },
         main: {
-          bg: 'var(--color-main-bg)',
-          text: 'var(--color-text)',
-          icon: 'var(--color-icon-main)',
+          DEFAULT: 'var(--color-main-bg)',
           hover: 'var(--color-main-hover-bg)',
+          icon: 'var(--color-icon-main)',
+          'icon-hover': 'var(--color-icon-main-hover)',
         },
         modal: {
-          bg: 'var(--color-modal-bg)',
+          DEFAULT: 'var(--color-modal-bg)',
           text: 'var(--color-text)',
-          icon: 'var(--color-icon-sidebar)',
           hover: 'var(--color-sidebar-hover-bg)',
           input: {
-            bg: 'var(--color-modal-input-bg)',
+            DEFAULT: 'var(--color-modal-input-bg)',
             hover: 'var(--color-modal-input-hover-bg)',
             placeholder: 'var(--color-modal-input-placeholder)',
-          }
+          },
         },
         icon: {
           sidebar: 'var(--color-icon-sidebar)',
@@ -60,11 +81,19 @@ export default {
           sidebar: 'var(--color-icon-sidebar-hover)',
           main: 'var(--color-icon-main-hover)',
         },
-        'background-hover': 'var(--color-bg-hover)', // background on hover
-        foreground: 'var(--color-text)', // main text / icons
-        accent: 'var(--color-primary)', // brand / highlight
-        surface: 'var(--color-surface)', // cards, sheets
-        outline: 'var(--color-border)', // borders, dividers
+        accent: {
+          DEFAULT: 'var(--color-primary)',
+          hover: 'var(--color-brand-hover)',
+          ring: 'var(--ds-accent-ring)',
+        },
+        overlay: {
+          DEFAULT: 'var(--ds-overlay)',
+        },
+        'background-hover': 'var(--color-bg-hover)',
+        foreground: 'var(--color-text)',
+        'sidebar-light': 'var(--color-sidebar-light)',
+        'sidebar-dark': 'var(--color-sidebar-dark)',
+        outline: 'var(--color-border)',
       },
     },
   },

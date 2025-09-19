@@ -7,23 +7,37 @@ import MoaDetail from './MoaDetail';
 import { ToastContainer } from 'react-toastify';
 import { platform } from '@tauri-apps/plugin-os';
 import { useEffect, useState } from 'react';
-import { listen } from '@tauri-apps/api/event';
+import { useTheme } from '../../theme/ThemeProvider';
 
 const Moa: React.FC = () => {
   const [isMac, setIsMac] = useState(false);
+  const { theme } = useTheme();
 
   useEffect(() => {
-    const checkPlatform = async () => {
-      const os = platform();
-      console.log(os);
-      setIsMac(os === 'macos');
+    let mounted = true;
+
+    const detectPlatform = async () => {
+      try {
+        const os = await platform();
+        if (mounted) {
+          setIsMac(os === 'macos');
+        }
+      } catch {
+        if (mounted) {
+          setIsMac(false);
+        }
+      }
     };
 
-    checkPlatform(); // call the async function
-  }, []); // dependency array to run only once on mount
+    void detectPlatform();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
-    <div className="flex w-full h-full bg-background-6 overflow-hidden" data-theme="dark">
+    <div className="flex w-full h-full bg-shell-base text-text overflow-hidden" data-theme={theme}>
       <ManageMoaSidebar />
       {!isMac && (
         <div className="fixed w-full top-0 z-50">

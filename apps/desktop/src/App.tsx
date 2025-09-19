@@ -1,22 +1,21 @@
 import React from 'react';
-import TitleBar from './features/main/layout/TitleBar';
 import { HashRouter, Routes, Route } from 'react-router-dom';
-import ManageMoaTitleBar from './features/moa/layout/ManageMoaTitleBar';
 import Moa from './features/moa/Moa';
 import './i18n';
 import Main from './features/main/Main';
 
-function App() {
+// Desktop entry point that keeps routing hash-based for Tauri compatibility.
+const App: React.FC = () => {
   return (
     <div className="flex flex-col h-screen">
       <HashRouter>
         <Routes>
           <Route path="/moa/*" element={<Main />} />
-          <Route path="/create-moa/*" element={<Moa></Moa>} />
+          <Route path="/create-moa/*" element={<Moa />} />
         </Routes>
       </HashRouter>
     </div>
   );
-}
+};
 
 export default App;
