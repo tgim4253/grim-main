@@ -183,7 +183,16 @@ pub struct StorageRootInfo {
 
 /// Logical file types derived from file extensions.
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    Type,
+    Default,
+    Hash,
 )]
 #[sqlx(type_name = "TEXT")]
 #[sqlx(rename_all = "lowercase")]
