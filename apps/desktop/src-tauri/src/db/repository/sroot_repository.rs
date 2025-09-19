@@ -6,10 +6,15 @@ use crate::{
     utils::{date::get_now_date, identifier::get_unique_id},
 };
 
+/// Repository for storage-root metadata.
 pub struct SrootRepository;
 
 impl SrootRepository {
-    pub async fn fetch_mount_path<'a, E>(executor: &mut E, sroot_id: &str) -> Result<Option<String>>
+    /// Fetch the primary mount path for the given storage-root identifier.
+    pub async fn fetch_mount_path<'a, E>(
+        executor: &mut E,
+        sroot_id: &str,
+    ) -> Result<Option<String>>
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
     {
@@ -26,6 +31,7 @@ impl SrootRepository {
         Ok(mount_path)
     }
 
+    /// Upsert a storage-root row and return its identifier.
     pub async fn upsert_storage_root<'a, E>(
         executor: &mut E,
         sroot_info: &crate::models::file::StorageRootInfo,
@@ -65,6 +71,7 @@ impl SrootRepository {
         Ok(sroot_id)
     }
 
+    /// Upsert the mount path for a storage root and return its identifier.
     pub async fn upsert_storage_root_mount<'a, E>(
         executor: &mut E,
         sroot_id: &str,
@@ -98,6 +105,7 @@ impl SrootRepository {
         Ok(sroot_mount_id)
     }
 
+    /// Ensure both the storage-root and its mount path exist.
     pub async fn ensure_storage_root<'a, E>(
         executor: &mut E,
         sroot_info: &StorageRootInfo,
@@ -106,12 +114,16 @@ impl SrootRepository {
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
     {
         // Ensure StorageRoot exists or create it
-        let sroot_id = Self::upsert_storage_root(&mut *executor, sroot_info).await?;
+        let sroot_id =
+            Self::upsert_storage_root(&mut *executor, sroot_info).await?;
 
         // Ensure StorageRootMount exists or create/update it
-        let _sroot_mount_id =
-            Self::upsert_storage_root_mount(&mut *executor, &sroot_id, &sroot_info.mount_path)
-                .await?;
+        let _sroot_mount_id = Self::upsert_storage_root_mount(
+            &mut *executor,
+            &sroot_id,
+            &sroot_info.mount_path,
+        )
+        .await?;
 
         Ok(sroot_id)
     }
