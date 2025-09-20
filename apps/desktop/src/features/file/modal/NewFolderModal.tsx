@@ -550,7 +550,7 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
                           </label>
                           {state.fileTypes && (
                             <Button
-                              variant="ghost"
+                              variant="default"
                               className="px-2 py-1 text-xs text-modal-text-secondary"
                               onClick={() => handleResetFolderTypes(key)}
                             >
@@ -608,7 +608,7 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
           </Button>
           {step === 'selection' ? (
             <>
-              <Button variant="outline" onClick={() => setStep('details')} disabled={submitting}>
+              <Button variant="default" onClick={() => setStep('details')} disabled={submitting}>
                 이전
               </Button>
               <Button variant="primary" onClick={handleSubmit} disabled={submitting}>

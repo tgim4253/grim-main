@@ -1,4 +1,12 @@
-import { FileType } from './graph';
+export enum FileType {
+  Image = 'image',
+  Video = 'video',
+  Document = 'document',
+  GraphicTool = 'graphictool',
+  Audio = 'audio',
+  Archive = 'archive',
+  Unknown = 'unknown',
+}
 
 export type ThumbJobStatus = 'ready' | 'pending' | 'error';
 
