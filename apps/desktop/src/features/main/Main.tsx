@@ -9,14 +9,12 @@ import useSidebarStore from '@tgim/stores/sidebarStore';
 import { useShallow } from 'zustand/shallow';
 import useFileTreeStore from '@tgim/stores/fileTreeStore';
 import { useMoa } from '@tgim/hooks';
-import { listen } from '@tauri-apps/api/event';
 import ProgressWindow from './ProgressWindow';
 
 import usePanelsStore from '@tgim/stores/panelStore';
 import PanelContainer from './panel/Container';
-import { ThumbResSpec } from '@tgim/types/file';
-import useThumbStore from '@tgim/stores/thumbStore';
 import { useTheme } from '../../theme/ThemeProvider';
+import { ensureThumbEventListener, disposeThumbEventListener } from '../../hooks/thumbs';
 
 interface LayoutPorps {
   layoutId: string;
@@ -153,39 +151,37 @@ const Main: React.FC = () => {
       leftSidebar: state.sidebars.left,
     })),
   );
-  const { upsertThumb } = useThumbStore(
-    useShallow(state => ({
-      upsertThumb: state.upsert,
-    })),
-  );
   // React to thumbnail worker updates to keep local caches in sync.
   useEffect(() => {
     if (!moaId) {
       return undefined;
     }
 
+    let disposed = false;
     let unlisten: (() => void) | undefined;
-    const initListener = async () => {
-      unlisten = await listen<{ items: ThumbResSpec[] }>(
-        'thumbnails://created',
-        event => {
-          event.payload.items.forEach(item => {
-            upsertThumb(item.thumb_key, {
-              status: 'ready',
-              url: item.url,
-              updatedAt: Date.now(),
-            });
-          });
-        },
-      );
-    };
 
-    void initListener();
+    ensureThumbEventListener()
+      .then(stop => {
+        if (disposed) {
+          stop();
+          return;
+        }
+        unlisten = stop;
+      })
+      .catch(error => {
+        console.error('Failed to bind thumbnail events', error);
+      });
 
     return () => {
-      unlisten?.();
+      disposed = true;
+      if (unlisten) {
+        unlisten();
+        unlisten = undefined;
+      } else {
+        void disposeThumbEventListener();
+      }
     };
-  }, [moaId, upsertThumb]);
+  }, [moaId]);
 
   // Load the initial graph and subscribe to bootstrap progress events.
   useEffect(() => {
@@ -208,12 +204,9 @@ const Main: React.FC = () => {
     void load();
 
     const initListener = async () => {
-      unlisten = await listen<AppProgressEvent>(
-        `bootstrap://progress/${moaId}`,
-        event => {
-          setProgressQueue(prev => [...prev, event.payload]);
-        },
-      );
+      unlisten = await listen<AppProgressEvent>(`bootstrap://progress/${moaId}`, event => {
+        setProgressQueue(prev => [...prev, event.payload]);
+      });
     };
 
     void initListener();
@@ -239,7 +232,10 @@ const Main: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col w-full h-full bg-shell-base text-text overflow-hidden" data-theme={theme}>
+    <div
+      className="flex flex-col w-full h-full bg-shell-base text-text overflow-hidden"
+      data-theme={theme}
+    >
       {!isMac && (
         <div className="fixed w-full top-0 z-50">
           <TitleBar />

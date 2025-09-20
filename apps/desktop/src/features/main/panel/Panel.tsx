@@ -90,8 +90,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
 
     const getGraphNodeData = (node: Node, graphNodeId?: string): GraphNode => {
       const defaultSize = 14;
-      const nodeSize =
-        node.id == graphData.root_node_id ? defaultSize * 1.6 : defaultSize;
+      const nodeSize = node.id == graphData.root_node_id ? defaultSize * 1.6 : defaultSize;
       if (!graphNodeId) graphNodeId = createNewId();
 
       if (node.kind == NodeKind.File && node.data['File']) {
@@ -110,6 +109,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
           label: data.file_name ?? 'file',
           size: nodeSize,
           type: type,
+          hash: data.xxh3_64,
         };
       } else if (node.kind == NodeKind.Folder && node.data['Folder']) {
         let data = node.data['Folder'];
@@ -231,8 +231,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   }, [graphData, rootNodeId]);
   if (!panel || !container) return null;
 
-  const showGraph =
-    viewType === 'graph' && graphData && rootNodeId && rootGraphNodeId;
+  const showGraph = viewType === 'graph' && graphData && rootNodeId && rootGraphNodeId;
   const showGrid = viewType === 'grid' && !!gridData;
 
   return ReactDOM.createPortal(
