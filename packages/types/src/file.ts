@@ -117,4 +117,6 @@ export interface CreateFolderPayload {
   path: string;
   parent_id: string;
   selection?: FolderSelection;
+  expectedBytes?: number;
+  expectedFiles?: number;
 }
