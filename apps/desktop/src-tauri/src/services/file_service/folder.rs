@@ -8,7 +8,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 use tokio::{fs, sync::Mutex};
 use tracing::{info, warn};
 
