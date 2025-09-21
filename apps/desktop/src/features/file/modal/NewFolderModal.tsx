@@ -12,6 +12,8 @@ interface Props {
     name: string;
     path: string;
     selection?: FolderSelection;
+    expectedBytes: number;
+    expectedFiles: number;
   }) => Promise<void> | void;
 }
 
@@ -392,6 +394,8 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
         name: name.trim(),
         path,
         selection: payload.entries.length ? payload : undefined,
+        expectedBytes: summary.totalBytes,
+        expectedFiles: summary.totalFiles,
       });
       onClose();
     } catch (error) {

@@ -24,6 +24,8 @@ pub async fn create_folder(
             node,
             path.clone(),
             data.selection.clone(),
+            data.expected_bytes,
+            data.expected_files,
         )
         .await
         .map_err(|e| e.to_string())?;

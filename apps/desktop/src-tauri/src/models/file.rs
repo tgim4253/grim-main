@@ -46,6 +46,10 @@ pub struct FolderData {
     pub path: Option<String>,
     pub parent_id: String,
     pub selection: Option<FolderSelection>,
+    #[serde(default, rename = "expectedBytes")]
+    pub expected_bytes: Option<u64>,
+    #[serde(default, rename = "expectedFiles")]
+    pub expected_files: Option<u64>,
 }
 
 /// Describes the folder/file-type filters chosen by the user before import.

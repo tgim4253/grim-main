@@ -1,13 +1,15 @@
 use anyhow::{anyhow, bail, Context, Result};
 use async_recursion::async_recursion;
+use serde::Serialize;
 use sqlx::{Sqlite, Transaction};
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
+    sync::Arc,
     time::{Duration, Instant},
 };
-use tauri::AppHandle;
-use tokio::fs;
+use tauri::{AppHandle, Emitter};
+use tokio::{fs, sync::Mutex};
 use tracing::{info, warn};
 
 use crate::{
@@ -112,6 +114,119 @@ impl UpsertFolderMetrics {
             self.upsert_file_count,
             bucket_summary,
         );
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+enum ImportState {
+    Running,
+    Completed,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FolderImportProgressPayload {
+    folder_id: String,
+    state: ImportState,
+    processed_bytes: u64,
+    total_bytes: Option<u64>,
+    processed_files: u64,
+    total_files: Option<u64>,
+    elapsed_ms: u64,
+}
+
+struct ImportProgressTracker {
+    app_handle: AppHandle,
+    moa_id: String,
+    folder_id: String,
+    total_bytes: Option<u64>,
+    total_files: Option<u64>,
+    processed_bytes: u64,
+    processed_files: u64,
+    started_at: Instant,
+}
+
+impl ImportProgressTracker {
+    fn new(
+        app_handle: AppHandle,
+        moa_id: String,
+        folder_id: String,
+        total_bytes: Option<u64>,
+        total_files: Option<u64>,
+    ) -> Self {
+        Self {
+            app_handle,
+            moa_id,
+            folder_id,
+            total_bytes,
+            total_files,
+            processed_bytes: 0,
+            processed_files: 0,
+            started_at: Instant::now(),
+        }
+    }
+
+    fn emit(&self, state: ImportState) {
+        let elapsed = self.started_at.elapsed().as_millis();
+        let elapsed_ms = if elapsed > u128::from(u64::MAX) {
+            u64::MAX
+        } else {
+            elapsed as u64
+        };
+
+        let payload = FolderImportProgressPayload {
+            folder_id: self.folder_id.clone(),
+            state,
+            processed_bytes: self.processed_bytes,
+            total_bytes: self.total_bytes,
+            processed_files: self.processed_files,
+            total_files: self.total_files,
+            elapsed_ms,
+        };
+
+        let topic = format!("folder-import://progress/{}", self.moa_id);
+        let _ = self.app_handle.emit(&topic, payload);
+    }
+
+    fn notify_start(&self) {
+        self.emit(ImportState::Running);
+    }
+
+    fn record_file(&mut self, bytes: Option<i64>) {
+        self.processed_files = self.processed_files.saturating_add(1);
+        if let Some(size) = bytes {
+            if size > 0 {
+                self.processed_bytes =
+                    self.processed_bytes.saturating_add(size as u64);
+            }
+        }
+        self.emit(ImportState::Running);
+    }
+
+    fn finish(&mut self) {
+        if let Some(total) = self.total_bytes {
+            if self.processed_bytes < total {
+                self.processed_bytes = total;
+            }
+        } else {
+            self.total_bytes = Some(self.processed_bytes);
+        }
+
+        if let Some(total) = self.total_files {
+            if self.processed_files < total {
+                self.processed_files = total;
+            }
+        } else {
+            self.total_files = Some(self.processed_files);
+        }
+
+        self.emit(ImportState::Completed);
+    }
+
+    fn fail(&self) {
+        self.emit(ImportState::Failed);
     }
 }
 
@@ -399,6 +514,8 @@ pub async fn first_mount_folder(
     node: Node,
     path: String,
     selection: Option<FolderSelection>,
+    expected_bytes: Option<u64>,
+    expected_files: Option<u64>,
 ) -> Result<()> {
     let mut tx = DB_MANAGER.create_new_tx(&moa_id).await?;
 
@@ -408,30 +525,59 @@ pub async fn first_mount_folder(
 
     let sroot_info = storage_root::detect_storage_root(&norm_path)?;
 
+    let virtual_folder_id = node.id.clone();
     let real_folder_id =
         ensure_storage_root_and_real_folder(&mut tx, &sroot_info, &norm_path)
             .await?;
 
     FileRepository::create_virtual_folder_mount(
         tx.as_mut(),
-        node.id.clone(),
+        virtual_folder_id.clone(),
         real_folder_id.clone(),
     )
     .await?;
 
-    upsert_folder(
+    let progress = Arc::new(Mutex::new(ImportProgressTracker::new(
+        app.clone(),
+        moa_id.clone(),
+        virtual_folder_id.clone(),
+        expected_bytes,
+        expected_files,
+    )));
+
+    {
+        let guard = progress.lock().await;
+        guard.notify_start();
+    }
+
+    let upsert_result = upsert_folder(
         &mut tx,
         &app,
         &moa_id,
         real_folder_id.clone(),
-        node.id,
+        virtual_folder_id.clone(),
         &norm_path,
         true,
         Some(true),
         selection_plan.as_ref(),
         &norm_path,
+        Some(progress.clone()),
     )
-    .await?;
+    .await;
+
+    match upsert_result {
+        Ok(()) => {
+            let mut guard = progress.lock().await;
+            guard.finish();
+        }
+        Err(err) => {
+            {
+                let guard = progress.lock().await;
+                guard.fail();
+            }
+            return Err(err);
+        }
+    }
 
     let _scan_id = start_scan_job(moa_id.clone(), real_folder_id).await?;
 
@@ -460,6 +606,7 @@ async fn upsert_folder(
     make_virtual_folder: Option<bool>,
     selection: Option<&SelectionPlan>,
     root_path: &Path,
+    progress: Option<Arc<Mutex<ImportProgressTracker>>>,
 ) -> Result<()> {
     let mut metrics = UpsertFolderMetrics::default();
     let total_timer = Instant::now();
@@ -477,6 +624,7 @@ async fn upsert_folder(
         root_path,
         None,
         &mut metrics,
+        progress,
     )
     .await?;
 
@@ -501,6 +649,7 @@ async fn upsert_folder_impl(
     root_path: &Path,
     inherited_allowed_types: Option<HashSet<FileType>>,
     metrics: &mut UpsertFolderMetrics,
+    progress: Option<Arc<Mutex<ImportProgressTracker>>>,
 ) -> Result<()> {
     let make_vf = make_virtual_folder.unwrap_or(true);
 
@@ -603,6 +752,7 @@ async fn upsert_folder_impl(
                 &entry,
                 current_allowed.as_ref(),
                 metrics,
+                progress.clone(),
             )
             .await
             .with_context(|| {
@@ -663,6 +813,7 @@ async fn upsert_folder_impl(
                 root_path,
                 child_allowed,
                 metrics,
+                progress.clone(),
             )
             .await
             {
@@ -684,6 +835,7 @@ async fn upsert_file_entry(
     entry: &fs::DirEntry,
     allowed_types: Option<&HashSet<FileType>>,
     metrics: &mut UpsertFolderMetrics,
+    progress: Option<Arc<Mutex<ImportProgressTracker>>>,
 ) -> Result<()> {
     let file_timer = Instant::now();
     let file_path = entry.path();
@@ -729,6 +881,11 @@ async fn upsert_file_entry(
         .await;
     }
     metrics.record_upsert_file(file_info.file_size, file_timer.elapsed());
+
+    if let Some(tracker) = &progress {
+        let mut guard = tracker.lock().await;
+        guard.record_file(file_info.file_size);
+    }
 
     Ok(())
 }
