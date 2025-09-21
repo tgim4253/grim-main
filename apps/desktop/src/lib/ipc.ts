@@ -1,17 +1,13 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { GraphResponse } from '@tgim/types/graph';
-import { ThumbRequest, ThumbResponse } from '@tgim/types/file';
+import { CreateFolderPayload, FolderPreview, ThumbRequest, ThumbResponse } from '@tgim/types/file';
+
 const appWindow = getCurrentWindow();
 
 // Thin wrappers around Tauri invoke calls to keep React components lean.
 const windowControllerIpc = {
-  minimize: async () => {
-    await appWindow.minimize();
-  minimize: () => {
-    appWindow.minimize();
-  },
-  maximize: async () => {
+  minimize: () => appWindow.minimize(),
   maximize: async () => {
     const isMaximized = await appWindow.isMaximized();
     if (isMaximized) {
@@ -20,11 +16,7 @@ const windowControllerIpc = {
     }
     await appWindow.maximize();
   },
-  close: async () => {
-    await appWindow.close();
-  close: () => {
-    appWindow.close();
-  },
+  close: () => appWindow.close(),
 };
 
 const moaIpc = {
@@ -36,15 +28,13 @@ const moaIpc = {
     }[];
     return response;
   },
-  createMoa: async (data: {
-    name: string;
-    path: string;
-  }): Promise<{ name: string; path: string; moaId: string }> => {
+  createMoa: async (data: { name: string; path: string }) => {
     const response = (await invoke('create_moa', { moa: data })) as {
       name: string;
       path: string;
       moaId: string;
     };
+    return response;
   },
   openMoa: async (moaId: string) => {
     await invoke('open_moa', { moaId });
@@ -56,8 +46,8 @@ const moaIpc = {
 };
 
 const graphIpc = {
-  createFolder: (moaId: string, data: { name: string; path: string; parent_id: string }) => {
-    invoke('create_folder', { moaId, data });
+  createFolder: async (moaId: string, data: CreateFolderPayload) => {
+    await invoke('create_folder', { moaId, data });
   },
   getGraphOne: async (moaId: string, nodeId: string): Promise<GraphResponse> => {
     const response = await invoke('get_graph_one', { moaId, nodeId });
@@ -66,9 +56,13 @@ const graphIpc = {
 };
 
 const fileIpc = {
-  getThumbnails: async (moaId: String, data: ThumbRequest) => {
+  getThumbnails: async (moaId: string, data: ThumbRequest) => {
     const response = await invoke('get_thumbnails', { data, moaId });
     return response as ThumbResponse;
+  },
+  previewFolderImport: async (path: string): Promise<FolderPreview> => {
+    const response = await invoke('preview_folder_import', { path });
+    return response as FolderPreview;
   },
 };
 

@@ -1,13 +1,15 @@
 use anyhow::{anyhow, bail, Context, Result};
 use async_recursion::async_recursion;
+use serde::Serialize;
 use sqlx::{Sqlite, Transaction};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
+    sync::Arc,
     time::{Duration, Instant},
 };
-use tauri::AppHandle;
-use tokio::fs;
+use tauri::{AppHandle, Emitter};
+use tokio::{fs, sync::Mutex};
 use tracing::{info, warn};
 
 use crate::{
@@ -16,7 +18,11 @@ use crate::{
         sroot_repository::SrootRepository,
     },
     models::{
-        file::{FileInfo, FileType, FolderData, RealFolderData},
+        file::{
+            FileInfo, FileType, FolderData, FolderPreview,
+            FolderPreviewFileStat, FolderPreviewNode, FolderPreviewSummary,
+            FolderSelection, RealFolderData,
+        },
         node::Node,
     },
     services::{
@@ -111,6 +117,119 @@ impl UpsertFolderMetrics {
     }
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+enum ImportState {
+    Running,
+    Completed,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FolderImportProgressPayload {
+    folder_id: String,
+    state: ImportState,
+    processed_bytes: u64,
+    total_bytes: Option<u64>,
+    processed_files: u64,
+    total_files: Option<u64>,
+    elapsed_ms: u64,
+}
+
+struct ImportProgressTracker {
+    app_handle: AppHandle,
+    moa_id: String,
+    folder_id: String,
+    total_bytes: Option<u64>,
+    total_files: Option<u64>,
+    processed_bytes: u64,
+    processed_files: u64,
+    started_at: Instant,
+}
+
+impl ImportProgressTracker {
+    fn new(
+        app_handle: AppHandle,
+        moa_id: String,
+        folder_id: String,
+        total_bytes: Option<u64>,
+        total_files: Option<u64>,
+    ) -> Self {
+        Self {
+            app_handle,
+            moa_id,
+            folder_id,
+            total_bytes,
+            total_files,
+            processed_bytes: 0,
+            processed_files: 0,
+            started_at: Instant::now(),
+        }
+    }
+
+    fn emit(&self, state: ImportState) {
+        let elapsed = self.started_at.elapsed().as_millis();
+        let elapsed_ms = if elapsed > u128::from(u64::MAX) {
+            u64::MAX
+        } else {
+            elapsed as u64
+        };
+
+        let payload = FolderImportProgressPayload {
+            folder_id: self.folder_id.clone(),
+            state,
+            processed_bytes: self.processed_bytes,
+            total_bytes: self.total_bytes,
+            processed_files: self.processed_files,
+            total_files: self.total_files,
+            elapsed_ms,
+        };
+
+        let topic = format!("folder-import://progress/{}", self.moa_id);
+        let _ = self.app_handle.emit(&topic, payload);
+    }
+
+    fn notify_start(&self) {
+        self.emit(ImportState::Running);
+    }
+
+    fn record_file(&mut self, bytes: Option<i64>) {
+        self.processed_files = self.processed_files.saturating_add(1);
+        if let Some(size) = bytes {
+            if size > 0 {
+                self.processed_bytes =
+                    self.processed_bytes.saturating_add(size as u64);
+            }
+        }
+        self.emit(ImportState::Running);
+    }
+
+    fn finish(&mut self) {
+        if let Some(total) = self.total_bytes {
+            if self.processed_bytes < total {
+                self.processed_bytes = total;
+            }
+        } else {
+            self.total_bytes = Some(self.processed_bytes);
+        }
+
+        if let Some(total) = self.total_files {
+            if self.processed_files < total {
+                self.processed_files = total;
+            }
+        } else {
+            self.total_files = Some(self.processed_files);
+        }
+
+        self.emit(ImportState::Completed);
+    }
+
+    fn fail(&self) {
+        self.emit(ImportState::Failed);
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum FileSizeBucket {
     Unknown,
@@ -160,6 +279,217 @@ struct BucketStats {
     count: u64,
 }
 
+const FILE_TYPE_ORDER: [FileType; 7] = [
+    FileType::Image,
+    FileType::Video,
+    FileType::Document,
+    FileType::GraphicTool,
+    FileType::Audio,
+    FileType::Archive,
+    FileType::Unknown,
+];
+
+#[derive(Default)]
+struct SelectionPlan {
+    entries: HashMap<String, SelectionNode>,
+}
+
+#[derive(Clone, Default)]
+struct SelectionNode {
+    include: bool,
+    allowed_types: Option<HashSet<FileType>>,
+}
+
+impl SelectionPlan {
+    fn from_selection(selection: FolderSelection) -> Self {
+        let mut entries = HashMap::new();
+        for entry in selection.entries {
+            let key = normalize_relative_key(&entry.relative_path);
+            let allowed_types = entry
+                .file_types
+                .map(|types| types.into_iter().collect::<HashSet<FileType>>());
+            entries.insert(
+                key,
+                SelectionNode { include: entry.include, allowed_types },
+            );
+        }
+
+        SelectionPlan { entries }
+    }
+
+    fn get(&self, key: &str) -> Option<&SelectionNode> {
+        self.entries.get(key)
+    }
+}
+
+#[derive(Default)]
+struct PreviewAccumulator {
+    total_folders: u64,
+    total_files: u64,
+    total_bytes: u64,
+    file_type_totals: HashMap<FileType, PreviewFileStats>,
+}
+
+#[derive(Default)]
+struct PreviewFileStats {
+    count: u64,
+    bytes: u64,
+}
+
+fn normalize_relative_key(value: &str) -> String {
+    if value.is_empty() {
+        return String::new();
+    }
+
+    let replaced = value.replace('\\', "/");
+    let trimmed = replaced.trim_matches('/');
+    if trimmed.is_empty() || trimmed == "." {
+        String::new()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn relative_path_key(root: &Path, current: &Path) -> String {
+    if let Ok(relative) = current.strip_prefix(root) {
+        if relative.as_os_str().is_empty() {
+            return String::new();
+        }
+        return join_path_components(relative);
+    }
+
+    join_path_components(current)
+}
+
+fn join_path_components(path: &Path) -> String {
+    path.components()
+        .map(|c| c.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+fn stats_map_to_vec(
+    map: &HashMap<FileType, PreviewFileStats>,
+) -> Vec<FolderPreviewFileStat> {
+    let mut out = Vec::new();
+    for file_type in FILE_TYPE_ORDER {
+        if let Some(stats) = map.get(&file_type) {
+            if stats.count > 0 {
+                out.push(FolderPreviewFileStat {
+                    file_type,
+                    count: stats.count,
+                    bytes: stats.bytes,
+                });
+            }
+        }
+    }
+
+    out
+}
+
+/// Traverse the filesystem and produce a preview tree for the selected folder.
+pub async fn collect_folder_preview(path: &Path) -> Result<FolderPreview> {
+    let norm = normalize_path(path);
+
+    let mut accumulator = PreviewAccumulator::default();
+    let root =
+        collect_folder_preview_impl(&norm, &norm, &mut accumulator).await?;
+
+    let summary = FolderPreviewSummary {
+        total_folders: accumulator.total_folders,
+        total_files: accumulator.total_files,
+        total_bytes: accumulator.total_bytes,
+        file_type_totals: stats_map_to_vec(&accumulator.file_type_totals),
+    };
+
+    Ok(FolderPreview { root, summary })
+}
+
+#[async_recursion]
+async fn collect_folder_preview_impl(
+    abs_dir: &Path,
+    root: &Path,
+    accumulator: &mut PreviewAccumulator,
+) -> Result<FolderPreviewNode> {
+    accumulator.total_folders += 1;
+
+    let mut dir = fs::read_dir(abs_dir)
+        .await
+        .with_context(|| format!("failed to read_dir {:?}", abs_dir))?;
+
+    let mut children = Vec::new();
+    let mut local_stats: HashMap<FileType, PreviewFileStats> = HashMap::new();
+    let mut total_files = 0_u64;
+    let mut total_bytes = 0_u64;
+
+    while let Some(entry) = dir
+        .next_entry()
+        .await
+        .with_context(|| format!("failed to read entry under {:?}", abs_dir))?
+    {
+        let entry_path = entry.path();
+
+        if check_is_hidden(&entry_path) {
+            continue;
+        }
+
+        let file_type = entry.file_type().await.with_context(|| {
+            format!("failed to get file_type for {:?}", entry_path)
+        })?;
+
+        if file_type.is_symlink() {
+            continue;
+        }
+
+        if file_type.is_dir() {
+            let child =
+                collect_folder_preview_impl(&entry_path, root, accumulator)
+                    .await?;
+            children.push(child);
+            continue;
+        }
+
+        if file_type.is_file() {
+            let kind = FileType::from(entry_path.as_path());
+            let metadata = entry.metadata().await.with_context(|| {
+                format!("failed to get metadata for {:?}", entry_path)
+            })?;
+            let size = metadata.len();
+
+            total_files += 1;
+            total_bytes += size;
+
+            let local_entry = local_stats.entry(kind).or_default();
+            local_entry.count += 1;
+            local_entry.bytes += size;
+
+            let global_entry =
+                accumulator.file_type_totals.entry(kind).or_default();
+            global_entry.count += 1;
+            global_entry.bytes += size;
+
+            accumulator.total_files += 1;
+            accumulator.total_bytes += size;
+        }
+    }
+
+    let name = abs_dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| abs_dir.to_string_lossy().into_owned());
+
+    Ok(FolderPreviewNode {
+        name,
+        path: abs_dir.to_string_lossy().into_owned(),
+        relative_path: relative_path_key(root, abs_dir),
+        total_files,
+        total_bytes,
+        file_stats: stats_map_to_vec(&local_stats),
+        children,
+    })
+}
+
 /// Create a new virtual folder inside a transaction.
 pub async fn create_folder(moa_id: String, data: FolderData) -> Result<Node> {
     let mut tx: Transaction<'_, Sqlite> =
@@ -183,35 +513,71 @@ pub async fn first_mount_folder(
     moa_id: String,
     node: Node,
     path: String,
+    selection: Option<FolderSelection>,
+    expected_bytes: Option<u64>,
+    expected_files: Option<u64>,
 ) -> Result<()> {
     let mut tx = DB_MANAGER.create_new_tx(&moa_id).await?;
 
     let norm_path = normalize_path(Path::new(&path));
 
+    let selection_plan = selection.map(SelectionPlan::from_selection);
+
     let sroot_info = storage_root::detect_storage_root(&norm_path)?;
 
+    let virtual_folder_id = node.id.clone();
     let real_folder_id =
         ensure_storage_root_and_real_folder(&mut tx, &sroot_info, &norm_path)
             .await?;
 
     FileRepository::create_virtual_folder_mount(
         tx.as_mut(),
-        node.id.clone(),
+        virtual_folder_id.clone(),
         real_folder_id.clone(),
     )
     .await?;
 
-    upsert_folder(
+    let progress = Arc::new(Mutex::new(ImportProgressTracker::new(
+        app.clone(),
+        moa_id.clone(),
+        virtual_folder_id.clone(),
+        expected_bytes,
+        expected_files,
+    )));
+
+    {
+        let guard = progress.lock().await;
+        guard.notify_start();
+    }
+
+    let upsert_result = upsert_folder(
         &mut tx,
         &app,
         &moa_id,
         real_folder_id.clone(),
-        node.id,
+        virtual_folder_id.clone(),
         &norm_path,
         true,
         Some(true),
+        selection_plan.as_ref(),
+        &norm_path,
+        Some(progress.clone()),
     )
-    .await?;
+    .await;
+
+    match upsert_result {
+        Ok(()) => {
+            let mut guard = progress.lock().await;
+            guard.finish();
+        }
+        Err(err) => {
+            {
+                let guard = progress.lock().await;
+                guard.fail();
+            }
+            return Err(err);
+        }
+    }
 
     let _scan_id = start_scan_job(moa_id.clone(), real_folder_id).await?;
 
@@ -238,6 +604,9 @@ async fn upsert_folder(
     abs_dir: &Path,
     recursive: bool,
     make_virtual_folder: Option<bool>,
+    selection: Option<&SelectionPlan>,
+    root_path: &Path,
+    progress: Option<Arc<Mutex<ImportProgressTracker>>>,
 ) -> Result<()> {
     let mut metrics = UpsertFolderMetrics::default();
     let total_timer = Instant::now();
@@ -251,7 +620,11 @@ async fn upsert_folder(
         abs_dir,
         recursive,
         make_virtual_folder,
+        selection,
+        root_path,
+        None,
         &mut metrics,
+        progress,
     )
     .await?;
 
@@ -272,16 +645,40 @@ async fn upsert_folder_impl(
     abs_dir: &Path,
     recursive: bool,
     make_virtual_folder: Option<bool>,
+    selection: Option<&SelectionPlan>,
+    root_path: &Path,
+    inherited_allowed_types: Option<HashSet<FileType>>,
     metrics: &mut UpsertFolderMetrics,
+    progress: Option<Arc<Mutex<ImportProgressTracker>>>,
 ) -> Result<()> {
     let make_vf = make_virtual_folder.unwrap_or(true);
+
+    let relative_key = relative_path_key(root_path, abs_dir);
+    let mut current_allowed = inherited_allowed_types;
+
+    if let Some(plan) = selection {
+        if let Some(node_selection) = plan.get(&relative_key) {
+            if !node_selection.include {
+                return Ok(());
+            }
+
+            if let Some(mut allowed) = node_selection.allowed_types.clone() {
+                if let Some(parent_allowed) = current_allowed.as_ref() {
+                    allowed =
+                        allowed.intersection(parent_allowed).cloned().collect();
+                }
+                current_allowed = Some(allowed);
+            }
+        }
+    }
 
     let tree_scan_timer = Instant::now();
     let mut dir = fs::read_dir(abs_dir)
         .await
         .with_context(|| format!("failed to read_dir {:?}", abs_dir))?;
 
-    let mut folder_entries: Vec<(PathBuf, String)> = Vec::new();
+    let mut folder_entries: Vec<(PathBuf, String, Option<HashSet<FileType>>)> =
+        Vec::new();
     while let Some(entry) = dir
         .next_entry()
         .await
@@ -304,8 +701,34 @@ async fn upsert_folder_impl(
         if file_type.is_dir() {
             let name = entry.file_name().to_string_lossy().to_string();
 
+            let mut include_child = true;
+            let mut child_allowed = current_allowed.clone();
+
+            if let Some(plan) = selection {
+                let child_key = relative_path_key(root_path, &entry_path);
+                if let Some(child_selection) = plan.get(&child_key) {
+                    if !child_selection.include {
+                        include_child = false;
+                    } else if let Some(mut allowed) =
+                        child_selection.allowed_types.clone()
+                    {
+                        if let Some(parent_allowed) = child_allowed.as_ref() {
+                            allowed = allowed
+                                .intersection(parent_allowed)
+                                .cloned()
+                                .collect();
+                        }
+                        child_allowed = Some(allowed);
+                    }
+                }
+            }
+
+            if !include_child {
+                continue;
+            }
+
             if recursive {
-                folder_entries.push((entry_path, name));
+                folder_entries.push((entry_path, name, child_allowed));
             } else if make_vf {
                 let folder_timer = Instant::now();
                 FileRepository::create_virtual_folder(
@@ -327,7 +750,9 @@ async fn upsert_folder_impl(
                 &parent_real_folder_id,
                 &parent_virtual_folder_id,
                 &entry,
+                current_allowed.as_ref(),
                 metrics,
+                progress.clone(),
             )
             .await
             .with_context(|| {
@@ -347,7 +772,7 @@ async fn upsert_folder_impl(
     .ok_or_else(|| anyhow!("parent_real_folder_id not found: {}", parent_real_folder_id))?;
 
     if recursive {
-        for (entry_path, name) in folder_entries {
+        for (entry_path, name, child_allowed) in folder_entries {
             let folder_timer = Instant::now();
             let child_vf = FileRepository::create_virtual_folder(
                 tx.as_mut(),
@@ -384,7 +809,11 @@ async fn upsert_folder_impl(
                 &entry_path,
                 recursive,
                 Some(make_vf),
+                selection,
+                root_path,
+                child_allowed,
                 metrics,
+                progress.clone(),
             )
             .await
             {
@@ -404,12 +833,21 @@ async fn upsert_file_entry(
     parent_real_folder_id: &str,
     parent_virtual_folder_id: &str,
     entry: &fs::DirEntry,
+    allowed_types: Option<&HashSet<FileType>>,
     metrics: &mut UpsertFolderMetrics,
+    progress: Option<Arc<Mutex<ImportProgressTracker>>>,
 ) -> Result<()> {
     let file_timer = Instant::now();
-    let file_name = entry.file_name().to_string_lossy().to_string();
-
     let file_path = entry.path();
+    let kind_guess = FileType::from(file_path.as_path());
+
+    if let Some(allowed) = allowed_types {
+        if !allowed.contains(&kind_guess) {
+            return Ok(());
+        }
+    }
+
+    let file_name = entry.file_name().to_string_lossy().to_string();
     let file_info =
         FileInfo::new(&file_path, parent_real_folder_id.to_string(), file_name)
             .await?;
@@ -443,6 +881,11 @@ async fn upsert_file_entry(
         .await;
     }
     metrics.record_upsert_file(file_info.file_size, file_timer.elapsed());
+
+    if let Some(tracker) = &progress {
+        let mut guard = tracker.lock().await;
+        guard.record_file(file_info.file_size);
+    }
 
     Ok(())
 }

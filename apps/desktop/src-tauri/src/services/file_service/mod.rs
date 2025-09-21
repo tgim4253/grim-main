@@ -7,7 +7,8 @@ pub mod thumbnail;
 pub mod utils;
 
 pub use folder::{
-    create_folder, ensure_real_folder, first_mount_folder, start_scan_job,
+    collect_folder_preview, create_folder, ensure_real_folder,
+    first_mount_folder, start_scan_job,
 };
 pub use hash::{sha256_of_img, xxh3_64_of};
 pub use job_queue::{

@@ -1,3 +1,5 @@
+import { FileType } from './file';
+
 export interface GraphResponse {
   nodes: Node[];
   connections: Connection[];
@@ -74,16 +76,6 @@ export interface NodeFile {
   kind: FileType;
   file_name: string;
   size: number;
-}
-
-export enum FileType {
-  Image = 'image',
-  Video = 'video',
-  Document = 'document',
-  GraphicTool = 'graphictool',
-  Audio = 'audio',
-  Archive = 'archive',
-  Unknown = 'unknown',
 }
 
 export enum RelationType {

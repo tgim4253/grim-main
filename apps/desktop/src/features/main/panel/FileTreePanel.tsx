@@ -1,5 +1,5 @@
 import { FileTreeData } from '@tgim/types/index';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   useHoverOpen,
   useMultiSelect,
@@ -17,6 +17,8 @@ import NewFolderModal from '../../file/modal/NewFolderModal';
 import { ipc } from '../../../lib/ipc';
 import { useMoa } from '@tgim/hooks/useMoa';
 import usePanelsStore from '@tgim/stores/panelStore';
+import { listen } from '@tauri-apps/api/event';
+import FolderImportProgressModal from '../../file/modal/FolderImportProgressModal';
 
 /* local utils for rendering */
 
@@ -58,6 +60,13 @@ const flattenVisible = (tree: FileTreeData[], expanded: Set<string>): string[] =
   };
   walk(tree);
   return out;
+};
+
+type ImportContext = {
+  folderName: string;
+  totalBytes: number;
+  totalFiles: number;
+  startedAt: number;
 };
 
 export const FileTree = () => {
@@ -113,6 +122,73 @@ export const FileTree = () => {
   };
 
   const { moaId } = useMoa(location);
+
+  const [importContext, setImportContext] = useState<ImportContext | null>(null);
+  const [importProgress, setImportProgress] = useState<FolderImportProgressEvent | null>(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const importContextRef = useRef<ImportContext | null>(null);
+
+  useEffect(() => {
+    importContextRef.current = importContext;
+  }, [importContext]);
+
+  useEffect(() => {
+    if (!moaId) {
+      return;
+    }
+
+    let unlisten: (() => void) | undefined;
+
+    const setup = async () => {
+      try {
+        unlisten = await listen<FolderImportProgressEvent>(
+          `folder-import://progress/${moaId}`,
+          event => {
+            const context = importContextRef.current;
+            if (!context) {
+              return;
+            }
+
+            setImportModalOpen(true);
+            setImportProgress(prev => {
+              const payload = event.payload;
+              const totalBytes = payload.totalBytes ?? prev?.totalBytes ?? context.totalBytes;
+              const totalFiles = payload.totalFiles ?? prev?.totalFiles ?? context.totalFiles;
+
+              return {
+                ...payload,
+                totalBytes,
+                totalFiles,
+              };
+            });
+
+            setImportContext(prev => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                totalBytes: event.payload.totalBytes ?? prev.totalBytes,
+                totalFiles: event.payload.totalFiles ?? prev.totalFiles,
+              };
+            });
+          },
+        );
+      } catch (error) {
+        console.error('Failed to listen for folder import progress', error);
+      }
+    };
+
+    void setup();
+
+    return () => {
+      unlisten?.();
+    };
+  }, [moaId]);
+
+  const handleImportModalClose = () => {
+    setImportModalOpen(false);
+    setImportProgress(null);
+    setImportContext(null);
+  };
 
   return (
     <div className="w-full h-full text-sidebar-text" onClick={clearSelection}>
@@ -196,21 +272,61 @@ export const FileTree = () => {
         <Modal onClose={() => setIsFolderModal(false)} className="bg-modal-bg">
           <NewFolderModal
             onClose={() => setIsFolderModal(false)}
-            onSubmit={d => {
+            onSubmit={async d => {
               if (!moaId) return;
+              const hasPath = Boolean(d.path);
+              if (hasPath) {
+                const context: ImportContext = {
+                  folderName: d.name,
+                  totalBytes: d.expectedBytes ?? 0,
+                  totalFiles: d.expectedFiles ?? 0,
+                  startedAt: Date.now(),
+                };
+                importContextRef.current = context;
+                setImportContext(context);
+                setImportProgress({
+                  folderId: '',
+                  state: 'running',
+                  processedBytes: 0,
+                  totalBytes: d.expectedBytes ?? 0,
+                  processedFiles: 0,
+                  totalFiles: d.expectedFiles ?? 0,
+                  elapsedMs: 0,
+                });
+                setImportModalOpen(true);
+              }
               try {
-                ipc.graph.createFolder(moaId, {
+                await ipc.graph.createFolder(moaId, {
                   name: d.name,
                   path: d.path,
                   parent_id: optionNode?.id ?? 'root',
+                  selection: d.selection,
+                  expectedBytes: d.expectedBytes,
+                  expectedFiles: d.expectedFiles,
                 });
               } catch (err) {
+                if (hasPath) {
+                  setImportModalOpen(false);
+                  setImportProgress(null);
+                  setImportContext(null);
+                }
                 console.error(err);
+                throw err;
               }
             }}
           />
         </Modal>
       )}
+      {importModalOpen && importProgress && importContext ? (
+        <FolderImportProgressModal
+          progress={importProgress}
+          onClose={handleImportModalClose}
+          folderName={importContext.folderName}
+          totalBytesFallback={importContext.totalBytes}
+          totalFilesFallback={importContext.totalFiles}
+          startedAt={importContext.startedAt}
+        />
+      ) : null}
     </div>
   );
 };

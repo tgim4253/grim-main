@@ -45,6 +45,69 @@ pub struct FolderData {
     pub name: String,
     pub path: Option<String>,
     pub parent_id: String,
+    pub selection: Option<FolderSelection>,
+    #[serde(default, rename = "expectedBytes")]
+    pub expected_bytes: Option<u64>,
+    #[serde(default, rename = "expectedFiles")]
+    pub expected_files: Option<u64>,
+}
+
+/// Describes the folder/file-type filters chosen by the user before import.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderSelection {
+    #[serde(default)]
+    pub entries: Vec<FolderSelectionEntry>,
+}
+
+/// Specific folder override provided by the user.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderSelectionEntry {
+    pub relative_path: String,
+    pub include: bool,
+    #[serde(default)]
+    pub file_types: Option<Vec<FileType>>,
+}
+
+/// Aggregated file statistics grouped by file type.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderPreviewFileStat {
+    pub file_type: FileType,
+    pub count: u64,
+    pub bytes: u64,
+}
+
+/// Preview information about a folder and its descendants.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderPreviewNode {
+    pub name: String,
+    pub path: String,
+    pub relative_path: String,
+    pub total_files: u64,
+    pub total_bytes: u64,
+    pub file_stats: Vec<FolderPreviewFileStat>,
+    pub children: Vec<FolderPreviewNode>,
+}
+
+/// Summary of the entire preview tree.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderPreviewSummary {
+    pub total_folders: u64,
+    pub total_files: u64,
+    pub total_bytes: u64,
+    pub file_type_totals: Vec<FolderPreviewFileStat>,
+}
+
+/// Full preview payload returned to the renderer before import.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderPreview {
+    pub root: FolderPreviewNode,
+    pub summary: FolderPreviewSummary,
 }
 
 /// Supported operating systems for storage roots.
@@ -124,7 +187,16 @@ pub struct StorageRootInfo {
 
 /// Logical file types derived from file extensions.
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    Type,
+    Default,
+    Hash,
 )]
 #[sqlx(type_name = "TEXT")]
 #[sqlx(rename_all = "lowercase")]
@@ -180,7 +252,7 @@ impl From<&Path> for FileType {
             "pdf" | "txt" | "doc" | "docx" | "xls" | "xlsx" | "ppt"
             | "pptx" | "odt" | "md" => FileType::Document,
 
-            // Graphic / Tool-specific (이미지 툴)
+            // Graphic / Tool-specific
             "psd" => FileType::GraphicTool, // Photoshop
             "ai" => FileType::GraphicTool,  // Illustrator
             "xd" => FileType::GraphicTool,  // Adobe XD
@@ -190,7 +262,7 @@ impl From<&Path> for FileType {
             "sai" => FileType::GraphicTool, // Paint Tool SAI
             "pur" => FileType::GraphicTool, // PureRef
 
-            // 압축파일
+            // Zip
             "zip" | "rar" | "7z" | "tar" | "gz" => FileType::Archive,
 
             // Default

@@ -8,9 +8,10 @@ interface Props {
   className?: string;
   children?: React.ReactNode;
   rootId?: string;
+  dismissible?: boolean;
 }
 
-const Modal: React.FC<Props> = ({ onClose, children, className, rootId }) => {
+const Modal: React.FC<Props> = ({ onClose, children, className, rootId, dismissible = true }) => {
   const targetId = rootId ?? 'modal_root';
 
   const modalRoot = useMemo(() => {
@@ -27,18 +28,20 @@ const Modal: React.FC<Props> = ({ onClose, children, className, rootId }) => {
     event.stopPropagation();
   }, []);
 
+  const handleOverlayClick = useCallback(() => {
+    if (!dismissible) return;
+    onClose();
+  }, [dismissible, onClose]);
+
   // Render inside a detached root so modals can escape stacking context issues.
   return createPortal(
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={handleOverlayClick}>
       <div className={cn('modal', className)} onClick={handleInnerClick}>
-        <Button
-          variant="icon"
-          className="modal-close"
-          onClick={onClose}
-          aria-label="Close modal"
-        >
-          ×
-        </Button>
+        {dismissible ? (
+          <Button variant="icon" className="modal-close" onClick={onClose} aria-label="Close modal">
+            ×
+          </Button>
+        ) : null}
         {children}
       </div>
     </div>,

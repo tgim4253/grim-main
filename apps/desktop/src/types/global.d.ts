@@ -29,6 +29,18 @@ declare global {
     percent: number;
     note?: string;
   }
+
+  type FolderImportState = 'running' | 'completed' | 'failed';
+
+  interface FolderImportProgressEvent {
+    folderId: string;
+    state: FolderImportState;
+    processedBytes: number;
+    totalBytes?: number | null;
+    processedFiles: number;
+    totalFiles?: number | null;
+    elapsedMs: number;
+  }
 }
 
 export {};

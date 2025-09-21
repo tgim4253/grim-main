@@ -7,7 +7,6 @@ import { useMoa } from '@tgim/hooks/useMoa';
 import GraphView from './panels/GraphView';
 import {
   Connection,
-  FileType,
   GraphConnection,
   GraphData,
   GraphNode,
@@ -22,7 +21,7 @@ import { createNewId } from '@tgim/utils/identifier';
 import GridView from './panels/GridView';
 import { GridData, ImageItem } from '@tgim/types/grid';
 import { listen } from '@tauri-apps/api/event';
-import { ThumbResSpec } from '@tgim/types/file';
+import { FileType, ThumbResSpec } from '@tgim/types/file';
 import { Button } from '@tgim/ui';
 import cn from '@tgim/utils/cn';
 import { GitBranch, LayoutGrid } from 'lucide-react';
@@ -90,8 +89,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
 
     const getGraphNodeData = (node: Node, graphNodeId?: string): GraphNode => {
       const defaultSize = 14;
-      const nodeSize =
-        node.id == graphData.root_node_id ? defaultSize * 1.6 : defaultSize;
+      const nodeSize = node.id == graphData.root_node_id ? defaultSize * 1.6 : defaultSize;
       if (!graphNodeId) graphNodeId = createNewId();
 
       if (node.kind == NodeKind.File && node.data['File']) {
@@ -231,8 +229,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   }, [graphData, rootNodeId]);
   if (!panel || !container) return null;
 
-  const showGraph =
-    viewType === 'graph' && graphData && rootNodeId && rootGraphNodeId;
+  const showGraph = viewType === 'graph' && graphData && rootNodeId && rootGraphNodeId;
   const showGrid = viewType === 'grid' && !!gridData;
 
   return ReactDOM.createPortal(

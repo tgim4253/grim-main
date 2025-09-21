@@ -42,6 +42,7 @@ fn main() {
             commands::moa::bootstrap_status,
             commands::graph::get_graph_one,
             commands::file::get_thumbnails,
+            commands::file::preview_folder_import,
         ])
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_decorum::init())
