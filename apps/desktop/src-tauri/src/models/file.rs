@@ -252,7 +252,7 @@ impl From<&Path> for FileType {
             "pdf" | "txt" | "doc" | "docx" | "xls" | "xlsx" | "ppt"
             | "pptx" | "odt" | "md" => FileType::Document,
 
-            // Graphic / Tool-specific (이미지 툴)
+            // Graphic / Tool-specific
             "psd" => FileType::GraphicTool, // Photoshop
             "ai" => FileType::GraphicTool,  // Illustrator
             "xd" => FileType::GraphicTool,  // Adobe XD
@@ -262,7 +262,7 @@ impl From<&Path> for FileType {
             "sai" => FileType::GraphicTool, // Paint Tool SAI
             "pur" => FileType::GraphicTool, // PureRef
 
-            // 압축파일
+            // Zip
             "zip" | "rar" | "7z" | "tar" | "gz" => FileType::Archive,
 
             // Default
