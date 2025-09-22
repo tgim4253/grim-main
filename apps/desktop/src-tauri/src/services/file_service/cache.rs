@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use tauri::{path::BaseDirectory, AppHandle};
+use tauri::{path::BaseDirectory, AppHandle, Manager};
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
