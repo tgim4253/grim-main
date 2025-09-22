@@ -12,7 +12,7 @@ pub fn launch_croquis(
     let uri = format!("croquis?session_id={}", session.session_id);
 
     #[cfg(debug_assertions)]
-    let url = WebviewUrl::App(format!("index.html#{uri}").into());
+    let url = WebviewUrl::App(format!("http://localhost:1420/#/{uri}").into());
 
     #[cfg(not(debug_assertions))]
     let url = WebviewUrl::App(format!("index.html#{uri}").into());
@@ -21,7 +21,7 @@ pub fn launch_croquis(
 
     let mut builder =
         tauri::WebviewWindowBuilder::new(app, window_label.clone(), url)
-            .title("Croquis")
+            .title("")
             .resizable(true)
             .maximizable(false)
             .always_on_top(true)

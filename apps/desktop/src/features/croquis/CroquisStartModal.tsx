@@ -28,8 +28,8 @@ const normaliseCroquisOption = (option: CroquisOption): CroquisOption => ({
     isSkip: option.auto?.isSkip ?? false,
   },
   timer: {
-    max_time:
-      option.timer?.max_time ??
+    maxTime:
+      option.timer?.maxTime ??
       (option.timer as unknown as { maxTime?: number } | undefined)?.maxTime ??
       60,
   },
@@ -176,7 +176,7 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
       setLocalOption(prev => {
         const timer = {
           ...prev.timer,
-          max_time: safeValue,
+          maxTime: safeValue,
         } as typeof prev.timer & { maxTime?: number };
         timer.maxTime = safeValue;
         return {
@@ -228,15 +228,15 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
     setSubmitting(true);
     try {
       const maxTimeValue =
-        localOption.timer.max_time ??
+        localOption.timer.maxTime ??
         (localOption.timer as unknown as { maxTime?: number }).maxTime ??
         60;
       const payloadOption = {
         ...localOption,
-        auto: { isSkip: false },
+        auto: { isSkip: skipMode === 'auto' },
         timer: {
           ...localOption.timer,
-          max_time: maxTimeValue,
+          maxTime: maxTimeValue,
         },
       } as CroquisOption & { timer: CroquisOption['timer'] & { maxTime?: number } };
       payloadOption.timer.maxTime = maxTimeValue;
@@ -348,7 +348,7 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
                 ...prev,
                 auto: {
                   ...prev.auto,
-                  skip: value === 'auto',
+                  isSkip: value === 'auto',
                 },
               }));
             }}
@@ -373,7 +373,7 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
               step={5}
               inputMode="numeric"
               className="input-default"
-              value={localOption.timer.max_time.toString()}
+              value={localOption.timer.maxTime.toString()}
               onChange={handleTimerChange}
             />
           </label>

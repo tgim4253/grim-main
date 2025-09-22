@@ -4,7 +4,7 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { Button } from '@tgim/ui';
 import { CroquisSession, CroquisSessionImage } from '@tgim/types/croquis';
-import { Minus, Pause, Play, SkipBack, SkipForward, Camera, X } from 'lucide-react';
+import { Pause, Play, SkipBack, SkipForward, Camera } from 'lucide-react';
 import { ipc } from '../../lib/ipc';
 
 const shuffleImages = (images: CroquisSessionImage[]): CroquisSessionImage[] => {
@@ -17,9 +17,7 @@ const shuffleImages = (images: CroquisSessionImage[]): CroquisSessionImage[] => 
 };
 
 const formatTime = (seconds: number): string => {
-  if (!Number.isFinite(seconds) || seconds < 0) {
-    return '00:00';
-  }
+  if (!Number.isFinite(seconds) || seconds < 0) return '00:00';
   const totalSeconds = Math.max(0, Math.floor(seconds));
   const minutes = Math.floor(totalSeconds / 60);
   const remainder = totalSeconds % 60;
@@ -33,7 +31,9 @@ const CroquisWindow: React.FC = () => {
   const [elapsedMs, setElapsedMs] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [timerExpired, setTimerExpired] = useState(false);
+  const [isHover, setIsHover] = useState(false); // UI visible only on hover
 
+  const imgRef = useRef<HTMLImageElement | null>(null); // reference to current <img>
   const rafRef = useRef<number | null>(null);
   const elapsedRef = useRef(0);
   const startTimestampRef = useRef<number | null>(null);
@@ -51,7 +51,6 @@ const CroquisWindow: React.FC = () => {
     }
 
     let cancelled = false;
-
     void (async () => {
       try {
         const data = await ipc.croquis.loadSession(sessionId);
@@ -78,53 +77,59 @@ const CroquisWindow: React.FC = () => {
   const isGray = option?.isGray ?? false;
 
   const imageList = useMemo(() => {
-    if (!session) {
-      return [];
-    }
+    if (!session) return [];
     const base = session.images ?? [];
-    if (!base.length) {
-      return [];
-    }
-    if (session.option?.isShuffle) {
-      return shuffleImages(base);
-    }
+    if (!base.length) return [];
+    if (session.option?.isShuffle) return shuffleImages(base);
     return [...base];
   }, [session]);
 
   useEffect(() => {
-    setCurrentIndex(prev => {
-      if (!imageList.length) {
-        return 0;
-      }
-      return Math.min(prev, imageList.length - 1);
-    });
+    setCurrentIndex(prev => (imageList.length ? Math.min(prev, imageList.length - 1) : 0));
   }, [imageList]);
 
-  useEffect(() => {
-    if (!session) return;
-    const { width, height } = session.option.window ?? {};
-    const parsedWidth = width ? Number(width) : NaN;
-    const parsedHeight = height ? Number(height) : NaN;
-    const hasWidth = Number.isFinite(parsedWidth) && parsedWidth > 0;
-    const hasHeight = Number.isFinite(parsedHeight) && parsedHeight > 0;
-    if (!hasWidth && !hasHeight) {
-      return;
-    }
+  // Re-apply size when image loads or index changes
+  // useEffect(() => {
+  //   const el = imgRef.current;
+  //   if (!el) return;
 
-    void (async () => {
+  //   const handle = () => void applyWindowSizeToImage();
+  //   if (el.complete) handle();
+  //   el.addEventListener('load', handle);
+  //   el.addEventListener('error', handle);
+  //   return () => {
+  //     el.removeEventListener('load', handle);
+  //     el.removeEventListener('error', handle);
+  //   };
+  // }, [applyWindowSizeToImage, currentIndex]);
+
+  const [isInitHeight, setIsInitHeight] = useState(false);
+  useEffect(() => {
+    (async () => {
+      if (isInitHeight) return;
+      const el = imgRef.current;
+      if (!el) return;
+
+      const naturalH = el.naturalHeight || el.height;
+      const naturalW = el.naturalWidth || el.width;
+      if (!naturalH) return;
+
       try {
         const windowRef = getCurrentWindow();
-        const currentSize = await windowRef.outerSize();
-        const nextWidth = hasWidth ? parsedWidth : currentSize.width;
-        const nextHeight = hasHeight ? parsedHeight : currentSize.height;
-        await windowRef.setSize(new LogicalSize(nextWidth, nextHeight));
+
+        const fixedWidth = Number(option?.window.width!);
+        const desiredHeight = Math.max(1, (Math.round(naturalH) * fixedWidth) / naturalW);
+
+        await windowRef.setSize(new LogicalSize(fixedWidth, desiredHeight));
+        setIsInitHeight(true);
       } catch (error) {
-        console.error('[Croquis] Failed to apply window size option', error);
+        console.error('[Croquis] Failed to apply window size to image', error);
       }
     })();
-  }, [session]);
+  }, [imageList, imgRef.current, option]);
 
-  const maxTimeSecondsRaw = option?.timer?.max_time ?? 0;
+  // --- Timer logic ---
+  const maxTimeSecondsRaw = option?.timer?.maxTime ?? 0;
   const maxTimeSeconds = Number.isFinite(maxTimeSecondsRaw) ? Math.max(0, maxTimeSecondsRaw) : 0;
   const maxTimeMs = maxTimeSeconds > 0 ? maxTimeSeconds * 1000 : 0;
 
@@ -132,12 +137,7 @@ const CroquisWindow: React.FC = () => {
     setIsPlaying(false);
     setTimerExpired(true);
     if (autoSkip && imageList.length > 0) {
-      setCurrentIndex(prev => {
-        if (prev >= imageList.length - 1) {
-          return prev;
-        }
-        return prev + 1;
-      });
+      setCurrentIndex(prev => (prev >= imageList.length - 1 ? prev : prev + 1));
     }
   }, [autoSkip, imageList.length]);
 
@@ -146,7 +146,6 @@ const CroquisWindow: React.FC = () => {
       if (startTimestampRef.current === null) {
         startTimestampRef.current = timestamp - elapsedRef.current;
       }
-
       const nextElapsed = timestamp - startTimestampRef.current;
       elapsedRef.current = nextElapsed;
       if (maxTimeMs > 0 && nextElapsed >= maxTimeMs) {
@@ -157,7 +156,6 @@ const CroquisWindow: React.FC = () => {
         handleTimerComplete();
         return;
       }
-
       setElapsedMs(nextElapsed);
       rafRef.current = requestAnimationFrame(updateLoop);
     },
@@ -177,9 +175,7 @@ const CroquisWindow: React.FC = () => {
   }, []);
 
   const startTimer = useCallback(() => {
-    if (rafRef.current !== null) {
-      return;
-    }
+    if (rafRef.current !== null) return;
     setTimerExpired(false);
     setIsPlaying(true);
     startTimestampRef.current = null;
@@ -196,20 +192,17 @@ const CroquisWindow: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!session || !imageList.length) {
-      return;
-    }
+    if (!session || !imageList.length) return;
     resetTimer();
     startTimer();
   }, [session, imageList, currentIndex, resetTimer, startTimer]);
 
-  useEffect(() => {
-    return () => {
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-      }
-    };
-  }, []);
+  useEffect(
+    () => () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    },
+    [],
+  );
 
   const currentImage = imageList[currentIndex] ?? null;
   const currentImageSrc = useMemo(
@@ -236,138 +229,108 @@ const CroquisWindow: React.FC = () => {
 
   const elapsedSeconds =
     maxTimeSeconds > 0 ? Math.min(maxTimeSeconds, elapsedMs / 1000) : elapsedMs / 1000;
-  const progress = maxTimeMs > 0 ? Math.min(elapsedMs / maxTimeMs, 1) : 0;
+  const progress = useMemo(
+    () => (maxTimeMs > 0 ? Math.min(elapsedMs / maxTimeMs, 1) : 0),
+    [elapsedMs, maxTimeMs],
+  );
   const isCritical = timerExpired || progress >= 0.9;
 
   return (
-    <div className="flex h-full flex-col bg-surface text-text">
-      <header
-        className="flex h-8 items-center justify-between border-b border-border bg-shell-base/80 px-3 text-text backdrop-blur"
-        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+    <div className="flex h-full w-full flex-col text-text">
+      {/* Stage area */}
+      <main
+        className="relative flex h-full w-full flex-1 select-none bg-transparent flex-col"
+        onMouseEnter={() => setIsHover(true)}
+        onMouseLeave={() => setIsHover(false)}
       >
-        <div className="text-sm font-semibold uppercase tracking-wide text-text-soft">
-          Croquis Session
-        </div>
-        <div
-          className="flex items-center"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        >
-          <Button
-            type="button"
-            variant="titlebar"
-            onClick={() => ipc.windowController.minimize()}
-            aria-label="Minimize window"
-            className="flex items-center justify-center text-icon-main hover:text-icon-hover-main"
-          >
-            <Minus className="size-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="titlebar"
-            onClick={() => ipc.windowController.close()}
-            aria-label="Close window"
-            className="flex items-center justify-center text-icon-main hover:text-icon-hover-main"
-          >
-            <X className="size-4" />
-          </Button>
-        </div>
-      </header>
-
-      <main className="flex flex-1 flex-col gap-4 p-6">
-        <div className="flex items-center justify-between text-sm text-text-soft">
-          <span>
-            {imageList.length > 0
-              ? `Image ${currentIndex + 1} / ${imageList.length}`
-              : 'Loading images...'}
-          </span>
-          <span>{option?.auto?.isSkip ? 'Auto skip mode' : 'Manual mode'}</span>
-        </div>
-
-        <div className="flex flex-1 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-muted shadow-inner">
+        <div className="relative flex h-full w-full items-center justify-center overflow-hidden">
           {currentImage && currentImageSrc ? (
             <img
               key={currentImage.hash}
+              ref={imgRef}
               src={currentImageSrc}
               alt={currentImage.hash}
-              className="max-h-full max-w-full object-contain"
+              className="h-full w-full object-contain"
               style={{ filter: isGray ? 'grayscale(100%)' : 'none' }}
             />
           ) : (
             <div className="text-sm text-text-soft">Waiting for Croquis data...</div>
           )}
         </div>
-
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handlePrev}
-            disabled={!hasPrev}
-            className="flex items-center gap-2"
-          >
-            <SkipBack className="size-4" />
-            Prev
-          </Button>
-          {isPlaying ? (
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={pauseTimer}
-              className="flex items-center gap-2"
-            >
-              <Pause className="size-4" />
-              Pause
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              variant="primary"
-              onClick={startTimer}
-              className="flex items-center gap-2"
-            >
-              <Play className="size-4" />
-              Start
-            </Button>
-          )}
-          {!autoSkip && (
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleNext}
-              disabled={!hasNext}
-              className="flex items-center gap-2"
-            >
-              <SkipForward className="size-4" />
-              Next
-            </Button>
-          )}
-          {!autoSkip && isCaptureEnabled && (
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleCapture}
-              className="flex items-center gap-2"
-            >
-              <Camera className="size-4" />
-              Capture
-            </Button>
-          )}
+        <div className="pointer-events-none flex w-full items-center justify-center">
+          <div className="w-full max-w-[720px]">
+            <div className="h-1 w-full overflow-hidden rounded-full bg-surface-muted">
+              <div
+                className={`h-full ${isCritical ? 'bg-red-500' : 'bg-accent'}`}
+                style={{ width: `${Math.min(100, Math.max(0, progress * 100))}%` }}
+              />
+            </div>
+          </div>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between text-xs text-text-soft">
-            <span>
-              {formatTime(elapsedSeconds)} / {formatTime(maxTimeSeconds)}
-            </span>
-            {maxTimeMs > 0 && <span>{Math.round(progress * 100)}%</span>}
-          </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-surface-muted">
-            <div
-              className={`h-full transition-[width,background-color] ${
-                isCritical ? 'bg-red-500' : 'bg-accent'
-              }`}
-              style={{ width: `${Math.min(100, Math.max(0, progress * 100))}%` }}
-            />
+        {/* Absolute overlay controls (show on hover only) */}
+        <div
+          className={`pointer-events-none absolute inset-0 flex flex-col items-center justify-between p-4 transition-opacity duration-200 ${
+            isHover ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          {/* Bottom transport controls */}
+          <div
+            className="absolute pointer-events-none flex w-full items-end justify-center"
+            style={{ bottom: 10 }}
+          >
+            <div className="pointer-events-auto flex items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handlePrev}
+                disabled={!hasPrev}
+                className="flex items-center gap-2"
+              >
+                <SkipBack className="size-4" />
+              </Button>
+
+              {isPlaying ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={pauseTimer}
+                  className="flex items-center gap-2"
+                >
+                  <Pause className="size-4" />
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={startTimer}
+                  className="flex items-center gap-2"
+                >
+                  <Play className="size-4" />
+                </Button>
+              )}
+
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleNext}
+                disabled={!hasNext}
+                className="flex items-center gap-2"
+              >
+                <SkipForward className="size-4" />
+              </Button>
+
+              {!autoSkip && isCaptureEnabled && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleCapture}
+                  className="flex items-center gap-2"
+                >
+                  <Camera className="size-4" />
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </main>

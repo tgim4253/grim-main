@@ -8,7 +8,7 @@ export interface CroquisAutoOption {
 }
 
 export interface CroquisTimerOption {
-  max_time: number;
+  maxTime: number;
 }
 
 export interface CroquisOption {
