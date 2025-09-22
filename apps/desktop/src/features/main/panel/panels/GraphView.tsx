@@ -1,12 +1,15 @@
 import usePanelsStore from '@tgim/stores/panelStore';
-import { Connection, GraphConnection, GraphData } from '@tgim/types/graph';
+import { Connection, GraphConnection, GraphData, GraphNode } from '@tgim/types/graph';
 import { NodeRenderer, clearNodeSpriteCaches, getGraphPalette } from '@tgim/ui/index';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d';
 import { useShallow } from 'zustand/shallow';
 import * as d3 from 'd3-force';
 import useThumbStore from '@tgim/stores/thumbStore';
 import { useMoa } from '@tgim/hooks/useMoa';
+import { ResizeMode } from '@tgim/types/file';
+import { convertFileSrc } from '@tauri-apps/api/core';
+import { useThumbnails } from '../../../../hooks';
 import { useTheme } from '../../../../theme/ThemeProvider';
 
 interface Props {
@@ -14,6 +17,8 @@ interface Props {
   rootNodeId: string;
   rootGraphNodeId: string;
 }
+
+const GRAPH_THUMB_SIZE = 64;
 
 const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -45,13 +50,6 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
       }
     };
   }, []);
-  const { upsertThumb, thumb } = useThumbStore(
-    useShallow(s => ({
-      upsertThumb: s.upsert,
-      thumb: s.byKey,
-    })),
-  );
-
   const nodesById = useMemo(() => {
     if (!graphData) return {};
     const nodesById = Object.fromEntries(graphData.nodes.map(node => [node.id, node]));
@@ -66,16 +64,9 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
     return nodesById;
   }, [graphData.nodes]);
   const { moaId } = useMoa(location);
-
-  useEffect(() => {
-    graphData.nodes.forEach(node => {
-      if (node.type == 'image' && !node.url) {
-      }
-    });
-  }, [moaId, graphData.nodes]);
+  const { ensureThumbnails, getThumbnailKey } = useThumbnails({ moaId });
 
   const GAP = 90;
-  const LEAF_OFFSET = 10;
 
   const getPrunedTree = () => {
     const visibleNodes = [];
@@ -96,6 +87,70 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
     return { nodes: visibleNodes, links: visibleLinks };
   };
   const [prunedTree, setPrunedTree] = useState(getPrunedTree());
+  const imageNodes = useMemo(
+    () => prunedTree.nodes.filter(node => node.type === 'image' && node.hash),
+    [prunedTree.nodes],
+  );
+  const imageNodesRef = useRef<GraphNode[]>([]);
+  useEffect(() => {
+    imageNodesRef.current = imageNodes;
+  }, [imageNodes]);
+
+  useEffect(() => {
+    if (imageNodes.length === 0) return;
+
+    const requests = imageNodes
+      .filter(
+        (node): node is GraphNode & { hash: string } =>
+          typeof node.hash === 'string' && node.hash.length > 0,
+      )
+      .map(node => {
+        const request = {
+          hash: node.hash,
+          width: GRAPH_THUMB_SIZE,
+          height: GRAPH_THUMB_SIZE,
+          dpr: 1 as const,
+          mode: ResizeMode.Original,
+        };
+        const key = getThumbnailKey(request);
+        if (node.thumbKey !== key) {
+          node.thumbKey = key;
+          node.url = undefined;
+        }
+        return { ...request, key };
+      });
+
+    if (requests.length === 0) return;
+
+    void ensureThumbnails(requests);
+  }, [ensureThumbnails, getThumbnailKey, imageNodes]);
+
+  useEffect(() => {
+    const unsubscribe = useThumbStore.subscribe(
+      state => state.byKey,
+      byKey => {
+        let changed = false;
+        imageNodesRef.current.forEach(node => {
+          const key = node.thumbKey;
+          if (!key) return;
+          const entry = byKey[key];
+          const nextUrl =
+            entry?.status === 'ready' && entry.url ? convertFileSrc(entry.url) : undefined;
+          if (node.url !== nextUrl) {
+            node.url = nextUrl;
+            changed = true;
+          }
+        });
+        if (changed) {
+          fgRef.current?.refresh();
+        }
+      },
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     if (fgRef && fgRef.current) {
@@ -179,6 +234,8 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
               y: node.y || 0,
               size: node.size,
               label: node.label,
+              url: node.url,
+              thumbKey: node.thumbKey,
             },
             globalScale,
           );
