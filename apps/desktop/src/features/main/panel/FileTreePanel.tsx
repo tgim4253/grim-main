@@ -1,5 +1,5 @@
 import { FileTreeData } from '@tgim/types/index';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   useHoverOpen,
   useMultiSelect,
@@ -73,10 +73,13 @@ export const FileTree = () => {
   const [isFolderModal, setIsFolderModal] = useState(false);
 
   // Select only what we need from the store (shallow compare to reduce re-renders)
-  const { treeData, onMove } = useFileTreeStore(
+  const { treeData, onMove, selectedNodeId, setSelectedNode, ensureVisible } = useFileTreeStore(
     useShallow(s => ({
       treeData: s.treeData,
       onMove: s.onMove,
+      selectedNodeId: s.selectedNodeId,
+      setSelectedNode: s.setSelectedNode,
+      ensureVisible: s.ensureVisible,
     })),
   );
 
@@ -99,7 +102,29 @@ export const FileTree = () => {
 
   // Multi-select (based on visible order)
   const visibleOrder = useMemo(() => flattenVisible(treeData, expanded), [treeData, expanded]);
-  const { selected, onItemClick, clearSelection, onDragStartSelect } = useMultiSelect(visibleOrder);
+  const {
+    selected,
+    setSelected,
+    setAnchorId,
+    onItemClick,
+    clearSelection: clearLocalSelection,
+    onDragStartSelect,
+  } = useMultiSelect(visibleOrder);
+
+  const skipSelectedSync = useRef(false);
+
+  const updateSelectedNode = useCallback(
+    (id: string | null) => {
+      skipSelectedSync.current = true;
+      setSelectedNode(id);
+    },
+    [setSelectedNode],
+  );
+
+  const handleClearSelection = useCallback(() => {
+    clearLocalSelection();
+    updateSelectedNode(null);
+  }, [clearLocalSelection, updateSelectedNode]);
 
   // Hover-to-open folder while dragging
   const { hoverId, onDragOverHoverOpen, resetHoverOpen } = useHoverOpen(
@@ -127,6 +152,52 @@ export const FileTree = () => {
   const [importProgress, setImportProgress] = useState<FolderImportProgressEvent | null>(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const importContextRef = useRef<ImportContext | null>(null);
+
+  useEffect(() => {
+    if (skipSelectedSync.current) {
+      skipSelectedSync.current = false;
+      return;
+    }
+
+    if (!selectedNodeId) {
+      clearLocalSelection();
+      return;
+    }
+
+    setSelected(prev => {
+      if (prev.size === 1 && prev.has(selectedNodeId)) return prev;
+      return new Set([selectedNodeId]);
+    });
+    setAnchorId(selectedNodeId);
+  }, [selectedNodeId, clearLocalSelection, setAnchorId, setSelected]);
+
+  useEffect(() => {
+    if (!selectedNodeId) return;
+
+    const ancestors = ensureVisible(selectedNodeId);
+    if (!ancestors?.length) return;
+
+    setExpanded(prev => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const ancestorId of ancestors) {
+        if (!next.has(ancestorId)) {
+          next.add(ancestorId);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [selectedNodeId, ensureVisible, treeData]);
+
+  useEffect(() => {
+    if (!selectedNodeId) return;
+    if (!treeData.length) return;
+
+    if (!findNode(treeData, selectedNodeId)) {
+      updateSelectedNode(null);
+    }
+  }, [treeData, selectedNodeId, updateSelectedNode]);
 
   useEffect(() => {
     importContextRef.current = importContext;
@@ -191,7 +262,7 @@ export const FileTree = () => {
   };
 
   return (
-    <div className="w-full h-full text-sidebar-text" onClick={clearSelection}>
+    <div className="w-full h-full text-sidebar-text" onClick={handleClearSelection}>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -199,6 +270,7 @@ export const FileTree = () => {
           const id = String(active.id);
           setActiveId(id);
           onDragStartSelect(id);
+          updateSelectedNode(id);
         }}
         onDragCancel={() => {
           setActiveId(null);
@@ -246,8 +318,10 @@ export const FileTree = () => {
           selectedSet={selected}
           onSelect={(e: React.MouseEvent, id: string) => {
             onItemClick(e, id);
+            updateSelectedNode(id);
           }}
           openFile={(node: FileTreeData) => {
+            updateSelectedNode(node.id);
             openFile({
               nodeId: node.id,
               name: node.name,
