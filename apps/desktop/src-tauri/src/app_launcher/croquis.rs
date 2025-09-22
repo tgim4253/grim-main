@@ -17,12 +17,13 @@ pub fn launch_croquis(
     #[cfg(not(debug_assertions))]
     let url = WebviewUrl::App(format!("index.html#{uri}").into());
 
-    let window_label = format!("moa-croquis-{}", session.session_id);
+    let window_label = "moa-croquis".to_string();
 
     let mut builder =
         tauri::WebviewWindowBuilder::new(app, window_label.clone(), url)
             .title("Croquis")
-            .resizable(true);
+            .resizable(true)
+            .maximizable(false);
 
     let width = parse_dimension(session.option.window.width.as_ref());
     let height = parse_dimension(session.option.window.height.as_ref());

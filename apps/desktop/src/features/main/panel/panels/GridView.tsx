@@ -324,6 +324,31 @@ const GridView: React.FC<Props> = ({ gridData }) => {
     });
   }, [clearSelection]);
 
+  const handleStartCroquis = useCallback(() => {
+    console.log('Starting Croquis with selected items:', selected);
+    if (!moaId) return;
+    ipc.croquis.startSession({
+      imageHashes: Array.from(selected),
+      moaId: moaId,
+      option: {
+        window: {},
+        auto: {
+          skip: true,
+          save: true,
+          capture: true,
+        },
+        timer: {
+          maxTime: 1000,
+        },
+        saveFolder: '',
+        savePath: '',
+        capture: false,
+        grayOption: false,
+        shuffleOption: false,
+      },
+    });
+  }, [selected, moaId]);
+
   const handleBackgroundClick = useCallback(() => {
     clearSelection();
   }, [clearSelection]);
@@ -373,6 +398,16 @@ const GridView: React.FC<Props> = ({ gridData }) => {
         >
           {selectMode && selectedCount ? `Done (${selectedCount})` : selectMode ? 'Done' : 'Select'}
         </Button>
+        {selectMode && selectedCount > 0 && (
+          <Button
+            variant={'secondary'}
+            onClick={handleStartCroquis}
+            aria-pressed={selectMode}
+            className="min-w-[7rem] px-4 py-2 text-sm font-medium"
+          >
+            Croquis
+          </Button>
+        )}
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-auto p-4" onClick={handleBackgroundClick}>
