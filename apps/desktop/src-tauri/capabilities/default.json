@@ -29,6 +29,7 @@
     "core:path:allow-resolve-directory",
     "core:webview:allow-internal-toggle-devtools",
     "dialog:default",
-    "decorum:allow-show-snap-overlay"
+    "decorum:allow-show-snap-overlay",
+    "core:window:allow-set-size"
   ]
 }

@@ -77,7 +77,7 @@ const INITIAL_FETCH_COUNT = 50;
 const createDefaultCroquisOption = (): CroquisOption => ({
   window: { width: null, height: null },
   auto: { isSkip: true },
-  timer: { max_time: 1000 },
+  timer: { maxTime: 1000 },
   isCapture: false,
   savePath: '',
   isGray: false,
