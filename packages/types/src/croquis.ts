@@ -4,9 +4,7 @@ export interface CroquisWindowOption {
 }
 
 export interface CroquisAutoOption {
-  skip: boolean;
-  save: boolean;
-  capture: boolean;
+  isSkip: boolean;
 }
 
 export interface CroquisTimerOption {
@@ -17,11 +15,10 @@ export interface CroquisOption {
   window: CroquisWindowOption;
   auto: CroquisAutoOption;
   timer: CroquisTimerOption;
-  capture: boolean;
+  isCapture: boolean;
   savePath: string;
-  saveFolder: string;
-  grayOption: boolean;
-  shuffleOption: boolean;
+  isGray: boolean;
+  isShuffle: boolean;
 }
 
 export interface CroquisStartPayload {

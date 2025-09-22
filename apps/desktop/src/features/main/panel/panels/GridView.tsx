@@ -333,18 +333,15 @@ const GridView: React.FC<Props> = ({ gridData }) => {
       option: {
         window: {},
         auto: {
-          skip: true,
-          save: true,
-          capture: true,
+          isSkip: true,
         },
         timer: {
           maxTime: 1000,
         },
-        saveFolder: '',
         savePath: '',
-        capture: false,
-        grayOption: false,
-        shuffleOption: false,
+        isCapture: false,
+        isGray: false,
+        isShuffle: false,
       },
     });
   }, [selected, moaId]);

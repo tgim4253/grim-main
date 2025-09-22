@@ -14,12 +14,7 @@ pub struct CroquisWindowOption {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CroquisAutoOption {
-    #[serde(default)]
-    pub skip: bool,
-    #[serde(default)]
-    pub save: bool,
-    #[serde(default)]
-    pub capture: bool,
+    pub is_skip: bool,
 }
 
 /// Timer configuration for the Croquis session.
@@ -41,15 +36,13 @@ pub struct CroquisOption {
     #[serde(default)]
     pub timer: CroquisTimerOption,
     #[serde(default)]
-    pub capture: bool,
+    pub is_capture: bool,
     #[serde(default)]
     pub save_path: String,
     #[serde(default)]
-    pub save_folder: String,
+    pub is_gray: bool,
     #[serde(default)]
-    pub gray_option: bool,
-    #[serde(default)]
-    pub shuffle_option: bool,
+    pub is_shuffle: bool,
 }
 
 /// Payload provided by the renderer to start a Croquis session.
