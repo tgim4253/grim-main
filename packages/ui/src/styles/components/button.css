@@ -26,8 +26,12 @@
   font-size: 0.875rem;
   font-weight: 500;
   line-height: 1.25rem;
-  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease,
-    box-shadow 150ms ease, transform 150ms ease;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
   cursor: pointer;
 }
 
@@ -132,6 +136,11 @@
   --_btn-padding-y: 0.625rem;
   --_btn-padding-x: 1.25rem;
   --_btn-radius: 0.625rem;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 
 .btn-panel-tab.selected {
