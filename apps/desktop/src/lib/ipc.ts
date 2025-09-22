@@ -2,6 +2,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { GraphResponse } from '@tgim/types/graph';
 import { CreateFolderPayload, FolderPreview, ThumbRequest, ThumbResponse } from '@tgim/types/file';
+import { CroquisSession, CroquisStartPayload, CroquisStartResponse } from '@tgim/types/croquis';
 
 const appWindow = getCurrentWindow();
 
@@ -66,9 +67,21 @@ const fileIpc = {
   },
 };
 
+const croquisIpc = {
+  startSession: async (payload: CroquisStartPayload): Promise<CroquisStartResponse> => {
+    const response = await invoke('start_croquis_session', { payload });
+    return response as CroquisStartResponse;
+  },
+  loadSession: async (sessionId: string): Promise<CroquisSession | null> => {
+    const response = await invoke('load_croquis_session', { sessionId });
+    return (response as CroquisSession | null) ?? null;
+  },
+};
+
 export const ipc = {
   windowController: windowControllerIpc,
   moa: moaIpc,
   graph: graphIpc,
   file: fileIpc,
+  croquis: croquisIpc,
 };
