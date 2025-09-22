@@ -1,4 +1,3 @@
-import { listen } from '@tauri-apps/api/event';
 import { useMoa } from '@tgim/hooks/useMoa';
 import { useMultiSelect } from '@tgim/dnd/index';
 import { GridData, ImageItem } from '@tgim/types/grid';
@@ -11,6 +10,10 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import Masonry from 'react-masonry-css';
 import { FixedSizeGrid as WindowGrid, GridChildComponentProps } from 'react-window';
 import { Button } from '@tgim/ui';
+import { CroquisOption } from '@tgim/types/croquis';
+import CroquisStartModal, {
+  CroquisStartModalConfirmPayload,
+} from '../../../croquis/CroquisStartModal';
 
 /* ---------------------------------------------
  * Helper Icon Components (unchanged)
@@ -70,6 +73,16 @@ const SIZES: Size[] = ['small', 'medium', 'large'];
 const LAYOUTS: Layout[] = ['grid', 'masonry'];
 const MAX_ITEMS_PER_REQ = 100;
 const INITIAL_FETCH_COUNT = 50;
+
+const createDefaultCroquisOption = (): CroquisOption => ({
+  window: { width: null, height: null },
+  auto: { isSkip: true },
+  timer: { max_time: 1000 },
+  isCapture: false,
+  savePath: '',
+  isGray: false,
+  isShuffle: false,
+});
 
 // Debounce Hook (unchanged)
 function useDebouncedEffect(fn: () => void, deps: React.DependencyList, delay: number) {
@@ -186,6 +199,43 @@ const GridView: React.FC<Props> = ({ gridData }) => {
     images.forEach(img => (map[img.hash] = img));
     return map;
   }, [images]);
+
+  const [croquisModalOpen, setCroquisModalOpen] = useState(false);
+  const [croquisOption, setCroquisOption] = useState<CroquisOption>(() =>
+    createDefaultCroquisOption(),
+  );
+  const [rememberCroquisOption, setRememberCroquisOption] = useState(false);
+
+  const selectedCount = selected.size;
+  const selectedHashes = useMemo(() => Array.from(selected), [selected]);
+
+  const handleStartCroquis = useCallback(() => {
+    if (selectedCount === 0) return;
+    if (!moaId) {
+      console.warn('Croquis start requested without a workspace id');
+      return;
+    }
+    setCroquisModalOpen(true);
+  }, [moaId, selectedCount]);
+
+  const handleCroquisModalClose = useCallback(() => {
+    setCroquisModalOpen(false);
+  }, []);
+
+  const handleCroquisConfirm = useCallback(
+    ({ option, remember }: CroquisStartModalConfirmPayload) => {
+      setCroquisOption(option);
+      setRememberCroquisOption(remember);
+      clearSelection();
+    },
+    [clearSelection],
+  );
+
+  useEffect(() => {
+    if (selectedCount === 0 && croquisModalOpen) {
+      setCroquisModalOpen(false);
+    }
+  }, [croquisModalOpen, selectedCount]);
 
   const { upsertThumb } = useThumbStore(
     useShallow(state => ({
@@ -312,8 +362,6 @@ const GridView: React.FC<Props> = ({ gridData }) => {
     return '';
   }, [size, layout]);
 
-  const selectedCount = selected.size;
-
   const handleToggleSelectMode = useCallback(() => {
     setSelectMode(prev => {
       if (prev) {
@@ -323,28 +371,6 @@ const GridView: React.FC<Props> = ({ gridData }) => {
       return true;
     });
   }, [clearSelection]);
-
-  const handleStartCroquis = useCallback(() => {
-    console.log('Starting Croquis with selected items:', selected);
-    if (!moaId) return;
-    ipc.croquis.startSession({
-      imageHashes: Array.from(selected),
-      moaId: moaId,
-      option: {
-        window: {},
-        auto: {
-          isSkip: true,
-        },
-        timer: {
-          maxTime: 1000,
-        },
-        savePath: '',
-        isCapture: false,
-        isGray: false,
-        isShuffle: false,
-      },
-    });
-  }, [selected, moaId]);
 
   const handleBackgroundClick = useCallback(() => {
     clearSelection();
@@ -434,6 +460,15 @@ const GridView: React.FC<Props> = ({ gridData }) => {
           />
         )}
       </div>
+      <CroquisStartModal
+        open={croquisModalOpen && selectedCount > 0}
+        option={croquisOption}
+        remember={rememberCroquisOption}
+        imageHashes={selectedHashes}
+        moaId={moaId}
+        onConfirm={handleCroquisConfirm}
+        onClose={handleCroquisModalClose}
+      />
     </div>
   );
 };
