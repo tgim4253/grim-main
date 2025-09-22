@@ -141,9 +141,6 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
             changed = true;
           }
         });
-        if (changed) {
-          fgRef.current?.refresh();
-        }
       },
     );
 
