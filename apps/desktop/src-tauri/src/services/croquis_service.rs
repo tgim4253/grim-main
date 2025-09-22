@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, io::ErrorKind};
 
 use anyhow::{anyhow, bail, Context, Result};
 use once_cell::sync::Lazy;
@@ -118,6 +118,32 @@ pub async fn start_session(
 pub async fn load_session(session_id: &str) -> Option<CroquisSession> {
     let sessions = CROQUIS_SESSIONS.read().await;
     sessions.get(session_id).cloned()
+}
+
+/// Load the persisted Croquis option payload from the workspace settings directory.
+pub async fn load_option(moa_id: &str) -> Result<Option<CroquisOption>> {
+    let paths = PATH_MANAGER
+        .get_or_add(moa_id)
+        .await
+        .context("Failed to resolve workspace paths")?;
+
+    let settings_dir = paths.moa_dir.join("settings");
+    let file_path = settings_dir.join("croquis.json");
+
+    match fs::read(&file_path).await {
+        Ok(payload) => {
+            let option = serde_json::from_slice(&payload)
+                .context("Failed to deserialise Croquis options")?;
+            Ok(Some(option))
+        }
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error).with_context(|| {
+            format!(
+                "Failed to read Croquis options from {}",
+                file_path.display()
+            )
+        }),
+    }
 }
 
 /// Persist the Croquis option payload into the workspace `.moa/settings` folder.

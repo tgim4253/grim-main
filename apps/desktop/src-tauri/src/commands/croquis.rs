@@ -1,6 +1,7 @@
 use crate::{
     models::croquis::{
-        CroquisSession, CroquisStartPayload, CroquisStartResponse,
+        CroquisOption, CroquisSession, CroquisStartPayload,
+        CroquisStartResponse,
     },
     services::croquis_service,
 };
@@ -22,4 +23,12 @@ pub async fn load_croquis_session(
     session_id: String,
 ) -> Result<Option<CroquisSession>, String> {
     Ok(croquis_service::load_session(&session_id).await)
+}
+
+/// Load persisted Croquis options for the provided workspace if available.
+#[tauri::command]
+pub async fn load_croquis_option(
+    moa_id: String,
+) -> Result<Option<CroquisOption>, String> {
+    croquis_service::load_option(&moa_id).await.map_err(|err| err.to_string())
 }
