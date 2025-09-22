@@ -9,6 +9,7 @@ const CroquisWindow: React.FC = () => {
 
   useEffect(() => {
     console.log('[Croquis] window mounted');
+    document.body.style.backgroundColor = 'transparent';
   }, []);
 
   useEffect(() => {
@@ -34,7 +35,7 @@ const CroquisWindow: React.FC = () => {
   }, [params]);
 
   return (
-    <div className="flex flex-col items-center justify-center w-full h-full bg-surface text-text">
+    <div className="flex flex-col items-center justify-center w-full h-full text-text">
       <p className="text-base font-semibold">Croquis window bootstrap</p>
       {session ? (
         <pre className="mt-4 max-w-xl whitespace-pre-wrap break-all text-left text-xs text-text-muted">

@@ -3,6 +3,8 @@ import { join } from '@tauri-apps/api/path';
 import { Button, Input, Modal, Switch } from '@tgim/ui';
 import { CroquisOption, CroquisStartResponse } from '@tgim/types/croquis';
 import { ipc } from '../../lib/ipc';
+import { open as pickerOpen } from '@tauri-apps/plugin-dialog';
+
 import { toast } from 'react-toastify';
 
 type WindowPreset = {
@@ -12,10 +14,9 @@ type WindowPreset = {
 };
 
 const WINDOW_PRESETS: WindowPreset[] = [
-  { label: 'Default', width: null, height: null },
-  { label: '1024×768', width: '1024', height: '768' },
-  { label: '1280×720', width: '1280', height: '720' },
-  { label: '1920×1080', width: '1920', height: '1080' },
+  { label: 'Custom', width: null, height: null },
+  { label: '256xauto', width: '256', height: '0' },
+  { label: '512xauto', width: '512', height: '0' },
 ];
 
 const normaliseCroquisOption = (option: CroquisOption): CroquisOption => ({
@@ -148,8 +149,7 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
     }));
   }, []);
 
-  const handleSavePathChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value;
+  const handleSavePathChange = useCallback((value: string) => {
     setLocalOption(prev => ({
       ...prev,
       savePath: value,
@@ -346,7 +346,14 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
           <header className="text-xs font-semibold uppercase tracking-wide text-text-soft">
             Saving
           </header>
-          <label className="flex flex-col gap-1 text-sm">
+          <label
+            className="flex flex-col gap-1 text-sm"
+            onClick={async () => {
+              const result = await pickerOpen({ directory: true });
+              if (!result) return;
+              handleSavePathChange(result);
+            }}
+          >
             <span className="text-xs font-semibold uppercase tracking-wide text-text-soft">
               Save path
             </span>
@@ -355,7 +362,7 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
               className="input-default"
               value={localOption.savePath}
               placeholder="Path for captured images"
-              onChange={handleSavePathChange}
+              readOnly
             />
           </label>
           <div className="flex items-center justify-between gap-3">
