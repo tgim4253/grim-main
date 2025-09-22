@@ -8,7 +8,7 @@ import {
   parseDropTarget,
 } from '@tgim/dnd/index';
 import { DndContext, DragOverlay, closestCenter } from '@dnd-kit/core';
-import { NodeList } from '@tgim/ui/index';
+import { NodeList, getVisibleNodeIds } from '@tgim/ui/index';
 import { File, Folder } from 'lucide-react';
 import useFileTreeStore from '@tgim/stores/fileTreeStore';
 import { useShallow } from 'zustand/shallow';
@@ -32,34 +32,6 @@ export const findNode = (tree: FileTreeData[], id: string): FileTreeData | null 
     }
   }
   return null;
-};
-
-// Returns a depth map used for indent rendering
-const buildDepthMap = (
-  tree: FileTreeData[],
-  depth = 0,
-  map: Map<string, number> = new Map<string, number>(),
-): Map<string, number> => {
-  for (const n of tree) {
-    map.set(n.id, depth);
-    if (n.children?.length) buildDepthMap(n.children, depth + 1, map);
-  }
-  return map;
-};
-
-// Returns visible id list based on expanded set
-const flattenVisible = (tree: FileTreeData[], expanded: Set<string>): string[] => {
-  const out: string[] = [];
-  const walk = (nodes: FileTreeData[]) => {
-    for (const n of nodes) {
-      out.push(n.id);
-      if (n.children?.length && expanded.has(n.id)) {
-        walk(n.children);
-      }
-    }
-  };
-  walk(tree);
-  return out;
 };
 
 type ImportContext = {
@@ -101,7 +73,7 @@ export const FileTree = () => {
   const [activeId, setActiveId] = useState<string | null>(null);
 
   // Multi-select (based on visible order)
-  const visibleOrder = useMemo(() => flattenVisible(treeData, expanded), [treeData, expanded]);
+  const visibleOrder = useMemo(() => getVisibleNodeIds(treeData, expanded), [treeData, expanded]);
   const {
     selected,
     setSelected,
@@ -137,7 +109,6 @@ export const FileTree = () => {
 
   // DnD sensors and depth map for rendering
   const sensors = useStandardSensors(4);
-  const depthMap = useMemo(() => buildDepthMap(treeData), [treeData]);
 
   const activeNode = activeId ? findNode(treeData, activeId) : null;
 
@@ -344,6 +315,7 @@ export const FileTree = () => {
       >
         <NodeList
           parentId="root"
+          depth={0}
           nodes={treeData}
           expandedSet={expanded}
           onToggle={id => {
@@ -354,7 +326,6 @@ export const FileTree = () => {
               return n;
             });
           }}
-          depthMap={depthMap}
           dragging={!!activeId}
           hoverId={hoverId}
           selectedSet={selected}

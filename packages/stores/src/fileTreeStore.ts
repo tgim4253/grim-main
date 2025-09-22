@@ -180,6 +180,7 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
         icon: n.kind === 'folder' ? 'folder' : 'file',
         type: n.kind === 'folder' ? NodeKind.Folder : NodeKind.File,
         children: n.kind === 'folder' ? [] : undefined,
+        fileType: fileData?.kind,
       });
 
       incoming.set(n.id, 0);
