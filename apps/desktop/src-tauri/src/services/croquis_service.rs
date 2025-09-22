@@ -14,7 +14,9 @@ use crate::{
     },
     services::file_service::{
         folder::fetch_one_file_path,
-        thumbnail::{ensure_base_thumbnail, BaseThumbInfo},
+        thumbnail::{
+            ensure_base_thumbnail, BaseThumbInfo, DEFAULT_BASE_THUMB_QUALITY,
+        },
     },
     utils::{date, identifier::get_unique_id},
 };
@@ -65,6 +67,7 @@ pub async fn start_session(
             &moa_id,
             hash,
             source_path.as_path(),
+            DEFAULT_BASE_THUMB_QUALITY,
         )
         .await
         {

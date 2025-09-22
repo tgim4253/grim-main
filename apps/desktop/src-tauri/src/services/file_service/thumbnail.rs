@@ -1,6 +1,10 @@
 use std::{
+    io::ErrorKind,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::Instant,
 };
 
@@ -11,7 +15,7 @@ use fast_image_resize::{
 };
 use image::{DynamicImage, GenericImageView};
 use num_cpus;
-use tauri::{AppHandle, Emitter};
+use tauri::{path::BaseDirectory, AppHandle, Emitter};
 use tokio::{
     sync::{mpsc, Semaphore},
     task,
@@ -32,7 +36,12 @@ use super::{
 };
 
 /// Version tag embedded in generated thumbnail paths.
-pub const SCHEMA_VERSION: u8 = 1;
+pub const SCHEMA_VERSION: u8 = 2;
+
+/// Default quality used when encoding base WebP thumbnails.
+pub const DEFAULT_BASE_THUMB_QUALITY: u8 = 82;
+
+static LEGACY_BASE_CACHE_CLEANED: AtomicBool = AtomicBool::new(false);
 
 /// Metadata about the cached base thumbnail for a file hash.
 #[derive(Debug, Clone)]
@@ -42,14 +51,75 @@ pub struct BaseThumbInfo {
     pub height: u32,
 }
 
+async fn ensure_legacy_base_cache_cleared(
+    app: &AppHandle,
+    schema_version: u8,
+) -> Result<()> {
+    if schema_version <= 1 {
+        return Ok(());
+    }
+
+    if LEGACY_BASE_CACHE_CLEANED
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .is_err()
+    {
+        return Ok(());
+    }
+
+    if let Err(err) = remove_legacy_base_cache(app, schema_version).await {
+        LEGACY_BASE_CACHE_CLEANED.store(false, Ordering::Release);
+        return Err(err);
+    }
+
+    Ok(())
+}
+
+async fn remove_legacy_base_cache(
+    app: &AppHandle,
+    schema_version: u8,
+) -> Result<()> {
+    for version in 1..schema_version {
+        let rel_path =
+            PathBuf::from("thumbs").join("base").join(format!("v{}", version));
+
+        let abs_path = app
+            .path()
+            .resolve(rel_path.clone(), BaseDirectory::AppCache)
+            .with_context(|| {
+                format!("failed to resolve cache path for {:?}", rel_path)
+            })?;
+
+        match tokio::fs::remove_dir_all(&abs_path).await {
+            Ok(_) => {}
+            Err(err) if err.kind() == ErrorKind::NotFound => {}
+            Err(err) => {
+                return Err(anyhow!(
+                    "failed to remove legacy base thumbnail cache at {}: {err}",
+                    abs_path.display()
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Ensure a cached 512px-wide thumbnail exists for the provided file hash.
 pub async fn ensure_base_thumbnail(
     app: &AppHandle,
     moa_id: &str,
     hash: &str,
     source_path: &Path,
+    quality: u8,
 ) -> Result<BaseThumbInfo> {
-    let base_path = ThumbBasePath::new(app, moa_id, hash, SCHEMA_VERSION)?;
+    ensure_legacy_base_cache_cleared(app, SCHEMA_VERSION).await?;
+
+    if quality > 100 {
+        bail!("base thumbnail quality must be in 0..=100 (got {})", quality);
+    }
+
+    let base_path =
+        ThumbBasePath::new(app, moa_id, hash, quality, SCHEMA_VERSION)?;
 
     if tokio::fs::metadata(base_path.as_path()).await.is_ok() {
         let dims = task::spawn_blocking({
@@ -133,12 +203,19 @@ pub async fn ensure_base_thumbnail(
         bail!("bad base thumbnail path");
     }
 
+    let encode_quality = quality;
     let encoded = task::spawn_blocking({
         let buffer = dst_image.into_vec();
         move || -> Result<Vec<u8>> {
             let mut buf = Vec::new();
+            let quality = image::codecs::webp::WebPQuality::new(f32::from(
+                encode_quality,
+            ))
+            .context("invalid base thumbnail quality")?;
             let mut encoder =
-                image::codecs::webp::WebPEncoder::new_lossless(&mut buf);
+                image::codecs::webp::WebPEncoder::new_with_quality(
+                    &mut buf, quality,
+                );
             encoder
                 .encode(
                     &buffer,
@@ -319,26 +396,31 @@ async fn process_job(app: &AppHandle, job: ThumbnailJob) -> Result<()> {
         bail!("unsupported mime type for thumbnail generation");
     }
 
-    let (input_path, used_cache) =
-        match ensure_base_thumbnail(app, &job.moa_id, &job.xxhs, &source_path)
-            .await
-        {
-            Ok(info) => {
-                let BaseThumbInfo { path, width, height } = info;
-                if job.spec.width <= width && job.spec.height <= height {
-                    (PathBuf::from(path), true)
-                } else {
-                    (source_path.clone(), false)
-                }
-            }
-            Err(err) => {
-                warn!(
-                    "failed to ensure base thumbnail for {:?}: {}",
-                    source_path, err
-                );
+    let (input_path, used_cache) = match ensure_base_thumbnail(
+        app,
+        &job.moa_id,
+        &job.xxhs,
+        &source_path,
+        DEFAULT_BASE_THUMB_QUALITY,
+    )
+    .await
+    {
+        Ok(info) => {
+            let BaseThumbInfo { path, width, height } = info;
+            if job.spec.width <= width && job.spec.height <= height {
+                (PathBuf::from(path), true)
+            } else {
                 (source_path.clone(), false)
             }
-        };
+        }
+        Err(err) => {
+            warn!(
+                "failed to ensure base thumbnail for {:?}: {}",
+                source_path, err
+            );
+            (source_path.clone(), false)
+        }
+    };
 
     let data = tokio::fs::read(&input_path).await.with_context(|| {
         format!("read source failed: {}", input_path.display())
@@ -507,8 +589,14 @@ async fn process_base_job(
         bail!("unsupported mime type for base thumbnail generation");
     }
 
-    ensure_base_thumbnail(app, &job.moa_id, &job.xxhs, &job.source_path)
-        .await?;
+    ensure_base_thumbnail(
+        app,
+        &job.moa_id,
+        &job.xxhs,
+        &job.source_path,
+        DEFAULT_BASE_THUMB_QUALITY,
+    )
+    .await?;
 
     Ok(())
 }

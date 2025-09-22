@@ -587,11 +587,12 @@ impl ThumbPath {
 }
 
 impl ThumbBasePath {
-    /// Cached base thumbnail path "thumbs/base/vX/ab/cd/<hash>/<hash>_w512_auto_vX.webp".
+    /// Cached base thumbnail path "thumbs/base/vX/ab/cd/<hash>/<hash>_w512_q{quality}_auto_vX.webp".
     pub fn new(
         app: &AppHandle,
         _moa_id: &str,
         hash: &str,
+        quality: u8,
         schema_version: u8,
     ) -> Result<Self> {
         if hash.len() < 4 {
@@ -601,13 +602,20 @@ impl ThumbBasePath {
             return Err(anyhow!("xxhs must be ASCII-hex [0-9a-fA-F]"));
         }
 
+        if quality > 100 {
+            return Err(anyhow!(
+                "base thumbnail quality must be in 0..=100 (got {})",
+                quality
+            ));
+        }
+
         let xxhs = hash.to_ascii_lowercase();
         let ab = &xxhs[0..2];
         let cd = &xxhs[2..4];
 
         let filename = format!(
-            "{}_w{}_auto_v{}.webp",
-            xxhs, THUMB_BASE_WIDTH, schema_version
+            "{}_w{}_q{}_auto_v{}.webp",
+            xxhs, THUMB_BASE_WIDTH, quality, schema_version
         );
 
         let rel_path = PathBuf::from("thumbs")
