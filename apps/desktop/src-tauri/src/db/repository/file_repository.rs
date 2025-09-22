@@ -47,6 +47,29 @@ impl FileRepository {
         Ok(mount_id)
     }
 
+    /// Locate an existing virtual folder that is mounted to the provided real folder.
+    pub async fn find_virtual_folder_id_by_real_folder<'a, E>(
+        executor: &mut E,
+        real_folder_id: &str,
+    ) -> Result<Option<String>>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let virtual_node_id = sqlx::query_scalar!(
+            r#"
+                SELECT virtual_node_id AS "virtual_node_id!"
+                FROM virtual_folder_mount
+                WHERE real_folder_id = ?1
+                LIMIT 1
+            "#,
+            real_folder_id,
+        )
+        .fetch_optional(&mut *executor)
+        .await?;
+
+        Ok(virtual_node_id)
+    }
+
     /// Look up a real-folder identifier by normalized path components.
     pub async fn _find_folder_id<'a, E>(
         executor: &mut E,

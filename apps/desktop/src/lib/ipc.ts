@@ -3,6 +3,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { GraphResponse } from '@tgim/types/graph';
 import { CreateFolderPayload, FolderPreview, ThumbRequest, ThumbResponse } from '@tgim/types/file';
 import {
+  CroquisCaptureRequest,
+  CroquisCaptureResponse,
   CroquisOption,
   CroquisSession,
   CroquisStartPayload,
@@ -84,6 +86,10 @@ const croquisIpc = {
   loadOption: async (moaId: string): Promise<CroquisOption | null> => {
     const response = await invoke('load_croquis_option', { moaId });
     return (response as CroquisOption | null) ?? null;
+  },
+  capture: async (payload: CroquisCaptureRequest): Promise<CroquisCaptureResponse> => {
+    const response = await invoke('capture_croquis_reference', { payload });
+    return response as CroquisCaptureResponse;
   },
 };
 

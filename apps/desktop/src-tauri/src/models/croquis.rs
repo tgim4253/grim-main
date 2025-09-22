@@ -85,3 +85,41 @@ pub struct CroquisStartResponse {
     pub session_id: String,
     pub window_label: String,
 }
+
+/// Selection rectangle expressed as normalised offsets relative to the base image.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CroquisCaptureSelection {
+    pub left: f32,
+    pub top: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
+/// Capture mode describing how the renderer derived the selection rectangle.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CroquisCaptureMode {
+    Freeform,
+    Square,
+    Full,
+}
+
+/// Payload received from the renderer when the user saves a capture.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CroquisCaptureRequest {
+    pub session_id: String,
+    pub image_hash: String,
+    pub mode: CroquisCaptureMode,
+    pub selection: CroquisCaptureSelection,
+}
+
+/// Response returned once the capture has been persisted to disk and registered.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CroquisCaptureResponse {
+    pub saved_path: String,
+    pub file_name: String,
+    pub node_id: String,
+}

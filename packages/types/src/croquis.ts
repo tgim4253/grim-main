@@ -48,3 +48,25 @@ export interface CroquisStartResponse {
   sessionId: string;
   windowLabel: string;
 }
+
+export type CroquisCaptureMode = 'freeform' | 'square' | 'full';
+
+export interface CroquisCaptureSelection {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+export interface CroquisCaptureRequest {
+  sessionId: string;
+  imageHash: string;
+  mode: CroquisCaptureMode;
+  selection: CroquisCaptureSelection;
+}
+
+export interface CroquisCaptureResponse {
+  savedPath: string;
+  fileName: string;
+  nodeId: string;
+}

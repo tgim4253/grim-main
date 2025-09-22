@@ -140,6 +140,20 @@ pub async fn seed_initial_data(pool: &Pool<Sqlite>) -> Result<()> {
         }
     }
 
+    // Ensure Croquis capture relation exists for upgraded databases.
+    sqlx::query!(
+        r#"INSERT OR IGNORE INTO connection_kind_rule
+               (id, kind, default_level, editable, description)
+               VALUES (?1, ?2, ?3, ?4, ?5);"#,
+        get_unique_id(),
+        RelationType::CroquisReference,
+        3,
+        0,
+        "Image -> Croquis capture",
+    )
+    .execute(&mut *tx)
+    .await?;
+
     // Seed one root folder node if none exists
     let (has_root,): (i64,) =
         sqlx::query_as(r#"SELECT COUNT(*) FROM node WHERE kind = 'folder';"#)

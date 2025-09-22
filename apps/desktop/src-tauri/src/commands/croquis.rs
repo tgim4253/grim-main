@@ -1,7 +1,7 @@
 use crate::{
     models::croquis::{
-        CroquisOption, CroquisSession, CroquisStartPayload,
-        CroquisStartResponse,
+        CroquisCaptureRequest, CroquisCaptureResponse, CroquisOption,
+        CroquisSession, CroquisStartPayload, CroquisStartResponse,
     },
     services::croquis_service,
 };
@@ -31,4 +31,15 @@ pub async fn load_croquis_option(
     moa_id: String,
 ) -> Result<Option<CroquisOption>, String> {
     croquis_service::load_option(&moa_id).await.map_err(|err| err.to_string())
+}
+
+/// Persist a capture for the current Croquis session and link it to the source image.
+#[tauri::command]
+pub async fn capture_croquis_reference(
+    app_handle: tauri::AppHandle,
+    payload: CroquisCaptureRequest,
+) -> Result<CroquisCaptureResponse, String> {
+    croquis_service::capture_reference(&app_handle, payload)
+        .await
+        .map_err(|err| err.to_string())
 }
