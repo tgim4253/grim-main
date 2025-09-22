@@ -34,6 +34,7 @@ use crate::{
 
 use super::{
     job_queue::{enqueue_base_job, BaseThumbnailJob},
+    settings,
     utils::check_is_hidden,
 };
 
@@ -873,12 +874,28 @@ async fn upsert_file_entry(
     .await?;
 
     if file_info.file_exists && file_info.kind_guess == FileType::Image {
-        enqueue_base_job(BaseThumbnailJob {
-            moa_id: moa_id.to_string(),
-            xxhs: file_info.xxh3_64.clone(),
-            source_path: file_path.clone(),
-        })
-        .await;
+        let precache_enabled = match settings::is_base_precache_enabled(moa_id)
+            .await
+        {
+            Ok(value) => value,
+            Err(error) => {
+                warn!(
+                    error = ?error,
+                    %moa_id,
+                    "Failed to load file settings; defaulting to base precache",
+                );
+                true
+            }
+        };
+
+        if precache_enabled {
+            enqueue_base_job(BaseThumbnailJob {
+                moa_id: moa_id.to_string(),
+                xxhs: file_info.xxh3_64.clone(),
+                source_path: file_path.clone(),
+            })
+            .await;
+        }
     }
     metrics.record_upsert_file(file_info.file_size, file_timer.elapsed());
 

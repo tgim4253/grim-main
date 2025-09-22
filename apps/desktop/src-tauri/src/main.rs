@@ -42,6 +42,8 @@ fn main() {
             commands::moa::bootstrap_status,
             commands::graph::get_graph_one,
             commands::file::get_thumbnails,
+            commands::file::get_file_settings,
+            commands::file::update_file_settings,
             commands::file::preview_folder_import,
             commands::croquis::start_croquis_session,
             commands::croquis::load_croquis_session,

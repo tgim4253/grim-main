@@ -488,11 +488,40 @@ pub struct ThumbSpec {
     pub key: String,
 }
 
+fn default_true() -> bool {
+    true
+}
+
+/// Persisted workspace-specific file settings toggled from the renderer.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileSettings {
+    #[serde(default = "default_true")]
+    pub precache_base_thumbnails: bool,
+}
+
+impl Default for FileSettings {
+    fn default() -> Self {
+        Self { precache_base_thumbnails: true }
+    }
+}
+
+/// Partial update payload applied to the stored file settings.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileSettingsUpdate {
+    #[serde(default)]
+    pub precache_base_thumbnails: Option<bool>,
+}
+
 /// Request payload containing thumbnail requirements per file.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ThumbReqInfo {
     pub xxhs: String, // ASCII-hex (will be normalized to lowercase)
     pub specs: Vec<ThumbSpec>,
+    #[serde(default)]
+    pub ensure_base: Option<bool>,
 }
 
 /// Wrapper representing the resolved thumbnail path on disk.
@@ -678,7 +707,10 @@ fn is_ascii_hex(s: &str) -> bool {
 
 /// Batch thumbnail request submitted from the frontend.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ThumbRequest {
+    #[serde(default)]
+    pub ensure_base: Option<bool>,
     pub items: Vec<ThumbReqInfo>,
 }
 

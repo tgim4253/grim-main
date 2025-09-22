@@ -19,8 +19,9 @@ use tokio::{
 use tracing::warn;
 
 use crate::models::file::{
-    ImageFmt, ThumbBasePath, ThumbPath, ThumbRequest, ThumbResInfo,
-    ThumbResSpec, ThumbResponse, ThumbSpec, ThumbStatus, THUMB_BASE_WIDTH,
+    ImageFmt, ThumbBasePath, ThumbPath, ThumbReqInfo, ThumbRequest,
+    ThumbResInfo, ThumbResSpec, ThumbResponse, ThumbSpec, ThumbStatus,
+    THUMB_BASE_WIDTH,
 };
 
 use super::{
@@ -29,6 +30,7 @@ use super::{
         cancel_pending_base_job, enqueue_jobs, finish_base_job, finish_job,
         take_next_base_job, take_next_job, BaseThumbnailJob, ThumbnailJob,
     },
+    settings,
 };
 
 /// Version tag embedded in generated thumbnail paths.
@@ -167,19 +169,22 @@ pub async fn get_thumbs(
     moa_id: String,
     data: ThumbRequest,
 ) -> Result<ThumbResponse> {
+    let ThumbRequest { ensure_base: request_override, items } = data;
+
     let mut response = ThumbResponse { items: Vec::new() };
     let mut pending_jobs: Vec<ThumbnailJob> = Vec::new();
 
-    for item in data.items {
-        let specs = item.specs;
+    for item in items {
+        let ThumbReqInfo { xxhs, specs, ensure_base } = item;
         let mut res_specs: Vec<ThumbResSpec> = Vec::new();
+        let base_override = ensure_base.or(request_override);
 
         for spec in specs {
             let ThumbPath(thumb_path) = match ThumbPath::new(
                 app,
                 &moa_id,
                 spec.clone(),
-                item.xxhs.clone(),
+                xxhs.clone(),
                 SCHEMA_VERSION,
             )
             .await
@@ -210,11 +215,12 @@ pub async fn get_thumbs(
 
             pending_jobs.push(ThumbnailJob {
                 moa_id: moa_id.clone(),
-                xxhs: item.xxhs.clone(),
+                xxhs: xxhs.clone(),
                 thumb_key: spec.key.clone(),
                 spec: spec.clone(),
                 out_path: thumb_path,
                 priority: 0,
+                base_override,
             });
             res_specs.push(ThumbResSpec {
                 status: ThumbStatus::Miss,
@@ -225,7 +231,7 @@ pub async fn get_thumbs(
             });
         }
 
-        response.items.push(ThumbResInfo { xxhs: item.xxhs, specs: res_specs });
+        response.items.push(ThumbResInfo { xxhs, specs: res_specs });
     }
 
     enqueue_jobs(pending_jobs).await;
@@ -319,7 +325,22 @@ async fn process_job(app: &AppHandle, job: ThumbnailJob) -> Result<()> {
         bail!("unsupported mime type for thumbnail generation");
     }
 
-    let (input_path, used_cache) =
+    let use_base_cache = match job.base_override {
+        Some(value) => value,
+        None => match settings::is_base_precache_enabled(&job.moa_id).await {
+            Ok(enabled) => enabled,
+            Err(error) => {
+                warn!(
+                    error = ?error,
+                    moa_id = %job.moa_id,
+                    "Failed to load file settings; defaulting to base precache",
+                );
+                true
+            }
+        },
+    };
+
+    let (input_path, used_cache) = if use_base_cache {
         match ensure_base_thumbnail(app, &job.moa_id, &job.xxhs, &source_path)
             .await
         {
@@ -338,7 +359,10 @@ async fn process_job(app: &AppHandle, job: ThumbnailJob) -> Result<()> {
                 );
                 (source_path.clone(), false)
             }
-        };
+        }
+    } else {
+        (source_path.clone(), false)
+    };
 
     let data = tokio::fs::read(&input_path).await.with_context(|| {
         format!("read source failed: {}", input_path.display())

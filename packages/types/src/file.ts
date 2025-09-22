@@ -18,6 +18,14 @@ export type ThumbEntry = {
   updatedAt: number;
 };
 
+export interface FileSettings {
+  precacheBaseThumbnails: boolean;
+}
+
+export interface UpdateFileSettingsPayload {
+  precacheBaseThumbnails?: boolean;
+}
+
 /** Resize behavior for thumbnails. */
 export enum ResizeMode {
   Upscale = 'upscale',
@@ -51,10 +59,12 @@ export interface ThumbSpec {
 export interface ThumbReqInfo {
   xxhs: string; // hex lowercase preferred
   specs: ThumbSpec[];
+  ensureBase?: boolean;
 }
 
 export interface ThumbRequest {
   items: ThumbReqInfo[];
+  ensureBase?: boolean;
 }
 
 export interface ThumbResSpec {

@@ -56,6 +56,7 @@ pub struct ThumbnailJob {
     pub spec: ThumbSpec,
     pub out_path: PathBuf,
     pub priority: u8,
+    pub base_override: Option<bool>,
 }
 
 #[derive(Default)]

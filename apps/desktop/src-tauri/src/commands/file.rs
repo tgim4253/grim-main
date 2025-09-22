@@ -1,7 +1,10 @@
 use std::path::PathBuf;
 
 use crate::{
-    models::file::{FolderData, FolderPreview, ThumbRequest, ThumbResponse},
+    models::file::{
+        FileSettings, FileSettingsUpdate, FolderData, FolderPreview,
+        ThumbRequest, ThumbResponse,
+    },
     services::file_service::{
         self, collect_folder_preview, first_mount_folder, get_thumbs,
     },
@@ -45,6 +48,25 @@ pub async fn get_thumbnails(
         .map_err(|e| e.to_string())?;
 
     Ok(response)
+}
+
+#[tauri::command]
+/// Fetch the persisted file service settings for the workspace.
+pub async fn get_file_settings(moa_id: String) -> Result<FileSettings, String> {
+    file_service::settings::get_settings(&moa_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+/// Update and persist the file service settings for the workspace.
+pub async fn update_file_settings(
+    moa_id: String,
+    data: FileSettingsUpdate,
+) -> Result<FileSettings, String> {
+    file_service::settings::update_settings(&moa_id, data)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

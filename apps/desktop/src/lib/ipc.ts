@@ -1,7 +1,14 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { GraphResponse } from '@tgim/types/graph';
-import { CreateFolderPayload, FolderPreview, ThumbRequest, ThumbResponse } from '@tgim/types/file';
+import {
+  CreateFolderPayload,
+  FileSettings,
+  FolderPreview,
+  ThumbRequest,
+  ThumbResponse,
+  UpdateFileSettingsPayload,
+} from '@tgim/types/file';
 import {
   CroquisOption,
   CroquisSession,
@@ -65,6 +72,14 @@ const fileIpc = {
   getThumbnails: async (moaId: string, data: ThumbRequest) => {
     const response = await invoke('get_thumbnails', { data, moaId });
     return response as ThumbResponse;
+  },
+  getSettings: async (moaId: string) => {
+    const response = await invoke('get_file_settings', { moaId });
+    return response as FileSettings;
+  },
+  updateSettings: async (moaId: string, data: UpdateFileSettingsPayload) => {
+    const response = await invoke('update_file_settings', { moaId, data });
+    return response as FileSettings;
   },
   previewFolderImport: async (path: string): Promise<FolderPreview> => {
     const response = await invoke('preview_folder_import', { path });

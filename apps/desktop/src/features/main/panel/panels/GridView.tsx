@@ -4,7 +4,7 @@ import { GridData, ImageItem } from '@tgim/types/grid';
 import { ipc } from '../../../../lib/ipc';
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import useThumbStore, { convertToThumbKey } from '@tgim/stores/thumbStore';
-import { ResizeMode } from '@tgim/types/file';
+import { ResizeMode, ThumbReqInfo, ThumbRequest } from '@tgim/types/file';
 import { useShallow } from 'zustand/shallow';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import Masonry from 'react-masonry-css';
@@ -243,6 +243,10 @@ const GridView: React.FC<Props> = ({ gridData }) => {
     })),
   );
 
+  const [precacheBaseThumbs, setPrecacheBaseThumbs] = useState(true);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [updatingSettings, setUpdatingSettings] = useState(false);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   // @ts-expect-error.
   const { visible, observe, unobserve } = useVisibilityMap(scrollRef, 800);
@@ -258,6 +262,39 @@ const GridView: React.FC<Props> = ({ gridData }) => {
     }
   }, [size]);
 
+  useEffect(() => {
+    if (!moaId) {
+      setPrecacheBaseThumbs(true);
+      setSettingsLoaded(false);
+      setUpdatingSettings(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSettingsLoaded(false);
+    setUpdatingSettings(false);
+
+    void (async () => {
+      try {
+        const settings = await ipc.file.getSettings(moaId);
+        if (!cancelled) {
+          setPrecacheBaseThumbs(settings.precacheBaseThumbnails);
+          setSettingsLoaded(true);
+        }
+      } catch (error) {
+        console.error('Failed to load workspace file settings', error);
+        if (!cancelled) {
+          setPrecacheBaseThumbs(true);
+          setSettingsLoaded(true);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [moaId]);
+
   /* -------------------------------------------------
    * Thumbnail fetcher
    * NOTE: Prevent duplicate work by checking store.
@@ -267,35 +304,55 @@ const GridView: React.FC<Props> = ({ gridData }) => {
       if (moaId === null || itemsToFetch.length === 0) return;
 
       const currentThumbs = useThumbStore.getState().byKey;
+      const basePreference = settingsLoaded ? precacheBaseThumbs : undefined;
 
-      const toRequest = itemsToFetch
-        .map(img => {
-          const key = convertToThumbKey(img.hash, {
-            width: thumbSize,
-            height: thumbSize,
-            dpr: 1,
-            mode: ResizeMode.Original,
-          });
-          // Skip if already ready
-          if (currentThumbs[key]?.status === 'ready') return null;
-          return {
-            xxhs: img.hash,
-            specs: [
-              { width: thumbSize, height: thumbSize, dpr: 1, mode: ResizeMode.Original, key },
-            ],
-          };
-        })
-        .filter(Boolean) as any[];
+      const toRequest = itemsToFetch.reduce<ThumbReqInfo[]>((acc, img) => {
+        const key = convertToThumbKey(img.hash, {
+          width: thumbSize,
+          height: thumbSize,
+          dpr: 1,
+          mode: ResizeMode.Original,
+        });
+
+        if (currentThumbs[key]?.status === 'ready') {
+          return acc;
+        }
+
+        const request: ThumbReqInfo = {
+          xxhs: img.hash,
+          specs: [
+            {
+              width: thumbSize,
+              height: thumbSize,
+              dpr: 1,
+              mode: ResizeMode.Original,
+              key,
+            },
+          ],
+        };
+
+        if (basePreference !== undefined) {
+          request.ensureBase = basePreference;
+        }
+
+        acc.push(request);
+        return acc;
+      }, []);
 
       if (toRequest.length === 0) return;
 
       for (let i = 0; i < toRequest.length; i += MAX_ITEMS_PER_REQ) {
         const chunk = toRequest.slice(i, i + MAX_ITEMS_PER_REQ);
         try {
-          const responses = await ipc.file.getThumbnails(moaId, { items: chunk });
-          responses.items.forEach((item: any) => {
-            item.specs.forEach((spec: any) => {
-              upsertThumb(spec.thumb_key ?? spec.key, {
+          const payload: ThumbRequest = { items: chunk };
+          if (basePreference !== undefined) {
+            payload.ensureBase = basePreference;
+          }
+
+          const responses = await ipc.file.getThumbnails(moaId, payload);
+          responses.items.forEach(item => {
+            item.specs.forEach(spec => {
+              upsertThumb(spec.thumb_key, {
                 status: spec.status === 'hit' ? 'ready' : 'pending',
                 url: spec.status === 'hit' ? spec.url : undefined,
                 updatedAt: Date.now(),
@@ -307,7 +364,7 @@ const GridView: React.FC<Props> = ({ gridData }) => {
         }
       }
     },
-    [moaId, thumbSize, upsertThumb],
+    [moaId, thumbSize, upsertThumb, precacheBaseThumbs, settingsLoaded],
   );
 
   // Stable ref to avoid stale closure
@@ -372,6 +429,28 @@ const GridView: React.FC<Props> = ({ gridData }) => {
     });
   }, [clearSelection]);
 
+  const handleToggleBaseCache = useCallback(async () => {
+    if (!moaId || !settingsLoaded || updatingSettings) {
+      return;
+    }
+
+    const previous = precacheBaseThumbs;
+    const next = !previous;
+    setPrecacheBaseThumbs(next);
+    setUpdatingSettings(true);
+
+    try {
+      await ipc.file.updateSettings(moaId, {
+        precacheBaseThumbnails: next,
+      });
+    } catch (error) {
+      console.error('Failed to update base thumbnail cache setting', error);
+      setPrecacheBaseThumbs(previous);
+    } finally {
+      setUpdatingSettings(false);
+    }
+  }, [moaId, precacheBaseThumbs, settingsLoaded, updatingSettings]);
+
   const handleBackgroundClick = useCallback(() => {
     clearSelection();
   }, [clearSelection]);
@@ -411,6 +490,18 @@ const GridView: React.FC<Props> = ({ gridData }) => {
                 {l === 'grid' ? <GridIcon /> : <MasonryIcon />}
               </Button>
             ))}
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-text-soft uppercase tracking-wide">Base cache</span>
+            <Button
+              variant="toggle"
+              active={precacheBaseThumbs}
+              onClick={handleToggleBaseCache}
+              disabled={!settingsLoaded || updatingSettings}
+              className="px-3"
+            >
+              {precacheBaseThumbs ? 'On' : 'Off'}
+            </Button>
           </div>
         </div>
         <Button

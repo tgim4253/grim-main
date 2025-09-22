@@ -3,6 +3,7 @@
 pub mod folder;
 pub mod hash;
 pub mod job_queue;
+pub mod settings;
 pub mod thumbnail;
 pub mod utils;
 
