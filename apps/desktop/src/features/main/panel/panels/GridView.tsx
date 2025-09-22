@@ -9,7 +9,7 @@ import { ResizeMode } from '@tgim/types/file';
 import { useShallow } from 'zustand/shallow';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import Masonry from 'react-masonry-css';
-import { FixedSizeGrid as WindowGrid } from 'react-window';
+import { FixedSizeGrid as WindowGrid, GridChildComponentProps } from 'react-window';
 import { Button } from '@tgim/ui';
 
 /* ---------------------------------------------
@@ -413,6 +413,20 @@ const GridView: React.FC<Props> = ({ gridData }) => {
  *    for the overscanned rows. This prevents "blank rows" on very fast scrolls
  *    where IntersectionObserver might miss transient intersections.
  * --------------------------------------------- */
+type GridCellData = {
+  images: ImageItem[];
+  cols: number;
+  itemW: number;
+  itemH: number;
+  gap: number;
+  onItemClick: (event: React.MouseEvent, img: ImageItem) => void;
+  selectMode: boolean;
+  observe: (el: Element | null, key: string) => void;
+  unobserve: (el: Element | null) => void;
+  thumbSize: number;
+  isSelected: (id: string) => boolean;
+};
+
 function VirtualGridLayout({
   images,
   size,
@@ -475,47 +489,64 @@ function VirtualGridLayout({
     [cols, images, onNeedThumbs],
   );
 
-  const Cell = useCallback(
-    ({ columnIndex, rowIndex, style }: any) => {
-      const idx = rowIndex * cols + columnIndex;
-      if (idx >= images.length) return null;
-      const img = images[idx];
-      return (
-        <div
-          style={{
-            ...style,
-            left: (style.left as number) + gap,
-            top: (style.top as number) + gap,
-            width: itemW,
-            height: itemH,
-          }}
-        >
-          <ThumbCard
-            img={img}
-            onClick={onItemClick}
-            showCheckbox={selectMode}
-            layout="grid"
-            observe={observe}
-            unobserve={unobserve}
-            thumbSize={thumbSize}
-            selected={isSelected(img.hash)}
-          />
-        </div>
-      );
-    },
-    [
-      cols,
+  const cellData = useMemo<GridCellData>(
+    () => ({
       images,
+      cols,
       itemW,
       itemH,
+      gap,
       onItemClick,
       selectMode,
       observe,
       unobserve,
+      thumbSize,
+      isSelected,
+    }),
+    [
+      images,
+      cols,
+      itemW,
+      itemH,
       gap,
+      onItemClick,
+      selectMode,
+      observe,
+      unobserve,
       thumbSize,
       isSelected,
     ],
+  );
+
+  const Cell = useCallback(
+    ({ columnIndex, rowIndex, style, data }: GridChildComponentProps<GridCellData>) => {
+      const idx = rowIndex * data.cols + columnIndex;
+      if (idx >= data.images.length) return null;
+      const img = data.images[idx];
+      return (
+        <div
+          style={{
+            ...style,
+            left: (style.left as number) + data.gap,
+            top: (style.top as number) + data.gap,
+            width: data.itemW,
+            height: data.itemH,
+          }}
+        >
+          <ThumbCard
+            img={img}
+            onClick={data.onItemClick}
+            showCheckbox={data.selectMode}
+            layout="grid"
+            observe={data.observe}
+            unobserve={data.unobserve}
+            thumbSize={data.thumbSize}
+            selected={data.isSelected(img.hash)}
+          />
+        </div>
+      );
+    },
+    [],
   );
 
   return (
@@ -528,6 +559,7 @@ function VirtualGridLayout({
           rowCount={rowCount}
           rowHeight={itemH + gap}
           width={width}
+          itemData={cellData}
           overscanRowCount={5} // ↑ a bit more generous overscan to hide fetch latency
           overscanColumnCount={1}
           onItemsRendered={({ overscanRowStartIndex, overscanRowStopIndex }) => {
