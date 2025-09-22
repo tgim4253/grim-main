@@ -14,6 +14,10 @@ interface FileTreeState {
   setTreeData: (data: FileTreeData[]) => void;
   convertToTreeData: (data: GraphResponse) => FileTreeData[];
 
+  selectedNodeId: string | null;
+  setSelectedNode: (id: string | null) => void;
+  ensureVisible: (id: string) => string[] | null;
+
   // move nodes into a parent (append)
   onMove: (args: { dragIds: string[]; parentId: string; index?: number }) => void;
 }
@@ -78,6 +82,19 @@ const removeNode = (
   return { removed, next };
 };
 
+// Path from root to id (inclusive) or null when not found
+const findPathToNode = (tree: FileTreeData[], id: string, path: string[] = []): string[] | null => {
+  for (const node of tree) {
+    const nextPath = [...path, node.id];
+    if (node.id === id) return nextPath;
+    if (node.children?.length) {
+      const found = findPathToNode(node.children, id, nextPath);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
 // Insert `node` under `parentId` (append). Special parentId "root" means top-level.
 const insertNode = (tree: FileTreeData[], parentId: string, node: FileTreeData): FileTreeData[] => {
   if (parentId === 'root') return [...tree, node];
@@ -130,7 +147,23 @@ const batchMoveIntoParent = (tree: FileTreeData[], ids: string[], targetParent: 
 
 const useFileTreeStore = create<FileTreeState>((set, get) => ({
   treeData: [],
-  setTreeData: data => set({ treeData: data }),
+  setTreeData: data =>
+    set(state => {
+      const next: Partial<FileTreeState> = { treeData: data };
+      if (state.selectedNodeId && !findNode(data, state.selectedNodeId)) {
+        next.selectedNodeId = null;
+      }
+      return next;
+    }),
+
+  selectedNodeId: null,
+  setSelectedNode: id => set({ selectedNodeId: id }),
+  ensureVisible: id => {
+    if (!id) return null;
+    const path = findPathToNode(get().treeData, id);
+    if (!path) return null;
+    return path.slice(0, -1);
+  },
 
   convertToTreeData: data => {
     const { nodes, connections } = data;

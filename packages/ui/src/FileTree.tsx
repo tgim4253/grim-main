@@ -49,7 +49,7 @@ export const TreeNode: React.FC<{
   const indentStyle = { ['--depth' as any]: depth } as React.CSSProperties;
 
   return (
-    <li ref={setRefs} className="tree-node">
+    <li ref={setRefs} className="tree-node" data-node-id={node.id}>
       <div
         className={cn(
           'tree-row',
