@@ -1,8 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { join } from '@tauri-apps/api/path';
 import { Button, Input, Modal, Switch } from '@tgim/ui';
 import { CroquisOption, CroquisStartResponse } from '@tgim/types/croquis';
 import { ipc } from '../../lib/ipc';
+import { open as pickerOpen } from '@tauri-apps/plugin-dialog';
+
 import { toast } from 'react-toastify';
 
 type WindowPreset = {
@@ -12,10 +14,9 @@ type WindowPreset = {
 };
 
 const WINDOW_PRESETS: WindowPreset[] = [
-  { label: 'Default', width: null, height: null },
-  { label: '1024×768', width: '1024', height: '768' },
-  { label: '1280×720', width: '1280', height: '720' },
-  { label: '1920×1080', width: '1920', height: '1080' },
+  { label: 'Custom', width: null, height: null },
+  { label: '256xauto', width: '256', height: '0' },
+  { label: '512xauto', width: '512', height: '0' },
 ];
 
 const normaliseCroquisOption = (option: CroquisOption): CroquisOption => ({
@@ -27,7 +28,10 @@ const normaliseCroquisOption = (option: CroquisOption): CroquisOption => ({
     isSkip: option.auto?.isSkip ?? false,
   },
   timer: {
-    max_time: option.timer?.max_time ?? 60,
+    max_time:
+      option.timer?.max_time ??
+      (option.timer as unknown as { maxTime?: number } | undefined)?.maxTime ??
+      60,
   },
   isCapture: option.isCapture ?? false,
   savePath: option.savePath ?? '',
@@ -65,12 +69,38 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
   );
   const [rememberSettings, setRememberSettings] = useState<boolean>(Boolean(remember));
   const [submitting, setSubmitting] = useState(false);
+  const hasUserInteractedRef = useRef(false);
+  const markInteracted = useCallback(() => {
+    hasUserInteractedRef.current = true;
+  }, []);
 
   useEffect(() => {
     if (!open) return;
+    hasUserInteractedRef.current = false;
     setLocalOption(normaliseCroquisOption(option));
     setRememberSettings(Boolean(remember));
   }, [open, option, remember]);
+
+  useEffect(() => {
+    if (!open || !moaId) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const persistedOption = await ipc.croquis.loadOption(moaId);
+        if (cancelled || !persistedOption) return;
+        if (hasUserInteractedRef.current) return;
+        setLocalOption(normaliseCroquisOption(persistedOption));
+      } catch (error) {
+        console.error('[Croquis] Failed to load saved options', error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, moaId]);
 
   useEffect(() => {
     if (!open || !moaId) return;
@@ -107,54 +137,78 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
   const skipMode = localOption.auto.isSkip ? 'auto' : 'manual';
   const rememberMode = rememberSettings ? 'remember' : 'session';
 
-  const handleWindowPresetClick = useCallback((preset: WindowPreset) => {
-    setLocalOption(prev => ({
-      ...prev,
-      window: {
-        width: preset.width,
-        height: preset.height,
-      },
-    }));
-  }, []);
-
-  const handleWindowDimensionChange = useCallback((key: 'width' | 'height') => {
-    return (event: React.ChangeEvent<HTMLInputElement>) => {
-      const value = event.target.value;
+  const handleWindowPresetClick = useCallback(
+    (preset: WindowPreset) => {
+      markInteracted();
       setLocalOption(prev => ({
         ...prev,
         window: {
-          ...prev.window,
-          [key]: value ? value : null,
+          width: preset.width,
+          height: preset.height,
         },
       }));
-    };
-  }, []);
+    },
+    [markInteracted],
+  );
 
-  const handleTimerChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const next = Number(event.target.value);
-    setLocalOption(prev => ({
-      ...prev,
-      timer: {
-        ...prev.timer,
-        maxTime: Number.isFinite(next) && next >= 0 ? next : 0,
-      },
-    }));
-  }, []);
+  const handleWindowDimensionChange = useCallback(
+    (key: 'width' | 'height') => {
+      return (event: React.ChangeEvent<HTMLInputElement>) => {
+        const value = event.target.value;
+        markInteracted();
+        setLocalOption(prev => ({
+          ...prev,
+          window: {
+            ...prev.window,
+            [key]: value ? value : null,
+          },
+        }));
+      };
+    },
+    [markInteracted],
+  );
 
-  const handleToggleOption = useCallback((key: 'isGray' | 'isCapture' | 'isShuffle') => {
-    setLocalOption(prev => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
-  }, []);
+  const handleTimerChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const next = Number(event.target.value);
+      const safeValue = Number.isFinite(next) && next >= 0 ? next : 0;
+      markInteracted();
+      setLocalOption(prev => {
+        const timer = {
+          ...prev.timer,
+          max_time: safeValue,
+        } as typeof prev.timer & { maxTime?: number };
+        timer.maxTime = safeValue;
+        return {
+          ...prev,
+          timer,
+        };
+      });
+    },
+    [markInteracted],
+  );
 
-  const handleSavePathChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value;
-    setLocalOption(prev => ({
-      ...prev,
-      savePath: value,
-    }));
-  }, []);
+  const handleToggleOption = useCallback(
+    (key: 'isGray' | 'isCapture' | 'isShuffle') => {
+      markInteracted();
+      setLocalOption(prev => ({
+        ...prev,
+        [key]: !prev[key],
+      }));
+    },
+    [markInteracted],
+  );
+
+  const handleSavePathChange = useCallback(
+    (value: string) => {
+      markInteracted();
+      setLocalOption(prev => ({
+        ...prev,
+        savePath: value,
+      }));
+    },
+    [markInteracted],
+  );
 
   const handleCancel = useCallback(() => {
     onClose();
@@ -173,10 +227,24 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
 
     setSubmitting(true);
     try {
+      const maxTimeValue =
+        localOption.timer.max_time ??
+        (localOption.timer as unknown as { maxTime?: number }).maxTime ??
+        60;
+      const payloadOption = {
+        ...localOption,
+        auto: { isSkip: false },
+        timer: {
+          ...localOption.timer,
+          max_time: maxTimeValue,
+        },
+      } as CroquisOption & { timer: CroquisOption['timer'] & { maxTime?: number } };
+      payloadOption.timer.maxTime = maxTimeValue;
+
       const response = await ipc.croquis.startSession({
         moaId,
         imageHashes,
-        option: { ...localOption, auto: { isSkip: false } },
+        option: payloadOption,
         saveOption: rememberSettings,
       });
       await onConfirm?.({ response, option: localOption, remember: rememberSettings });
@@ -274,15 +342,16 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
           </header>
           <Switch
             current={skipMode}
-            onChanged={value =>
+            onChanged={value => {
+              markInteracted();
               setLocalOption(prev => ({
                 ...prev,
                 auto: {
                   ...prev.auto,
                   skip: value === 'auto',
                 },
-              }))
-            }
+              }));
+            }}
             options={[
               { name: 'Auto skip breaks', value: 'auto' },
               { name: 'Manual control', value: 'manual' },
@@ -346,7 +415,14 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
           <header className="text-xs font-semibold uppercase tracking-wide text-text-soft">
             Saving
           </header>
-          <label className="flex flex-col gap-1 text-sm">
+          <label
+            className="flex flex-col gap-1 text-sm"
+            onClick={async () => {
+              const result = await pickerOpen({ directory: true });
+              if (!result) return;
+              handleSavePathChange(result);
+            }}
+          >
             <span className="text-xs font-semibold uppercase tracking-wide text-text-soft">
               Save path
             </span>
@@ -355,7 +431,7 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
               className="input-default"
               value={localOption.savePath}
               placeholder="Path for captured images"
-              onChange={handleSavePathChange}
+              readOnly
             />
           </label>
           <div className="flex items-center justify-between gap-3">

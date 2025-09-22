@@ -14,8 +14,14 @@ body,
 
 body {
   margin: 0;
-  font-family: 'Pretendard Variable', 'Inter', 'Segoe UI', system-ui, -apple-system,
-    BlinkMacSystemFont, sans-serif;
+  font-family:
+    'Pretendard Variable',
+    'Inter',
+    'Segoe UI',
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
   background-color: var(--ds-shell-surface);
   color: var(--ds-text-primary);
   -webkit-font-smoothing: antialiased;

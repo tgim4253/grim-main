@@ -166,18 +166,15 @@ const Main: React.FC = () => {
 
     let unlisten: (() => void) | undefined;
     const initListener = async () => {
-      unlisten = await listen<{ items: ThumbResSpec[] }>(
-        'thumbnails://created',
-        event => {
-          event.payload.items.forEach(item => {
-            upsertThumb(item.thumb_key, {
-              status: 'ready',
-              url: item.url,
-              updatedAt: Date.now(),
-            });
+      unlisten = await listen<{ items: ThumbResSpec[] }>('thumbnails://created', event => {
+        event.payload.items.forEach(item => {
+          upsertThumb(item.thumb_key, {
+            status: 'ready',
+            url: item.url,
+            updatedAt: Date.now(),
           });
-        },
-      );
+        });
+      });
     };
 
     void initListener();
@@ -208,12 +205,9 @@ const Main: React.FC = () => {
     void load();
 
     const initListener = async () => {
-      unlisten = await listen<AppProgressEvent>(
-        `bootstrap://progress/${moaId}`,
-        event => {
-          setProgressQueue(prev => [...prev, event.payload]);
-        },
-      );
+      unlisten = await listen<AppProgressEvent>(`bootstrap://progress/${moaId}`, event => {
+        setProgressQueue(prev => [...prev, event.payload]);
+      });
     };
 
     void initListener();
@@ -239,7 +233,10 @@ const Main: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col w-full h-full bg-shell-base text-text overflow-hidden" data-theme={theme}>
+    <div
+      className="flex flex-col w-full h-full bg-shell-base text-text overflow-hidden"
+      data-theme={theme}
+    >
       {!isMac && (
         <div className="fixed w-full top-0 z-50">
           <TitleBar />

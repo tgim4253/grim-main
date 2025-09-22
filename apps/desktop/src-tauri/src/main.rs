@@ -45,6 +45,7 @@ fn main() {
             commands::file::preview_folder_import,
             commands::croquis::start_croquis_session,
             commands::croquis::load_croquis_session,
+            commands::croquis::load_croquis_option,
         ])
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_decorum::init())
