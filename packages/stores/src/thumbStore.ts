@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { subscribeWithSelector } from 'zustand/middleware';
 import { ThumbEntry, ThumbSpec } from '@tgim/types/file';
 
 /**
@@ -33,92 +34,94 @@ interface ThumbState {
 }
 
 export const useThumbStore = create<ThumbState>()(
-  immer((set, get) => ({
-    byKey: {},
-    byHash: {},
-    lru: [],
+  subscribeWithSelector(
+    immer((set, get) => ({
+      byKey: {},
+      byHash: {},
+      lru: [],
 
-    upsert: (key, patch) => {
-      const cur = get().byKey[key] ?? { status: 'pending', updatedAt: 0, v: 1 };
-      const prevUrl = cur.url;
-      const next = { ...cur, ...patch, updatedAt: Date.now() };
-      set(s => {
-        s.byKey[key] = next;
+      upsert: (key, patch) => {
+        const cur = get().byKey[key] ?? { status: 'pending', updatedAt: 0, v: 1 };
+        const prevUrl = cur.url;
+        const next = { ...cur, ...patch, updatedAt: Date.now() };
+        set(s => {
+          s.byKey[key] = next;
 
-        // Revoke previous blob URL if replaced to avoid leaks
-        // (safe-guard: don't revoke if same string)
-        if (prevUrl && prevUrl !== next.url && prevUrl.startsWith('blob:')) {
-          try {
-            URL.revokeObjectURL(prevUrl);
-          } catch {}
+          // Revoke previous blob URL if replaced to avoid leaks
+          // (safe-guard: don't revoke if same string)
+          if (prevUrl && prevUrl !== next.url && prevUrl.startsWith('blob:')) {
+            try {
+              URL.revokeObjectURL(prevUrl);
+            } catch {}
+          }
+        });
+        // Move to MRU only when entry becomes ready
+        if (next.status === 'ready') {
+          set(s => {
+            const lru = s.lru.filter(k => k !== key);
+            lru.push(key);
+            s.lru = lru;
+          });
         }
-      });
-      // Move to MRU only when entry becomes ready
-      if (next.status === 'ready') {
+      },
+
+      // Touch for read-access MRU update
+      touch: key => {
         set(s => {
           const lru = s.lru.filter(k => k !== key);
           lru.push(key);
           s.lru = lru;
         });
-      }
-    },
+      },
 
-    // Touch for read-access MRU update
-    touch: key => {
-      set(s => {
-        const lru = s.lru.filter(k => k !== key);
-        lru.push(key);
-        s.lru = lru;
-      });
-    },
+      attach: (hash, key) => {
+        set(s => {
+          const setForHash = s.byHash[hash] ?? [];
+          setForHash.push(key);
+          s.byHash[hash] = setForHash;
+        });
+      },
 
-    attach: (hash, key) => {
-      set(s => {
-        const setForHash = s.byHash[hash] ?? [];
-        setForHash.push(key);
-        s.byHash[hash] = setForHash;
-      });
-    },
+      evictLRU: max => {
+        const { lru, byKey } = get();
+        if (lru.length <= max) return;
 
-    evictLRU: max => {
-      const { lru, byKey } = get();
-      if (lru.length <= max) return;
+        const cut = lru.length - max;
+        const toEvict = lru.slice(0, cut);
+        const evictSet = new Set(toEvict); // lookups
 
-      const cut = lru.length - max;
-      const toEvict = lru.slice(0, cut);
-      const evictSet = new Set(toEvict); // lookups
-
-      // revoke Blob URLs for evicted keys
-      for (const k of toEvict) {
-        const e = byKey[k];
-        if (e?.url?.startsWith('blob:')) {
-          try {
-            URL.revokeObjectURL(e.url);
-          } catch {}
-        }
-      }
-
-      set(s => {
-        s.lru = s.lru.slice(cut);
-
-        for (const k of Object.keys(s.byKey)) {
-          if (evictSet.has(k)) {
-            const v = s.byKey[k];
-            if (v) s.byKey[k] = { ...v, url: undefined };
+        // revoke Blob URLs for evicted keys
+        for (const k of toEvict) {
+          const e = byKey[k];
+          if (e?.url?.startsWith('blob:')) {
+            try {
+              URL.revokeObjectURL(e.url);
+            } catch {}
           }
         }
-      });
-    },
 
-    getThumbPathByKey: key => {
-      const thumb = get().byKey[key];
-      if (thumb && thumb.status === 'ready') {
-        get().touch(key);
-        return thumb.url;
-      }
-      return undefined;
-    },
-  })),
+        set(s => {
+          s.lru = s.lru.slice(cut);
+
+          for (const k of Object.keys(s.byKey)) {
+            if (evictSet.has(k)) {
+              const v = s.byKey[k];
+              if (v) s.byKey[k] = { ...v, url: undefined };
+            }
+          }
+        });
+      },
+
+      getThumbPathByKey: key => {
+        const thumb = get().byKey[key];
+        if (thumb && thumb.status === 'ready') {
+          get().touch(key);
+          return thumb.url;
+        }
+        return undefined;
+      },
+    })),
+  ),
 );
 
 export const convertToThumbKey = (hash: string, spec: Partial<ThumbSpec>) => {

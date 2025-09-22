@@ -137,9 +137,7 @@ ensurePaletteObservers();
 const getGraphPaletteInternal = () => graphPalette;
 
 const colorParsingCtx =
-  typeof document !== 'undefined'
-    ? document.createElement('canvas').getContext('2d')
-    : null;
+  typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
 
 const normalizeColor = (value: string) => {
   if (!colorParsingCtx) return value;
@@ -352,8 +350,16 @@ function drawLabelCached(ctx: CanvasRenderingContext2D, node: NodeProp) {
 /** External images */
 // =========================
 
-function resolveImageSrc(_node: NodeProp): string | undefined {
-  // TODO: Implement project-specific mapping from node payload to URL
+function resolveImageSrc(node: NodeProp): string | undefined {
+  if (typeof node.url === 'string' && node.url.length > 0) {
+    return node.url;
+  }
+  if (typeof node.imageUrl === 'string' && node.imageUrl.length > 0) {
+    return node.imageUrl;
+  }
+  if (typeof node.src === 'string' && node.src.length > 0) {
+    return node.src;
+  }
   return undefined;
 }
 

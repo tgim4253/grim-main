@@ -108,6 +108,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
           label: data.file_name ?? 'file',
           size: nodeSize,
           type: type,
+          hash: data.xxh3_64,
         };
       } else if (node.kind == NodeKind.Folder && node.data['Folder']) {
         let data = node.data['Folder'];
