@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use anyhow::{anyhow, bail, Context, Result};
 use once_cell::sync::Lazy;
 use tokio::{fs, sync::RwLock};
+use tracing::warn;
 
 use crate::{
     app_launcher,
@@ -42,22 +43,41 @@ pub async fn start_session(
         Vec::with_capacity(image_hashes.len());
 
     for hash in &image_hashes {
-        let source_path = fetch_one_file_path(moa_id.clone(), hash.clone())
-            .await
-            .with_context(|| {
-                format!("Failed to resolve source path for hash {hash}")
-            })?;
+        let source_path = match fetch_one_file_path(
+            moa_id.clone(),
+            hash.clone(),
+        )
+        .await
+        {
+            Ok(path) => path,
+            Err(error) => {
+                warn!(
+                    error = ?error,
+                    %hash,
+                    "Failed to resolve source path for Croquis hash; skipping"
+                );
+                continue;
+            }
+        };
 
-        let BaseThumbInfo { path, width, height } = ensure_base_thumbnail(
+        let BaseThumbInfo { path, width, height } = match ensure_base_thumbnail(
             app_handle,
             &moa_id,
             hash,
             source_path.as_path(),
         )
         .await
-        .with_context(|| {
-            format!("Failed to ensure base thumbnail for hash {hash}")
-        })?;
+        {
+            Ok(info) => info,
+            Err(error) => {
+                warn!(
+                    error = ?error,
+                    %hash,
+                    "Failed to ensure base thumbnail for Croquis hash; skipping"
+                );
+                continue;
+            }
+        };
 
         images.push(CroquisSessionImage {
             hash: hash.clone(),
@@ -66,6 +86,10 @@ pub async fn start_session(
             base_height: height,
             source_path: source_path.to_string_lossy().into_owned(),
         });
+    }
+
+    if images.is_empty() {
+        bail!("None of the provided image hashes could be loaded for Croquis");
     }
 
     let session_id = get_unique_id();
