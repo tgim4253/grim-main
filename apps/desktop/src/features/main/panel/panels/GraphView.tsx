@@ -142,9 +142,6 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
     const frame = requestAnimationFrame(() => {
       clearNodeSpriteCaches();
       setLinkStroke(getGraphPalette().link);
-      refreshFrame = requestAnimationFrame(() => {
-        fgRef.current?.refresh();
-      });
     });
     return () => {
       cancelAnimationFrame(frame);
@@ -173,7 +170,6 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
         // linkDirectionalArrowRelPos={0.96}
         linkColor={linkStroke}
         linkWidth={1.5}
-        linkOpacity={0.95}
         linkCurvature={0}
         nodeCanvasObject={(node, ctx, globalScale) => {
           NodeRenderer(node.type)?.(

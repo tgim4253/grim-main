@@ -309,12 +309,7 @@ const GridView: React.FC<Props> = ({ gridData }) => {
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-1 rounded-full border border-border bg-surface-muted p-1 shadow-inner">
             {SIZES.map(s => (
-              <Button
-                key={s}
-                variant="toggle"
-                active={size === s}
-                onClick={() => setSize(s)}
-              >
+              <Button key={s} variant="toggle" active={size === s} onClick={() => setSize(s)}>
                 {s.charAt(0).toUpperCase() + s.slice(1)}
               </Button>
             ))}
