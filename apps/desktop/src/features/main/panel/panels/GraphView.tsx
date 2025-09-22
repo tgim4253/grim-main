@@ -64,7 +64,7 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
     return nodesById;
   }, [graphData.nodes]);
   const { moaId } = useMoa(location);
-  const { ensureThumbnails, getThumbnailKey } = useThumbnails({ moaId });
+  const { ensureThumbnails, getThumbnailKey, getThumbnailUrl } = useThumbnails({ moaId });
 
   const GAP = 90;
 
@@ -116,6 +116,12 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
         if (node.thumbKey !== key) {
           node.thumbKey = key;
           node.url = undefined;
+        }
+
+        const url = getThumbnailUrl(request).url;
+        if (url !== undefined) {
+          node.url = convertFileSrc(url);
+          node.key = getThumbnailKey(request);
         }
         return { ...request, key };
       });

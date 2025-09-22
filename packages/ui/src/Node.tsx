@@ -657,61 +657,73 @@ const documentRenderer: NodeRenderer = (ctx, node, globalScale) => {
 
 const imageRenderer: NodeRenderer = (ctx, node, globalScale) => {
   const r = getNodeRadius(node);
-  const w = r * 2.0 * 1.2;
-  const h = r * 2.0 * 1.0;
-  const radius = 8;
+  const baseSize = r * 2.0;
+  const side = baseSize * 1.2;
 
-  // backplate sprite
   const palette = getGraphPaletteInternal();
-  const bg = node.bgColor ?? palette.imageBg;
+  const bg = node.bgColor ?? withAlpha(palette.imageBg, 0.9);
   const fg = node.fgColor ?? palette.imageBorder;
   const scaleB = bucketScale(globalScale);
-  const backKey = `imgback|${w}|${h}|${radius}|${bg}|${fg}|${scaleB}`;
-  const backplate = getOrCreateSprite(backKey, w, h, g => {
-    g.globalAlpha = 0.95;
-    roundRect(g, 0, 0, w, h, radius);
+  const radius = Math.max(2, baseSize * 0.18);
+  const padding = 0;
+  const contentSize = Math.max(1, side - padding * 2);
+  const clipRadius = Math.max(2, radius - padding * 0.5);
+
+  const backKey = `imgback|${side}|${radius}|${bg}|${fg}|${scaleB}`;
+  const backplate = getOrCreateSprite(backKey, side, side, g => {
+    roundRect(g, 0, 0, side, side, radius);
     g.fillStyle = bg;
     g.fill();
-    g.lineWidth = Math.max(1, 2 / Math.max(0.001, scaleB));
     g.strokeStyle = fg;
     g.stroke();
   });
 
-  ctx.drawImage(backplate, node.x - w / 2, node.y - h / 2, w, h);
+  ctx.drawImage(backplate, node.x - side / 2, node.y - side / 2, side, side);
 
   const src = resolveImageSrc(node);
   let tile: HTMLCanvasElement | undefined;
-  if (src) tile = getMaskedImageTile(src, w - 4, h - 4, radius * 0.8);
+  if (src) tile = getMaskedImageTile(src, contentSize, contentSize, clipRadius);
 
   if (tile) {
-    ctx.drawImage(tile, node.x - (w - 4) / 2, node.y - (h - 4) / 2, w - 4, h - 4);
+    ctx.drawImage(
+      tile,
+      node.x - contentSize / 2,
+      node.y - contentSize / 2,
+      contentSize,
+      contentSize,
+    );
   } else {
-    // placeholder sprite
-    const phKey = `imgph|${w}|${h}|${radius}|${scaleB}`;
-    const placeholder = getOrCreateSprite(phKey, w, h, g => {
-      roundRect(g, 4, 4, w - 8, h - 8, 6);
+    const phKey = `imgph|${side}|${radius}|${padding}|${clipRadius}|${scaleB}`;
+    const placeholder = getOrCreateSprite(phKey, side, side, g => {
+      roundRect(g, padding, padding, contentSize, contentSize, clipRadius);
       g.strokeStyle = palette.placeholderStroke;
       g.lineWidth = Math.max(1, 1.5 / Math.max(0.001, scaleB));
       g.stroke();
 
       g.beginPath();
-      g.arc(w * 0.25, h * 0.32, Math.min(w, h) * 0.07, 0, Math.PI * 2);
+      g.arc(
+        padding + contentSize * 0.28,
+        padding + contentSize * 0.32,
+        contentSize * 0.12,
+        0,
+        Math.PI * 2,
+      );
       g.fillStyle = palette.placeholderAccent;
       g.fill();
 
       g.beginPath();
-      const baseY = h * 0.72;
-      g.moveTo(w * 0.12, baseY);
-      g.lineTo(w * 0.4, h * 0.45);
-      g.lineTo(w * 0.6, baseY);
-      g.lineTo(w * 0.48, baseY);
-      g.lineTo(w * 0.7, h * 0.55);
-      g.lineTo(w * 0.88, baseY);
+      const baseY = padding + contentSize * 0.78;
+      g.moveTo(padding + contentSize * 0.08, baseY);
+      g.lineTo(padding + contentSize * 0.35, padding + contentSize * 0.48);
+      g.lineTo(padding + contentSize * 0.55, baseY);
+      g.lineTo(padding + contentSize * 0.48, baseY);
+      g.lineTo(padding + contentSize * 0.72, padding + contentSize * 0.58);
+      g.lineTo(padding + contentSize * 0.92, baseY);
       g.closePath();
       g.fillStyle = palette.placeholderFill;
       g.fill();
     });
-    ctx.drawImage(placeholder, node.x - w / 2, node.y - h / 2, w, h);
+    ctx.drawImage(placeholder, node.x - side / 2, node.y - side / 2, side, side);
   }
 
   // drawLabelCached(ctx, node);
