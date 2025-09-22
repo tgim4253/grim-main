@@ -5,10 +5,12 @@ type UseMultiSelectOptions = {
   mergeShiftToggle?: boolean;
   // Drop selections/anchor that are no longer visible
   pruneOnVisibilityChange?: boolean;
+  // Keep selected items when just click
+  keepSelectedOnClick?: boolean;
 };
 
 export function useMultiSelect(visibleIds: string[], options: UseMultiSelectOptions = {}) {
-  const { mergeShiftToggle = false, pruneOnVisibilityChange = false } = options;
+  const { mergeShiftToggle = false, pruneOnVisibilityChange = false, keepSelectedOnClick = false } = options;
 
   // Selected IDs as a Set
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -103,8 +105,12 @@ export function useMultiSelect(visibleIds: string[], options: UseMultiSelectOpti
       } else if (isToggle) {
         toggle(id);
       } else {
-        // remove all selected item
-        selectOnly(id);
+        if(!keepSelectedOnClick){ 
+          // remove all selected item
+          selectOnly(id);
+        } else {
+          toggle(id);
+        }
       }
 
       // Update anchor unless range-extending

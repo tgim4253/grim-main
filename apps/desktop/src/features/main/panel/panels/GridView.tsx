@@ -177,6 +177,7 @@ const GridView: React.FC<Props> = ({ gridData }) => {
     isSelected,
   } = useMultiSelect(visibleOrder, {
     pruneOnVisibilityChange: true,
+    keepSelectedOnClick: true,
   });
 
   // Map for quick lookup by hash
