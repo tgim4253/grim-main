@@ -1,4 +1,4 @@
-use tauri::WebviewUrl;
+use tauri::{window::Color, WebviewUrl};
 #[cfg(target_os = "macos")]
 use tauri_plugin_decorum::WebviewWindowExt;
 
@@ -23,13 +23,16 @@ pub fn launch_croquis(
         tauri::WebviewWindowBuilder::new(app, window_label.clone(), url)
             .title("Croquis")
             .resizable(true)
-            .maximizable(false);
+            .maximizable(false)
+            .always_on_top(true)
+            .background_color(Color(0, 0, 0, 0));
 
     let width = parse_dimension(session.option.window.width.as_ref());
     let height = parse_dimension(session.option.window.height.as_ref());
 
     builder = match (width, height) {
         (Some(w), Some(h)) => builder.inner_size(w, h),
+        (Some(w), None) => builder.inner_size(w, 720.0),
         _ => builder.inner_size(1024.0, 720.0),
     };
 

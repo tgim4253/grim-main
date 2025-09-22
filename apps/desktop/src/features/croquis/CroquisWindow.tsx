@@ -40,6 +40,7 @@ const CroquisWindow: React.FC = () => {
 
   useEffect(() => {
     console.log('[Croquis] window mounted');
+    document.body.style.backgroundColor = 'transparent';
   }, []);
 
   useEffect(() => {
