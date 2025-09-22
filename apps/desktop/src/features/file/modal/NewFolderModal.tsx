@@ -5,6 +5,7 @@ import { Input } from '@tgim/ui/Input';
 import { FileType, FolderPreview, FolderPreviewFileStat, FolderSelection } from '@tgim/types/file';
 
 import { ipc } from '../../../lib/ipc';
+import { formatBytes } from '../../../lib/format';
 
 interface Props {
   onClose: () => void;
@@ -50,19 +51,6 @@ const FILE_TYPE_LABELS: Record<FileType, string> = {
   [FileType.Audio]: '오디오',
   [FileType.Archive]: '압축',
   [FileType.Unknown]: '기타',
-};
-
-const formatBytes = (bytes: number) => {
-  if (!bytes) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let value = bytes;
-  let idx = 0;
-  while (value >= 1024 && idx < units.length - 1) {
-    value /= 1024;
-    idx += 1;
-  }
-  const fixed = value >= 10 ? value.toFixed(0) : value.toFixed(2);
-  return `${fixed} ${units[idx]}`;
 };
 
 const getStatForType = (stats: FolderPreviewFileStat[] | undefined, fileType: FileType) =>

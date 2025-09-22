@@ -3,7 +3,9 @@ use std::path::PathBuf;
 use crate::{
     models::file::{FolderData, FolderPreview, ThumbRequest, ThumbResponse},
     services::file_service::{
-        self, collect_folder_preview, first_mount_folder, get_thumbs,
+        self, clear_base_thumb_cache, clear_derived_thumb_cache,
+        collect_folder_preview, collect_thumb_cache_usage, first_mount_folder,
+        get_thumbs, ThumbCacheUsage,
     },
 };
 #[tauri::command]
@@ -54,4 +56,28 @@ pub async fn preview_folder_import(
 ) -> Result<FolderPreview, String> {
     let path = PathBuf::from(path);
     collect_folder_preview(path.as_path()).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+/// Return usage statistics for cached base and derived thumbnails.
+pub async fn get_thumbnail_usage(
+    app_handle: tauri::AppHandle,
+) -> Result<ThumbCacheUsage, String> {
+    collect_thumb_cache_usage(&app_handle).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+/// Remove cached derived thumbnails (keeps base cache intact).
+pub async fn clear_thumbnail_cache(
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    clear_derived_thumb_cache(&app_handle).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+/// Remove cached base thumbnails forcing regeneration on demand.
+pub async fn clear_base_thumbnail_cache(
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    clear_base_thumb_cache(&app_handle).await.map_err(|e| e.to_string())
 }
