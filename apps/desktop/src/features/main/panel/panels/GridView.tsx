@@ -1,14 +1,15 @@
 import { listen } from '@tauri-apps/api/event';
 import { useMoa } from '@tgim/hooks/useMoa';
+import { useMultiSelect } from '@tgim/dnd/index';
 import { GridData, ImageItem } from '@tgim/types/grid';
 import { ipc } from '../../../../lib/ipc';
-import React, { useEffect, useMemo, useRef, useState, useCallback, CSSProperties } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import useThumbStore, { convertToThumbKey } from '@tgim/stores/thumbStore';
 import { ResizeMode } from '@tgim/types/file';
 import { useShallow } from 'zustand/shallow';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import Masonry from 'react-masonry-css';
-import { FixedSizeGrid as WindowGrid } from 'react-window';
+import { FixedSizeGrid as WindowGrid, GridChildComponentProps } from 'react-window';
 import { Button } from '@tgim/ui';
 
 /* ---------------------------------------------
@@ -167,6 +168,18 @@ const GridView: React.FC<Props> = ({ gridData }) => {
   const [selectMode, setSelectMode] = useState(false);
   const [images] = useState(gridData.images);
 
+  const visibleOrder = useMemo(() => images.map(img => img.hash), [images]);
+
+  const {
+    selected,
+    onItemClick: handleSelectionClick,
+    clearSelection,
+    isSelected,
+  } = useMultiSelect(visibleOrder, {
+    pruneOnVisibilityChange: true,
+    keepSelectedOnClick: true,
+  });
+
   // Map for quick lookup by hash
   const hashToImgMap = useMemo(() => {
     const map: Record<string, ImageItem> = {};
@@ -299,9 +312,57 @@ const GridView: React.FC<Props> = ({ gridData }) => {
     return '';
   }, [size, layout]);
 
-  const handleItemClick = useCallback((img: ImageItem) => {
-    console.log(img);
-  }, []);
+  const selectedCount = selected.size;
+
+  const handleToggleSelectMode = useCallback(() => {
+    setSelectMode(prev => {
+      if (prev) {
+        clearSelection();
+        return false;
+      }
+      return true;
+    });
+  }, [clearSelection]);
+
+  const handleStartCroquis = useCallback(() => {
+    console.log('Starting Croquis with selected items:', selected);
+    if (!moaId) return;
+    ipc.croquis.startSession({
+      imageHashes: Array.from(selected),
+      moaId: moaId,
+      option: {
+        window: {},
+        auto: {
+          skip: true,
+          save: true,
+          capture: true,
+        },
+        timer: {
+          maxTime: 1000,
+        },
+        saveFolder: '',
+        savePath: '',
+        capture: false,
+        grayOption: false,
+        shuffleOption: false,
+      },
+    });
+  }, [selected, moaId]);
+
+  const handleBackgroundClick = useCallback(() => {
+    clearSelection();
+  }, [clearSelection]);
+
+  const handleItemClick = useCallback(
+    (event: React.MouseEvent, img: ImageItem) => {
+      handleSelectionClick(event, img.hash);
+
+      if (!selectMode) {
+        console.log(img);
+      }
+    },
+    [handleSelectionClick, selectMode],
+  );
 
   return (
     <div className="flex flex-col w-full h-full bg-surface text-text font-sans">
@@ -331,15 +392,25 @@ const GridView: React.FC<Props> = ({ gridData }) => {
         </div>
         <Button
           variant={selectMode ? 'primary' : 'secondary'}
-          onClick={() => setSelectMode(v => !v)}
+          onClick={handleToggleSelectMode}
           aria-pressed={selectMode}
           className="min-w-[7rem] px-4 py-2 text-sm font-medium"
         >
-          {selectMode ? 'Done' : 'Select'}
+          {selectMode && selectedCount ? `Done (${selectedCount})` : selectMode ? 'Done' : 'Select'}
         </Button>
+        {selectMode && selectedCount > 0 && (
+          <Button
+            variant={'secondary'}
+            onClick={handleStartCroquis}
+            aria-pressed={selectMode}
+            className="min-w-[7rem] px-4 py-2 text-sm font-medium"
+          >
+            Croquis
+          </Button>
+        )}
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-auto p-4">
+      <div ref={scrollRef} className="flex-1 overflow-auto p-4" onClick={handleBackgroundClick}>
         {layout === 'grid' ? (
           <VirtualGridLayout
             images={images}
@@ -351,6 +422,7 @@ const GridView: React.FC<Props> = ({ gridData }) => {
             selectMode={selectMode}
             thumbSize={thumbSize}
             onNeedThumbs={handleNeedThumbs}
+            isSelected={isSelected}
           />
         ) : (
           <MasonryLayout
@@ -361,6 +433,7 @@ const GridView: React.FC<Props> = ({ gridData }) => {
             observe={observe}
             unobserve={unobserve}
             thumbSize={thumbSize}
+            isSelected={isSelected}
           />
         )}
       </div>
@@ -376,6 +449,20 @@ const GridView: React.FC<Props> = ({ gridData }) => {
  *    for the overscanned rows. This prevents "blank rows" on very fast scrolls
  *    where IntersectionObserver might miss transient intersections.
  * --------------------------------------------- */
+type GridCellData = {
+  images: ImageItem[];
+  cols: number;
+  itemW: number;
+  itemH: number;
+  gap: number;
+  onItemClick: (event: React.MouseEvent, img: ImageItem) => void;
+  selectMode: boolean;
+  observe: (el: Element | null, key: string) => void;
+  unobserve: (el: Element | null) => void;
+  thumbSize: number;
+  isSelected: (id: string) => boolean;
+};
+
 function VirtualGridLayout({
   images,
   size,
@@ -385,15 +472,17 @@ function VirtualGridLayout({
   selectMode,
   thumbSize,
   onNeedThumbs,
+  isSelected,
 }: {
   images: ImageItem[];
   size: Size;
-  onItemClick: (img: ImageItem) => void;
+  onItemClick: (event: React.MouseEvent, img: ImageItem) => void;
   observe: (el: Element | null, key: string) => void;
   unobserve: (el: Element | null) => void;
   selectMode: boolean;
   thumbSize: number;
   onNeedThumbs: (items: ImageItem[]) => void;
+  isSelected: (id: string) => boolean;
 }) {
   const itemW = size === 'small' ? 96 : size === 'large' ? 192 : 144;
   const itemH = itemW;
@@ -436,34 +525,64 @@ function VirtualGridLayout({
     [cols, images, onNeedThumbs],
   );
 
+  const cellData = useMemo<GridCellData>(
+    () => ({
+      images,
+      cols,
+      itemW,
+      itemH,
+      gap,
+      onItemClick,
+      selectMode,
+      observe,
+      unobserve,
+      thumbSize,
+      isSelected,
+    }),
+    [
+      images,
+      cols,
+      itemW,
+      itemH,
+      gap,
+      onItemClick,
+      selectMode,
+      observe,
+      unobserve,
+      thumbSize,
+      isSelected,
+    ],
+  );
+
   const Cell = useCallback(
-    ({ columnIndex, rowIndex, style }: any) => {
-      const idx = rowIndex * cols + columnIndex;
-      if (idx >= images.length) return null;
-      const img = images[idx];
+    ({ columnIndex, rowIndex, style, data }: GridChildComponentProps<GridCellData>) => {
+      const idx = rowIndex * data.cols + columnIndex;
+      if (idx >= data.images.length) return null;
+      const img = data.images[idx];
       return (
         <div
           style={{
             ...style,
-            left: (style.left as number) + gap,
-            top: (style.top as number) + gap,
-            width: itemW,
-            height: itemH,
+            left: (style.left as number) + data.gap,
+            top: (style.top as number) + data.gap,
+            width: data.itemW,
+            height: data.itemH,
           }}
         >
           <ThumbCard
             img={img}
-            onClick={onItemClick}
-            showCheckbox={selectMode}
+            onClick={data.onItemClick}
+            showCheckbox={data.selectMode}
             layout="grid"
-            observe={observe}
-            unobserve={unobserve}
-            thumbSize={thumbSize}
+            observe={data.observe}
+            unobserve={data.unobserve}
+            thumbSize={data.thumbSize}
+            selected={data.isSelected(img.hash)}
           />
         </div>
       );
     },
-    [cols, images, itemW, itemH, onItemClick, selectMode, observe, unobserve, gap, thumbSize],
+    [],
   );
 
   return (
@@ -476,6 +595,7 @@ function VirtualGridLayout({
           rowCount={rowCount}
           rowHeight={itemH + gap}
           width={width}
+          itemData={cellData}
           overscanRowCount={5} // ↑ a bit more generous overscan to hide fetch latency
           overscanColumnCount={1}
           onItemsRendered={({ overscanRowStartIndex, overscanRowStopIndex }) => {
@@ -502,7 +622,17 @@ function MasonryLayout({
   observe,
   unobserve,
   thumbSize,
-}: any) {
+  isSelected,
+}: {
+  images: ImageItem[];
+  onItemClick: (event: React.MouseEvent, img: ImageItem) => void;
+  sizeClass: string;
+  selectMode: boolean;
+  observe: (el: Element | null, key: string) => void;
+  unobserve: (el: Element | null) => void;
+  thumbSize: number;
+  isSelected: (id: string) => boolean;
+}) {
   const breakpointColumnsObj = { default: 6, 1536: 6, 1280: 5, 1024: 4, 768: 3, 640: 2 };
   return (
     <Masonry
@@ -521,6 +651,7 @@ function MasonryLayout({
             observe={observe}
             unobserve={unobserve}
             thumbSize={thumbSize}
+            selected={isSelected(img.hash)}
           />
         </div>
       ))}
@@ -533,8 +664,9 @@ function MasonryLayout({
  * --------------------------------------------- */
 type ThumbCardProps = {
   img: ImageItem;
-  onClick: (img: ImageItem) => void;
+  onClick: (event: React.MouseEvent, img: ImageItem) => void;
   showCheckbox: boolean;
+  selected: boolean;
   layout: Layout;
   observe: (el: Element | null, key: string) => void;
   unobserve: (el: Element | null) => void;
@@ -546,6 +678,7 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
   img,
   onClick,
   showCheckbox,
+  selected,
   layout,
   observe,
   unobserve,
@@ -583,15 +716,26 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
   }, [img.hash, observe, unobserve]);
 
   const handleImageLoad = useCallback(() => setLoaded(true), []);
-  const handleCardClick = useCallback(() => onClick(img), [onClick, img]);
+  const handleCardClick = useCallback(
+    (event: React.MouseEvent) => {
+      onClick(event, img);
+    },
+    [onClick, img],
+  );
+
+  const selectionClasses = selected
+    ? 'border-accent ring-2 ring-accent/60 ring-offset-1 ring-offset-surface-raised'
+    : 'border-border';
 
   return (
     <div
       ref={containerRef}
-      className={`group relative w-full h-full overflow-hidden rounded-lg border border-border bg-surface shadow-sm transition-all duration-200 hover:border-accent hover:shadow-lg hover:-translate-y-1 cursor-pointer ${sizeClass ?? ''}`}
+      className={`group relative w-full h-full overflow-hidden rounded-lg border ${selectionClasses} bg-surface shadow-sm transition-all duration-200 hover:border-accent hover:shadow-lg hover:-translate-y-1 cursor-pointer ${sizeClass ?? ''}`}
       onClick={handleCardClick}
       role="button"
       tabIndex={0}
+      aria-selected={selected}
+      data-selected={selected ? 'true' : 'false'}
     >
       {showCheckbox && (
         <div className="absolute left-2 top-2 z-10">
@@ -599,6 +743,7 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
             type="checkbox"
             className="w-4 h-4 rounded text-accent bg-surface-muted border-border focus:ring-accent"
             readOnly
+            checked={selected}
           />
         </div>
       )}

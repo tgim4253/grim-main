@@ -43,6 +43,8 @@ fn main() {
             commands::graph::get_graph_one,
             commands::file::get_thumbnails,
             commands::file::preview_folder_import,
+            commands::croquis::start_croquis_session,
+            commands::croquis::load_croquis_session,
         ])
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_decorum::init())
