@@ -112,10 +112,13 @@ export const FileTree = () => {
   } = useMultiSelect(visibleOrder);
 
   const skipSelectedSync = useRef(false);
+  const manualSelection = useRef(false);
+  const pendingScrollId = useRef<string | null>(null);
 
   const updateSelectedNode = useCallback(
     (id: string | null) => {
       skipSelectedSync.current = true;
+      manualSelection.current = id !== null;
       setSelectedNode(id);
     },
     [setSelectedNode],
@@ -172,10 +175,25 @@ export const FileTree = () => {
   }, [selectedNodeId, clearLocalSelection, setAnchorId, setSelected]);
 
   useEffect(() => {
-    if (!selectedNodeId) return;
+    if (!selectedNodeId) {
+      manualSelection.current = false;
+      pendingScrollId.current = null;
+      return;
+    }
 
-    const ancestors = ensureVisible(selectedNodeId);
-    if (!ancestors?.length) return;
+    if (manualSelection.current) {
+      manualSelection.current = false;
+      pendingScrollId.current = null;
+      return;
+    }
+
+    const node = findNode(treeData, selectedNodeId);
+    if (!node) {
+      pendingScrollId.current = selectedNodeId;
+      return;
+    }
+
+    const ancestors = ensureVisible(selectedNodeId) ?? [];
 
     setExpanded(prev => {
       let changed = false;
@@ -186,9 +204,33 @@ export const FileTree = () => {
           changed = true;
         }
       }
+
+      if (node.children && !next.has(node.id)) {
+        next.add(node.id);
+        changed = true;
+      }
+
       return changed ? next : prev;
     });
+
+    pendingScrollId.current = selectedNodeId;
   }, [selectedNodeId, ensureVisible, treeData]);
+
+  useEffect(() => {
+    const targetId = pendingScrollId.current;
+    if (!targetId || targetId !== selectedNodeId) return;
+
+    const escapeId =
+      typeof window !== 'undefined' && window.CSS?.escape
+        ? window.CSS.escape(targetId)
+        : targetId.replace(/["\\]/g, '\\$&');
+
+    const element = document.querySelector<HTMLElement>(`[data-node-id="${escapeId}"]`);
+    if (!element) return;
+
+    pendingScrollId.current = null;
+    element.scrollIntoView({ block: 'nearest' });
+  }, [expanded, treeData, selectedNodeId]);
 
   useEffect(() => {
     if (!selectedNodeId) return;
