@@ -244,6 +244,7 @@ const GridView: React.FC<Props> = ({ gridData }) => {
   const { visible, observe, unobserve } = useVisibilityMap(scrollRef, 800);
 
   const thumbSize = useMemo(() => {
+    if (layout == 'masonry') return 256;
     switch (size) {
       case 'small':
         return 96;
@@ -252,7 +253,7 @@ const GridView: React.FC<Props> = ({ gridData }) => {
       default:
         return 128;
     }
-  }, [size]);
+  }, [size, layout]);
 
   /* -------------------------------------------------
    * Thumbnail fetcher
@@ -265,14 +266,14 @@ const GridView: React.FC<Props> = ({ gridData }) => {
       const requests = itemsToFetch.map(img => ({
         hash: img.hash,
         width: thumbSize,
-        height: thumbSize,
+        height: layout == 'masonry' ? 0 : thumbSize,
         dpr: 1 as const,
         mode: ResizeMode.Original,
       }));
 
       await ensureThumbnails(requests);
     },
-    [ensureThumbnails, thumbSize],
+    [ensureThumbnails, thumbSize, layout],
   );
 
   // Stable ref to avoid stale closure
@@ -689,11 +690,11 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
     () =>
       convertToThumbKey(img.hash, {
         width: thumbSize,
-        height: thumbSize,
+        height: layout == 'masonry' ? 0 : thumbSize,
         dpr: 1,
         mode: ResizeMode.Original,
       }),
-    [img.hash, thumbSize],
+    [img.hash, thumbSize, layout],
   );
 
   const { entry } = useThumbStore(useShallow(state => ({ entry: state.byKey[key] })));

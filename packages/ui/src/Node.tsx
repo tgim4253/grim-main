@@ -664,18 +664,16 @@ const imageRenderer: NodeRenderer = (ctx, node, globalScale) => {
   const bg = node.bgColor ?? withAlpha(palette.imageBg, 0.9);
   const fg = node.fgColor ?? palette.imageBorder;
   const scaleB = bucketScale(globalScale);
-  const borderWidth = Math.max(1, 2 / Math.max(0.001, scaleB));
-  const radius = Math.min(12, side * 0.22);
-  const padding = Math.max(2, side * 0.08);
+  const radius = Math.max(2, baseSize * 0.18);
+  const padding = 0;
   const contentSize = Math.max(1, side - padding * 2);
   const clipRadius = Math.max(2, radius - padding * 0.5);
 
-  const backKey = `imgback|${side}|${radius}|${bg}|${fg}|${borderWidth}|${scaleB}`;
+  const backKey = `imgback|${side}|${radius}|${bg}|${fg}|${scaleB}`;
   const backplate = getOrCreateSprite(backKey, side, side, g => {
     roundRect(g, 0, 0, side, side, radius);
     g.fillStyle = bg;
     g.fill();
-    g.lineWidth = borderWidth;
     g.strokeStyle = fg;
     g.stroke();
   });

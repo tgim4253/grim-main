@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { ipc } from '../lib/ipc';
+import { ipc } from '../../../apps/desktop/src/lib/ipc';
 import useThumbStore, { convertToThumbKey } from '@tgim/stores/thumbStore';
 import { ImageFmt, ResizeMode, ThumbSpec, ThumbStatus } from '@tgim/types/file';
 import { useShallow } from 'zustand/shallow';
@@ -48,7 +48,7 @@ export function useThumbnails({ moaId, maxBatchSize = DEFAULT_MAX_BATCH }: UseTh
 
       for (const request of requests) {
         const { hash, width, height } = request;
-        if (!hash || width <= 0 || height <= 0) continue;
+        if (!hash || width <= 0) continue;
 
         const descriptor: ThumbnailRequest = {
           hash,

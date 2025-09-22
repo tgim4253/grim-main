@@ -1,1 +1,1 @@
-export * from './useThumbnails';
+export * from '../../../../packages/hooks/src/useThumbnails';
