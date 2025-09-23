@@ -85,3 +85,67 @@ pub struct CroquisStartResponse {
     pub session_id: String,
     pub window_label: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CroquisCaptureStartPayload {
+    pub session_id: String,
+    pub image_hash: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CroquisCaptureStartResponse {
+    pub capture_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CroquisCaptureContext {
+    pub capture_id: String,
+    pub session_id: String,
+    pub image_hash: String,
+    pub moa_id: String,
+    pub save_path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CroquisCaptureRect {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CroquisCaptureMonitor {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CroquisCapturePreviewPayload {
+    pub capture_id: String,
+    pub rect: CroquisCaptureRect,
+    pub monitor: CroquisCaptureMonitor,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CroquisCapturePreview {
+    pub preview_path: String,
+    pub rect: CroquisCaptureRect,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CroquisCaptureConfirmResponse {
+    pub file_path: String,
+    pub file_name: String,
+}

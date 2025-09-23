@@ -46,6 +46,11 @@ fn main() {
             commands::croquis::start_croquis_session,
             commands::croquis::load_croquis_session,
             commands::croquis::load_croquis_option,
+            commands::croquis::start_croquis_capture,
+            commands::croquis::load_croquis_capture_context,
+            commands::croquis::render_croquis_capture_preview,
+            commands::croquis::confirm_croquis_capture,
+            commands::croquis::cancel_croquis_capture,
         ])
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_decorum::init())

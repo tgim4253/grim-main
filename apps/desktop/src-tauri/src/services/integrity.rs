@@ -121,6 +121,12 @@ pub async fn seed_initial_data(pool: &Pool<Sqlite>) -> Result<()> {
                 0,
                 "Folder(parent) -> Folder(child)",
             ),
+            (
+                RelationType::CroquisReference,
+                1,
+                0,
+                "Original reference -> Croquis capture",
+            ),
         ];
 
         for (kind, default_level, editable, description) in seed_data {

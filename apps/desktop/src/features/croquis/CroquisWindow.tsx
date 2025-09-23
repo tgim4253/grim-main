@@ -6,6 +6,7 @@ import { Button } from '@tgim/ui';
 import { CroquisSession, CroquisSessionImage } from '@tgim/types/croquis';
 import { Pause, Play, SkipBack, SkipForward, Camera } from 'lucide-react';
 import { ipc } from '../../lib/ipc';
+import { toast } from 'react-toastify';
 
 const shuffleImages = (images: CroquisSessionImage[]): CroquisSessionImage[] => {
   const next = [...images];
@@ -32,6 +33,7 @@ const CroquisWindow: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [timerExpired, setTimerExpired] = useState(false);
   const [isHover, setIsHover] = useState(false); // UI visible only on hover
+  const [isCaptureBusy, setIsCaptureBusy] = useState(false);
 
   const imgRef = useRef<HTMLImageElement | null>(null); // reference to current <img>
   const rafRef = useRef<number | null>(null);
@@ -223,9 +225,24 @@ const CroquisWindow: React.FC = () => {
     setCurrentIndex(prev => Math.min(imageList.length - 1, prev + 1));
   }, [hasNext, imageList.length]);
 
-  const handleCapture = useCallback(() => {
-    window.alert('Capture requested. (Not implemented yet)');
-  }, []);
+  const handleCapture = useCallback(async () => {
+    if (!session || !currentImage || !isCaptureEnabled || isCaptureBusy) {
+      return;
+    }
+
+    setIsCaptureBusy(true);
+    try {
+      await ipc.croquis.startCapture({
+        sessionId: session.sessionId,
+        imageHash: currentImage.hash,
+      });
+    } catch (error) {
+      console.error('[Croquis] Failed to launch capture overlay', error);
+      toast.error('Failed to start capture overlay.');
+    } finally {
+      setIsCaptureBusy(false);
+    }
+  }, [currentImage, isCaptureBusy, isCaptureEnabled, session]);
 
   const elapsedSeconds =
     maxTimeSeconds > 0 ? Math.min(maxTimeSeconds, elapsedMs / 1000) : elapsedMs / 1000;
@@ -325,6 +342,7 @@ const CroquisWindow: React.FC = () => {
                   type="button"
                   variant="secondary"
                   onClick={handleCapture}
+                  disabled={isCaptureBusy}
                   className="flex items-center gap-2"
                 >
                   <Camera className="size-4" />

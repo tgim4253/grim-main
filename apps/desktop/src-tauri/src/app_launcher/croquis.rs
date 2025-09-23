@@ -67,3 +67,41 @@ fn parse_dimension(value: Option<&String>) -> Option<f64> {
     }
     raw.parse::<f64>().ok().filter(|v| *v > 0.0)
 }
+
+/// Launch the transparent capture overlay used to select screen regions.
+pub fn launch_croquis_capture(
+    app: &tauri::AppHandle,
+    capture_id: &str,
+) -> Result<String, String> {
+    let uri = format!("croquis-capture?capture_id={capture_id}");
+
+    #[cfg(debug_assertions)]
+    let url = WebviewUrl::App(format!("http://localhost:1420/#/{uri}").into());
+
+    #[cfg(not(debug_assertions))]
+    let url = WebviewUrl::App(format!("index.html#{uri}").into());
+
+    let window_label = "moa-croquis-capture".to_string();
+
+    if let Some(existing) = app.get_webview_window(&window_label) {
+        let _ = existing.close();
+    }
+
+    let builder =
+        tauri::WebviewWindowBuilder::new(app, window_label.clone(), url)
+            .title("")
+            .decorations(false)
+            .resizable(false)
+            .maximizable(false)
+            .always_on_top(true)
+            .fullscreen(true)
+            .background_color(Color(0, 0, 0, 0));
+
+    builder
+        .build()
+        .map_err(|err| err.to_string())?
+        .set_focus()
+        .map_err(|err| err.to_string())?;
+
+    Ok(window_label)
+}

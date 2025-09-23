@@ -3,6 +3,12 @@ import { invoke } from '@tauri-apps/api/core';
 import { GraphResponse } from '@tgim/types/graph';
 import { CreateFolderPayload, FolderPreview, ThumbRequest, ThumbResponse } from '@tgim/types/file';
 import {
+  CroquisCaptureConfirmResponse,
+  CroquisCaptureContext,
+  CroquisCapturePreview,
+  CroquisCapturePreviewPayload,
+  CroquisCaptureStartPayload,
+  CroquisCaptureStartResponse,
   CroquisOption,
   CroquisSession,
   CroquisStartPayload,
@@ -84,6 +90,29 @@ const croquisIpc = {
   loadOption: async (moaId: string): Promise<CroquisOption | null> => {
     const response = await invoke('load_croquis_option', { moaId });
     return (response as CroquisOption | null) ?? null;
+  },
+  startCapture: async (
+    payload: CroquisCaptureStartPayload,
+  ): Promise<CroquisCaptureStartResponse> => {
+    const response = await invoke('start_croquis_capture', { payload });
+    return response as CroquisCaptureStartResponse;
+  },
+  loadCaptureContext: async (captureId: string): Promise<CroquisCaptureContext | null> => {
+    const response = await invoke('load_croquis_capture_context', { captureId });
+    return (response as CroquisCaptureContext | null) ?? null;
+  },
+  renderCapturePreview: async (
+    payload: CroquisCapturePreviewPayload,
+  ): Promise<CroquisCapturePreview> => {
+    const response = await invoke('render_croquis_capture_preview', { payload });
+    return response as CroquisCapturePreview;
+  },
+  confirmCapture: async (captureId: string): Promise<CroquisCaptureConfirmResponse> => {
+    const response = await invoke('confirm_croquis_capture', { captureId });
+    return response as CroquisCaptureConfirmResponse;
+  },
+  cancelCapture: async (captureId: string): Promise<void> => {
+    await invoke('cancel_croquis_capture', { captureId });
   },
 };
 
