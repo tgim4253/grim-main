@@ -112,13 +112,27 @@ const CroquisWindow: React.FC = () => {
       if (isInitHeight) return;
 
       try {
-        const windowRef = getCurrentWindow();
+        if (!imageList.length) return;
 
-        const fixedWidth = Number(option?.window.width!);
-        const avgHeight =
-          imageList.reduce<number>((acc, image) => (acc += image.baseHeight), 0) / imageList.length;
+        const fixedWidthRaw = option?.window.width;
+        const fixedWidth = fixedWidthRaw ? Number(fixedWidthRaw) : Number.NaN;
+        if (!Number.isFinite(fixedWidth) || fixedWidth <= 0) return;
+
+        let totalScaledHeight = 0;
+        let validImageCount = 0;
+        for (const image of imageList) {
+          if (!Number.isFinite(image.baseWidth) || image.baseWidth <= 0) continue;
+          const scale = fixedWidth / image.baseWidth;
+          totalScaledHeight += image.baseHeight * scale;
+          validImageCount += 1;
+        }
+
+        if (validImageCount === 0) return;
+
+        const avgHeight = totalScaledHeight / validImageCount;
         const desiredHeight = Math.max(fixedWidth, Math.ceil(avgHeight));
 
+        const windowRef = getCurrentWindow();
         await windowRef.setSize(new LogicalSize(fixedWidth, desiredHeight));
         setIsInitHeight(true);
       } catch (error) {
