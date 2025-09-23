@@ -9,10 +9,11 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { useThumbnails } from '../../../../hooks';
 import { FixedSizeGrid as WindowGrid, GridChildComponentProps } from 'react-window';
 import { Button } from '@tgim/ui';
-import { CroquisOption } from '@tgim/types/croquis';
+import { CroquisPreferences } from '@tgim/types/croquis';
 import CroquisStartModal, {
   CroquisStartModalConfirmPayload,
 } from '../../../croquis/CroquisStartModal';
+import { createDefaultCroquisPreferences } from '../../../croquis/lib/preferences';
 import ThumbnailStorageModal from '../../../file/modal/ThumbnailStorageModal';
 
 /* ---------------------------------------------
@@ -251,10 +252,10 @@ const GridView: React.FC<Props> = ({ gridData }) => {
   }, [images]);
 
   const [croquisModalOpen, setCroquisModalOpen] = useState(false);
-  const [croquisOption, setCroquisOption] = useState<CroquisOption>(() =>
-    createDefaultCroquisOption(),
+  const [croquisPreferences, setCroquisPreferences] = useState<CroquisPreferences>(() =>
+    createDefaultCroquisPreferences(),
   );
-  const [rememberCroquisOption, setRememberCroquisOption] = useState(false);
+  const [rememberCroquisOption, setRememberCroquisOption] = useState(true);
   const [storageModalOpen, setStorageModalOpen] = useState(false);
 
   const selectedCount = selected.size;
@@ -278,8 +279,8 @@ const GridView: React.FC<Props> = ({ gridData }) => {
   }, []);
 
   const handleCroquisConfirm = useCallback(
-    ({ option, remember }: CroquisStartModalConfirmPayload) => {
-      setCroquisOption(option);
+    ({ preferences, remember }: CroquisStartModalConfirmPayload) => {
+      setCroquisPreferences(preferences);
       setRememberCroquisOption(remember);
       clearSelection();
     },
@@ -512,7 +513,7 @@ const GridView: React.FC<Props> = ({ gridData }) => {
       </div>
       <CroquisStartModal
         open={croquisModalOpen && selectedCount > 0}
-        option={croquisOption}
+        preferences={croquisPreferences}
         remember={rememberCroquisOption}
         imageHashes={selectedHashes}
         moaId={moaId}

@@ -45,6 +45,28 @@ pub struct CroquisOption {
     pub is_shuffle: bool,
 }
 
+/// Named preset that stores a single Croquis option payload.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CroquisPreset {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub option: CroquisOption,
+}
+
+/// Collection of Croquis presets remembered for a workspace.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CroquisPreferences {
+    #[serde(default)]
+    pub presets: Vec<CroquisPreset>,
+    #[serde(default)]
+    pub active_preset_id: String,
+}
+
 /// Payload provided by the renderer to start a Croquis session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -54,6 +76,8 @@ pub struct CroquisStartPayload {
     pub image_hashes: Vec<String>,
     #[serde(default)]
     pub save_option: bool,
+    #[serde(default)]
+    pub preferences: Option<CroquisPreferences>,
 }
 
 /// Metadata describing an ensured Croquis base image.
