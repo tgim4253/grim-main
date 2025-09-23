@@ -8,14 +8,14 @@ const TitleBar: React.FC = () => {
       className="flex h-8 text-text justify-end"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
-      <div className="flex h-8" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+      <div className="flex h-3" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <Button
           variant="titlebar"
           onClick={() => ipc.windowController.minimize()}
           aria-label="Minimize window"
           className="flex items-center justify-center text-icon-main"
         >
-          <Minus className="size-4" />
+          <Minus className="size-3" />
         </Button>
         <Button
           variant="titlebar"
@@ -23,7 +23,7 @@ const TitleBar: React.FC = () => {
           aria-label="Close window"
           className="flex items-center justify-center text-icon-main"
         >
-          <X className="size-4" />
+          <X className="size-3" />
         </Button>
       </div>
     </div>

@@ -256,17 +256,17 @@ const CroquisWindow: React.FC = () => {
 
   return (
     <div className="flex h-full w-full flex-col text-text">
+      {!isMac && (
+        <div className="fixed w-full top-0 z-50">
+          <TitleBar />
+        </div>
+      )}
       {/* Stage area */}
       <main
         className="relative flex h-full w-full flex-1 select-none bg-transparent flex-col"
         onMouseEnter={() => setIsHover(true)}
         onMouseLeave={() => setIsHover(false)}
       >
-        {!isMac && isHover && (
-          <div className="fixed w-full top-0 z-50">
-            <TitleBar />
-          </div>
-        )}
         <div className="relative flex h-full w-full items-center justify-center overflow-hidden">
           {currentImage && currentImageSrc ? (
             <img
