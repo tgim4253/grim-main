@@ -29,6 +29,7 @@ interface ThumbState {
   touch: (thumbKey: ThumbKey) => void;
   attach: (hash: string, thumbKey: ThumbKey) => void;
   evictLRU: (max: number) => void;
+  reset: () => void;
 
   getThumbPathByKey: (key: ThumbKey) => string | undefined;
 }
@@ -109,6 +110,24 @@ export const useThumbStore = create<ThumbState>()(
               if (v) s.byKey[k] = { ...v, url: undefined };
             }
           }
+        });
+      },
+
+      reset: () => {
+        const entries = Object.values(get().byKey);
+        for (const entry of entries) {
+          const url = entry?.url;
+          if (url?.startsWith('blob:')) {
+            try {
+              URL.revokeObjectURL(url);
+            } catch {}
+          }
+        }
+
+        set(s => {
+          s.byKey = {};
+          s.byHash = {};
+          s.lru = [];
         });
       },
 

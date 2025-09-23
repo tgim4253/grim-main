@@ -153,9 +153,10 @@ const Main: React.FC = () => {
       leftSidebar: state.sidebars.left,
     })),
   );
-  const { upsertThumb } = useThumbStore(
+  const { upsertThumb, resetThumbs } = useThumbStore(
     useShallow(state => ({
       upsertThumb: state.upsert,
+      resetThumbs: state.reset,
     })),
   );
   // React to thumbnail worker updates to keep local caches in sync.
@@ -183,6 +184,22 @@ const Main: React.FC = () => {
       unlisten?.();
     };
   }, [moaId, upsertThumb]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+
+    const initListener = async () => {
+      unlisten = await listen<{ scope: 'base' | 'derived' }>('thumbnails://purged', () => {
+        resetThumbs();
+      });
+    };
+
+    void initListener();
+
+    return () => {
+      unlisten?.();
+    };
+  }, [resetThumbs]);
 
   // Load the initial graph and subscribe to bootstrap progress events.
   useEffect(() => {
