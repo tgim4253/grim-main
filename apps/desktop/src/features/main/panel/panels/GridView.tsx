@@ -816,6 +816,7 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const isMasonry = layout === 'masonry';
 
   const key = useMemo(
     () =>
@@ -868,22 +869,27 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
     : 'border-border';
 
   // While scrolling or already loaded, avoid fade transition to reduce flicker
+  const baseImgClass = isMasonry
+    ? 'w-full h-auto object-cover'
+    : 'w-full h-full object-cover';
   const imgClass =
     isScrolling || loaded
-      ? 'w-full h-full object-cover'
-      : 'w-full h-full object-cover opacity-0 transition-opacity duration-300';
+      ? baseImgClass
+      : `${baseImgClass} opacity-0 transition-opacity duration-300`;
 
   const cardStyle = useMemo<React.CSSProperties>(() => {
-    if (layout !== 'masonry') return {};
+    if (!isMasonry) return {};
     return {
       containIntrinsicSize: `${thumbSize}px ${thumbSize}px`,
     };
-  }, [layout, thumbSize]);
+  }, [isMasonry, thumbSize]);
 
   return (
     <div
       ref={containerRef}
-      className={`group relative w-full h-full overflow-hidden rounded-lg border ${selectionClasses} bg-surface shadow-sm transition-all duration-200 hover:border-accent hover:shadow-lg hover:-translate-y-1 cursor-pointer ${sizeClass ?? ''}`}
+      className={`group relative w-full ${
+        isMasonry ? '' : 'h-full'
+      } overflow-hidden rounded-lg border ${selectionClasses} bg-surface shadow-sm transition-all duration-200 hover:border-accent hover:shadow-lg hover:-translate-y-1 cursor-pointer ${sizeClass ?? ''}`}
       onClick={handleCardClick}
       role="button"
       tabIndex={0}
@@ -901,8 +907,13 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
           />
         </div>
       )}
-      <div className="relative w-full h-full">
-        {!stableSrc && <div className="w-full h-full bg-surface-muted animate-pulse" />}
+      <div className={`relative w-full ${isMasonry ? '' : 'h-full'}`}>
+        {!stableSrc && (
+          <div
+            className={`w-full ${isMasonry ? '' : 'h-full'} bg-surface-muted animate-pulse`}
+            style={isMasonry ? { height: thumbSize } : undefined}
+          />
+        )}
         {stableSrc && (
           <img
             src={stableSrc}
