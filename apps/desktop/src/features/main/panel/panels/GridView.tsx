@@ -73,6 +73,7 @@ const SIZES: Size[] = ['small', 'medium', 'large'];
 const LAYOUTS: Layout[] = ['grid', 'masonry'];
 const MAX_ITEMS_PER_REQ = 100;
 const INITIAL_FETCH_COUNT = 50;
+const BUFFER_ADDITIONAL_ROWS = 3;
 
 const createDefaultCroquisOption = (): CroquisOption => ({
   window: { width: null, height: null },
@@ -96,14 +97,31 @@ function useDebouncedEffect(fn: () => void, deps: React.DependencyList, delay: n
 function useVisibilityMap(rootRef: React.RefObject<HTMLElement>, overscanPx = 600) {
   const ioRef = useRef<IntersectionObserver | null>(null);
   const [visible, setVisible] = useState<Record<string, boolean>>({});
-  const pending = useRef<Record<string, boolean>>({});
+  const pending = useRef<Map<string, boolean>>(new Map());
   const rafId = useRef<number | null>(null);
 
   const flush = useCallback(() => {
     setVisible(prev => {
-      if (Object.keys(pending.current).length === 0) return prev;
-      const next = { ...prev, ...pending.current };
-      pending.current = {};
+      if (pending.current.size === 0) return prev;
+
+      const next = { ...prev };
+      let changed = false;
+
+      pending.current.forEach((isVisible, key) => {
+        if (isVisible) {
+          if (!next[key]) {
+            next[key] = true;
+            changed = true;
+          }
+        } else if (next[key]) {
+          delete next[key];
+          changed = true;
+        }
+      });
+
+      pending.current.clear();
+
+      if (!changed) return prev;
       return next;
     });
     rafId.current = null;
@@ -116,7 +134,7 @@ function useVisibilityMap(rootRef: React.RefObject<HTMLElement>, overscanPx = 60
         for (const entry of entries) {
           const k = (entry.target as HTMLElement).dataset.k;
           if (!k) continue;
-          pending.current[k] = entry.isIntersecting;
+          pending.current.set(k, entry.isIntersecting);
         }
         if (rafId.current == null) {
           rafId.current = requestAnimationFrame(flush);
@@ -140,10 +158,22 @@ function useVisibilityMap(rootRef: React.RefObject<HTMLElement>, overscanPx = 60
     [ensureObserver],
   );
 
-  const unobserve = useCallback((el: Element | null) => {
-    if (!el || !ioRef.current) return;
-    ioRef.current.unobserve(el);
-  }, []);
+  const unobserve = useCallback(
+    (el: Element | null) => {
+      if (!el) return;
+      const key = (el as HTMLElement).dataset.k;
+      if (key) {
+        pending.current.set(key, false);
+        if (rafId.current == null) {
+          rafId.current = requestAnimationFrame(flush);
+        }
+      }
+      if (ioRef.current) {
+        ioRef.current.unobserve(el);
+      }
+    },
+    [flush],
+  );
 
   useEffect(() => {
     return () => {
@@ -181,6 +211,17 @@ const GridView: React.FC<Props> = ({ gridData }) => {
   const [selectMode, setSelectMode] = useState(false);
   const [images] = useState(gridData.images);
 
+  const thumbSize = useMemo(() => {
+    switch (size) {
+      case 'small':
+        return 96;
+      case 'large':
+        return 256;
+      default:
+        return 128;
+    }
+  }, [size]);
+
   const visibleOrder = useMemo(() => images.map(img => img.hash), [images]);
 
   const {
@@ -194,9 +235,11 @@ const GridView: React.FC<Props> = ({ gridData }) => {
   });
 
   // Map for quick lookup by hash
-  const hashToImgMap = useMemo(() => {
-    const map: Record<string, ImageItem> = {};
-    images.forEach(img => (map[img.hash] = img));
+  const hashToIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    images.forEach((img, index) => {
+      map.set(img.hash, index);
+    });
     return map;
   }, [images]);
 
@@ -244,19 +287,33 @@ const GridView: React.FC<Props> = ({ gridData }) => {
   );
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { width: scrollWidth } = useElementSize(scrollRef);
   // @ts-expect-error.
   const { visible, observe, unobserve } = useVisibilityMap(scrollRef, 800);
 
-  const thumbSize = useMemo(() => {
-    switch (size) {
-      case 'small':
-        return 96;
-      case 'large':
-        return 256;
-      default:
-        return 128;
+  const approxColumns = useMemo(() => {
+    const width = scrollWidth;
+    const gap = 16;
+
+    if (!width) {
+      return layout === 'grid' ? 4 : 3;
     }
-  }, [size]);
+
+    if (layout === 'grid') {
+      const columnWidth = thumbSize + gap;
+      return Math.max(1, Math.floor((width + gap) / columnWidth));
+    }
+
+    const masonryWidth = size === 'small' ? 160 : size === 'large' ? 320 : 256;
+    return Math.max(1, Math.floor((width + gap) / (masonryWidth + gap)));
+  }, [layout, scrollWidth, size, thumbSize]);
+
+  // Cache a few extra rows worth of items above/below the current viewport to
+  // prevent rapid toggling from IntersectionObserver callbacks during scroll.
+  const bufferRadius = useMemo(
+    () => Math.max(approxColumns * BUFFER_ADDITIONAL_ROWS, approxColumns),
+    [approxColumns],
+  );
 
   /* -------------------------------------------------
    * Thumbnail fetcher
@@ -326,20 +383,44 @@ const GridView: React.FC<Props> = ({ gridData }) => {
    * Fetch for Masonry via IntersectionObserver
    * (Grid uses react-window onItemsRendered; see below)
    * ------------------------------------------------- */
-  const visibleItems = useMemo(() => {
-    return Object.keys(visible)
-      .filter(k => visible[k])
-      .map(hash => hashToImgMap[hash])
-      .filter(Boolean);
-  }, [visible, hashToImgMap]);
+  const visibleHashes = useMemo(
+    () => Object.keys(visible).filter(hash => visible[hash]),
+    [visible],
+  );
+
+  const bufferedVisibleItems = useMemo(() => {
+    // Build a superset of the currently visible hashes by including neighbours
+    // within the buffered radius. This keeps thumbnails "warm" a couple of
+    // rows ahead/behind the scroll position so the cards do not flicker.
+    if (visibleHashes.length === 0) return [] as ImageItem[];
+
+    const indices = new Set<number>();
+
+    visibleHashes.forEach(hash => {
+      const index = hashToIndexMap.get(hash);
+      if (index == null) return;
+
+      const start = Math.max(0, index - bufferRadius);
+      const end = Math.min(images.length - 1, index + bufferRadius);
+
+      for (let i = start; i <= end; i += 1) {
+        indices.add(i);
+      }
+    });
+
+    return Array.from(indices)
+      .sort((a, b) => a - b)
+      .map(idx => images[idx])
+      .filter((img): img is ImageItem => Boolean(img));
+  }, [bufferRadius, hashToIndexMap, images, visibleHashes]);
 
   useDebouncedEffect(
     () => {
-      if (layout === 'masonry' && visibleItems.length > 0) {
-        stableFetchThumbnails.current(visibleItems);
+      if (layout === 'masonry' && bufferedVisibleItems.length > 0) {
+        stableFetchThumbnails.current(bufferedVisibleItems);
       }
     },
-    [visibleItems, layout],
+    [bufferedVisibleItems, layout],
     120,
   );
 
