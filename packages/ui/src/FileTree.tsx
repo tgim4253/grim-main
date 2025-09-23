@@ -29,6 +29,19 @@ export const TreeNode: React.FC<{
 }) => {
   const isFolder = node.type === NodeKind.Folder;
   const isFile = node.type === NodeKind.File;
+  const clickTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearClickTimeout = React.useCallback(() => {
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+      clickTimeoutRef.current = null;
+    }
+  }, []);
+
+  React.useEffect(() => () => clearClickTimeout(), [clearClickTimeout]);
+
+  const hasModifierKey = (event: React.MouseEvent) =>
+    event.shiftKey || event.metaKey || event.ctrlKey || event.altKey;
+
   const {
     attributes,
     listeners,
@@ -59,8 +72,30 @@ export const TreeNode: React.FC<{
         )}
         onClick={e => {
           onSelect?.(e, node.id);
-          if (isFolder && !e.shiftKey && !e.metaKey && !e.ctrlKey) onToggle(node.id);
-          if (isFile && !e.shiftKey && !e.metaKey && !e.ctrlKey) openFile(node);
+          if (hasModifierKey(e)) return;
+
+          if (isFolder) {
+            clearClickTimeout();
+            clickTimeoutRef.current = setTimeout(() => {
+              onToggle(node.id);
+              clearClickTimeout();
+            }, 200);
+          } else if (isFile) {
+            openFile(node);
+          }
+        }}
+        onDoubleClick={e => {
+          if (hasModifierKey(e)) return;
+
+          if (isFolder) {
+            clearClickTimeout();
+            if (!expanded) {
+              onToggle(node.id);
+            }
+            openFile(node);
+          } else if (isFile) {
+            openFile(node);
+          }
         }}
         {...attributes}
         {...listeners}
