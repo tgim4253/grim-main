@@ -1,11 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { join } from '@tauri-apps/api/path';
 import { Button, Input, Modal, Switch } from '@tgim/ui';
-import { CroquisOption, CroquisPreferences, CroquisStartResponse } from '@tgim/types/croquis';
+import {
+  CroquisOption,
+  CroquisPreferences,
+  CroquisPreset,
+  CroquisStartResponse,
+} from '@tgim/types/croquis';
 import { ipc } from '../../lib/ipc';
 import { open as pickerOpen } from '@tauri-apps/plugin-dialog';
 
 import { toast } from 'react-toastify';
+import { Pencil } from 'lucide-react';
 import {
   createPreset,
   normaliseCroquisOption,
@@ -138,11 +144,147 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [timerInput, setTimerInput] = useState(() => formatTimer(activeOption.timer.maxTime));
   const [editingTimer, setEditingTimer] = useState(false);
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
+  const [presetNameDraft, setPresetNameDraft] = useState('');
+  const [editingPresetInitialName, setEditingPresetInitialName] = useState('');
   const hasUserInteractedRef = useRef(false);
+  const editingPresetInputRef = useRef<HTMLInputElement | null>(null);
 
   const markInteracted = useCallback(() => {
     hasUserInteractedRef.current = true;
   }, []);
+
+  useEffect(() => {
+    if (!editingPresetId) {
+      editingPresetInputRef.current = null;
+      return;
+    }
+    const node = editingPresetInputRef.current;
+    if (!node) return;
+    node.focus();
+    node.select();
+  }, [editingPresetId]);
+
+  const commitPresetName = useCallback(() => {
+    if (!editingPresetId) {
+      return;
+    }
+    const trimmed = presetNameDraft.trim();
+    let didChange = false;
+    setPreferencesState(prev => {
+      const index = prev.presets.findIndex(preset => preset.id === editingPresetId);
+      if (index === -1) return prev;
+      const fallbackName = `Preset ${index + 1}`;
+      const current = prev.presets[index];
+      const nextName = trimmed || fallbackName;
+      if (current.name === nextName) {
+        return prev;
+      }
+      const nextPresets = [...prev.presets];
+      nextPresets[index] = {
+        ...current,
+        name: nextName,
+      };
+      didChange = true;
+      return {
+        ...prev,
+        presets: nextPresets,
+      };
+    });
+    if (didChange) {
+      markInteracted();
+    }
+    setEditingPresetId(null);
+    setPresetNameDraft('');
+    setEditingPresetInitialName('');
+    editingPresetInputRef.current = null;
+  }, [editingPresetId, markInteracted, presetNameDraft, setPreferencesState]);
+
+  const cancelPresetNameEdit = useCallback(() => {
+    if (editingPresetId) {
+      setPreferencesState(prev => {
+        const index = prev.presets.findIndex(preset => preset.id === editingPresetId);
+        if (index === -1) return prev;
+        const nextPresets = [...prev.presets];
+        const current = nextPresets[index];
+        if (current.name === editingPresetInitialName) {
+          return prev;
+        }
+        nextPresets[index] = {
+          ...current,
+          name: editingPresetInitialName,
+        };
+        return {
+          ...prev,
+          presets: nextPresets,
+        };
+      });
+    }
+    setEditingPresetId(null);
+    setPresetNameDraft('');
+    setEditingPresetInitialName('');
+    editingPresetInputRef.current = null;
+  }, [editingPresetId, editingPresetInitialName, setPreferencesState]);
+
+  const handlePresetNameInputChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const value = event.target.value;
+      setPresetNameDraft(value);
+      if (!editingPresetId) return;
+      markInteracted();
+      setPreferencesState(prev => {
+        const index = prev.presets.findIndex(preset => preset.id === editingPresetId);
+        if (index === -1) return prev;
+        const nextPresets = [...prev.presets];
+        const current = nextPresets[index];
+        if (current.name === value) {
+          return prev;
+        }
+        nextPresets[index] = {
+          ...current,
+          name: value,
+        };
+        return {
+          ...prev,
+          presets: nextPresets,
+        };
+      });
+    },
+    [editingPresetId, markInteracted, setPreferencesState],
+  );
+
+  const handlePresetNameInputKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        commitPresetName();
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        cancelPresetNameEdit();
+      }
+    },
+    [cancelPresetNameEdit, commitPresetName],
+  );
+
+  const handlePresetRenameClick = useCallback(
+    (preset: CroquisPreset) => {
+      markInteracted();
+      if (editingPresetId === preset.id) {
+        const node = editingPresetInputRef.current;
+        node?.focus();
+        node?.select();
+        return;
+      }
+      if (editingPresetId) {
+        commitPresetName();
+      }
+      setEditingPresetInitialName(preset.name);
+      setPresetNameDraft(preset.name);
+      setEditingPresetId(preset.id);
+    },
+    [commitPresetName, editingPresetId, markInteracted],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -150,6 +292,10 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
     setPreferencesState(normaliseCroquisPreferences(preferences));
     setRememberSettings(Boolean(remember));
     setEditingTimer(false);
+    setEditingPresetId(null);
+    setPresetNameDraft('');
+    setEditingPresetInitialName('');
+    editingPresetInputRef.current = null;
   }, [open, preferences, remember]);
 
   useEffect(() => {
@@ -168,6 +314,10 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
         if (cancelled || !persisted) return;
         if (hasUserInteractedRef.current) return;
         setPreferencesState(normaliseCroquisPreferences(persisted));
+        setEditingPresetId(null);
+        setPresetNameDraft('');
+        setEditingPresetInitialName('');
+        editingPresetInputRef.current = null;
       } catch (error) {
         console.error('[Croquis] Failed to load saved presets', error);
       }
@@ -243,6 +393,9 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
 
   const handlePresetSelect = useCallback(
     (presetId: string) => {
+      if (editingPresetId) {
+        commitPresetName();
+      }
       markInteracted();
       setEditingTimer(false);
       setPreferencesState(prev => {
@@ -253,21 +406,31 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
         };
       });
     },
-    [markInteracted],
+    [commitPresetName, editingPresetId, markInteracted],
   );
 
   const handleAddPreset = useCallback(() => {
+    if (editingPresetId) {
+      commitPresetName();
+    }
     markInteracted();
     setEditingTimer(false);
+    let createdPreset: CroquisPreset | null = null;
     setPreferencesState(prev => {
       const index = prev.presets.length;
       const nextPreset = createPreset(`Preset ${index + 1}`, activeOption, index);
+      createdPreset = nextPreset;
       return {
         presets: [...prev.presets, nextPreset],
         activePresetId: nextPreset.id,
       };
     });
-  }, [activeOption, markInteracted]);
+    if (createdPreset) {
+      setPresetNameDraft(createdPreset.name);
+      setEditingPresetInitialName(createdPreset.name);
+      setEditingPresetId(createdPreset.id);
+    }
+  }, [activeOption, commitPresetName, editingPresetId, markInteracted]);
 
   const handleWindowPresetClick = useCallback(
     (preset: WindowPreset) => {
@@ -411,12 +574,45 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
       const safeMaxTime = clampSeconds(payloadOption.timer.maxTime);
       payloadOption.timer.maxTime = safeMaxTime;
 
+      const updatedNames = new Map<string, string>();
+      const payloadPresets = preferencesState.presets.map((preset, index) => {
+        const rawName = editingPresetId === preset.id ? presetNameDraft : preset.name;
+        const trimmedName = rawName.trim();
+        const safeName = trimmedName || `Preset ${index + 1}`;
+        if (safeName !== preset.name) {
+          updatedNames.set(preset.id, safeName);
+        }
+        return {
+          ...preset,
+          name: safeName,
+          option: normaliseCroquisOption(preset.option),
+        };
+      });
+
+      if (editingPresetId) {
+        setEditingPresetId(null);
+        setPresetNameDraft('');
+        setEditingPresetInitialName('');
+        editingPresetInputRef.current = null;
+      }
+
+      if (updatedNames.size) {
+        setPreferencesState(prev => ({
+          ...prev,
+          presets: prev.presets.map(preset => {
+            const nextName = updatedNames.get(preset.id);
+            if (!nextName) return preset;
+            return {
+              ...preset,
+              name: nextName,
+            };
+          }),
+        }));
+      }
+
       const preferencesPayload: CroquisPreferences = {
         activePresetId: preferencesState.activePresetId,
-        presets: preferencesState.presets.map(preset => ({
-          ...preset,
-          option: normaliseCroquisOption(preset.option),
-        })),
+        presets: payloadPresets,
       };
 
       const response = await ipc.croquis.startSession({
@@ -443,13 +639,16 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
     }
   }, [
     activeOption,
+    editingPresetId,
     imageHashes,
     moaId,
     onClose,
     onConfirm,
     preferencesState,
+    presetNameDraft,
     rememberSettings,
     selectedCount,
+    setPreferencesState,
     submitting,
   ]);
 
@@ -468,18 +667,54 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
               Presets
             </header>
             <div className="mt-2 flex max-h-[22rem] flex-col gap-2 overflow-y-auto pr-1">
-              {preferencesState.presets.map(preset => (
-                <Button
-                  key={preset.id}
-                  type="button"
-                  variant="toggle"
-                  active={preset.id === preferencesState.activePresetId}
-                  className="justify-start"
-                  onClick={() => handlePresetSelect(preset.id)}
-                >
-                  {preset.name}
-                </Button>
-              ))}
+              {preferencesState.presets.map((preset, index) => {
+                const isActive = preset.id === preferencesState.activePresetId;
+                const isEditing = editingPresetId === preset.id;
+                return (
+                  <div key={preset.id} className="flex w-full min-w-0 items-center gap-2">
+                    {isEditing ? (
+                      <Input.Input
+                        ref={node => {
+                          if (preset.id === editingPresetId) {
+                            editingPresetInputRef.current = node;
+                          }
+                        }}
+                        type="text"
+                        className={`input-default h-9 w-full flex-1${
+                          isActive ? ' border-primary/60 ring-2 ring-primary/20' : ''
+                        }`}
+                        value={presetNameDraft}
+                        placeholder={`Preset ${index + 1}`}
+                        onChange={handlePresetNameInputChange}
+                        onBlur={commitPresetName}
+                        onKeyDown={handlePresetNameInputKeyDown}
+                        spellCheck={false}
+                      />
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="toggle"
+                        active={isActive}
+                        className="flex-1 justify-start"
+                        onClick={() => handlePresetSelect(preset.id)}
+                      >
+                        {preset.name}
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="icon"
+                      active={isEditing}
+                      onMouseDown={event => event.preventDefault()}
+                      onClick={() => handlePresetRenameClick(preset)}
+                      aria-label={`Rename preset ${preset.name}`}
+                      title="Rename preset"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           </div>
           <Button type="button" variant="ghost" className="justify-start" onClick={handleAddPreset}>
