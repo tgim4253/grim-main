@@ -426,9 +426,9 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
       };
     });
     if (createdPreset) {
-      setPresetNameDraft(createdPreset.name);
-      setEditingPresetInitialName(createdPreset.name);
-      setEditingPresetId(createdPreset.id);
+      setPresetNameDraft((createdPreset as CroquisPreset).name);
+      setEditingPresetInitialName((createdPreset as CroquisPreset).name);
+      setEditingPresetId((createdPreset as CroquisPreset).id);
     }
   }, [activeOption, commitPresetName, editingPresetId, markInteracted]);
 
@@ -698,26 +698,33 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
                         className="flex-1 justify-start"
                         onClick={() => handlePresetSelect(preset.id)}
                       >
-                        {preset.name}
+                        <div className="flex w-full items-center justify-between">
+                          <div className="flex-1 text-center">{preset.name}</div>
+                          <Button
+                            type="button"
+                            variant="icon"
+                            active={isEditing}
+                            onMouseDown={event => event.preventDefault()}
+                            onClick={() => handlePresetRenameClick(preset)}
+                            aria-label={`Rename preset ${preset.name}`}
+                            title="Rename preset"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </Button>
                     )}
-                    <Button
-                      type="button"
-                      variant="icon"
-                      active={isEditing}
-                      onMouseDown={event => event.preventDefault()}
-                      onClick={() => handlePresetRenameClick(preset)}
-                      aria-label={`Rename preset ${preset.name}`}
-                      title="Rename preset"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
                   </div>
                 );
               })}
             </div>
           </div>
-          <Button type="button" variant="ghost" className="justify-start" onClick={handleAddPreset}>
+          <Button
+            type="button"
+            variant="default"
+            className="justify-start"
+            onClick={handleAddPreset}
+          >
             + Add preset
           </Button>
         </aside>

@@ -156,7 +156,7 @@
   --_btn-hover-border: transparent;
   --_btn-padding-y: 0.375rem;
   --_btn-padding-x: 0.75rem;
-  --_btn-radius: 9999px;
+  --_btn-radius: 10px;
   --_btn-focus-ring: 0 0 0 3px var(--btn-default-ring);
   font-size: 0.8125rem;
   font-weight: 600;
