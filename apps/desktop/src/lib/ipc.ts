@@ -10,6 +10,7 @@ import {
 } from '@tgim/types/file';
 import {
   CroquisOption,
+  CroquisPreferences,
   CroquisSession,
   CroquisStartPayload,
   CroquisStartResponse,
@@ -100,9 +101,9 @@ const croquisIpc = {
     const response = await invoke('load_croquis_session', { sessionId });
     return (response as CroquisSession | null) ?? null;
   },
-  loadOption: async (moaId: string): Promise<CroquisOption | null> => {
+  loadPreferences: async (moaId: string): Promise<CroquisPreferences | null> => {
     const response = await invoke('load_croquis_option', { moaId });
-    return (response as CroquisOption | null) ?? null;
+    return (response as CroquisPreferences | null) ?? null;
   },
 };
 

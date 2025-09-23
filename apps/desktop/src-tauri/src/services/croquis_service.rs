@@ -9,8 +9,8 @@ use crate::{
     app_launcher,
     bootstrap::PATH_MANAGER,
     models::croquis::{
-        CroquisOption, CroquisSession, CroquisSessionImage,
-        CroquisStartPayload, CroquisStartResponse,
+        CroquisOption, CroquisPreferences, CroquisPreset, CroquisSession,
+        CroquisSessionImage, CroquisStartPayload, CroquisStartResponse,
     },
     services::file_service::{
         folder::fetch_one_file_path,
@@ -28,15 +28,31 @@ pub async fn start_session(
     app_handle: &tauri::AppHandle,
     payload: CroquisStartPayload,
 ) -> Result<CroquisStartResponse> {
-    let CroquisStartPayload { moa_id, option, image_hashes, save_option } =
-        payload;
+    let CroquisStartPayload {
+        moa_id,
+        option,
+        image_hashes,
+        save_option,
+        preferences,
+    } = payload;
 
     if image_hashes.is_empty() {
         bail!("At least one image hash must be provided to start Croquis");
     }
 
     if save_option {
-        persist_option(&moa_id, &option).await?;
+        let preferences_to_persist = preferences.unwrap_or_else(|| {
+            let preset_id = get_unique_id();
+            CroquisPreferences {
+                active_preset_id: preset_id.clone(),
+                presets: vec![CroquisPreset {
+                    id: preset_id,
+                    name: "Preset 1".to_string(),
+                    option: option.clone(),
+                }],
+            }
+        });
+        persist_preferences(&moa_id, &preferences_to_persist).await?;
     }
 
     let mut images: Vec<CroquisSessionImage> =
@@ -120,8 +136,10 @@ pub async fn load_session(session_id: &str) -> Option<CroquisSession> {
     sessions.get(session_id).cloned()
 }
 
-/// Load the persisted Croquis option payload from the workspace settings directory.
-pub async fn load_option(moa_id: &str) -> Result<Option<CroquisOption>> {
+/// Load the persisted Croquis preferences from the workspace settings directory.
+pub async fn load_preferences(
+    moa_id: &str,
+) -> Result<Option<CroquisPreferences>> {
     let paths = PATH_MANAGER
         .get_or_add(moa_id)
         .await
@@ -132,22 +150,65 @@ pub async fn load_option(moa_id: &str) -> Result<Option<CroquisOption>> {
 
     match fs::read(&file_path).await {
         Ok(payload) => {
-            let option = serde_json::from_slice(&payload)
-                .context("Failed to deserialise Croquis options")?;
-            Ok(Some(option))
+            match serde_json::from_slice::<CroquisPreferences>(&payload) {
+                Ok(mut preferences) => {
+                    if preferences.presets.is_empty() {
+                        let preset_id = get_unique_id();
+                        preferences.presets.push(CroquisPreset {
+                            id: preset_id.clone(),
+                            name: "Preset 1".to_string(),
+                            option: CroquisOption::default(),
+                        });
+                        preferences.active_preset_id = preset_id;
+                    } else if preferences.active_preset_id.is_empty()
+                        || !preferences.presets.iter().any(|preset| {
+                            preset.id == preferences.active_preset_id
+                        })
+                    {
+                        if let Some(first) = preferences.presets.first() {
+                            preferences.active_preset_id = first.id.clone();
+                        }
+                    }
+
+                    Ok(Some(preferences))
+                }
+                Err(primary_error) => {
+                    match serde_json::from_slice::<CroquisOption>(&payload) {
+                        Ok(option) => {
+                            let preset_id = get_unique_id();
+                            let preferences = CroquisPreferences {
+                                active_preset_id: preset_id.clone(),
+                                presets: vec![CroquisPreset {
+                                    id: preset_id,
+                                    name: "Preset 1".to_string(),
+                                    option,
+                                }],
+                            };
+                            Ok(Some(preferences))
+                        }
+                        Err(_) => Err(primary_error).context(format!(
+                            "Failed to deserialise Croquis preferences from {}",
+                            file_path.display()
+                        )),
+                    }
+                }
+            }
         }
         Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
         Err(error) => Err(error).with_context(|| {
             format!(
-                "Failed to read Croquis options from {}",
+                "Failed to read Croquis preferences from {}",
                 file_path.display()
             )
         }),
     }
 }
 
-/// Persist the Croquis option payload into the workspace `.moa/settings` folder.
-async fn persist_option(moa_id: &str, option: &CroquisOption) -> Result<()> {
+/// Persist the Croquis preferences into the workspace `.moa/settings` folder.
+async fn persist_preferences(
+    moa_id: &str,
+    preferences: &CroquisPreferences,
+) -> Result<()> {
     let paths = PATH_MANAGER
         .get_or_add(moa_id)
         .await
@@ -162,11 +223,14 @@ async fn persist_option(moa_id: &str, option: &CroquisOption) -> Result<()> {
     })?;
 
     let file_path = settings_dir.join("croquis.json");
-    let payload = serde_json::to_vec_pretty(option)
-        .context("Failed to serialise Croquis options")?;
+    let payload = serde_json::to_vec_pretty(preferences)
+        .context("Failed to serialise Croquis preferences")?;
 
     fs::write(&file_path, payload).await.with_context(|| {
-        format!("Failed to write Croquis options to {}", file_path.display())
+        format!(
+            "Failed to write Croquis preferences to {}",
+            file_path.display()
+        )
     })?;
 
     Ok(())

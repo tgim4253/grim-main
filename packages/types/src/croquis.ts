@@ -21,11 +21,23 @@ export interface CroquisOption {
   isShuffle: boolean;
 }
 
+export interface CroquisPreset {
+  id: string;
+  name: string;
+  option: CroquisOption;
+}
+
+export interface CroquisPreferences {
+  presets: CroquisPreset[];
+  activePresetId: string;
+}
+
 export interface CroquisStartPayload {
   moaId: string;
   option: CroquisOption;
   imageHashes: string[];
   saveOption?: boolean;
+  preferences?: CroquisPreferences;
 }
 
 export interface CroquisSessionImage {
