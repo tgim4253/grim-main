@@ -6,6 +6,8 @@ import { Button } from '@tgim/ui';
 import { CroquisSession, CroquisSessionImage } from '@tgim/types/croquis';
 import { Pause, Play, SkipBack, SkipForward, Camera } from 'lucide-react';
 import { ipc } from '../../lib/ipc';
+import { platform } from '@tauri-apps/plugin-os';
+import TitleBar from './layout/TitleBar';
 
 const shuffleImages = (images: CroquisSessionImage[]): CroquisSessionImage[] => {
   const next = [...images];
@@ -204,6 +206,23 @@ const CroquisWindow: React.FC = () => {
     [],
   );
 
+  const [isMac, setIsMac] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const os = await platform();
+        if (mounted) setIsMac(os === 'macos');
+      } catch {
+        if (mounted) setIsMac(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const currentImage = imageList[currentIndex] ?? null;
   const currentImageSrc = useMemo(
     () => (currentImage ? convertFileSrc(currentImage.basePath) : null),
@@ -243,6 +262,11 @@ const CroquisWindow: React.FC = () => {
         onMouseEnter={() => setIsHover(true)}
         onMouseLeave={() => setIsHover(false)}
       >
+        {!isMac && isHover && (
+          <div className="fixed w-full top-0 z-50">
+            <TitleBar />
+          </div>
+        )}
         <div className="relative flex h-full w-full items-center justify-center overflow-hidden">
           {currentImage && currentImageSrc ? (
             <img

@@ -59,7 +59,7 @@
 }
 
 .btn-titlebar {
-  --_btn-bg: var(--btn-titlebar-bg);
+  --_btn-bg: transparent;
   --_btn-hover-bg: var(--btn-titlebar-bg-hover);
   --_btn-color: var(--btn-titlebar-fg);
   --_btn-border: transparent;
