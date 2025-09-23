@@ -106,21 +106,18 @@ const CroquisWindow: React.FC = () => {
   // }, [applyWindowSizeToImage, currentIndex]);
 
   const [isInitHeight, setIsInitHeight] = useState(false);
+
   useEffect(() => {
     (async () => {
       if (isInitHeight) return;
-      const el = imgRef.current;
-      if (!el) return;
-
-      const naturalH = el.naturalHeight || el.height;
-      const naturalW = el.naturalWidth || el.width;
-      if (!naturalH) return;
 
       try {
         const windowRef = getCurrentWindow();
 
         const fixedWidth = Number(option?.window.width!);
-        const desiredHeight = Math.max(1, (Math.round(naturalH) * fixedWidth) / naturalW);
+        const avgHeight =
+          imageList.reduce<number>((acc, image) => (acc += image.baseHeight), 0) / imageList.length;
+        const desiredHeight = Math.max(fixedWidth, Math.ceil(avgHeight));
 
         await windowRef.setSize(new LogicalSize(fixedWidth, desiredHeight));
         setIsInitHeight(true);
@@ -128,7 +125,7 @@ const CroquisWindow: React.FC = () => {
         console.error('[Croquis] Failed to apply window size to image', error);
       }
     })();
-  }, [imageList, imgRef.current, option]);
+  }, [imageList, option]);
 
   // --- Timer logic ---
   const maxTimeSecondsRaw = option?.timer?.maxTime ?? 0;

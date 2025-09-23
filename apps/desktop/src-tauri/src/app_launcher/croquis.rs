@@ -32,8 +32,8 @@ pub fn launch_croquis(
 
     builder = match (width, height) {
         (Some(w), Some(h)) => builder.inner_size(w, h),
-        (Some(w), None) => builder.inner_size(w, 720.0),
-        _ => builder.inner_size(1024.0, 720.0),
+        (Some(w), None) => builder.inner_size(w, w),
+        _ => builder.inner_size(256.0, 512.0),
     };
 
     #[cfg(target_os = "macos")]
