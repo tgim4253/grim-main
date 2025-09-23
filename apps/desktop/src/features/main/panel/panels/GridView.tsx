@@ -7,7 +7,6 @@ import { ResizeMode } from '@tgim/types/file';
 import { useShallow } from 'zustand/shallow';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useThumbnails } from '../../../../hooks';
-import Masonry from 'react-masonry-css';
 import { FixedSizeGrid as WindowGrid, GridChildComponentProps } from 'react-window';
 import { Button } from '@tgim/ui';
 import { CroquisPreferences } from '@tgim/types/croquis';
@@ -73,8 +72,42 @@ type Layout = 'grid' | 'masonry';
 
 const SIZES: Size[] = ['small', 'medium', 'large'];
 const LAYOUTS: Layout[] = ['grid', 'masonry'];
+const MASONRY_CONFIG: Record<Size, { idealWidth: number; maxColumns: number }> = {
+  small: { idealWidth: 160, maxColumns: 8 },
+  medium: { idealWidth: 256, maxColumns: 6 },
+  large: { idealWidth: 320, maxColumns: 4 },
+};
+const MASONRY_COLUMN_GAP = 16;
+const SCROLL_CONTAINER_PADDING_X = 32;
 const MAX_ITEMS_PER_REQ = 100;
 const INITIAL_FETCH_COUNT = 50;
+
+function calculateMasonryMetrics(containerWidth: number, size: Size) {
+  const { idealWidth, maxColumns } = MASONRY_CONFIG[size];
+  if (containerWidth <= 0) {
+    return { columnCount: 1, cardWidth: idealWidth };
+  }
+
+  const desired = idealWidth + MASONRY_COLUMN_GAP;
+  const available = containerWidth + MASONRY_COLUMN_GAP;
+  const rawCount = Math.max(1, Math.floor(available / Math.max(desired, 1)));
+  const columnCount = Math.min(rawCount, maxColumns);
+  const totalGap = Math.max(columnCount - 1, 0) * MASONRY_COLUMN_GAP;
+  const usableWidth = Math.max(containerWidth - totalGap, 1);
+  const cardWidth = Math.max(Math.floor(usableWidth / columnCount), 1);
+
+  return { columnCount, cardWidth };
+}
+
+const createDefaultCroquisOption = (): CroquisOption => ({
+  window: { width: null, height: null },
+  auto: { isSkip: true },
+  timer: { maxTime: 1000 },
+  isCapture: false,
+  savePath: '',
+  isGray: false,
+  isShuffle: false,
+});
 
 // Debounce Hook (unchanged)
 function useDebouncedEffect(fn: () => void, deps: React.DependencyList, delay: number) {
@@ -278,8 +311,18 @@ const GridView: React.FC<Props> = ({ gridData }) => {
   // @ts-expect-error.
   const { visible, observe, unobserve } = useVisibilityMap(scrollRef, overscanPx);
 
+  const masonryMetrics = useMemo(() => {
+    if (layout !== 'masonry') {
+      return { columnCount: 1, cardWidth: MASONRY_CONFIG[size].idealWidth };
+    }
+    const containerWidth = Math.max(viewportSize.width - SCROLL_CONTAINER_PADDING_X, 0);
+    return calculateMasonryMetrics(containerWidth, size);
+  }, [layout, size, viewportSize.width]);
+
   const thumbSize = useMemo(() => {
-    if (layout == 'masonry') return 256;
+    if (layout === 'masonry') {
+      return masonryMetrics.cardWidth;
+    }
     switch (size) {
       case 'small':
         return 96;
@@ -288,7 +331,7 @@ const GridView: React.FC<Props> = ({ gridData }) => {
       default:
         return 128;
     }
-  }, [size, layout]);
+  }, [layout, masonryMetrics.cardWidth, size]);
 
   /* -------------------------------------------------
    * Thumbnail fetcher
@@ -356,20 +399,6 @@ const GridView: React.FC<Props> = ({ gridData }) => {
   const handleNeedThumbs = useCallback((items: ImageItem[]) => {
     if (items.length) stableFetchThumbnails.current(items);
   }, []);
-
-  const gridItemSizeClass = useMemo(() => {
-    if (layout === 'masonry') {
-      switch (size) {
-        case 'small':
-          return 'w-40';
-        case 'large':
-          return 'w-80';
-        default:
-          return 'w-64';
-      }
-    }
-    return '';
-  }, [size, layout]);
 
   const handleToggleSelectMode = useCallback(() => {
     setSelectMode(prev => {
@@ -472,13 +501,13 @@ const GridView: React.FC<Props> = ({ gridData }) => {
         ) : (
           <MasonryLayout
             images={images}
-            sizeClass={gridItemSizeClass}
             selectMode={selectMode}
             onItemClick={handleItemClick}
             observe={observe}
             unobserve={unobserve}
             thumbSize={thumbSize}
             isSelected={isSelected}
+            columnCount={masonryMetrics.columnCount}
           />
         )}
       </div>
@@ -695,42 +724,49 @@ function VirtualGridLayout({
 }
 
 /* ---------------------------------------------
- * Non-virtual Masonry (unchanged structure)
- * Uses IO-based visibility to decide fetches.
- * Adds content-visibility hints to reduce paint cost
+ * Masonry layout via CSS columns
+ * - Receives computed column counts to stay in sync with thumbnail sizing
+ * - Works with IO-based visibility for thumbnail fetches
  * --------------------------------------------- */
 function MasonryLayout({
   images,
   onItemClick,
-  sizeClass,
   selectMode,
   observe,
   unobserve,
   thumbSize,
   isSelected,
+  columnCount,
 }: {
   images: ImageItem[];
   onItemClick: (event: React.MouseEvent, img: ImageItem) => void;
-  sizeClass: string;
   selectMode: boolean;
   observe: (el: Element | null, key: string) => void;
   unobserve: (el: Element | null) => void;
   thumbSize: number;
   isSelected: (id: string) => boolean;
+  columnCount: number;
 }) {
-  const breakpointColumnsObj = { default: 6, 1536: 6, 1280: 5, 1024: 4, 768: 3, 640: 2 };
+  const columnStyle = useMemo<React.CSSProperties>(
+    () => ({
+      columnCount: Math.max(columnCount, 1),
+      columnGap: `${MASONRY_COLUMN_GAP}px`,
+      columnFill: 'balance',
+    }),
+    [columnCount],
+  );
+
   return (
-    <Masonry
-      breakpointCols={breakpointColumnsObj}
-      className="flex w-auto -ml-4"
-      columnClassName="pl-4 bg-clip-padding"
-    >
+    <div className="w-full" style={columnStyle}>
       {images.map((img: ImageItem) => (
-        <div key={img.id ?? img.hash} className="mb-4">
+        <div
+          key={img.id ?? img.hash}
+          className="mb-4 inline-block w-full align-top"
+          style={{ breakInside: 'avoid' }}
+        >
           <ThumbCard
             img={img}
             onClick={onItemClick}
-            sizeClass={sizeClass}
             showCheckbox={selectMode}
             layout="masonry"
             observe={observe}
@@ -740,7 +776,7 @@ function MasonryLayout({
           />
         </div>
       ))}
-    </Masonry>
+    </div>
   );
 }
 
@@ -748,7 +784,7 @@ function MasonryLayout({
  * Thumb Card (memoized)
  * - Persist loaded state across remounts to avoid re-fade flicker
  * - Disable heavy transitions while scrolling
- * - Add content-visibility / contain-intrinsic-size hints for masonry
+ * - Provide intrinsic size hints for masonry cards
  * --------------------------------------------- */
 
 type ThumbCardProps = {
@@ -781,6 +817,7 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const isMasonry = layout === 'masonry';
 
   const key = useMemo(
     () =>
@@ -833,25 +870,33 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
     : 'border-border';
 
   // While scrolling or already loaded, avoid fade transition to reduce flicker
+  const baseImgClass = isMasonry
+    ? 'w-full h-auto object-cover'
+    : 'w-full h-full object-cover';
   const imgClass =
     isScrolling || loaded
-      ? 'w-full h-full object-cover'
-      : 'w-full h-full object-cover opacity-0 transition-opacity duration-300';
+      ? baseImgClass
+      : `${baseImgClass} opacity-0 transition-opacity duration-300`;
+
+  const cardStyle = useMemo<React.CSSProperties>(() => {
+    if (!isMasonry) return {};
+    return {
+      containIntrinsicSize: `${thumbSize}px ${thumbSize}px`,
+    };
+  }, [isMasonry, thumbSize]);
 
   return (
     <div
       ref={containerRef}
-      className={`group relative w-full h-full overflow-hidden rounded-lg border ${selectionClasses} bg-surface shadow-sm transition-all duration-200 hover:border-accent hover:shadow-lg hover:-translate-y-1 cursor-pointer ${sizeClass ?? ''}`}
+      className={`group relative w-full ${
+        isMasonry ? '' : 'h-full'
+      } overflow-hidden rounded-lg border ${selectionClasses} bg-surface shadow-sm transition-all duration-200 hover:border-accent hover:shadow-lg hover:-translate-y-1 cursor-pointer ${sizeClass ?? ''}`}
       onClick={handleCardClick}
       role="button"
       tabIndex={0}
       aria-selected={selected}
       data-selected={selected ? 'true' : 'false'}
-      // Content-visibility hints help masonry by skipping offscreen paint
-      style={{
-        contentVisibility: 'auto' as any,
-        containIntrinsicSize: `${thumbSize}px ${thumbSize}px` as any,
-      }}
+      style={cardStyle}
     >
       {showCheckbox && (
         <div className="absolute left-2 top-2 z-10">
@@ -863,8 +908,13 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
           />
         </div>
       )}
-      <div className="relative w-full h-full">
-        {!stableSrc && <div className="w-full h-full bg-surface-muted animate-pulse" />}
+      <div className={`relative w-full ${isMasonry ? '' : 'h-full'}`}>
+        {!stableSrc && (
+          <div
+            className={`w-full ${isMasonry ? '' : 'h-full'} bg-surface-muted animate-pulse`}
+            style={isMasonry ? { height: thumbSize } : undefined}
+          />
+        )}
         {stableSrc && (
           <img
             src={stableSrc}
