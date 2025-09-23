@@ -6,6 +6,8 @@ import { Button } from '@tgim/ui';
 import { CroquisSession, CroquisSessionImage } from '@tgim/types/croquis';
 import { Pause, Play, SkipBack, SkipForward, Camera } from 'lucide-react';
 import { ipc } from '../../lib/ipc';
+import { platform } from '@tauri-apps/plugin-os';
+import TitleBar from './layout/TitleBar';
 
 const shuffleImages = (images: CroquisSessionImage[]): CroquisSessionImage[] => {
   const next = [...images];
@@ -104,29 +106,40 @@ const CroquisWindow: React.FC = () => {
   // }, [applyWindowSizeToImage, currentIndex]);
 
   const [isInitHeight, setIsInitHeight] = useState(false);
+
   useEffect(() => {
     (async () => {
       if (isInitHeight) return;
-      const el = imgRef.current;
-      if (!el) return;
-
-      const naturalH = el.naturalHeight || el.height;
-      const naturalW = el.naturalWidth || el.width;
-      if (!naturalH) return;
 
       try {
+        if (!imageList.length) return;
+
+        const fixedWidthRaw = option?.window.width;
+        const fixedWidth = fixedWidthRaw ? Number(fixedWidthRaw) : Number.NaN;
+        if (!Number.isFinite(fixedWidth) || fixedWidth <= 0) return;
+
+        let totalScaledHeight = 0;
+        let validImageCount = 0;
+        for (const image of imageList) {
+          if (!Number.isFinite(image.baseWidth) || image.baseWidth <= 0) continue;
+          const scale = fixedWidth / image.baseWidth;
+          totalScaledHeight += image.baseHeight * scale;
+          validImageCount += 1;
+        }
+
+        if (validImageCount === 0) return;
+
+        const avgHeight = totalScaledHeight / validImageCount;
+        const desiredHeight = Math.max(fixedWidth, Math.ceil(avgHeight));
+
         const windowRef = getCurrentWindow();
-
-        const fixedWidth = Number(option?.window.width!);
-        const desiredHeight = Math.max(1, (Math.round(naturalH) * fixedWidth) / naturalW);
-
         await windowRef.setSize(new LogicalSize(fixedWidth, desiredHeight));
         setIsInitHeight(true);
       } catch (error) {
         console.error('[Croquis] Failed to apply window size to image', error);
       }
     })();
-  }, [imageList, imgRef.current, option]);
+  }, [imageList, option]);
 
   // --- Timer logic ---
   const maxTimeSecondsRaw = option?.timer?.maxTime ?? 0;
@@ -204,6 +217,23 @@ const CroquisWindow: React.FC = () => {
     [],
   );
 
+  const [isMac, setIsMac] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const os = await platform();
+        if (mounted) setIsMac(os === 'macos');
+      } catch {
+        if (mounted) setIsMac(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const currentImage = imageList[currentIndex] ?? null;
   const currentImageSrc = useMemo(
     () => (currentImage ? convertFileSrc(currentImage.basePath) : null),
@@ -237,6 +267,11 @@ const CroquisWindow: React.FC = () => {
 
   return (
     <div className="flex h-full w-full flex-col text-text">
+      {!isMac && (
+        <div className="fixed w-full top-0 z-50">
+          <TitleBar />
+        </div>
+      )}
       {/* Stage area */}
       <main
         className="relative flex h-full w-full flex-1 select-none bg-transparent flex-col"
