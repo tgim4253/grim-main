@@ -17,6 +17,19 @@ pub struct ThumbCacheUsage {
     pub total_files: u64,
 }
 
+#[derive(Debug, Clone, Copy, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+enum ThumbPurgeScope {
+    Base,
+    Derived,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ThumbPurgeEvent {
+    scope: ThumbPurgeScope,
+}
+
 pub async fn collect_thumb_cache_usage(
     app: &AppHandle,
 ) -> Result<ThumbCacheUsage> {
@@ -42,14 +55,19 @@ pub async fn collect_thumb_cache_usage(
 pub async fn clear_base_thumb_cache(app: &AppHandle) -> Result<()> {
     let root = cache_root(app)?;
     let base_path = root.join("base");
-    remove_path(base_path.as_path()).await
+    remove_path(base_path.as_path()).await?;
+    emit_thumb_purged(app, ThumbPurgeScope::Base)?;
+    Ok(())
 }
 
 pub async fn clear_derived_thumb_cache(app: &AppHandle) -> Result<()> {
     let root = cache_root(app)?;
     let metadata = match tokio::fs::metadata(root.as_path()).await {
         Ok(metadata) => metadata,
-        Err(err) if err.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(err) if err.kind() == ErrorKind::NotFound => {
+            emit_thumb_purged(app, ThumbPurgeScope::Derived)?;
+            return Ok(());
+        }
         Err(err) => {
             return Err(err).context(format!(
                 "failed to inspect thumbnail cache root: {}",
@@ -59,7 +77,9 @@ pub async fn clear_derived_thumb_cache(app: &AppHandle) -> Result<()> {
     };
 
     if !metadata.is_dir() {
-        return remove_path(root.as_path()).await;
+        remove_path(root.as_path()).await?;
+        emit_thumb_purged(app, ThumbPurgeScope::Derived)?;
+        return Ok(());
     }
 
     let mut entries = tokio::fs::read_dir(root.as_path())
@@ -78,6 +98,7 @@ pub async fn clear_derived_thumb_cache(app: &AppHandle) -> Result<()> {
         remove_path(path.as_path()).await?;
     }
 
+    emit_thumb_purged(app, ThumbPurgeScope::Derived)?;
     Ok(())
 }
 
@@ -208,4 +229,10 @@ async fn remove_path(path: &Path) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn emit_thumb_purged(app: &AppHandle, scope: ThumbPurgeScope) -> Result<()> {
+    let payload = ThumbPurgeEvent { scope };
+    app.emit("thumbnails://purged", payload)
+        .context("failed to emit thumbnail purge event")
 }
