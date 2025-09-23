@@ -271,27 +271,6 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
     [markInteracted],
   );
 
-  const handlePresetSelect = useCallback(
-    (presetId: string) => {
-      markInteracted();
-      setEditingTimer(false);
-      if (editingPresetId) {
-        commitPresetName();
-      } else {
-        setPresetNameInput('');
-        setEditingPresetId(null);
-      }
-      setPreferencesState(prev => {
-        if (prev.activePresetId === presetId) return prev;
-        return {
-          ...prev,
-          activePresetId: presetId,
-        };
-      });
-    },
-    [commitPresetName, editingPresetId, markInteracted],
-  );
-
   const handleAddPreset = useCallback(() => {
     markInteracted();
     setEditingTimer(false);
@@ -306,7 +285,7 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
       };
     });
     if (createdPreset) {
-      beginEditingPreset(createdPreset.id, '');
+      beginEditingPreset((createdPreset as CroquisPreset).id, '');
     }
   }, [activeOption, beginEditingPreset, markInteracted]);
 
@@ -337,6 +316,27 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
     });
     setEditingPresetId(null);
   }, [editingPresetId, markInteracted, presetNameInput]);
+
+  const handlePresetSelect = useCallback(
+    (presetId: string) => {
+      markInteracted();
+      setEditingTimer(false);
+      if (editingPresetId) {
+        commitPresetName();
+      } else {
+        setPresetNameInput('');
+        setEditingPresetId(null);
+      }
+      setPreferencesState(prev => {
+        if (prev.activePresetId === presetId) return prev;
+        return {
+          ...prev,
+          activePresetId: presetId,
+        };
+      });
+    },
+    [commitPresetName, editingPresetId, markInteracted],
+  );
 
   const handlePresetNameBlur = useCallback(() => {
     commitPresetName();
@@ -546,10 +546,6 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
     submitting,
   ]);
 
-  if (!open || !activePreset) {
-    return null;
-  }
-
   const activeTimerSeconds = activeOption.timer.maxTime;
   const editingPresetIndex = useMemo(
     () => preferencesState.presets.findIndex(preset => preset.id === editingPresetId),
@@ -557,6 +553,10 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
   );
   const editingPresetPlaceholder =
     editingPresetIndex >= 0 ? `Preset ${editingPresetIndex + 1}` : 'Preset name';
+
+  if (!open || !activePreset) {
+    return null;
+  }
 
   return (
     <Modal onClose={handleCancel} dismissible>
@@ -581,7 +581,12 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
               ))}
             </div>
           </div>
-          <Button type="button" variant="ghost" className="justify-start" onClick={handleAddPreset}>
+          <Button
+            type="button"
+            variant="default"
+            className="justify-start"
+            onClick={handleAddPreset}
+          >
             + Add preset
           </Button>
         </aside>
