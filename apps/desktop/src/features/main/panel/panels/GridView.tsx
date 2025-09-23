@@ -273,6 +273,8 @@ const GridView: React.FC<Props> = ({ gridData }) => {
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const noop = React.useCallback((..._args: any[]) => {}, []);
+
   //@ts-ignore
   const viewportSize = useElementSize(scrollRef);
   const overscanPx = useMemo(
@@ -468,9 +470,9 @@ const GridView: React.FC<Props> = ({ gridData }) => {
             images={images}
             size={size}
             onItemClick={handleItemClick}
-            // For grid we *don't* rely on IO to fetch; pass no-op to avoid overhead
-            observe={() => {}}
-            unobserve={() => {}}
+            // For grid we *don't* rely on IO to fetch; pass stable no-op to avoid overhead
+            observe={noop}
+            unobserve={noop}
             selectMode={selectMode}
             thumbSize={thumbSize}
             onNeedThumbs={handleNeedThumbs}
@@ -505,12 +507,8 @@ const GridView: React.FC<Props> = ({ gridData }) => {
 
 /* ---------------------------------------------
  * Virtualized Grid (react-window)
- *
- * IMPORTANT CHANGE:
- *  - Use react-window's onItemsRendered to proactively request thumbnails
- *    for the overscanned rows. This prevents "blank rows" on very fast scrolls
- *    where IntersectionObserver might miss transient intersections.
  * --------------------------------------------- */
+
 type GridCellData = {
   images: ImageItem[];
   cols: number;
@@ -551,22 +549,26 @@ function VirtualGridLayout({
   const gap = 16;
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // @ts-expect-error.
+  //@ts-expect-error.
   const { width, height } = useElementSize(containerRef);
 
   const cols = Math.max(1, Math.floor((width + gap) / (itemW + gap)));
   const rowCount = Math.ceil(images.length / cols);
   const rowsInView = height > 0 ? height / (itemH + gap) : 0;
-  // Render roughly 1.n× the viewport by overscanning ~0.5n% of the visible rows on each side
-  const overscanRowCount = rowsInView > 0 ? Math.max(1, Math.ceil(rowsInView * 2)) : 2;
+  // ▶ Wider pre-render: about 1.5x viewport worth of rows
+  const overscanRowCount = rowsInView > 0 ? Math.max(2, Math.ceil(rowsInView * 1.5)) : 4;
 
-  // Request thumbs for rows/cols in overscan range (debounced via RAF)
+  // Request thumbs for rows/cols in overscan range (debounced via RAF) with extra buffer
   const rafRef = useRef<number | null>(null);
   const pendingRangeRef = useRef<{ rs: number; re: number } | null>(null);
 
   const scheduleFetchForRange = useCallback(
     (rs: number, re: number) => {
-      // Merge with pending range to reduce calls
+      // Merge with pending range to reduce calls, and expand with buffer rows
+      const EXTRA = 3; // prefetch additional rows beyond overscan
+      rs = Math.max(0, rs - EXTRA);
+      re = re + EXTRA;
+
       if (!pendingRangeRef.current) {
         pendingRangeRef.current = { rs, re };
       } else {
@@ -619,8 +621,31 @@ function VirtualGridLayout({
     ],
   );
 
+  // Stable key to prevent remount flicker when layout/size changes
+  const itemKey = useCallback(
+    ({
+      columnIndex,
+      rowIndex,
+      data,
+    }: {
+      columnIndex: number;
+      rowIndex: number;
+      data: GridCellData;
+    }) => {
+      const idx = rowIndex * data.cols + columnIndex;
+      return data.images[idx]?.hash ?? `row${rowIndex}-col${columnIndex}`;
+    },
+    [],
+  );
+
   const Cell = useCallback(
-    ({ columnIndex, rowIndex, style, data }: GridChildComponentProps<GridCellData>) => {
+    ({
+      columnIndex,
+      rowIndex,
+      style,
+      data,
+      isScrolling,
+    }: GridChildComponentProps<GridCellData>) => {
       const idx = rowIndex * data.cols + columnIndex;
       if (idx >= data.images.length) return null;
       const img = data.images[idx];
@@ -643,6 +668,7 @@ function VirtualGridLayout({
             unobserve={data.unobserve}
             thumbSize={data.thumbSize}
             selected={data.isSelected(img.hash)}
+            isScrolling={!!isScrolling}
           />
         </div>
       );
@@ -661,10 +687,12 @@ function VirtualGridLayout({
           rowHeight={itemH + gap}
           width={width}
           itemData={cellData}
-          overscanColumnCount={1}
+          overscanColumnCount={2}
           overscanRowCount={overscanRowCount}
+          useIsScrolling
+          itemKey={itemKey}
           onItemsRendered={({ overscanRowStartIndex, overscanRowStopIndex }) => {
-            // Proactively fetch thumbnails for overscanned rows
+            // Proactively fetch thumbnails for overscanned rows (with buffer)
             scheduleFetchForRange(overscanRowStartIndex, overscanRowStopIndex);
           }}
         >
@@ -676,8 +704,9 @@ function VirtualGridLayout({
 }
 
 /* ---------------------------------------------
- * Non-virtual Masonry (unchanged behavior)
+ * Non-virtual Masonry (unchanged structure)
  * Uses IO-based visibility to decide fetches.
+ * Adds content-visibility hints to reduce paint cost
  * --------------------------------------------- */
 function MasonryLayout({
   images,
@@ -726,7 +755,11 @@ function MasonryLayout({
 
 /* ---------------------------------------------
  * Thumb Card (memoized)
+ * - Persist loaded state across remounts to avoid re-fade flicker
+ * - Disable heavy transitions while scrolling
+ * - Add content-visibility / contain-intrinsic-size hints for masonry
  * --------------------------------------------- */
+
 type ThumbCardProps = {
   img: ImageItem;
   onClick: (event: React.MouseEvent, img: ImageItem) => void;
@@ -737,7 +770,11 @@ type ThumbCardProps = {
   unobserve: (el: Element | null) => void;
   thumbSize: number;
   sizeClass?: string;
+  isScrolling?: boolean;
 };
+
+// Keep a global set of keys that have completed loading to avoid re-fade
+const loadedOnceSet = new Set<string>();
 
 const ThumbCardComponent: React.FC<ThumbCardProps> = ({
   img,
@@ -749,6 +786,7 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
   unobserve,
   sizeClass,
   thumbSize,
+  isScrolling = false,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -763,6 +801,13 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
       }),
     [img.hash, thumbSize, layout],
   );
+
+  // If previously loaded, start in loaded state to skip fade-in
+  useEffect(() => {
+    if (loadedOnceSet.has(key)) {
+      setLoaded(true);
+    }
+  }, [key]);
 
   const { entry } = useThumbStore(useShallow(state => ({ entry: state.byKey[key] })));
   const [stableSrc, setStableSrc] = useState<string | undefined>(undefined);
@@ -780,7 +825,11 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
     return () => unobserve(el);
   }, [img.hash, observe, unobserve]);
 
-  const handleImageLoad = useCallback(() => setLoaded(true), []);
+  const handleImageLoad = useCallback(() => {
+    loadedOnceSet.add(key);
+    setLoaded(true);
+  }, [key]);
+
   const handleCardClick = useCallback(
     (event: React.MouseEvent) => {
       onClick(event, img);
@@ -792,6 +841,12 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
     ? 'border-accent ring-2 ring-accent/60 ring-offset-1 ring-offset-surface-raised'
     : 'border-border';
 
+  // While scrolling or already loaded, avoid fade transition to reduce flicker
+  const imgClass =
+    isScrolling || loaded
+      ? 'w-full h-full object-cover'
+      : 'w-full h-full object-cover opacity-0 transition-opacity duration-300';
+
   return (
     <div
       ref={containerRef}
@@ -801,6 +856,11 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
       tabIndex={0}
       aria-selected={selected}
       data-selected={selected ? 'true' : 'false'}
+      // Content-visibility hints help masonry by skipping offscreen paint
+      style={{
+        contentVisibility: 'auto' as any,
+        containIntrinsicSize: `${thumbSize}px ${thumbSize}px` as any,
+      }}
     >
       {showCheckbox && (
         <div className="absolute left-2 top-2 z-10">
@@ -818,7 +878,7 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
           <img
             src={stableSrc}
             alt={img.name}
-            className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+            className={imgClass}
             onLoad={handleImageLoad}
             loading="lazy"
             decoding="async"
