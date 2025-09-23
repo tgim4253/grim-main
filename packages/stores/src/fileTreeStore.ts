@@ -1,12 +1,5 @@
 import { create } from 'zustand';
-import {
-  FileTreeData,
-  GraphResponse,
-  NodeFile,
-  NodeFolder,
-  NodeKind,
-  RelationType,
-} from '@tgim/types/index';
+import { FileTreeData, GraphResponse, NodeFolder, NodeKind, RelationType } from '@tgim/types/index';
 
 interface FileTreeState {
   // current tree data
@@ -172,14 +165,16 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
     const incoming = new Map<string, number>();
 
     for (const n of nodes) {
+      if (n.kind !== NodeKind.Folder) continue;
+
       const folderData = (n.data?.['Folder'] as NodeFolder) ?? undefined;
-      const fileData = (n.data?.['File'] as NodeFile) ?? undefined;
+
       nodeMap.set(n.id, {
         id: n.id,
-        name: folderData?.folder_name ?? fileData?.file_name ?? '',
-        icon: n.kind === 'folder' ? 'folder' : 'file',
-        type: n.kind === 'folder' ? NodeKind.Folder : NodeKind.File,
-        children: n.kind === 'folder' ? [] : undefined,
+        name: folderData?.folder_name ?? '',
+        icon: 'folder',
+        type: NodeKind.Folder,
+        children: [],
       });
 
       incoming.set(n.id, 0);
@@ -187,8 +182,7 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
     const childrenMap = new Map<string, FileTreeData[]>();
 
     for (const conn of connections) {
-      if (conn.kind !== RelationType.ChildFolder && conn.kind !== RelationType.ContainsFile)
-        continue;
+      if (conn.kind !== RelationType.ChildFolder) continue;
 
       const parent = nodeMap.get(conn.src_node_id);
       const child = nodeMap.get(conn.dst_node_id);
@@ -205,11 +199,7 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
     }
 
     for (const [id, node] of nodeMap) {
-      if (node.type === 'folder') {
-        node.children = childrenMap.get(id) ?? [];
-      } else {
-        node.children = undefined;
-      }
+      node.children = childrenMap.get(id) ?? [];
     }
 
     const roots: FileTreeData[] = [];
