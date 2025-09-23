@@ -1,7 +1,7 @@
 import usePanelsStore from '@tgim/stores/panelStore';
 import { Connection, GraphConnection, GraphData, GraphNode } from '@tgim/types/graph';
 import { NodeRenderer, clearNodeSpriteCaches, getGraphPalette } from '@tgim/ui/index';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d';
 import { useShallow } from 'zustand/shallow';
 import * as d3 from 'd3-force';
@@ -19,6 +19,50 @@ interface Props {
 }
 
 const GRAPH_THUMB_SIZE = 64;
+const KIND_GROUP_THRESHOLD = 5;
+
+type AggregatedGroupMeta = {
+  id: string;
+  parentId: string;
+  kind: string;
+  count: number;
+  displayLabel: string;
+  aggregatorNode: GraphNode;
+  aggregatorLink: GraphConnection;
+  originalLinkKeys: Set<string>;
+  virtualChildLinks: GraphConnection[];
+};
+
+const resolveNodeReference = (ref: unknown): string => {
+  if (typeof ref === 'string') return ref;
+  if (typeof ref === 'number') return ref.toString();
+  if (ref && typeof ref === 'object' && 'id' in ref) {
+    const { id } = ref as { id?: string | number };
+    if (typeof id === 'string') return id;
+    if (typeof id === 'number') return id.toString();
+  }
+  return '';
+};
+
+const linkKey = (link: GraphConnection) =>
+  `${resolveNodeReference(link.source)}-->${resolveNodeReference(link.target)}`;
+
+const formatRelationLabel = (value?: string) => {
+  if (!value) return 'Group';
+  const normalized = value.replace(/[_-]+/g, ' ').trim();
+  if (!normalized) return 'Group';
+  return normalized
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+};
+
+const calculateGroupSize = (baseSize: number, count: number) => {
+  const base = Math.max(16, baseSize * 0.75);
+  const growth = Math.log2(count + 1) * 6;
+  return Math.min(48, base + growth);
+};
 
 const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -50,43 +94,239 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
       }
     };
   }, []);
-  const nodesById = useMemo(() => {
-    if (!graphData) return {};
-    const nodesById = Object.fromEntries(graphData.nodes.map(node => [node.id, node]));
+  const { nodesById, aggregatedGroupsByParent, aggregatorIds } = useMemo(() => {
+    const nodesMap: Record<string, GraphNode> = {};
+    const groupsByParent: Record<string, AggregatedGroupMeta[]> = {};
+    const groupIds: string[] = [];
+
     graphData.nodes.forEach(node => {
       node.isHidden = node.isLeaf;
       node.childLinks = [];
+      nodesMap[node.id] = node;
     });
+
     graphData.links.forEach(link => {
-      const source = typeof link.source === 'object' ? (link.source as any).id : link.source;
-      nodesById[source].childLinks.push(link);
+      const normalizedLink: GraphConnection = {
+        source: resolveNodeReference(link.source),
+        target: resolveNodeReference(link.target),
+        label: link.label,
+        data: link.data,
+      };
+
+      const sourceNode = nodesMap[normalizedLink.source];
+      if (!sourceNode) return;
+
+      if (!Array.isArray(sourceNode.childLinks)) {
+        sourceNode.childLinks = [];
+      }
+
+      sourceNode.childLinks.push(normalizedLink);
     });
-    return nodesById;
-  }, [graphData.nodes]);
+
+    Object.values(nodesMap).forEach(parent => {
+      if (!Array.isArray(parent.childLinks) || parent.childLinks.length === 0) {
+        return;
+      }
+
+      const grouped = new Map<string, GraphConnection[]>();
+
+      parent.childLinks.forEach(link => {
+        const kind = link.data?.kind;
+        if (!kind) return;
+        if (!grouped.has(kind)) {
+          grouped.set(kind, []);
+        }
+        grouped.get(kind)!.push(link);
+      });
+
+      const metas: AggregatedGroupMeta[] = [];
+
+      grouped.forEach((links, kind) => {
+        if (links.length < KIND_GROUP_THRESHOLD) {
+          return;
+        }
+
+        const aggregatorId = `${parent.id}::group::${kind}`;
+        const count = links.length;
+        const displayLabel = formatRelationLabel(links[0]?.label ?? kind);
+
+        const aggregatorNode: GraphNode = {
+          id: aggregatorId,
+          nodeId: aggregatorId,
+          label: displayLabel,
+          size: calculateGroupSize(parent.size, count),
+          type: 'cluster',
+          depth: (parent.depth ?? 0) + 1,
+          isLeaf: false,
+          isHidden: false,
+        };
+
+        aggregatorNode.childLinks = [];
+        aggregatorNode.isAggregate = true;
+        aggregatorNode.groupKind = kind;
+        aggregatorNode.groupCount = count;
+        aggregatorNode.parentId = parent.id;
+
+        const aggregatorLink: GraphConnection = {
+          source: parent.id,
+          target: aggregatorId,
+          label: displayLabel,
+          data: {
+            id: `${links[0].data.id}::group::${aggregatorId}`,
+            src_node_id: links[0].data.src_node_id,
+            dst_node_id: aggregatorId,
+            kind: links[0].data.kind,
+            kind_rule_id: links[0].data.kind_rule_id,
+            level: links[0].data.level,
+          },
+        };
+
+        const virtualChildLinks: GraphConnection[] = [];
+        links.forEach(link => {
+          const targetId = resolveNodeReference(link.target);
+          if (!targetId || !nodesMap[targetId]) {
+            return;
+          }
+          virtualChildLinks.push({
+            source: aggregatorId,
+            target: targetId,
+            label: link.label,
+            data: link.data,
+          });
+        });
+
+        const originalLinkKeys = new Set<string>(links.map(item => linkKey(item)));
+
+        metas.push({
+          id: aggregatorId,
+          parentId: parent.id,
+          kind,
+          count,
+          displayLabel,
+          aggregatorNode,
+          aggregatorLink,
+          originalLinkKeys,
+          virtualChildLinks,
+        });
+
+        nodesMap[aggregatorId] = aggregatorNode;
+        groupIds.push(aggregatorId);
+      });
+
+      if (metas.length > 0) {
+        groupsByParent[parent.id] = metas;
+      }
+    });
+
+    return {
+      nodesById: nodesMap,
+      aggregatedGroupsByParent: groupsByParent,
+      aggregatorIds: groupIds,
+    };
+  }, [graphData]);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    setExpandedGroups(prev => {
+      if (aggregatorIds.length === 0) {
+        return Object.keys(prev).length === 0 ? prev : {};
+      }
+
+      const next: Record<string, boolean> = {};
+      let changed = false;
+
+      aggregatorIds.forEach(id => {
+        if (prev[id] !== undefined) {
+          next[id] = prev[id];
+        } else {
+          next[id] = false;
+          changed = true;
+        }
+      });
+
+      if (!changed) {
+        const prevKeys = Object.keys(prev);
+        if (prevKeys.length !== aggregatorIds.length) {
+          changed = true;
+        } else {
+          for (const key of prevKeys) {
+            if (!(key in next)) {
+              changed = true;
+              break;
+            }
+          }
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [aggregatorIds]);
   const { moaId } = useMoa(location);
   const { ensureThumbnails, getThumbnailKey, getThumbnailUrl } = useThumbnails({ moaId });
 
   const GAP = 90;
 
-  const getPrunedTree = () => {
-    const visibleNodes = [];
-    const visibleLinks = [];
-    (function traverseTree(node = nodesById[rootGraphNodeId]) {
+  const getPrunedTree = useCallback(() => {
+    if (!rootGraphNodeId || !nodesById[rootGraphNodeId]) {
+      return { nodes: [], links: [] };
+    }
+
+    const visibleNodes: GraphNode[] = [];
+    const visibleLinks: GraphConnection[] = [];
+    const visited = new Set<string>();
+
+    const traverseTree = (nodeId: string) => {
+      const node = nodesById[nodeId];
+      if (!node || visited.has(nodeId)) return;
+
+      visited.add(nodeId);
       visibleNodes.push(node);
-      const filteredLinks = node.childLinks.filter((link: any) => {
-        const target = typeof link.target === 'object' ? link.target : nodesById[link.target];
-        return !target.isHidden;
+
+      const groups = aggregatedGroupsByParent[nodeId] ?? [];
+      const aggregatedKeys = new Set<string>();
+      groups.forEach(group => {
+        group.originalLinkKeys.forEach(key => aggregatedKeys.add(key));
       });
-      visibleLinks.push(...filteredLinks);
-      filteredLinks
-        .map((link: any) =>
-          typeof link.target === 'object' ? link.target : nodesById[link.target],
-        )
-        .forEach(traverseTree);
-    })();
+
+      const childLinks = Array.isArray(node.childLinks) ? node.childLinks : [];
+
+      childLinks.forEach(link => {
+        const key = linkKey(link);
+        if (aggregatedKeys.has(key)) {
+          return;
+        }
+
+        const targetId = resolveNodeReference(link.target);
+        if (!targetId) return;
+        const target = nodesById[targetId];
+        if (!target || target.isHidden) return;
+
+        visibleLinks.push(link);
+        traverseTree(targetId);
+      });
+
+      groups.forEach(group => {
+        const aggregatorNode = group.aggregatorNode;
+        const expanded = expandedGroups[group.id] ?? false;
+
+        aggregatorNode.groupCount = group.count;
+        aggregatorNode.groupKind = group.kind;
+        aggregatorNode.collapsed = !expanded;
+        aggregatorNode.isHidden = false;
+        aggregatorNode.childLinks = expanded ? group.virtualChildLinks : [];
+        aggregatorNode.label = `${group.displayLabel} (${group.count})${expanded ? ' ▾' : ' ▸'}`;
+
+        visibleLinks.push(group.aggregatorLink);
+        traverseTree(group.id);
+      });
+    };
+
+    traverseTree(rootGraphNodeId);
     return { nodes: visibleNodes, links: visibleLinks };
-  };
-  const [prunedTree, setPrunedTree] = useState(getPrunedTree());
+  }, [aggregatedGroupsByParent, expandedGroups, nodesById, rootGraphNodeId]);
+  const [prunedTree, setPrunedTree] = useState(() => getPrunedTree());
+  useEffect(() => {
+    setPrunedTree(getPrunedTree());
+  }, [getPrunedTree]);
   const imageNodes = useMemo(
     () => prunedTree.nodes.filter(node => node.type === 'image' && node.hash),
     [prunedTree.nodes],
@@ -244,13 +484,22 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
           );
         }}
         onNodeClick={node => {
+          if ((node as GraphNode & { isAggregate?: boolean }).isAggregate) {
+            setExpandedGroups(prev => ({
+              ...prev,
+              [node.id]: !(prev[node.id] ?? false),
+            }));
+            return;
+          }
+
           node.collapsed = false;
           setPrunedTree(getPrunedTree());
-          node.id &&
+          if (node.id) {
             openNode({
               nodeId: node.nodeId,
-              name: node.id + '',
+              name: `${node.id}`,
             });
+          }
         }}
       />
     </div>

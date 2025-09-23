@@ -403,6 +403,46 @@ function getCircleSpriteNode(node: NodeProp, globalScale: number) {
   });
 }
 
+function getClusterSpriteNode(node: NodeProp, globalScale: number) {
+  const r = node.size / 2;
+  const w = r * 2;
+  const h = r * 2;
+
+  const scaleB = bucketScale(globalScale);
+  const palette = getGraphPaletteInternal();
+  const bg = node.bgColor ?? withAlpha(palette.circleFill, 0.85);
+  const fg = node.fgColor ?? palette.circleStroke;
+  const accent = palette.label;
+  const key = `cluster|${w}|${h}|${bg}|${fg}|${accent}|${scaleB}`;
+
+  return getOrCreateSprite(key, w, h, g => {
+    const stroke = Math.max(1, 2 / Math.max(0.001, scaleB));
+    g.beginPath();
+    g.arc(w / 2, h / 2, r, 0, Math.PI * 2);
+    g.fillStyle = bg;
+    g.fill();
+    g.lineWidth = stroke;
+    g.strokeStyle = fg;
+    g.stroke();
+
+    const innerRadius = Math.max(1, r * 0.6);
+    g.beginPath();
+    g.arc(w / 2, h / 2, innerRadius, 0, Math.PI * 2);
+    g.strokeStyle = withAlpha(fg, 0.45);
+    g.lineWidth = Math.max(1, stroke * 0.8);
+    g.stroke();
+
+    const dotRadius = Math.max(1.5, r * 0.18);
+    const offset = dotRadius * 2.4;
+    [-offset, 0, offset].forEach(dx => {
+      g.beginPath();
+      g.arc(w / 2 + dx, h / 2, dotRadius, 0, Math.PI * 2);
+      g.fillStyle = accent;
+      g.fill();
+    });
+  });
+}
+
 function getTagSpriteNode(node: NodeProp, globalScale: number) {
   const r = node.size / 2;
   const s = r * 2.0;
@@ -628,6 +668,15 @@ const circleRenderer: NodeRenderer = (ctx, node, globalScale) => {
   drawLabelCached(ctx, node);
 };
 
+const clusterRenderer: NodeRenderer = (ctx, node, globalScale) => {
+  const r = node.size / 2;
+  const sprite = getClusterSpriteNode(node, globalScale);
+  const w = r * 2,
+    h = r * 2;
+  ctx.drawImage(sprite, node.x - w / 2, node.y - h / 2, w, h);
+  drawLabelCached(ctx, node);
+};
+
 const tagRenderer: NodeRenderer = (ctx, node, globalScale) => {
   const r = node.size / 2;
   const sprite = getTagSpriteNode(node, globalScale);
@@ -744,6 +793,7 @@ export default (key: GraphNodeType): NodeRenderer => {
     folder: folderRenderer as NodeRenderer,
     image: imageRenderer as NodeRenderer,
     document: documentRenderer as NodeRenderer,
+    cluster: clusterRenderer as NodeRenderer,
   };
   return (map as NodeRendererType)[key];
 };
