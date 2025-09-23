@@ -1,7 +1,13 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { GraphResponse } from '@tgim/types/graph';
-import { CreateFolderPayload, FolderPreview, ThumbRequest, ThumbResponse } from '@tgim/types/file';
+import {
+  CreateFolderPayload,
+  FolderPreview,
+  ThumbRequest,
+  ThumbResponse,
+  ThumbnailUsage,
+} from '@tgim/types/file';
 import {
   CroquisOption,
   CroquisSession,
@@ -72,6 +78,19 @@ const fileIpc = {
   },
 };
 
+const thumbnailIpc = {
+  getUsage: async (): Promise<ThumbnailUsage> => {
+    const response = await invoke('get_thumbnail_usage');
+    return response as ThumbnailUsage;
+  },
+  clearDerived: async () => {
+    await invoke('clear_thumbnail_cache');
+  },
+  clearBase: async () => {
+    await invoke('clear_base_thumbnail_cache');
+  },
+};
+
 const croquisIpc = {
   startSession: async (payload: CroquisStartPayload): Promise<CroquisStartResponse> => {
     const response = await invoke('start_croquis_session', { payload });
@@ -93,4 +112,5 @@ export const ipc = {
   graph: graphIpc,
   file: fileIpc,
   croquis: croquisIpc,
+  thumbnail: thumbnailIpc,
 };

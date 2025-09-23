@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react';
 import { Button, Modal } from '@tgim/ui/index';
 
+import { formatBytes } from '../../../lib/format';
+
 interface Props {
   progress: FolderImportProgressEvent;
   onClose: () => void;
@@ -9,21 +11,6 @@ interface Props {
   totalFilesFallback?: number;
   startedAt: number;
 }
-
-const formatBytes = (bytes: number) => {
-  if (!bytes) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let value = bytes;
-  let idx = 0;
-
-  while (value >= 1024 && idx < units.length - 1) {
-    value /= 1024;
-    idx += 1;
-  }
-
-  const fixed = value >= 10 ? value.toFixed(0) : value.toFixed(2);
-  return `${fixed} ${units[idx]}`;
-};
 
 const formatDuration = (milliseconds: number) => {
   if (!Number.isFinite(milliseconds) || milliseconds <= 0) {

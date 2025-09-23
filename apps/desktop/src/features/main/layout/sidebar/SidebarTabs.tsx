@@ -1,8 +1,9 @@
 import { Button } from '@tgim/ui/index';
 import { useSidebarStore } from '@tgim/stores/index';
 import { useShallow } from 'zustand/shallow';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import cn from '@tgim/utils/cn';
+import ThumbnailStorageModal from '../../../file/modal/ThumbnailStorageModal';
 
 // Vertical tab list that mirrors VS Code style sidebars.
 const SidebarTabs: React.FC<SidebarProps> = ({ sidebarPosition }) => {
@@ -28,6 +29,8 @@ const SidebarTabs: React.FC<SidebarProps> = ({ sidebarPosition }) => {
         .setHidden(sidebarPosition, !useSidebarStore.getState().sidebars[sidebarPosition].hidden),
     [sidebarPosition],
   );
+
+  const [tOpen, setTOpen] = useState(false);
 
   return (
     <div className="flex flex-col min-w-8 w-fit h-full overflow-hidden border-t border-r border-border-sidebar bg-sidebar text-text">
@@ -55,6 +58,15 @@ const SidebarTabs: React.FC<SidebarProps> = ({ sidebarPosition }) => {
           </Button>
         );
       })}
+      <Button
+        variant="icon"
+        onClick={() => {
+          setTOpen(true);
+        }}
+      >
+        Open
+      </Button>
+      <ThumbnailStorageModal open={tOpen} onClose={() => setTOpen(false)}></ThumbnailStorageModal>
     </div>
   );
 };

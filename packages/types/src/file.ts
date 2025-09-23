@@ -74,6 +74,15 @@ export interface ThumbResponse {
   items: ThumbResInfo[];
 }
 
+export interface ThumbnailUsage {
+  baseBytes: number;
+  derivedBytes: number;
+  totalBytes: number;
+  baseFiles: number;
+  derivedFiles: number;
+  totalFiles: number;
+}
+
 export interface FolderPreviewFileStat {
   fileType: FileType;
   count: number;

@@ -14,6 +14,7 @@ import { CroquisOption } from '@tgim/types/croquis';
 import CroquisStartModal, {
   CroquisStartModalConfirmPayload,
 } from '../../../croquis/CroquisStartModal';
+import ThumbnailStorageModal from '../../../file/modal/ThumbnailStorageModal';
 
 /* ---------------------------------------------
  * Helper Icon Components (unchanged)
@@ -205,6 +206,7 @@ const GridView: React.FC<Props> = ({ gridData }) => {
     createDefaultCroquisOption(),
   );
   const [rememberCroquisOption, setRememberCroquisOption] = useState(false);
+  const [storageModalOpen, setStorageModalOpen] = useState(false);
 
   const selectedCount = selected.size;
   const selectedHashes = useMemo(() => Array.from(selected), [selected]);
@@ -220,6 +222,10 @@ const GridView: React.FC<Props> = ({ gridData }) => {
 
   const handleCroquisModalClose = useCallback(() => {
     setCroquisModalOpen(false);
+  }, []);
+
+  const handleStorageModalClose = useCallback(() => {
+    setStorageModalOpen(false);
   }, []);
 
   const handleCroquisConfirm = useCallback(
@@ -379,24 +385,37 @@ const GridView: React.FC<Props> = ({ gridData }) => {
             ))}
           </div>
         </div>
-        <Button
-          variant={selectMode ? 'primary' : 'secondary'}
-          onClick={handleToggleSelectMode}
-          aria-pressed={selectMode}
-          className="min-w-[7rem] px-4 py-2 text-sm font-medium"
-        >
-          {selectMode && selectedCount ? `Done (${selectedCount})` : selectMode ? 'Done' : 'Select'}
-        </Button>
-        {selectMode && selectedCount > 0 && (
+        <div className="flex items-center gap-2">
           <Button
-            variant={'secondary'}
-            onClick={handleStartCroquis}
+            variant="secondary"
+            onClick={() => setStorageModalOpen(true)}
+            className="min-w-[7rem] px-4 py-2 text-sm font-medium"
+          >
+            썸네일 관리
+          </Button>
+          <Button
+            variant={selectMode ? 'primary' : 'secondary'}
+            onClick={handleToggleSelectMode}
             aria-pressed={selectMode}
             className="min-w-[7rem] px-4 py-2 text-sm font-medium"
           >
-            Croquis
+            {selectMode && selectedCount
+              ? `Done (${selectedCount})`
+              : selectMode
+                ? 'Done'
+                : 'Select'}
           </Button>
-        )}
+          {selectMode && selectedCount > 0 && (
+            <Button
+              variant="secondary"
+              onClick={handleStartCroquis}
+              aria-pressed={selectMode}
+              className="min-w-[7rem] px-4 py-2 text-sm font-medium"
+            >
+              Croquis
+            </Button>
+          )}
+        </div>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-auto p-4" onClick={handleBackgroundClick}>
@@ -435,6 +454,7 @@ const GridView: React.FC<Props> = ({ gridData }) => {
         onConfirm={handleCroquisConfirm}
         onClose={handleCroquisModalClose}
       />
+      <ThumbnailStorageModal open={storageModalOpen} onClose={handleStorageModalClose} />
     </div>
   );
 };
