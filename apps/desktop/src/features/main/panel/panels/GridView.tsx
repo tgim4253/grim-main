@@ -1,12 +1,12 @@
 import { useMoa } from '@tgim/hooks/useMoa';
 import { useMultiSelect } from '@tgim/dnd/index';
 import { GridData, ImageItem } from '@tgim/types/grid';
-import { ipc } from '../../../../lib/ipc';
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import useThumbStore, { convertToThumbKey } from '@tgim/stores/thumbStore';
 import { ResizeMode } from '@tgim/types/file';
 import { useShallow } from 'zustand/shallow';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { useThumbnails } from '../../../../hooks';
 import Masonry from 'react-masonry-css';
 import { FixedSizeGrid as WindowGrid, GridChildComponentProps } from 'react-window';
 import { Button } from '@tgim/ui';
@@ -237,17 +237,14 @@ const GridView: React.FC<Props> = ({ gridData }) => {
     }
   }, [croquisModalOpen, selectedCount]);
 
-  const { upsertThumb } = useThumbStore(
-    useShallow(state => ({
-      upsertThumb: state.upsert,
-    })),
-  );
+  const { ensureThumbnails } = useThumbnails({ moaId, maxBatchSize: MAX_ITEMS_PER_REQ });
 
   const scrollRef = useRef<HTMLDivElement>(null);
   // @ts-expect-error.
   const { visible, observe, unobserve } = useVisibilityMap(scrollRef, 800);
 
   const thumbSize = useMemo(() => {
+    if (layout == 'masonry') return 256;
     switch (size) {
       case 'small':
         return 96;
@@ -256,7 +253,7 @@ const GridView: React.FC<Props> = ({ gridData }) => {
       default:
         return 128;
     }
-  }, [size]);
+  }, [size, layout]);
 
   /* -------------------------------------------------
    * Thumbnail fetcher
@@ -264,50 +261,19 @@ const GridView: React.FC<Props> = ({ gridData }) => {
    * ------------------------------------------------- */
   const fetchThumbnails = useCallback(
     async (itemsToFetch: ImageItem[]) => {
-      if (moaId === null || itemsToFetch.length === 0) return;
+      if (itemsToFetch.length === 0) return;
 
-      const currentThumbs = useThumbStore.getState().byKey;
+      const requests = itemsToFetch.map(img => ({
+        hash: img.hash,
+        width: thumbSize,
+        height: layout == 'masonry' ? 0 : thumbSize,
+        dpr: 1 as const,
+        mode: ResizeMode.Original,
+      }));
 
-      const toRequest = itemsToFetch
-        .map(img => {
-          const key = convertToThumbKey(img.hash, {
-            width: thumbSize,
-            height: thumbSize,
-            dpr: 1,
-            mode: ResizeMode.Original,
-          });
-          // Skip if already ready
-          if (currentThumbs[key]?.status === 'ready') return null;
-          return {
-            xxhs: img.hash,
-            specs: [
-              { width: thumbSize, height: thumbSize, dpr: 1, mode: ResizeMode.Original, key },
-            ],
-          };
-        })
-        .filter(Boolean) as any[];
-
-      if (toRequest.length === 0) return;
-
-      for (let i = 0; i < toRequest.length; i += MAX_ITEMS_PER_REQ) {
-        const chunk = toRequest.slice(i, i + MAX_ITEMS_PER_REQ);
-        try {
-          const responses = await ipc.file.getThumbnails(moaId, { items: chunk });
-          responses.items.forEach((item: any) => {
-            item.specs.forEach((spec: any) => {
-              upsertThumb(spec.thumb_key ?? spec.key, {
-                status: spec.status === 'hit' ? 'ready' : 'pending',
-                url: spec.status === 'hit' ? spec.url : undefined,
-                updatedAt: Date.now(),
-              });
-            });
-          });
-        } catch (error) {
-          console.error('Failed to fetch thumbnails:', error);
-        }
-      }
+      await ensureThumbnails(requests);
     },
-    [moaId, thumbSize, upsertThumb],
+    [ensureThumbnails, thumbSize, layout],
   );
 
   // Stable ref to avoid stale closure
@@ -724,11 +690,11 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
     () =>
       convertToThumbKey(img.hash, {
         width: thumbSize,
-        height: thumbSize,
+        height: layout == 'masonry' ? 0 : thumbSize,
         dpr: 1,
         mode: ResizeMode.Original,
       }),
-    [img.hash, thumbSize],
+    [img.hash, thumbSize, layout],
   );
 
   const { entry } = useThumbStore(useShallow(state => ({ entry: state.byKey[key] })));
