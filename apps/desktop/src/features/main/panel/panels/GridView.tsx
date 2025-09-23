@@ -290,9 +290,17 @@ const GridView: React.FC<Props> = ({ gridData }) => {
 
   // Initial warm-up
   useEffect(() => {
+    if (!moaId) {
+      return;
+    }
+
     const initialItems = images.slice(0, INITIAL_FETCH_COUNT);
+    if (initialItems.length === 0) {
+      return;
+    }
+
     stableFetchThumbnails.current(initialItems);
-  }, [images]);
+  }, [images, moaId]);
 
   /* -------------------------------------------------
    * Fetch for Masonry via IntersectionObserver
