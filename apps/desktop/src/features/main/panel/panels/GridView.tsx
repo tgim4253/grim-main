@@ -96,6 +96,7 @@ function useDebouncedEffect(fn: () => void, deps: React.DependencyList, delay: n
 // Visibility Hook (unchanged)
 function useVisibilityMap(rootRef: React.RefObject<HTMLElement>, overscanPx = 600) {
   const ioRef = useRef<IntersectionObserver | null>(null);
+  const observedElementsRef = useRef(new Map<string, Element>());
   const [visible, setVisible] = useState<Record<string, boolean>>({});
   const pending = useRef<Record<string, boolean>>({});
   const rafId = useRef<number | null>(null);
@@ -110,9 +111,8 @@ function useVisibilityMap(rootRef: React.RefObject<HTMLElement>, overscanPx = 60
     rafId.current = null;
   }, []);
 
-  const ensureObserver = useCallback(() => {
-    if (ioRef.current) return ioRef.current;
-    ioRef.current = new IntersectionObserver(
+  const createObserver = useCallback(() => {
+    return new IntersectionObserver(
       entries => {
         for (const entry of entries) {
           const k = (entry.target as HTMLElement).dataset.k;
@@ -129,27 +129,53 @@ function useVisibilityMap(rootRef: React.RefObject<HTMLElement>, overscanPx = 60
         threshold: 0,
       },
     );
-    return ioRef.current;
   }, [flush, overscanPx, rootRef]);
+
+  const ensureObserver = useCallback(() => {
+    if (ioRef.current) return ioRef.current;
+    const observer = createObserver();
+    observedElementsRef.current.forEach(element => observer.observe(element));
+    ioRef.current = observer;
+    return observer;
+  }, [createObserver]);
 
   const observe = useCallback(
     (el: Element | null, key: string) => {
       if (!el) return;
-      (el as HTMLElement).dataset.k = key;
-      ensureObserver().observe(el);
+      const element = el as HTMLElement;
+      element.dataset.k = key;
+      observedElementsRef.current.set(key, element);
+      ensureObserver().observe(element);
     },
     [ensureObserver],
   );
 
   const unobserve = useCallback((el: Element | null) => {
-    if (!el || !ioRef.current) return;
-    ioRef.current.unobserve(el);
+    if (!el) return;
+    const element = el as HTMLElement;
+    const key = element.dataset.k;
+    if (key) {
+      observedElementsRef.current.delete(key);
+    }
+    if (ioRef.current) {
+      ioRef.current.unobserve(element);
+    }
   }, []);
+
+  useEffect(() => {
+    if (!ioRef.current) return;
+    const prevObserver = ioRef.current;
+    const nextObserver = createObserver();
+    observedElementsRef.current.forEach(element => nextObserver.observe(element));
+    ioRef.current = nextObserver;
+    prevObserver.disconnect();
+  }, [createObserver]);
 
   useEffect(() => {
     return () => {
       if (ioRef.current) ioRef.current.disconnect();
       if (rafId.current != null) cancelAnimationFrame(rafId.current);
+      observedElementsRef.current.clear();
     };
   }, []);
 
@@ -246,8 +272,18 @@ const GridView: React.FC<Props> = ({ gridData }) => {
   const { ensureThumbnails } = useThumbnails({ moaId, maxBatchSize: MAX_ITEMS_PER_REQ });
 
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  //@ts-ignore
+  const viewportSize = useElementSize(scrollRef);
+  const overscanPx = useMemo(
+    () =>
+      viewportSize.height > 0
+        ? viewportSize.height * 0.25 // Observe ~25% extra above/below (~1.5× viewport)
+        : 800,
+    [viewportSize.height],
+  );
   // @ts-expect-error.
-  const { visible, observe, unobserve } = useVisibilityMap(scrollRef, 800);
+  const { visible, observe, unobserve } = useVisibilityMap(scrollRef, overscanPx);
 
   const thumbSize = useMemo(() => {
     if (layout == 'masonry') return 256;
@@ -512,6 +548,9 @@ function VirtualGridLayout({
 
   const cols = Math.max(1, Math.floor((width + gap) / (itemW + gap)));
   const rowCount = Math.ceil(images.length / cols);
+  const rowsInView = height > 0 ? height / (itemH + gap) : 0;
+  // Render roughly 1.n× the viewport by overscanning ~0.5n% of the visible rows on each side
+  const overscanRowCount = rowsInView > 0 ? Math.max(1, Math.ceil(rowsInView * 2)) : 2;
 
   // Request thumbs for rows/cols in overscan range (debounced via RAF)
   const rafRef = useRef<number | null>(null);
@@ -614,8 +653,8 @@ function VirtualGridLayout({
           rowHeight={itemH + gap}
           width={width}
           itemData={cellData}
-          overscanRowCount={5} // ↑ a bit more generous overscan to hide fetch latency
           overscanColumnCount={1}
+          overscanRowCount={overscanRowCount}
           onItemsRendered={({ overscanRowStartIndex, overscanRowStopIndex }) => {
             // Proactively fetch thumbnails for overscanned rows
             scheduleFetchForRange(overscanRowStartIndex, overscanRowStopIndex);
