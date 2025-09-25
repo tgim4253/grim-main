@@ -7,7 +7,9 @@ use crate::{
     config::file::MatchStates,
     db::repository::node_repository::NodeRepository,
     models::{
-        file::{FileInfo, NodeFolder, RealFolderData},
+        file::{
+            FileInfo, FolderHealthState, FolderMountState, NodeFolder, RealFolderData,
+        },
         node::{Node, NodeData, NodeKind},
     },
     utils::{date::get_now_date, identifier::get_unique_id},
@@ -15,6 +17,22 @@ use crate::{
 
 /// Repository for file and folder persistence logic.
 pub struct FileRepository;
+
+/// Joined virtual-folder mount information used by services for syncing/options.
+#[derive(Debug, Clone)]
+pub struct MountWithFolder {
+    pub mount_id: String,
+    pub virtual_node_id: String,
+    pub real_folder_id: String,
+    pub recursive: bool,
+    pub sync_enabled: bool,
+    pub suppress_warnings: bool,
+    pub abs_path: Option<String>,
+    pub error_flag: crate::config::file::IntegrityCheckResult,
+    pub error_msg: Option<String>,
+    pub last_seen_scan_id: Option<String>,
+    pub last_seen_at: Option<String>,
+}
 
 impl FileRepository {
     /// Create a mount entry linking a virtual folder node to a real folder.
@@ -32,9 +50,9 @@ impl FileRepository {
         sqlx::query(
             r#"
         INSERT INTO virtual_folder_mount
-            (id, virtual_node_id, real_folder_id, created_at, enabled, priority, recursive)
+            (id, virtual_node_id, real_folder_id, created_at, enabled, priority, recursive, sync_enabled, suppress_warnings)
         VALUES
-            (?1, ?2, ?3, ?4, 1, 0, 1)
+            (?1, ?2, ?3, ?4, 1, 0, 1, 0, 0)
         "#,
         )
         .bind(&mount_id)
@@ -45,6 +63,112 @@ impl FileRepository {
         .await?;
 
         Ok(mount_id)
+    }
+
+    /// Fetch mount metadata along with the associated real-folder information.
+    pub async fn fetch_mount_for_virtual_node<'a, E>(
+        executor: &mut E,
+        virtual_node_id: &str,
+    ) -> Result<Option<MountWithFolder>>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        struct Row {
+            mount_id: String,
+            real_folder_id: String,
+            recursive: i64,
+            sync_enabled: i64,
+            suppress_warnings: i64,
+            abs_path: Option<String>,
+            error_flag: Option<String>,
+            error_msg: Option<String>,
+            last_seen_scan_id: Option<String>,
+            last_seen_at: Option<String>,
+        }
+
+        let row = sqlx::query_as!(
+            Row,
+            r#"
+            SELECT
+                vfm.id                AS "mount_id!",
+                vfm.real_folder_id    AS "real_folder_id!",
+                vfm.recursive         AS "recursive!",
+                vfm.sync_enabled      AS "sync_enabled!",
+                vfm.suppress_warnings AS "suppress_warnings!",
+                rf.abs_path_cached    AS "abs_path?",
+                rf.error_flag         AS "error_flag?",
+                rf.error_msg          AS "error_msg?",
+                rf.last_seen_scan_id  AS "last_seen_scan_id?",
+                rf.last_seen_at       AS "last_seen_at?"
+            FROM virtual_folder_mount vfm
+            LEFT JOIN real_folder rf ON rf.id = vfm.real_folder_id
+            WHERE vfm.virtual_node_id = ?1 AND vfm.enabled = 1
+            ORDER BY vfm.priority
+            LIMIT 1
+            "#,
+            virtual_node_id
+        )
+        .fetch_optional(&mut *executor)
+        .await?;
+
+        let Some(row) = row else {
+            return Ok(None);
+        };
+
+        let error_flag = match row.error_flag.as_deref() {
+            Some("notfound") => crate::config::file::IntegrityCheckResult::NotFound,
+            Some("mismatch") => crate::config::file::IntegrityCheckResult::Mismatch,
+            _ => crate::config::file::IntegrityCheckResult::Success,
+        };
+
+        Ok(Some(MountWithFolder {
+            mount_id: row.mount_id,
+            virtual_node_id: virtual_node_id.to_string(),
+            real_folder_id: row.real_folder_id,
+            recursive: row.recursive != 0,
+            sync_enabled: row.sync_enabled != 0,
+            suppress_warnings: row.suppress_warnings != 0,
+            abs_path: row.abs_path,
+            error_flag,
+            error_msg: row.error_msg,
+            last_seen_scan_id: row.last_seen_scan_id,
+            last_seen_at: row.last_seen_at,
+        }))
+    }
+
+    /// Update mount options and optionally switch to a different real-folder.
+    pub async fn update_mount_options<'a, E>(
+        executor: &mut E,
+        mount_id: &str,
+        new_real_folder_id: Option<&str>,
+        recursive: bool,
+        sync_enabled: bool,
+        suppress_warnings: bool,
+    ) -> Result<()>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let mut query = String::from(
+            "UPDATE virtual_folder_mount SET recursive = ?2, sync_enabled = ?3, suppress_warnings = ?4",
+        );
+        if new_real_folder_id.is_some() {
+            query.push_str(", real_folder_id = ?5");
+        }
+        query.push_str(", updated_at = datetime('now') WHERE id = ?1");
+
+        let mut q = sqlx::query(&query)
+            .bind(mount_id)
+            .bind(if recursive { 1 } else { 0 })
+            .bind(if sync_enabled { 1 } else { 0 })
+            .bind(if suppress_warnings { 1 } else { 0 });
+
+        if let Some(new_real_folder_id) = new_real_folder_id {
+            q = q.bind(new_real_folder_id);
+        }
+
+        q.execute(&mut *executor).await?;
+
+        Ok(())
     }
 
     /// Look up a real-folder identifier by normalized path components.
@@ -100,6 +224,8 @@ impl FileRepository {
                 folder_id,
                 node_id: node_id.clone(),
                 folder_name: name,
+                mounts: Vec::new(),
+                health: FolderHealthState::Normal,
             })),
             created_at: now.clone(),
             updated_at: now,

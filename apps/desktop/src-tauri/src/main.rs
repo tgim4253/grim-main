@@ -46,6 +46,8 @@ fn main() {
             commands::file::get_thumbnail_usage,
             commands::file::clear_thumbnail_cache,
             commands::file::clear_base_thumbnail_cache,
+            commands::file::sync_folder_mount,
+            commands::file::update_folder_mount_options,
             commands::croquis::start_croquis_session,
             commands::croquis::load_croquis_session,
             commands::croquis::load_croquis_option,

@@ -8,17 +8,18 @@ import {
   parseDropTarget,
 } from '@tgim/dnd/index';
 import { DndContext, DragOverlay, closestCenter } from '@dnd-kit/core';
-import { NodeList } from '@tgim/ui/index';
+import { Button, Modal, NodeList } from '@tgim/ui/index';
 import { File, Folder } from 'lucide-react';
 import useFileTreeStore from '@tgim/stores/fileTreeStore';
 import { useShallow } from 'zustand/shallow';
-import { Modal } from '@tgim/ui/index';
 import NewFolderModal from '../../file/modal/NewFolderModal';
 import { ipc } from '../../../lib/ipc';
 import { useMoa } from '@tgim/hooks/useMoa';
 import usePanelsStore from '@tgim/stores/panelStore';
 import { listen } from '@tauri-apps/api/event';
 import FolderImportProgressModal from '../../file/modal/FolderImportProgressModal';
+import FolderOptionsModal from '../../file/modal/FolderOptionsModal';
+import { GraphResponse } from '@tgim/types/graph';
 
 /* local utils for rendering */
 
@@ -70,20 +71,57 @@ type ImportContext = {
 };
 
 export const FileTree = () => {
-  const [isFolderModal, setIsFolderModal] = useState(false);
+  const [activeModal, setActiveModal] = useState<'new-folder' | 'options' | null>(null);
+  const [showActionMenu, setShowActionMenu] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Select only what we need from the store (shallow compare to reduce re-renders)
-  const { treeData, onMove, selectedNodeId, setSelectedNode, ensureVisible } = useFileTreeStore(
+  const {
+    treeData,
+    onMove,
+    selectedNodeId,
+    setSelectedNode,
+    ensureVisible,
+    convertToTreeData,
+    setTreeData,
+  } = useFileTreeStore(
     useShallow(s => ({
       treeData: s.treeData,
       onMove: s.onMove,
       selectedNodeId: s.selectedNodeId,
       setSelectedNode: s.setSelectedNode,
       ensureVisible: s.ensureVisible,
+      convertToTreeData: s.convertToTreeData,
+      setTreeData: s.setTreeData,
     })),
   );
 
   const { openFile } = usePanelsStore(useShallow(s => ({ openFile: s.addPanelWithoutContainer })));
+
+  const refreshTree = useCallback(async () => {
+    if (!moaId) return;
+    try {
+      const graph = (await ipc.graph.getGraphOne(moaId, 'root')) as GraphResponse;
+      const next = convertToTreeData(graph);
+      setTreeData(next);
+    } catch (err) {
+      console.error('Failed to refresh file tree', err);
+    }
+  }, [convertToTreeData, moaId, setTreeData]);
+
+  const handleManualSync = useCallback(async () => {
+    if (!moaId || !optionNode) return;
+    try {
+      setShowActionMenu(false);
+      setIsSyncing(true);
+      await ipc.file.syncFolder(moaId, optionNode.id);
+      await refreshTree();
+    } catch (err) {
+      console.error('Failed to sync folder', err);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [moaId, optionNode, refreshTree]);
 
   // Expanded state: open folders initially if they have children
   const [expanded, setExpanded] = useState<Set<string>>(() => {
@@ -143,11 +181,19 @@ export const FileTree = () => {
 
   const [optionNode, setOptionNode] = useState<FileTreeData | undefined>(undefined);
 
-  const onOptionClick = (node: FileTreeData | undefined) => {
-    if (!node) return;
-    setOptionNode(node);
-    if (!isFolderModal) setIsFolderModal(true);
-  };
+  const handleOptionClick = useCallback(
+    (node: FileTreeData | undefined, action: 'menu' | 'options' = 'menu') => {
+      if (!node) return;
+      setOptionNode(node);
+      if (action === 'options') {
+        setActiveModal('options');
+        setShowActionMenu(false);
+      } else {
+        setShowActionMenu(true);
+      }
+    },
+    [],
+  );
 
   const { moaId } = useMoa(location);
 
@@ -369,7 +415,7 @@ export const FileTree = () => {
               name: node.name,
             });
           }}
-          onClickOption={onOptionClick}
+          onClickOption={handleOptionClick}
         />
 
         <DragOverlay dropAnimation={null}>
@@ -384,10 +430,43 @@ export const FileTree = () => {
           ) : null}
         </DragOverlay>
       </DndContext>
-      {isFolderModal && (
-        <Modal onClose={() => setIsFolderModal(false)} className="bg-modal-bg">
+      {showActionMenu && optionNode ? (
+        <Modal onClose={() => setShowActionMenu(false)} className="bg-modal-bg max-w-xs">
+          <div className="flex flex-col gap-3 text-modal-text">
+            <h3 className="text-lg font-semibold">폴더 작업</h3>
+            <Button
+              variant="default"
+              onClick={() => {
+                setShowActionMenu(false);
+                setActiveModal('new-folder');
+              }}
+            >
+              새 폴더 만들기
+            </Button>
+            <Button
+              variant="default"
+              onClick={handleManualSync}
+              disabled={isSyncing}
+            >
+              폴더/파일 업서트
+            </Button>
+            <Button
+              variant="default"
+              onClick={() => {
+                setShowActionMenu(false);
+                setActiveModal('options');
+              }}
+            >
+              옵션 열기
+            </Button>
+          </div>
+        </Modal>
+      ) : null}
+
+      {activeModal === 'new-folder' && (
+        <Modal onClose={() => setActiveModal(null)} className="bg-modal-bg">
           <NewFolderModal
-            onClose={() => setIsFolderModal(false)}
+            onClose={() => setActiveModal(null)}
             onSubmit={async d => {
               if (!moaId) return;
               const hasPath = Boolean(d.path);
@@ -420,6 +499,8 @@ export const FileTree = () => {
                   expectedBytes: d.expectedBytes,
                   expectedFiles: d.expectedFiles,
                 });
+                await refreshTree();
+                setActiveModal(null);
               } catch (err) {
                 if (hasPath) {
                   setImportModalOpen(false);
@@ -433,6 +514,21 @@ export const FileTree = () => {
           />
         </Modal>
       )}
+      {activeModal === 'options' && optionNode ? (
+        <FolderOptionsModal
+          node={optionNode}
+          moaId={moaId ?? ''}
+          onClose={() => setActiveModal(null)}
+          onUpdated={refreshTree}
+        />
+      ) : null}
+      {isSyncing ? (
+        <Modal onClose={() => setIsSyncing(false)} dismissible={false} className="bg-modal-bg max-w-xs text-center text-modal-text">
+          <div className="space-y-2 py-6">
+            <p className="text-sm">동기화 중입니다...</p>
+          </div>
+        </Modal>
+      ) : null}
       {importModalOpen && importProgress && importContext ? (
         <FolderImportProgressModal
           progress={importProgress}

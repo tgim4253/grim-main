@@ -1,12 +1,18 @@
 use anyhow::Result;
 use sqlx::{Executor, Sqlite};
-use std::{collections::HashSet, str::FromStr};
+use std::{
+    collections::{hash_map::Entry, HashMap, HashSet},
+    str::FromStr,
+};
 
 use crate::{
+    config::file::IntegrityCheckResult,
     db::repository::connection_repository::ConnectionRepository,
     models::{
         connection::RelationType,
-        file::{FileContent, FileType, NodeFolder},
+        file::{
+            FileContent, FileType, FolderHealthState, FolderMountState, NodeFolder,
+        },
         node::{Node, NodeData, NodeKind},
     },
     utils::identifier::get_unique_id,
@@ -218,43 +224,141 @@ impl NodeRepository {
             folder_name: String,
             created_at: String,
             updated_at: String,
+            mount_id: Option<String>,
+            real_folder_id: Option<String>,
+            recursive: Option<i64>,
+            sync_enabled: Option<i64>,
+            suppress_warnings: Option<i64>,
+            real_path: Option<String>,
+            error_flag: Option<String>,
+            error_msg: Option<String>,
+            last_seen_scan_id: Option<String>,
+            last_seen_at: Option<String>,
         }
 
         let rows: Vec<FolderNodeRow> = sqlx::query_as!(
             FolderNodeRow,
             r#"
-                    SELECT
-                        n.id          AS "node_id!",
-                        n.kind        AS "kind!",
-                        nf.id         AS "folder_id!",
-                        nf.display_name       AS "folder_name!",
-                        n.created_at AS "created_at!",
-                        n.updated_at AS "updated_at!"
-                    FROM node               n
-                    JOIN node_folder        nf  ON nf.node_id = n.id
-                    WHERE n.kind = 'folder'
-                    ORDER BY n.created_at
-                    "#,
+                SELECT
+                    n.id                         AS "node_id!",
+                    n.kind                       AS "kind!",
+                    nf.id                        AS "folder_id!",
+                    nf.display_name              AS "folder_name!",
+                    n.created_at                 AS "created_at!",
+                    n.updated_at                 AS "updated_at!",
+                    vfm.id                       AS "mount_id?",
+                    vfm.real_folder_id           AS "real_folder_id?",
+                    vfm.recursive                AS "recursive?",
+                    vfm.sync_enabled             AS "sync_enabled?",
+                    vfm.suppress_warnings        AS "suppress_warnings?",
+                    rf.abs_path_cached           AS "real_path?",
+                    rf.error_flag                AS "error_flag?",
+                    rf.error_msg                 AS "error_msg?",
+                    rf.last_seen_scan_id         AS "last_seen_scan_id?",
+                    rf.last_seen_at              AS "last_seen_at?"
+                FROM node n
+                JOIN node_folder nf ON nf.node_id = n.id
+                LEFT JOIN virtual_folder_mount vfm
+                    ON vfm.virtual_node_id = n.id AND vfm.enabled = 1
+                LEFT JOIN real_folder rf ON rf.id = vfm.real_folder_id
+                WHERE n.kind = 'folder'
+                ORDER BY n.created_at, vfm.priority
+            "#,
         )
         .fetch_all(&mut *executor)
         .await?;
 
-        let mut nodes: Vec<Node> = Vec::new();
+        let mut nodes_by_id: HashMap<String, Node> = HashMap::new();
+        let mut ordered_ids: Vec<String> = Vec::new();
 
         for row in rows {
-            nodes.push(Node {
-                id: row.node_id.clone(),
-                kind: NodeKind::from_str(&row.kind)?,
-                data: Some(NodeData::Folder({
-                    NodeFolder {
-                        folder_id: row.folder_id,
-                        node_id: row.node_id.clone(),
-                        folder_name: row.folder_name,
+            let node_kind = NodeKind::from_str(&row.kind)?;
+
+            let entry = match nodes_by_id.entry(row.node_id.clone()) {
+                Entry::Occupied(occupied) => occupied.into_mut(),
+                Entry::Vacant(vacant) => {
+                    ordered_ids.push(row.node_id.clone());
+                    vacant.insert(Node {
+                        id: row.node_id.clone(),
+                        kind: node_kind,
+                        data: Some(NodeData::Folder(NodeFolder {
+                            folder_id: row.folder_id.clone(),
+                            node_id: row.node_id.clone(),
+                            folder_name: row.folder_name.clone(),
+                            mounts: Vec::new(),
+                            health: FolderHealthState::Normal,
+                        })),
+                        created_at: row.created_at.clone(),
+                        updated_at: row.updated_at.clone(),
+                    })
+                }
+            };
+
+            let Some(NodeData::Folder(folder)) = entry.data.as_mut() else {
+                continue;
+            };
+
+            let Some(mount_id) = row.mount_id.clone() else {
+                continue;
+            };
+
+            let error_flag = match row.error_flag.as_deref() {
+                Some("notfound") => IntegrityCheckResult::NotFound,
+                Some("mismatch") => IntegrityCheckResult::Mismatch,
+                Some("success") => IntegrityCheckResult::Success,
+                _ => IntegrityCheckResult::Success,
+            };
+
+            let recursive = row.recursive.unwrap_or(1) != 0;
+            let sync_enabled = row.sync_enabled.unwrap_or(0) != 0;
+            let suppress_warnings = row.suppress_warnings.unwrap_or(0) != 0;
+
+            let mount_state = FolderMountState {
+                mount_id,
+                real_folder_id: row
+                    .real_folder_id
+                    .clone()
+                    .unwrap_or_else(String::new),
+                recursive,
+                sync_enabled,
+                suppress_warnings,
+                real_path: row.real_path.clone(),
+                error_flag,
+                error_msg: row.error_msg.clone(),
+                last_seen_scan_id: row.last_seen_scan_id.clone(),
+                last_seen_at: row.last_seen_at.clone(),
+            };
+
+            folder.mounts.push(mount_state);
+
+            let mount_health = match error_flag {
+                IntegrityCheckResult::NotFound => FolderHealthState::Error,
+                IntegrityCheckResult::Mismatch => {
+                    if suppress_warnings {
+                        FolderHealthState::Normal
+                    } else {
+                        FolderHealthState::Warning
                     }
-                })),
-                created_at: row.created_at,
-                updated_at: row.updated_at,
-            });
+                }
+                IntegrityCheckResult::Success => FolderHealthState::Normal,
+            };
+
+            folder.health = match (folder.health, mount_health) {
+                (FolderHealthState::Error, _) | (_, FolderHealthState::Error) => {
+                    FolderHealthState::Error
+                }
+                (FolderHealthState::Warning, _) | (_, FolderHealthState::Warning) => {
+                    FolderHealthState::Warning
+                }
+                _ => FolderHealthState::Normal,
+            };
+        }
+
+        let mut nodes: Vec<Node> = Vec::with_capacity(nodes_by_id.len());
+        for id in ordered_ids {
+            if let Some(node) = nodes_by_id.remove(&id) {
+                nodes.push(node);
+            }
         }
 
         Ok(nodes)

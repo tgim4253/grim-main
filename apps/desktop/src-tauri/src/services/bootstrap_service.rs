@@ -1,8 +1,11 @@
 use crate::bootstrap;
+use crate::config::file::IntegrityCheckResult;
 use crate::db::repository::connection_repository::ConnectionRepository;
 use crate::db::repository::node_repository::NodeRepository;
+use crate::models::file::FileInfo;
 use crate::models::node::{NodeKind, NodeWithConnections};
 use crate::services::db::DB_MANAGER;
+use crate::services::file_service::folder::sync_virtual_folder;
 use crate::services::storage_root::enumerate_mounted_root;
 use crate::services::{db, integrity, moa_services};
 use crate::utils::date::get_now_date;
@@ -13,7 +16,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::{Emitter, State};
-use tokio::sync::{Mutex, RwLock};
+use tokio::{fs, sync::{Mutex, RwLock}};
 use tracing::{error, info};
 
 /// Progress payload emitted to the renderer while bootstrapping a workspace.
@@ -157,6 +160,8 @@ async fn run_bootstrap_pipeline(
     step(&app, &state, &moa_id, Stage::InitialScan, 60, Some("Indexing files"))
         .await;
 
+    perform_initial_scan(&app, &moa_id).await?;
+
     step(&app, &state, &moa_id, Stage::Ready, 100, Some("Done")).await;
 
     Ok(())
@@ -209,6 +214,161 @@ fn emit(
 ) {
     let topic = format!("bootstrap://progress/{}", moa_id);
     let _ = app_handle.emit(&topic, payload);
+}
+
+/// Perform a lightweight filesystem scan to record mount health and optionally sync.
+async fn perform_initial_scan(app: &tauri::AppHandle, moa_id: &str) -> Result<()> {
+    struct MountRow {
+        virtual_node_id: String,
+        real_folder_id: String,
+        sync_enabled: i64,
+        abs_path: Option<String>,
+        stored_mtime: i64,
+    }
+
+    let scan_id = get_unique_id();
+    let now = get_now_date();
+
+    {
+        let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
+        sqlx::query!(
+            r"""
+            INSERT INTO scan_session (id, started_at)
+            VALUES (?1, ?2)
+            """,
+            scan_id,
+            now
+        )
+        .execute(tx.as_mut())
+        .await?;
+        tx.commit().await?;
+    }
+
+    let mounts = {
+        let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
+        let rows = sqlx::query_as!(
+            MountRow,
+            r"""
+            SELECT
+                vfm.virtual_node_id AS "virtual_node_id!",
+                vfm.real_folder_id  AS "real_folder_id!",
+                vfm.sync_enabled    AS "sync_enabled!",
+                rf.abs_path_cached  AS "abs_path?",
+                rf.mtime            AS "stored_mtime!"
+            FROM virtual_folder_mount vfm
+            JOIN real_folder rf ON rf.id = vfm.real_folder_id
+            WHERE vfm.enabled = 1
+            """
+        )
+        .fetch_all(tx.as_mut())
+        .await?;
+        tx.commit().await?;
+        rows
+    };
+
+    for mount in mounts {
+        let mut status = IntegrityCheckResult::Success;
+        let mut error_msg: Option<String> = None;
+        let mut current_mtime = mount.stored_mtime;
+        let mut path_buf: Option<PathBuf> = None;
+
+        if let Some(path) = mount.abs_path.as_ref() {
+            let pb = PathBuf::from(path);
+            path_buf = Some(pb.clone());
+            match fs::metadata(&pb).await {
+                Ok(meta) => {
+                    current_mtime = FileInfo::file_mtime_epoch(&meta)?;
+                    if current_mtime != mount.stored_mtime {
+                        status = IntegrityCheckResult::Mismatch;
+                        error_msg = Some("Detected filesystem changes".to_string());
+
+                        if mount.sync_enabled != 0 {
+                            match sync_virtual_folder(app, moa_id, &mount.virtual_node_id).await {
+                                Ok(()) => {
+                                    if let Some(pb) = path_buf.as_ref() {
+                                        if let Ok(meta) = fs::metadata(pb).await {
+                                            current_mtime = FileInfo::file_mtime_epoch(&meta)?;
+                                        }
+                                    }
+                                    status = IntegrityCheckResult::Success;
+                                    error_msg = None;
+                                }
+                                Err(sync_err) => {
+                                    error_msg = Some(format("Sync failed: {}", sync_err));
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(err) => {
+                    status = IntegrityCheckResult::NotFound;
+                    error_msg = Some(err.to_string());
+                }
+            }
+        } else {
+            status = IntegrityCheckResult::NotFound;
+            error_msg = Some("Missing cached path for mounted folder".to_string());
+        }
+
+        let mut update_tx = DB_MANAGER.create_new_tx(moa_id).await?;
+        sqlx::query!(
+            r"""
+            UPDATE real_folder
+               SET error_flag = ?2,
+                   error_msg = ?3,
+                   last_seen_scan_id = ?4,
+                   last_seen_at = ?5,
+                   updated_at = ?5
+             WHERE id = ?1
+            """,
+            mount.real_folder_id,
+            match status {
+                IntegrityCheckResult::NotFound => "notfound",
+                IntegrityCheckResult::Mismatch => "mismatch",
+                IntegrityCheckResult::Success => "success",
+            },
+            error_msg,
+            scan_id,
+            now
+        )
+        .execute(update_tx.as_mut())
+        .await?;
+
+        if status == IntegrityCheckResult::Success {
+            sqlx::query!(
+                r"""
+                UPDATE real_folder
+                   SET mtime = ?2
+                 WHERE id = ?1
+                """,
+                mount.real_folder_id,
+                current_mtime
+            )
+            .execute(update_tx.as_mut())
+            .await?;
+        }
+
+        update_tx.commit().await?;
+    }
+
+    {
+        let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
+        let finished = get_now_date();
+        sqlx::query!(
+            r"""
+            UPDATE scan_session
+               SET finished_at = ?2
+             WHERE id = ?1
+            """,
+            scan_id,
+            finished
+        )
+        .execute(tx.as_mut())
+        .await?;
+        tx.commit().await?;
+    }
+
+    Ok(())
 }
 
 /// Fetch the initial node graph needed by the renderer after bootstrap.

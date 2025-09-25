@@ -168,6 +168,8 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
       if (n.kind !== NodeKind.Folder) continue;
 
       const folderData = (n.data?.['Folder'] as NodeFolder) ?? undefined;
+      const mounts = folderData?.mounts ?? [];
+      const health = folderData?.health ?? 'normal';
 
       nodeMap.set(n.id, {
         id: n.id,
@@ -175,6 +177,8 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
         icon: 'folder',
         type: NodeKind.Folder,
         children: [],
+        status: health,
+        mounts,
       });
 
       incoming.set(n.id, 0);

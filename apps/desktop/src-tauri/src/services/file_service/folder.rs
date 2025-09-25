@@ -19,7 +19,7 @@ use crate::{
     },
     models::{
         file::{
-            FileInfo, FileType, FolderData, FolderPreview,
+            FileInfo, FileType, FolderData, FolderOptionUpdatePayload, FolderPreview,
             FolderPreviewFileStat, FolderPreviewNode, FolderPreviewSummary,
             FolderSelection, RealFolderData,
         },
@@ -580,6 +580,121 @@ pub async fn first_mount_folder(
     }
 
     let _scan_id = start_scan_job(moa_id.clone(), real_folder_id).await?;
+
+    tx.commit().await?;
+
+    Ok(())
+}
+
+/// Re-run ingestion for an existing virtual folder mount to pull in filesystem changes.
+pub async fn sync_virtual_folder(
+    app: &AppHandle,
+    moa_id: &str,
+    virtual_node_id: &str,
+) -> Result<()> {
+    let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
+
+    let mount = FileRepository::fetch_mount_for_virtual_node(tx.as_mut(), virtual_node_id)
+        .await?
+        .ok_or_else(|| anyhow!("No mounted real folder for virtual node {virtual_node_id}"))?;
+
+    let abs_path = mount
+        .abs_path
+        .ok_or_else(|| anyhow!("Missing cached absolute path for mounted folder"))?;
+    let abs_path = PathBuf::from(&abs_path);
+
+    if !abs_path.exists() {
+        bail!(
+            "Mounted folder path {} no longer exists",
+            abs_path.display()
+        );
+    }
+
+    let metadata = fs::metadata(&abs_path).await.with_context(|| {
+        format!(
+            "Failed to read metadata for mounted folder {}",
+            abs_path.display()
+        )
+    })?;
+    let mtime = FileInfo::file_mtime_epoch(&metadata)?;
+
+    upsert_folder(
+        tx.as_mut(),
+        app,
+        moa_id,
+        mount.real_folder_id.clone(),
+        virtual_node_id.to_string(),
+        abs_path.as_path(),
+        mount.recursive,
+        Some(true),
+        None,
+        abs_path.as_path(),
+        None,
+    )
+    .await?;
+
+    let now = crate::utils::date::get_now_date();
+    sqlx::query!(
+        r#"
+        UPDATE real_folder
+           SET mtime = ?2,
+               error_flag = 'success',
+               error_msg = NULL,
+               last_seen_at = COALESCE(last_seen_at, ?3),
+               updated_at = ?3
+         WHERE id = ?1
+        "#,
+        mount.real_folder_id,
+        mtime,
+        now
+    )
+    .execute(tx.as_mut())
+    .await?;
+
+    tx.commit().await?;
+
+    Ok(())
+}
+
+/// Update mount-level options such as recursion, sync, and associated real-folder path.
+pub async fn update_virtual_folder_options(
+    moa_id: &str,
+    virtual_node_id: &str,
+    payload: FolderOptionUpdatePayload,
+) -> Result<()> {
+    let mount = {
+        let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
+        let mount = FileRepository::fetch_mount_for_virtual_node(tx.as_mut(), virtual_node_id)
+            .await?;
+        tx.commit().await?;
+        mount
+    }
+    .ok_or_else(|| anyhow!("No mounted real folder for virtual node {virtual_node_id}"))?;
+
+    let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
+
+    let mut new_real_folder_id: Option<String> = None;
+
+    if let Some(path) = payload.path.as_ref().filter(|p| !p.is_empty()) {
+        let norm_path = normalize_path(Path::new(path));
+        let norm_str = norm_path.to_string_lossy();
+        if mount.abs_path.as_deref() != Some(norm_str.as_ref()) {
+            let sroot_info = storage_root::detect_storage_root(&norm_path)?;
+            let ensured = ensure_storage_root_and_real_folder(tx.as_mut(), &sroot_info, &norm_path)
+                .await?;
+            new_real_folder_id = Some(ensured);
+        }
+    }
+
+    FileRepository::update_mount_options(
+        tx.as_mut(),
+        &mount.mount_id,
+        new_real_folder_id.as_deref(),
+        payload.recursive,
+        payload.sync_enabled,
+        payload.suppress_warnings,
+    )
+    .await?;
 
     tx.commit().await?;
 
