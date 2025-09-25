@@ -163,14 +163,15 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
         d3
           .forceRadial(
             (d: any) => {
-              if (d.nodeId == rootNodeId) return 0;
+              if (!isFinite(d.depth)) return 0;
               return d.depth * GAP;
             },
             0,
             0,
           )
           .strength((d: any) => {
-            return 0;
+            if (!d.isLeaf) return 0.9;
+            else return 0;
           }),
       );
       fg.d3Force('charge')?.strength(-50);
@@ -179,6 +180,7 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
           Math.abs((l.source.depth ?? 0) - (l.target.depth ?? 0)) <= 1 ? 40 : 110,
         )
         .strength(0.6);
+      fg.d3Force('collide', d3.forceCollide(10));
     }
     setTimeout(() => {
       showAllNode();

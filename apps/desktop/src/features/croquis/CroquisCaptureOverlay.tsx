@@ -68,7 +68,7 @@ const CroquisCaptureOverlay: React.FC = () => {
 
   useEffect(() => {
     const body = document.body;
-    body.style.backgroundColor = 'rgba(0, 0, 0, 0.0)';
+    body.style.backgroundColor = 'rgba(0, 0, 0, 0.35)';
     body.style.userSelect = 'none';
   }, []);
 
