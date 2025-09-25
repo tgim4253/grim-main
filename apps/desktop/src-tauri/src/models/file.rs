@@ -413,7 +413,7 @@ impl FileInfo {
 //     parent_real_folder_id: String,
 //     parent_virtual_folder_id: String,
 //     abs_dir: PathBuf,
-//     recursive: bool,
+//     re: bool,
 //     make_virtual_folder: Option<bool>,
 
 //     files: Vec<FileInfo>,

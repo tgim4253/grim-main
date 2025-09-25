@@ -9,6 +9,9 @@ import {
   ThumbnailUsage,
 } from '@tgim/types/file';
 import {
+  CroquisCaptureContext,
+  CroquisCapturePreview,
+  CroquisCapturePreviewPayload,
   CroquisOption,
   CroquisPreferences,
   CroquisSession,
@@ -104,6 +107,17 @@ const croquisIpc = {
   loadPreferences: async (moaId: string): Promise<CroquisPreferences | null> => {
     const response = await invoke('load_croquis_option', { moaId });
     return (response as CroquisPreferences | null) ?? null;
+  },
+  openCaptureOverlay: async (payload: { sessionId: string; moaId: string; hash: string }) => {
+    await invoke('open_croquis_capture_overlay', { payload });
+  },
+  renderCapturePreview: async (
+    payload: CroquisCapturePreviewPayload,
+  ): Promise<CroquisCapturePreview> => {
+    return await invoke('render_croquis_capture_preview', { ...payload });
+  },
+  confirmCapture: async (payload: { baseUrl: string; context: CroquisCaptureContext }) => {
+    await invoke('confirm_croquis_capture', { ...payload });
   },
 };
 

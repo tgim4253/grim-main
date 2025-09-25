@@ -109,3 +109,57 @@ pub struct CroquisStartResponse {
     pub session_id: String,
     pub window_label: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CaptureOverlayPayload {
+    pub moa_id: String,
+    pub hash: String,
+    pub session_id: String,
+}
+
+/// Monitor bounds reported by the renderer when preparing a capture.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CroquisCaptureMonitor {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+}
+
+/// Rectangle describing the selection region to capture.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CroquisCaptureRect {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// Payload provided when requesting a capture preview.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CroquisCapturePreviewPayload {
+    pub rect: CroquisCaptureRect,
+    pub monitor: CroquisCaptureMonitor,
+}
+
+/// Data returned to the renderer for preview display.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CroquisCapturePreview {
+    pub base_url: String,
+}
+
+/// Context required to persist a confirmed capture.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CroquisCaptureContext {
+    pub session_id: String,
+    pub image_hash: String,
+    pub moa_id: String,
+    pub save_path: String,
+}

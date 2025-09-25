@@ -145,8 +145,12 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       // This mirrors the original recursive function (children are not shared).
       let rootNewId: string | undefined;
 
+      const seen: Set<string> = new Set();
+
       while (stack.length > 0) {
         const { origId, parentNewId, via, prevLevel, depth } = stack.pop()!;
+        if (seen.has(origId)) continue;
+        seen.add(origId);
 
         if (maxDepth && depth > maxDepth) continue;
 
@@ -155,7 +159,10 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         const node = nodesMap[origId];
         const newNode = getGraphNodeData(node, newId);
         newNode.depth = depth;
-
+        if (node.id == graphData.root_node_id) {
+          newNode.fx = 0;
+          newNode.fy = 0;
+        }
         // Capture root id (the very first item expanded has no parent)
         if (!parentNewId && rootNewId === undefined) {
           rootNewId = newId;
@@ -170,7 +177,6 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
             data: via,
           });
         }
-
         // 3) Enqueue children; they will each create brand-new nodes
         const connections: Connection[] = connectionsMap[origId] ?? [];
         newNode.isLeaf = connections.length == 0;
