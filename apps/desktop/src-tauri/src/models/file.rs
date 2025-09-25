@@ -544,7 +544,7 @@ impl ThumbPath {
         }
 
         // Format
-        let fmt = spec.fmt.unwrap_or(ImageFmt::Webp);
+        let fmt = spec.fmt.unwrap_or(ImageFmt::Jpeg);
 
         // --------------------------------------------------------------------
 
@@ -587,7 +587,7 @@ impl ThumbPath {
 }
 
 impl ThumbBasePath {
-    /// Cached base thumbnail path "thumbs/base/vX/ab/cd/<hash>/<hash>_w512_auto_vX.webp".
+    /// Cached base thumbnail path "thumbs/base/vX/ab/cd/<hash>/<hash>_w512_auto_vX.jpeg".
     pub fn new(
         app: &AppHandle,
         _moa_id: &str,
@@ -606,7 +606,7 @@ impl ThumbBasePath {
         let cd = &xxhs[2..4];
 
         let filename = format!(
-            "{}_w{}_auto_v{}.webp",
+            "{}_w{}_auto_v{}.jpeg",
             xxhs, THUMB_BASE_WIDTH, schema_version
         );
 
