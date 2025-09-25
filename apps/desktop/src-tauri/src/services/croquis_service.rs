@@ -472,6 +472,7 @@ async fn persist_capture_bytes(
     Ok((prepared_path, registration))
 }
 
+#[cfg_attr(not(target_os = "windows"), allow(unused_variables))]
 fn platform_capture_rect(
     rect: CroquisCaptureRect,
     scale_factor: f32,

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                    UPDATE virtual_folder_mount\n                    SET recursive = ?,\n                        sync_enabled = ?,\n                        suppress_warnings = ?\n                    WHERE id = ?\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "0b7053adb3d2b3768c3795c9f2a19e230ba02480db729c6ed2ba52caf42efa75"
+}

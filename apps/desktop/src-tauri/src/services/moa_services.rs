@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::ErrorKind, path::Path, sync::RwLock};
+use std::{collections::HashMap, io::ErrorKind, sync::RwLock};
 
 use anyhow::{anyhow, Context, Result};
 use once_cell::sync::Lazy;

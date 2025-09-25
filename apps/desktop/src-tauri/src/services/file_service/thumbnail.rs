@@ -6,8 +6,7 @@ use std::{
 
 use anyhow::{anyhow, bail, Context, Result};
 use fast_image_resize::{
-    images::Image, FilterType, MulDiv, PixelType, ResizeAlg, ResizeOptions,
-    Resizer,
+    images::Image, FilterType, PixelType, ResizeAlg, ResizeOptions, Resizer,
 };
 use image::{DynamicImage, GenericImageView};
 use num_cpus;
@@ -20,7 +19,7 @@ use tracing::warn;
 
 use crate::models::file::{
     ImageFmt, ThumbBasePath, ThumbPath, ThumbRequest, ThumbResInfo,
-    ThumbResSpec, ThumbResponse, ThumbSpec, ThumbStatus, THUMB_BASE_WIDTH,
+    ThumbResSpec, ThumbResponse, ThumbStatus, THUMB_BASE_WIDTH,
 };
 
 use super::{
@@ -112,7 +111,7 @@ pub async fn ensure_base_thumbnail(
 
     let rgba = image.to_rgba8();
     let (src_w, src_h) = rgba.dimensions();
-    let mut src_image =
+    let src_image =
         Image::from_vec_u8(src_w, src_h, rgba.into_raw(), PixelType::U8x4)
             .expect("invalid source image");
     let mut dst_image = Image::new(target_w, target_h, src_image.pixel_type());
@@ -449,11 +448,7 @@ async fn process_job(app: &AppHandle, job: ThumbnailJob) -> Result<()> {
             let mut buf = Vec::new();
             match format {
                 Some(ImageFmt::Webp) => {
-                    let mut encoder =
-                        image::codecs::webp::WebPEncoder::new_lossless(
-                            &mut buf,
-                        );
-                    encoder
+                    image::codecs::webp::WebPEncoder::new_lossless(&mut buf)
                         .encode(&buffer, w, h, image::ExtendedColorType::Rgba8)
                         .context("webp encode failed")?;
                 }

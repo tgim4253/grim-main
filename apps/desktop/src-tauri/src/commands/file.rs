@@ -1,11 +1,15 @@
 use std::path::PathBuf;
 
 use crate::{
-    models::file::{FolderData, FolderPreview, ThumbRequest, ThumbResponse},
+    models::file::{
+        FolderData, FolderOptionUpdatePayload, FolderPreview, ThumbRequest,
+        ThumbResponse,
+    },
     services::file_service::{
         self, clear_base_thumb_cache, clear_derived_thumb_cache,
         collect_folder_preview, collect_thumb_cache_usage, first_mount_folder,
-        get_thumbs, ThumbCacheUsage,
+        get_thumbs, sync_virtual_folder, update_virtual_folder_options,
+        ThumbCacheUsage,
     },
 };
 #[tauri::command]
@@ -80,4 +84,28 @@ pub async fn clear_base_thumbnail_cache(
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     clear_base_thumb_cache(&app_handle).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+/// Trigger a manual sync for a mounted virtual folder.
+pub async fn sync_folder_mount(
+    app_handle: tauri::AppHandle,
+    moa_id: String,
+    virtual_node_id: String,
+) -> Result<(), String> {
+    sync_virtual_folder(&app_handle, &moa_id, &virtual_node_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+/// Update folder mount options such as path, recursion, and sync behaviour.
+pub async fn update_folder_mount_options(
+    moa_id: String,
+    virtual_node_id: String,
+    options: FolderOptionUpdatePayload,
+) -> Result<(), String> {
+    update_virtual_folder_options(&moa_id, &virtual_node_id, options)
+        .await
+        .map_err(|e| e.to_string())
 }

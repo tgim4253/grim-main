@@ -1,22 +1,67 @@
 use anyhow::{anyhow, Context, Result};
 use core::fmt;
-use image::error;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Type};
 use std::{
-    convert::{From, TryFrom},
+    convert::From,
     fs::{self, Metadata},
     path::{Path, PathBuf},
     str::FromStr,
-    string,
     time::UNIX_EPOCH,
 };
 use tauri::{path::BaseDirectory, AppHandle, Manager};
 
 use crate::{
-    bootstrap::PATH_MANAGER, config::file::IntegrityCheckResult,
-    services::file_service::xxh3_64_of, utils::file_utils::guess_mime,
+    config::file::IntegrityCheckResult, services::file_service::xxh3_64_of,
+    utils::file_utils::guess_mime,
 };
+
+/// Aggregated health state for a mounted folder.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FolderHealthState {
+    Normal,
+    Warning,
+    Error,
+}
+
+impl Default for FolderHealthState {
+    fn default() -> Self {
+        Self::Normal
+    }
+}
+
+/// Runtime state for a virtual folder mount.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FolderMountState {
+    pub mount_id: String,
+    pub real_folder_id: String,
+    pub recursive: bool,
+    pub sync_enabled: bool,
+    pub suppress_warnings: bool,
+    pub real_path: Option<String>,
+    pub error_flag: IntegrityCheckResult,
+    pub error_msg: Option<String>,
+    pub last_seen_scan_id: Option<String>,
+    pub last_seen_at: Option<String>,
+}
+
+impl Default for FolderMountState {
+    fn default() -> Self {
+        Self {
+            mount_id: String::new(),
+            real_folder_id: String::new(),
+            recursive: true,
+            sync_enabled: false,
+            suppress_warnings: false,
+            real_path: None,
+            error_flag: IntegrityCheckResult::Success,
+            error_msg: None,
+            last_seen_scan_id: None,
+            last_seen_at: None,
+        }
+    }
+}
 
 /// Folder node metadata fetched from the database.
 #[derive(Debug, FromRow, Serialize, Deserialize)]
@@ -24,6 +69,10 @@ pub struct NodeFolder {
     pub folder_id: String,
     pub node_id: String,
     pub folder_name: String,
+    #[serde(default)]
+    pub mounts: Vec<FolderMountState>,
+    #[serde(default)]
+    pub health: FolderHealthState,
 }
 
 /// File content metadata persisted in the database.
@@ -50,6 +99,19 @@ pub struct FolderData {
     pub expected_bytes: Option<u64>,
     #[serde(default, rename = "expectedFiles")]
     pub expected_files: Option<u64>,
+}
+
+/// Payload for updating folder mount configuration from the renderer.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderOptionUpdatePayload {
+    pub path: Option<String>,
+    #[serde(default)]
+    pub recursive: bool,
+    #[serde(default)]
+    pub sync_enabled: bool,
+    #[serde(default)]
+    pub suppress_warnings: bool,
 }
 
 /// Describes the folder/file-type filters chosen by the user before import.
@@ -510,7 +572,7 @@ impl ThumbPath {
     /// path/to/ab/cd/<hash>/<hash>_<width>x<height>_dpr<1|2|3>[_modeToken].<ext>
     pub async fn new(
         app: &AppHandle,
-        moa_id: &String,
+        _moa_id: &String,
         spec: ThumbSpec,
         hash: String,
         schema_version: u8,

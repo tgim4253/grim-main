@@ -1,4 +1,4 @@
-import { FileType } from './file';
+import { FileType, FolderHealthState, FolderMountState } from './file';
 
 export interface GraphResponse {
   nodes: Node[];
@@ -66,6 +66,8 @@ export interface NodeFolder {
   folder_id: string;
   node_id: string;
   folder_name: string | null;
+  mounts?: FolderMountState[];
+  health?: FolderHealthState;
 }
 
 export interface NodeFile {

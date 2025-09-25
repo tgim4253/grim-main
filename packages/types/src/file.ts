@@ -129,3 +129,27 @@ export interface CreateFolderPayload {
   expectedBytes?: number;
   expectedFiles?: number;
 }
+
+export type IntegrityCheckResult = 'success' | 'notfound' | 'mismatch';
+
+export type FolderHealthState = 'normal' | 'warning' | 'error';
+
+export interface FolderMountState {
+  mountId: string;
+  realFolderId: string;
+  recursive: boolean;
+  syncEnabled: boolean;
+  suppressWarnings: boolean;
+  realPath?: string | null;
+  errorFlag: IntegrityCheckResult;
+  errorMsg?: string | null;
+  lastSeenScanId?: string | null;
+  lastSeenAt?: string | null;
+}
+
+export interface FolderOptionUpdatePayload {
+  path?: string;
+  recursive: boolean;
+  syncEnabled: boolean;
+  suppressWarnings: boolean;
+}

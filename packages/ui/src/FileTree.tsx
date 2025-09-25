@@ -2,7 +2,16 @@ import React from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { createContainerId, createFolderId, Droppable } from '@tgim/dnd/index';
 import { NodeKind, type FileTreeData } from '@tgim/types/index';
-import { ChevronDown, ChevronRight, File, Folder, MoreVertical } from 'lucide-react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  File,
+  Folder,
+  MoreVertical,
+  RefreshCw,
+} from 'lucide-react';
 import cn from '@tgim/utils/cn';
 import Button from './Button';
 
@@ -13,7 +22,7 @@ export const TreeNode: React.FC<{
   onToggle: (id: string) => void;
   hovered?: boolean;
   selected?: boolean;
-  onClickOption?: (node: FileTreeData | undefined) => void;
+  onClickOption?: (node: FileTreeData | undefined, action?: 'menu' | 'options') => void;
   onSelect?: (e: React.MouseEvent, id: string) => void;
   openFile: (node: FileTreeData) => void;
 }> = ({
@@ -60,6 +69,19 @@ export const TreeNode: React.FC<{
   const highlight = hovered || isOver;
 
   const indentStyle = { ['--depth' as any]: depth } as React.CSSProperties;
+
+  const status = node.status ?? 'normal';
+  const hasSync = node.mounts?.some(mount => mount.syncEnabled) ?? false;
+  const showWarning = status === 'warning';
+  const showError = status === 'error';
+
+  const handleOpenOptions = React.useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation();
+      onClickOption?.(node, 'options');
+    },
+    [node, onClickOption],
+  );
 
   return (
     <li ref={setRefs} className="tree-node" data-node-id={node.id}>
@@ -125,12 +147,36 @@ export const TreeNode: React.FC<{
           {node.name}
         </span>
 
+        <div className="ml-2 flex items-center gap-1">
+          {hasSync ? <RefreshCw className="icon text-sky-400" aria-label="Sync enabled" /> : null}
+          {showWarning ? (
+            <button
+              type="button"
+              className="p-0.5 text-amber-400 hover:text-amber-300 focus:outline-none"
+              onClick={handleOpenOptions}
+              aria-label="Folder has changes"
+            >
+              <AlertTriangle className="icon" />
+            </button>
+          ) : null}
+          {showError ? (
+            <button
+              type="button"
+              className="p-0.5 text-red-500 hover:text-red-400 focus:outline-none"
+              onClick={handleOpenOptions}
+              aria-label="Folder inaccessible"
+            >
+              <AlertCircle className="icon" />
+            </button>
+          ) : null}
+        </div>
+
         <Button
           variant="icon"
           aria-label="More actions"
           onClick={e => {
             e.stopPropagation();
-            onClickOption?.(node);
+            onClickOption?.(node, 'menu');
           }}
         >
           <MoreVertical className="icon" />
@@ -150,7 +196,7 @@ export const NodeList: React.FC<{
   hoverId: string | null;
   selectedSet: Set<string>;
   onSelect: (e: React.MouseEvent, id: string) => void;
-  onClickOption?: (node: FileTreeData | undefined) => void;
+  onClickOption?: (node: FileTreeData | undefined, action?: 'menu' | 'options') => void;
   openFile: (node: FileTreeData) => void;
 }> = ({
   parentId,

@@ -7,6 +7,7 @@ import {
   ThumbRequest,
   ThumbResponse,
   ThumbnailUsage,
+  FolderOptionUpdatePayload,
 } from '@tgim/types/file';
 import {
   CroquisCaptureContext,
@@ -79,6 +80,16 @@ const fileIpc = {
   previewFolderImport: async (path: string): Promise<FolderPreview> => {
     const response = await invoke('preview_folder_import', { path });
     return response as FolderPreview;
+  },
+  syncFolder: async (moaId: string, virtualNodeId: string) => {
+    await invoke('sync_folder_mount', { moaId, virtualNodeId });
+  },
+  updateFolderOptions: async (
+    moaId: string,
+    virtualNodeId: string,
+    options: FolderOptionUpdatePayload,
+  ) => {
+    await invoke('update_folder_mount_options', { moaId, virtualNodeId, options });
   },
 };
 

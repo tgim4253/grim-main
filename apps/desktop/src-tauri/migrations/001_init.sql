@@ -199,6 +199,8 @@ CREATE TABLE IF NOT EXISTS virtual_folder_mount (
   include_glob     TEXT,
   exclude_glob     TEXT,
   created_at       TEXT DEFAULT (datetime('now')),
+  sync_enabled     INTEGER NOT NULL DEFAULT 0,
+  suppress_warnings INTEGER NOT NULL DEFAULT 0,
   UNIQUE (virtual_node_id, real_folder_id)
 );
 

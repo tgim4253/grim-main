@@ -13,10 +13,8 @@ pub use cache::{
 };
 pub use folder::{
     collect_folder_preview, create_folder, ensure_real_folder,
-    first_mount_folder, start_scan_job,
+    first_mount_folder, sync_virtual_folder, update_virtual_folder_options,
 };
-pub use hash::{sha256_of_img, xxh3_64_of};
-pub use job_queue::{
-    ThumbnailJob, ThumbnailWorkerState, THUMBNAIL_WORKER_STATE,
-};
+pub use hash::xxh3_64_of;
+pub use job_queue::THUMBNAIL_WORKER_STATE;
 pub use thumbnail::{get_thumbs, worker_loop};

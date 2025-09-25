@@ -95,7 +95,7 @@ export function useThumbnails({ moaId, maxBatchSize = DEFAULT_MAX_BATCH }: UseTh
           const response = await ipc.file.getThumbnails(moaId, { items: chunk });
           response.items.forEach(item => {
             item.specs.forEach(spec => {
-              const key = spec.thumb_key ?? spec.key;
+              const key = spec.thumb_key;
               if (!key) return;
 
               switch (spec.status) {
