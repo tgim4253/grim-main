@@ -99,16 +99,6 @@ function calculateMasonryMetrics(containerWidth: number, size: Size) {
   return { columnCount, cardWidth };
 }
 
-const createDefaultCroquisOption = (): CroquisOption => ({
-  window: { width: null, height: null },
-  auto: { isSkip: true },
-  timer: { maxTime: 1000 },
-  isCapture: false,
-  savePath: '',
-  isGray: false,
-  isShuffle: false,
-});
-
 // Debounce Hook (unchanged)
 function useDebouncedEffect(fn: () => void, deps: React.DependencyList, delay: number) {
   useEffect(() => {
@@ -870,9 +860,7 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
     : 'border-border';
 
   // While scrolling or already loaded, avoid fade transition to reduce flicker
-  const baseImgClass = isMasonry
-    ? 'w-full h-auto object-cover'
-    : 'w-full h-full object-cover';
+  const baseImgClass = isMasonry ? 'w-full h-auto object-cover' : 'w-full h-full object-cover';
   const imgClass =
     isScrolling || loaded
       ? baseImgClass
