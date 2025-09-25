@@ -1,7 +1,6 @@
 import {
   CroquisCaptureContext,
   CroquisCaptureMonitor,
-  CroquisCapturePreview,
   CroquisCaptureRect,
 } from '@tgim/types/croquis';
 import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window';
@@ -9,7 +8,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom';
 import { ipc } from '../../lib/ipc';
 import Button from '@tgim/ui/Button';
-import { convertFileSrc } from '@tauri-apps/api/core';
 import { toast } from 'react-toastify';
 
 const MIN_SELECTION_SIZE = 12;
@@ -59,8 +57,8 @@ const CroquisCaptureOverlay: React.FC = () => {
   const [phase, setPhase] = useState<Phase>('loading');
   const [mode, setMode] = useState<CaptureMode>('freeform');
   const [selection, setSelection] = useState<SelectionRect | null>(null);
-  const [preview, setPreview] = useState<CroquisCapturePreview | null>(null);
   const [busy, setBusy] = useState(false);
+  const [baseUrl, setBaseUrl] = useState<string | null>(null);
 
   const startRef = useRef<PointerPoint | null>(null);
   const isPointerDownRef = useRef(false);
@@ -217,20 +215,22 @@ const CroquisCaptureOverlay: React.FC = () => {
       await (async () => {
         setBusy(true);
         setPhase('loading');
+        const body = document.body;
+        const previousOpacity = body.style.opacity;
         try {
-          const scale = monitorInfo.scaleFactor || window.devicePixelRatio || 1;
-          const scaled: CroquisCaptureRect = {
-            x: Math.round(selection.x * scale),
-            y: Math.round(selection.y * scale),
-            width: Math.round(selection.width * scale),
-            height: Math.round(selection.height * scale),
+          body.style.opacity = '0';
+          const logical: CroquisCaptureRect = {
+            x: Math.round(selection.x),
+            y: Math.round(selection.y),
+            width: Math.round(selection.width),
+            height: Math.round(selection.height),
           };
-          const normalized = normaliseRect(scaled, monitorInfo);
+          const normalized = normaliseRect(logical, monitorInfo);
           const response = await ipc.croquis.renderCapturePreview({
             rect: normalized,
             monitor: monitorInfo,
           });
-          setPreview(response);
+          setBaseUrl(response.baseUrl);
           setSelection(null);
           setPhase('preview');
         } catch (error) {
@@ -239,6 +239,7 @@ const CroquisCaptureOverlay: React.FC = () => {
           setSelection(null);
           setPhase('selecting');
         } finally {
+          body.style.opacity = previousOpacity;
           setBusy(false);
         }
       })();
@@ -246,48 +247,9 @@ const CroquisCaptureOverlay: React.FC = () => {
     [monitorInfo, phase, selection],
   );
 
-  const handleFullScreenCapture = useCallback(() => {
-    if (!monitorInfo || phase === 'loading') return;
-    const scale = monitorInfo.scaleFactor || window.devicePixelRatio || 1;
-    const rect: CroquisCaptureRect = {
-      x: 0,
-      y: 0,
-      width: Math.round(monitorInfo.width),
-      height: Math.round(monitorInfo.height),
-    };
-    const viewRect: SelectionRect = {
-      x: 0,
-      y: 0,
-      width: monitorInfo.width / scale,
-      height: monitorInfo.height / scale,
-    };
-
-    setSelection(viewRect);
-    void (async () => {
-      setBusy(true);
-      setPhase('loading');
-      try {
-        const response = await ipc.croquis.renderCapturePreview({
-          rect: normaliseRect(rect, monitorInfo),
-          monitor: monitorInfo,
-        });
-        setPreview(response);
-        setSelection(null);
-        setPhase('preview');
-      } catch (error) {
-        console.error('[Croquis] Failed to capture full screen', error);
-        toast.error('Failed to capture full screen.');
-        setSelection(null);
-        setPhase('selecting');
-      } finally {
-        setBusy(false);
-      }
-    })();
-  }, [monitorInfo, phase]);
-
   const handleRetake = useCallback(() => {
-    setPreview(null);
     setSelection(null);
+    setBaseUrl(null);
     setPhase('selecting');
   }, []);
 
@@ -299,8 +261,9 @@ const CroquisCaptureOverlay: React.FC = () => {
   const handleConfirm = useCallback(async () => {
     setBusy(true);
     try {
-      const result = await ipc.croquis.confirmCapture(captureId);
-      toast.success(`Capture saved as ${result.fileName}`);
+      if (!context || !baseUrl) return;
+      await ipc.croquis.confirmCapture({ baseUrl, context });
+      toast.success('Capture saved');
       confirmedRef.current = true;
       await windowRef.current.close();
     } catch (error) {
@@ -309,7 +272,7 @@ const CroquisCaptureOverlay: React.FC = () => {
       setBusy(false);
       setPhase('selecting');
     }
-  }, [captureId]);
+  }, [baseUrl, context]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -327,11 +290,6 @@ const CroquisCaptureOverlay: React.FC = () => {
       window.removeEventListener('keydown', handler);
     };
   }, [handleCancel, handleConfirm, phase]);
-
-  const previewSrc = useMemo(() => {
-    if (!preview) return null;
-    return convertFileSrc(preview.previewPath);
-  }, [preview]);
 
   const renderSelectionOverlay = () => {
     if (!selection || phase !== 'selecting') return null;
@@ -356,16 +314,32 @@ const CroquisCaptureOverlay: React.FC = () => {
     if (phase !== 'preview') return null;
     return (
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-12">
-        <div className="pointer-events-auto max-h-full max-w-4xl rounded-lg bg-surface p-4 shadow-xl">
-          {previewSrc ? (
-            <img
-              src={previewSrc}
-              alt="Croquis capture preview"
-              className="max-h-[70vh] max-w-full rounded"
-            />
-          ) : (
-            <div className="p-6 text-center text-sm text-text-soft">Preparing preview…</div>
-          )}
+        <div className="pointer-events-auto max-h-full max-w-4xl rounded-lg bg-surface p-4 justify-center shadow-xl">
+          <div className="w-full flex justify-center">
+            {baseUrl ? (
+              <img
+                src={baseUrl}
+                alt="Croquis capture preview"
+                className="max-h-[70vh] max-w-full rounded border-2 border-border"
+              />
+            ) : (
+              <div className="p-6 text-center text-sm text-text-soft">Preparing preview…</div>
+            )}
+          </div>
+
+          <div className="w-full flex justify-center mt-2">
+            <div className="pointer-events-auto flex items-center gap-3">
+              <Button variant="secondary" onClick={handleRetake} disabled={busy}>
+                Retake
+              </Button>
+              <Button variant="secondary" onClick={handleCancel} disabled={busy}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={handleConfirm} disabled={busy}>
+                Confirm
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -373,21 +347,6 @@ const CroquisCaptureOverlay: React.FC = () => {
 
   const renderBottomControls = () => {
     const disabled = busy || phase === 'loading';
-    if (phase === 'preview') {
-      return (
-        <div className="pointer-events-auto flex items-center gap-3">
-          <Button variant="secondary" onClick={handleRetake} disabled={busy}>
-            Retake
-          </Button>
-          <Button variant="secondary" onClick={handleCancel} disabled={busy}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={handleConfirm} disabled={busy}>
-            Confirm
-          </Button>
-        </div>
-      );
-    }
 
     return (
       <div className="pointer-events-auto flex items-center gap-3">
@@ -406,9 +365,6 @@ const CroquisCaptureOverlay: React.FC = () => {
           disabled={disabled}
         >
           Square
-        </Button>
-        <Button variant="secondary" onClick={handleFullScreenCapture} disabled={disabled}>
-          Full screen
         </Button>
         <Button variant="secondary" onClick={handleCancel} disabled={disabled}>
           Cancel

@@ -353,6 +353,26 @@ impl NodeRepository {
         Ok(node_id)
     }
 
+    /// Create a file node without attaching it to a folder hierarchy.
+    pub async fn create_orphan_file_node<'a, E>(
+        executor: &mut E,
+        file_content_id: String,
+    ) -> Result<String>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let now = crate::utils::date::get_now_date();
+        let node_id = Self::insert_node(executor, NodeKind::File, &now).await?;
+        Self::insert_node_file_binding(
+            executor,
+            node_id.clone(),
+            file_content_id,
+            now,
+        )
+        .await?;
+        Ok(node_id)
+    }
+
     async fn insert_node_file_binding<'a, E>(
         executor: &mut E,
         node_id: String,

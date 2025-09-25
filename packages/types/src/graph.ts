@@ -83,4 +83,5 @@ export enum RelationType {
   BelongToFolder = 'belongtofolder',
   ParentFolder = 'parentfolder',
   ChildFolder = 'childfolder',
+  CroquisLink = 'croquislink',
 }

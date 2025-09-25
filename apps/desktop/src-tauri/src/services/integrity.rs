@@ -99,45 +99,29 @@ pub async fn seed_initial_data(pool: &Pool<Sqlite>) -> Result<()> {
     // Run seeding atomically
     let mut tx = pool.begin().await?;
     // Seed connection_kind_rule if empty
-    let (count_rules,): (i64,) =
-        sqlx::query_as("SELECT COUNT(*) FROM connection_kind_rule;")
-            .fetch_one(&mut *tx)
-            .await?;
+    let seed_data = vec![
+        (RelationType::ContainsFile, 3, 0, "Folder -> File"),
+        (RelationType::BelongToFolder, 3, 0, "File -> Folder"),
+        (RelationType::ParentFolder, 3, 0, "Folder(child) -> Folder(parent)"),
+        (RelationType::ChildFolder, 1, 0, "Folder(parent) -> Folder(child)"),
+        (RelationType::CroquisResLink, 1, 0, "origin -> croquis"),
+        (RelationType::CroquisRefLink, 1, 0, "croquis -> origin"),
+    ];
 
-    if count_rules == 0 {
-        // Define seed data without IDs
-        let seed_data = vec![
-            (RelationType::ContainsFile, 3, 0, "Folder -> File"),
-            (RelationType::BelongToFolder, 3, 0, "File -> Folder"),
-            (
-                RelationType::ParentFolder,
-                3,
-                0,
-                "Folder(child) -> Folder(parent)",
-            ),
-            (
-                RelationType::ChildFolder,
-                1,
-                0,
-                "Folder(parent) -> Folder(child)",
-            ),
-        ];
-
-        for (kind, default_level, editable, description) in seed_data {
-            let id = get_unique_id();
-            sqlx::query!(
-                r#"INSERT OR IGNORE INTO connection_kind_rule
-                   (id, kind, default_level, editable, description)
-                   VALUES (?1, ?2, ?3, ?4, ?5);"#,
-                id,
-                kind,
-                default_level,
-                editable,
-                description
-            )
-            .execute(&mut *tx)
-            .await?;
-        }
+    for (kind, default_level, editable, description) in seed_data {
+        let id = get_unique_id();
+        sqlx::query(
+            r#"INSERT OR IGNORE INTO connection_kind_rule
+               (id, kind, default_level, editable, description)
+               VALUES (?, ?, ?, ?, ?);"#,
+        )
+        .bind(id)
+        .bind(kind)
+        .bind(default_level)
+        .bind(editable)
+        .bind(description)
+        .execute(&mut *tx)
+        .await?;
     }
 
     // Seed one root folder node if none exists

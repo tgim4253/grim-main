@@ -22,6 +22,8 @@ pub enum RelationType {
     BelongToFolder,
     ParentFolder,
     ChildFolder,
+    CroquisResLink,
+    CroquisRefLink,
 }
 
 /// Describes how edges are treated during graph traversal.

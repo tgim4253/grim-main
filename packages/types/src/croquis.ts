@@ -94,5 +94,5 @@ export interface CroquisCapturePreviewPayload {
 }
 
 export interface CroquisCapturePreview {
-  previewPath: string;
+  baseUrl: string;
 }

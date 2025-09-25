@@ -9,6 +9,7 @@ import {
   ThumbnailUsage,
 } from '@tgim/types/file';
 import {
+  CroquisCaptureContext,
   CroquisCapturePreview,
   CroquisCapturePreviewPayload,
   CroquisOption,
@@ -114,6 +115,9 @@ const croquisIpc = {
     payload: CroquisCapturePreviewPayload,
   ): Promise<CroquisCapturePreview> => {
     return await invoke('render_croquis_capture_preview', { ...payload });
+  },
+  confirmCapture: async (payload: { baseUrl: string; context: CroquisCaptureContext }) => {
+    await invoke('confirm_croquis_capture', { ...payload });
   },
 };
 
