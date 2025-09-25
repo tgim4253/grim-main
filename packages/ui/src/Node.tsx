@@ -1,3 +1,4 @@
+// @tgim/ui/index
 // =========================
 // Types
 // =========================
@@ -48,6 +49,10 @@ const FALLBACK_PALETTE: GraphPalette = {
 
 let graphPalette: GraphPalette = FALLBACK_PALETTE;
 
+// =========================
+// CSS Tokens -> Palette
+// =========================
+
 const COLOR_TOKENS: Array<[keyof GraphPalette, string]> = [
   ['label', '--ds-graph-node-label'],
   ['circleFill', '--ds-graph-node-default-bg'],
@@ -79,7 +84,6 @@ const updateGraphPalette = () => {
     graphPalette = FALLBACK_PALETTE;
     return;
   }
-
   const styles = getComputedStyle(document.documentElement);
   const next: GraphPalette = { ...FALLBACK_PALETTE };
   COLOR_TOKENS.forEach(([key, token]) => {
@@ -89,97 +93,54 @@ const updateGraphPalette = () => {
 };
 
 const ensurePaletteObservers = () => {
-  if (typeof window === 'undefined') {
-    return;
-  }
+  if (typeof window === 'undefined') return;
 
   updateGraphPalette();
 
-  if (typeof MutationObserver === 'undefined') {
-    return;
-  }
-
-  const observer = new MutationObserver(updateGraphPalette);
-  observer.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ['class', 'data-theme'],
-  });
-
-  const attachBodyObserver = () => {
-    if (!document.body) return;
-    observer.observe(document.body, {
+  if (typeof MutationObserver !== 'undefined') {
+    const observer = new MutationObserver(updateGraphPalette);
+    observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['class', 'data-theme'],
     });
-  };
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      updateGraphPalette();
+    const attachBodyObserver = () => {
+      if (!document.body) return;
+      observer.observe(document.body, {
+        attributes: true,
+        attributeFilter: ['class', 'data-theme'],
+      });
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        updateGraphPalette();
+        attachBodyObserver();
+      });
+    } else {
       attachBodyObserver();
-    });
-  } else {
-    attachBodyObserver();
+    }
   }
 
   const media = window.matchMedia?.('(prefers-color-scheme: dark)');
   if (media) {
-    if ('addEventListener' in media) {
-      media.addEventListener('change', updateGraphPalette);
-    } else if ('addListener' in media) {
-      media.addListener(updateGraphPalette);
-    }
+    if ('addEventListener' in media) media.addEventListener('change', updateGraphPalette);
+    // @ts-ignore Safari legacy
+    else if ('addListener' in media) media.addListener(updateGraphPalette);
   }
 };
 
 ensurePaletteObservers();
 
-const getGraphPaletteInternal = () => graphPalette;
+// =========================
+// Public getters
+// =========================
 
-const colorParsingCtx =
-  typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
+export const getGraphPalette = () => graphPalette;
 
-const normalizeColor = (value: string) => {
-  if (!colorParsingCtx) return value;
-  try {
-    colorParsingCtx.fillStyle = '#000000';
-    colorParsingCtx.fillStyle = value;
-    return colorParsingCtx.fillStyle;
-  } catch (error) {
-    return value;
-  }
-};
-
-const hexToRgba = (hex: string, alpha: number) => {
-  let normalized = hex.replace('#', '');
-  if (normalized.length === 3) {
-    normalized = normalized
-      .split('')
-      .map(ch => ch + ch)
-      .join('');
-  }
-  if (normalized.length !== 6) return hex;
-
-  const r = parseInt(normalized.substring(0, 2), 16);
-  const g = parseInt(normalized.substring(2, 4), 16);
-  const b = parseInt(normalized.substring(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
-
-const withAlpha = (color: string, alpha: number) => {
-  const normalized = normalizeColor(color);
-  if (normalized.startsWith('#')) {
-    return hexToRgba(normalized, alpha);
-  }
-  const match = normalized
-    .replace(/\s+/g, '')
-    .match(/^rgba?\((\d+),(\d+),(\d+)(?:,(\d*\.?\d+))?\)$/i);
-  if (match) {
-    const [, r, g, b] = match;
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  }
-  return color;
-};
+// =========================
+// Types for rendering
+// =========================
 
 type NodeProp = {
   [key: string]: any; // extensible payload
@@ -193,7 +154,11 @@ type NodeProp = {
   icon?: 'circle' | 'tag' | 'folder' | 'image';
 };
 
-type NodeRenderer = (ctx: CanvasRenderingContext2D, node: NodeProp, globalScale: number) => void;
+export type NodeRenderer = (
+  ctx: CanvasRenderingContext2D,
+  node: NodeProp,
+  globalScale: number,
+) => void;
 
 // =========================
 // Utils
@@ -234,14 +199,14 @@ function roundRect(
 const getNodeRadius = (node: NodeProp) => node.size / 2;
 
 // =========================
-// Sprite Cache & Helpers (NEW)
+// Sprite Cache & Helpers (HiDPI + Zoom-aware)
 // =========================
 
 const _spriteCache = new Map<string, HTMLCanvasElement>(); // shapes/icons
 const _textSpriteCache = new Map<string, HTMLCanvasElement>(); // labels
 const _imgTileCache = new Map<string, HTMLCanvasElement>(); // masked image tiles
 
-const DPR = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+let DPR = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
 
 /** Quantize scale so we don't explode cache cardinality */
 function bucketScale(globalScale: number, step = 0.2) {
@@ -254,35 +219,54 @@ function getOrCreateSprite(
   w: number,
   h: number,
   draw: (ctx: CanvasRenderingContext2D, pxW: number, pxH: number) => void,
+  resScale = 1, // resolution multiplier (zoom bucket)
 ): HTMLCanvasElement {
   const hit = _spriteCache.get(key);
   if (hit) return hit;
 
   const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(w * DPR));
-  canvas.height = Math.max(1, Math.round(h * DPR));
+  // Render buffer at DPR * resScale for crisp output at zoom
+  canvas.width = Math.max(1, Math.round(w * DPR * resScale));
+  canvas.height = Math.max(1, Math.round(h * DPR * resScale));
   canvas.style.width = `${w}px`;
   canvas.style.height = `${h}px`;
 
   const ctx = canvas.getContext('2d')!;
-  ctx.scale(DPR, DPR);
+  ctx.scale(DPR * resScale, DPR * resScale);
   draw(ctx, w, h);
 
   _spriteCache.set(key, canvas);
   return canvas;
 }
 
+// auto-clear caches when DPR changes (browser zoom / screen move)
+if (typeof window !== 'undefined') {
+  let _lastDPR = DPR;
+  const checkDPR = () => {
+    const next = window.devicePixelRatio || 1;
+    if (next !== _lastDPR) {
+      _lastDPR = DPR = next;
+      _spriteCache.clear();
+      _textSpriteCache.clear();
+      _imgTileCache.clear();
+    }
+  };
+  window.addEventListener('resize', checkDPR);
+  window.addEventListener('orientationchange', checkDPR);
+}
+
 // =========================
-// Label Sprites (NEW)
+// Label Sprites (zoom-aware)
 // =========================
 
 function getLabelSprite(
   text: string,
   color: string,
-  font = '7px sans-serif',
+  font = '9px sans-serif', // slightly larger for legibility
   maxWidth: number,
+  resScale = 1,
 ): HTMLCanvasElement {
-  // Pre-measure and ellipsize once
+  // Pre-measure and ellipsize once in CSS pixels
   const tmp = document.createElement('canvas').getContext('2d')!;
   tmp.font = font;
   const ellipsis = '...';
@@ -301,23 +285,23 @@ function getLabelSprite(
     }
   }
 
-  const key = `label|${font}|${color}|${maxWidth}|${renderText}`;
+  const key = `label|${font}|${color}|${maxWidth}|${renderText}|${resScale}`;
   const hit = _textSpriteCache.get(key);
   if (hit) return hit;
 
   const padX = 2;
   const padY = 2;
   const textW = Math.ceil(tmp.measureText(renderText).width);
-  const textH = 10; // enough for 7px baseline
+  const textH = 12; // for 9px font
 
   const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round((textW + padX * 2) * DPR));
-  canvas.height = Math.max(1, Math.round((textH + padY * 2) * DPR));
+  canvas.width = Math.max(1, Math.round((textW + padX * 2) * DPR * resScale));
+  canvas.height = Math.max(1, Math.round((textH + padY * 2) * DPR * resScale));
   canvas.style.width = `${textW + padX * 2}px`;
   canvas.style.height = `${textH + padY * 2}px`;
 
   const ctx = canvas.getContext('2d')!;
-  ctx.scale(DPR, DPR);
+  ctx.scale(DPR * resScale, DPR * resScale);
   ctx.font = font;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
@@ -328,38 +312,295 @@ function getLabelSprite(
   return canvas;
 }
 
-function drawLabelCached(ctx: CanvasRenderingContext2D, node: NodeProp) {
-  const font = '7px sans-serif';
-  const palette = getGraphPaletteInternal();
+function drawLabelCached(ctx: CanvasRenderingContext2D, node: NodeProp, globalScale: number) {
+  const font = '9px sans-serif';
+  const palette = getGraphPalette();
   const color = node.fgColor ?? palette.label;
   const maxWidth = node.size * 4;
   const text = String(node.label ?? '');
+  const scaleB = bucketScale(globalScale);
 
   const padding = 8;
   const textX = node.x;
   const textY = node.y + node.size / 2 + padding;
 
-  const sprite = getLabelSprite(text, color, font, maxWidth);
-
-  const pxW = sprite.width / DPR;
-  const pxH = sprite.height / DPR;
+  const sprite = getLabelSprite(text, color, font, maxWidth, scaleB);
+  const pxW = sprite.width / (DPR * scaleB);
+  const pxH = sprite.height / (DPR * scaleB);
   ctx.drawImage(sprite, textX - pxW / 2, textY - pxH / 2, pxW, pxH);
 }
 
 // =========================
-/** External images */
+// Color helpers
+// =========================
+
+const colorParsingCtx =
+  typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
+
+const normalizeColor = (value: string) => {
+  if (!colorParsingCtx) return value;
+  try {
+    colorParsingCtx.fillStyle = '#000000';
+    colorParsingCtx.fillStyle = value;
+    return colorParsingCtx.fillStyle;
+  } catch {
+    return value;
+  }
+};
+
+const hexToRgba = (hex: string, alpha: number) => {
+  let normalized = hex.replace('#', '');
+  if (normalized.length === 3) {
+    normalized = normalized
+      .split('')
+      .map(ch => ch + ch)
+      .join('');
+  }
+  if (normalized.length !== 6) return hex;
+
+  const r = parseInt(normalized.substring(0, 2), 16);
+  const g = parseInt(normalized.substring(2, 4), 16);
+  const b = parseInt(normalized.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const withAlpha = (color: string, alpha: number) => {
+  const normalized = normalizeColor(color);
+  if (normalized.startsWith('#')) {
+    return hexToRgba(normalized, alpha);
+  }
+  const match = normalized
+    .replace(/\s+/g, '')
+    .match(/^rgba?\((\d+),(\d+),(\d+)(?:,(\d*\.?\d+))?\)$/i);
+  if (match) {
+    const [, r, g, b] = match;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  return color;
+};
+
+// =========================
+// Shape/Icon Sprites (zoom-aware)
+// =========================
+
+function getCircleSpriteNode(node: NodeProp, globalScale: number) {
+  const r = node.size / 2;
+  const w = r * 2;
+  const h = r * 2;
+
+  const scaleB = bucketScale(globalScale);
+  const palette = getGraphPalette();
+  const bg = node.color ?? node.bgColor ?? palette.circleFill;
+  const fg = node.fgColor ?? palette.circleStroke;
+  const key = `circle|${w}|${h}|${bg}|${fg}|${scaleB}`;
+
+  return getOrCreateSprite(
+    key,
+    w,
+    h,
+    g => {
+      const stroke = Math.max(1, 2 / Math.max(0.001, scaleB));
+      g.beginPath();
+      g.arc(w / 2, h / 2, r, 0, Math.PI * 2);
+      g.fillStyle = bg;
+      g.fill();
+      g.lineWidth = stroke;
+      g.strokeStyle = fg;
+      g.stroke();
+    },
+    scaleB,
+  );
+}
+
+function getTagSpriteNode(node: NodeProp, globalScale: number) {
+  const r = node.size / 2;
+  const s = r * 2.0;
+  const w = s;
+  const h = s;
+
+  const scaleB = bucketScale(globalScale);
+  const palette = getGraphPalette();
+  const fg = node.fgColor ?? palette.tagStroke;
+  const key = `tag|${w}|${h}|${fg}|${scaleB}`;
+
+  return getOrCreateSprite(
+    key,
+    w,
+    h,
+    g => {
+      const stroke = Math.max(1, (s * 0.18) / Math.max(0.001, scaleB));
+      g.translate(w / 2, h / 2);
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
+      g.strokeStyle = fg;
+      g.lineWidth = stroke;
+
+      const half = s * 0.38;
+      const xOff = s * 0.18;
+      const yOff = s * 0.16;
+
+      g.beginPath();
+      g.moveTo(-xOff, -half);
+      g.lineTo(-xOff, half);
+      g.moveTo(+xOff, -half);
+      g.lineTo(+xOff, half);
+      g.moveTo(-half - s * 0.06, -yOff);
+      g.lineTo(half + s * 0.06, -yOff);
+      g.moveTo(-half - s * 0.06, +yOff);
+      g.lineTo(half + s * 0.06, +yOff);
+      g.stroke();
+    },
+    scaleB,
+  );
+}
+
+function getFolderSpriteNode(node: NodeProp, globalScale: number) {
+  const r = node.size / 2;
+  const w = r * 2.0 * 1.4;
+  const h = r * 2.0 * 1.0;
+
+  const scaleB = bucketScale(globalScale);
+  const palette = getGraphPalette();
+  const bgBack = palette.folderBack;
+  const frontLight = palette.folderFrontLight;
+  const frontDark = palette.folderFrontDark;
+  const edge = palette.folderEdge;
+  const key = `folder|${w}|${h}|${bgBack}|${frontLight}|${frontDark}|${edge}|${scaleB}`;
+
+  return getOrCreateSprite(
+    key,
+    w,
+    h,
+    g => {
+      const tabH = h * 0.15;
+      const tabW = w * 0.4;
+      const cornerRadius = 12 * (r / 50);
+      const x = 0,
+        y = 0;
+
+      g.shadowColor = withAlpha(edge, 0.28);
+      g.shadowBlur = 10;
+      g.shadowOffsetY = 4;
+
+      g.fillStyle = bgBack;
+      g.strokeStyle = edge;
+      g.lineWidth = Math.max(1, 2.5 / Math.max(0.001, scaleB));
+
+      g.beginPath();
+      g.moveTo(x, y + cornerRadius);
+      g.arcTo(x, y, x + cornerRadius, y, cornerRadius);
+      g.lineTo(x + tabW - cornerRadius, y);
+      g.arcTo(x + tabW, y, x + tabW, y + cornerRadius, cornerRadius);
+      g.lineTo(x + tabW, y + tabH);
+      g.lineTo(x + w - cornerRadius, y + tabH);
+      g.arcTo(x + w, y + tabH, x + w, y + tabH + cornerRadius, cornerRadius);
+      g.lineTo(x + w, y + h - cornerRadius);
+      g.arcTo(x + w, y + h, x + w - cornerRadius, y + h, cornerRadius);
+      g.lineTo(x + cornerRadius, y + h);
+      g.arcTo(x, y + h, x, y + h - cornerRadius, cornerRadius);
+      g.closePath();
+      g.fill();
+      g.stroke();
+
+      g.shadowColor = 'transparent';
+      const frontY = y + tabH + 2;
+      const grad = g.createLinearGradient(x, y, x, y + h);
+      grad.addColorStop(0, frontLight);
+      grad.addColorStop(1, frontDark);
+      g.fillStyle = grad;
+      g.strokeStyle = edge;
+
+      roundRect(g, x, frontY, w, h - frontY + y, cornerRadius);
+      g.fill();
+      g.stroke();
+
+      g.beginPath();
+      g.moveTo(x + cornerRadius, frontY);
+      g.lineTo(x + w - cornerRadius, frontY);
+      g.strokeStyle = withAlpha(palette.label, 0.35);
+      g.lineWidth = Math.max(1, 2 / Math.max(0.001, scaleB));
+      g.stroke();
+    },
+    scaleB,
+  );
+}
+
+function getDocumentSpriteNode(node: NodeProp, globalScale: number) {
+  const r = node.size / 2;
+  const w = r * 2.0 * 1.1;
+  const h = r * 2.0 * 1.3;
+
+  const scaleB = bucketScale(globalScale);
+  const palette = getGraphPalette();
+  const paper = palette.documentPaper;
+  const edge = palette.documentEdge;
+  const shadow = palette.documentShadow;
+  const line = palette.documentLine;
+  const key = `document|${w}|${h}|${paper}|${edge}|${shadow}|${line}|${scaleB}`;
+
+  return getOrCreateSprite(
+    key,
+    w,
+    h,
+    g => {
+      const dogEarSize = w * 0.25;
+      const x = 0,
+        y = 0;
+
+      g.shadowColor = withAlpha(edge, 0.25);
+      g.shadowBlur = 12;
+      g.shadowOffsetY = 4;
+
+      g.fillStyle = paper;
+      g.strokeStyle = edge;
+      g.lineWidth = Math.max(1, 2 / Math.max(0.001, scaleB));
+
+      g.beginPath();
+      g.moveTo(x, y);
+      g.lineTo(x + w - dogEarSize, y);
+      g.lineTo(x + w, y + dogEarSize);
+      g.lineTo(x + w, y + h);
+      g.lineTo(x, y + h);
+      g.closePath();
+      g.fill();
+      g.stroke();
+
+      g.shadowColor = 'transparent';
+      g.fillStyle = shadow;
+      g.strokeStyle = edge;
+      g.beginPath();
+      g.moveTo(x + w - dogEarSize, y);
+      g.lineTo(x + w - dogEarSize, y + dogEarSize);
+      g.lineTo(x + w, y + dogEarSize);
+      g.closePath();
+      g.fill();
+      g.stroke();
+
+      g.strokeStyle = line;
+      g.lineWidth = Math.max(1, 1.5 / Math.max(0.001, scaleB));
+      const lineYstart = y + h * 0.3;
+      const lineYgap = h * 0.1;
+      const lineXstart = x + w * 0.15;
+      const lineXend = x + w * 0.85;
+      for (let i = 0; i < 5; i++) {
+        g.beginPath();
+        g.moveTo(lineXstart, lineYstart + i * lineYgap);
+        g.lineTo(lineXend - (i === 4 ? w * 0.2 : 0), lineYstart + i * lineYgap);
+        g.stroke();
+      }
+    },
+    scaleB,
+  );
+}
+
+// =========================
+// Masked Image Tile (zoom-aware)
 // =========================
 
 function resolveImageSrc(node: NodeProp): string | undefined {
-  if (typeof node.url === 'string' && node.url.length > 0) {
-    return node.url;
-  }
-  if (typeof node.imageUrl === 'string' && node.imageUrl.length > 0) {
-    return node.imageUrl;
-  }
-  if (typeof node.src === 'string' && node.src.length > 0) {
-    return node.src;
-  }
+  if (typeof node.url === 'string' && node.url.length > 0) return node.url;
+  if (typeof node.imageUrl === 'string' && node.imageUrl.length > 0) return node.imageUrl;
+  if (typeof node.src === 'string' && node.src.length > 0) return node.src;
   return undefined;
 }
 
@@ -376,207 +617,14 @@ function getOrCreateImage(src: string) {
   return img;
 }
 
-// =========================
-// Shape/Icon Sprites (NEW)
-// =========================
-
-function getCircleSpriteNode(node: NodeProp, globalScale: number) {
-  const r = node.size / 2;
-  const w = r * 2;
-  const h = r * 2;
-
-  const scaleB = bucketScale(globalScale);
-  const palette = getGraphPaletteInternal();
-  const bg = node.color ?? node.bgColor ?? palette.circleFill;
-  const fg = node.fgColor ?? palette.circleStroke;
-  const key = `circle|${w}|${h}|${bg}|${fg}|${scaleB}`;
-
-  return getOrCreateSprite(key, w, h, g => {
-    const stroke = Math.max(1, 2 / Math.max(0.001, scaleB));
-    g.beginPath();
-    g.arc(w / 2, h / 2, r, 0, Math.PI * 2);
-    g.fillStyle = bg;
-    g.fill();
-    g.lineWidth = stroke;
-    g.strokeStyle = fg;
-    g.stroke();
-  });
-}
-
-function getTagSpriteNode(node: NodeProp, globalScale: number) {
-  const r = node.size / 2;
-  const s = r * 2.0;
-  const w = s;
-  const h = s;
-
-  const scaleB = bucketScale(globalScale);
-  const palette = getGraphPaletteInternal();
-  const fg = node.fgColor ?? palette.tagStroke;
-  const key = `tag|${w}|${h}|${fg}|${scaleB}`;
-
-  return getOrCreateSprite(key, w, h, g => {
-    const stroke = Math.max(1, (s * 0.18) / Math.max(0.001, scaleB));
-    g.translate(w / 2, h / 2);
-    g.lineCap = 'round';
-    g.lineJoin = 'round';
-    g.strokeStyle = fg;
-    g.lineWidth = stroke;
-
-    const half = s * 0.38;
-    const xOff = s * 0.18;
-    const yOff = s * 0.16;
-
-    g.beginPath();
-    g.moveTo(-xOff, -half);
-    g.lineTo(-xOff, half);
-    g.moveTo(+xOff, -half);
-    g.lineTo(+xOff, half);
-    g.moveTo(-half - s * 0.06, -yOff);
-    g.lineTo(half + s * 0.06, -yOff);
-    g.moveTo(-half - s * 0.06, +yOff);
-    g.lineTo(half + s * 0.06, +yOff);
-    g.stroke();
-  });
-}
-
-function getFolderSpriteNode(node: NodeProp, globalScale: number) {
-  const r = node.size / 2;
-  const w = r * 2.0 * 1.4;
-  const h = r * 2.0 * 1.0;
-
-  const scaleB = bucketScale(globalScale);
-  const palette = getGraphPaletteInternal();
-  const bgBack = palette.folderBack;
-  const frontLight = palette.folderFrontLight;
-  const frontDark = palette.folderFrontDark;
-  const edge = palette.folderEdge;
-  const key = `folder|${w}|${h}|${bgBack}|${frontLight}|${frontDark}|${edge}|${scaleB}`;
-
-  return getOrCreateSprite(key, w, h, g => {
-    const tabH = h * 0.15;
-    const tabW = w * 0.4;
-    const cornerRadius = 12 * (r / 50);
-    const x = 0,
-      y = 0;
-
-    g.shadowColor = withAlpha(edge, 0.28);
-    g.shadowBlur = 10;
-    g.shadowOffsetY = 4;
-
-    g.fillStyle = bgBack;
-    g.strokeStyle = edge;
-    g.lineWidth = Math.max(1, 2.5 / Math.max(0.001, scaleB));
-
-    g.beginPath();
-    g.moveTo(x, y + cornerRadius);
-    g.arcTo(x, y, x + cornerRadius, y, cornerRadius);
-    g.lineTo(x + tabW - cornerRadius, y);
-    g.arcTo(x + tabW, y, x + tabW, y + cornerRadius, cornerRadius);
-    g.lineTo(x + tabW, y + tabH);
-    g.lineTo(x + w - cornerRadius, y + tabH);
-    g.arcTo(x + w, y + tabH, x + w, y + tabH + cornerRadius, cornerRadius);
-    g.lineTo(x + w, y + h - cornerRadius);
-    g.arcTo(x + w, y + h, x + w - cornerRadius, y + h, cornerRadius);
-    g.lineTo(x + cornerRadius, y + h);
-    g.arcTo(x, y + h, x, y + h - cornerRadius, cornerRadius);
-    g.closePath();
-    g.fill();
-    g.stroke();
-
-    g.shadowColor = 'transparent';
-    const frontY = y + tabH + 2;
-    const grad = g.createLinearGradient(x, y, x, y + h);
-    grad.addColorStop(0, frontLight);
-    grad.addColorStop(1, frontDark);
-    g.fillStyle = grad;
-    g.strokeStyle = edge;
-
-    roundRect(g, x, frontY, w, h - frontY + y, cornerRadius);
-    g.fill();
-    g.stroke();
-
-    g.beginPath();
-    g.moveTo(x + cornerRadius, frontY);
-    g.lineTo(x + w - cornerRadius, frontY);
-    g.strokeStyle = withAlpha(palette.label, 0.35);
-    g.lineWidth = Math.max(1, 2 / Math.max(0.001, scaleB));
-    g.stroke();
-  });
-}
-
-function getDocumentSpriteNode(node: NodeProp, globalScale: number) {
-  const r = node.size / 2;
-  const w = r * 2.0 * 1.1;
-  const h = r * 2.0 * 1.3;
-
-  const scaleB = bucketScale(globalScale);
-  const palette = getGraphPaletteInternal();
-  const paper = palette.documentPaper;
-  const edge = palette.documentEdge;
-  const shadow = palette.documentShadow;
-  const line = palette.documentLine;
-  const key = `document|${w}|${h}|${paper}|${edge}|${shadow}|${line}|${scaleB}`;
-
-  return getOrCreateSprite(key, w, h, g => {
-    const dogEarSize = w * 0.25;
-    const x = 0,
-      y = 0;
-
-    g.shadowColor = withAlpha(edge, 0.25);
-    g.shadowBlur = 12;
-    g.shadowOffsetY = 4;
-
-    g.fillStyle = paper;
-    g.strokeStyle = edge;
-    g.lineWidth = Math.max(1, 2 / Math.max(0.001, scaleB));
-
-    g.beginPath();
-    g.moveTo(x, y);
-    g.lineTo(x + w - dogEarSize, y);
-    g.lineTo(x + w, y + dogEarSize);
-    g.lineTo(x + w, y + h);
-    g.lineTo(x, y + h);
-    g.closePath();
-    g.fill();
-    g.stroke();
-
-    g.shadowColor = 'transparent';
-    g.fillStyle = shadow;
-    g.strokeStyle = edge;
-    g.beginPath();
-    g.moveTo(x + w - dogEarSize, y);
-    g.lineTo(x + w - dogEarSize, y + dogEarSize);
-    g.lineTo(x + w, y + dogEarSize);
-    g.closePath();
-    g.fill();
-    g.stroke();
-
-    g.strokeStyle = line;
-    g.lineWidth = Math.max(1, 1.5 / Math.max(0.001, scaleB));
-    const lineYstart = y + h * 0.3;
-    const lineYgap = h * 0.1;
-    const lineXstart = x + w * 0.15;
-    const lineXend = x + w * 0.85;
-    for (let i = 0; i < 5; i++) {
-      g.beginPath();
-      g.moveTo(lineXstart, lineYstart + i * lineYgap);
-      g.lineTo(lineXend - (i === 4 ? w * 0.2 : 0), lineYstart + i * lineYgap);
-      g.stroke();
-    }
-  });
-}
-
-// =========================
-// Masked Image Tile (NEW)
-// =========================
-
 function getMaskedImageTile(
   src: string,
   w: number,
   h: number,
   radius: number,
+  resScale = 1,
 ): HTMLCanvasElement | undefined {
-  const key = `imgtile|${src}|${w}|${h}|${radius}`;
+  const key = `imgtile|${src}|${w}|${h}|${radius}|${resScale}`;
   const hit = _imgTileCache.get(key);
   if (hit) return hit;
 
@@ -584,13 +632,16 @@ function getMaskedImageTile(
   if (!(img.complete && img.naturalWidth > 0)) return undefined;
 
   const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(w * DPR));
-  canvas.height = Math.max(1, Math.round(h * DPR));
+  canvas.width = Math.max(1, Math.round(w * DPR * resScale));
+  canvas.height = Math.max(1, Math.round(h * DPR * resScale));
   canvas.style.width = `${w}px`;
   canvas.style.height = `${h}px`;
 
   const ctx = canvas.getContext('2d')!;
-  ctx.scale(DPR, DPR);
+  ctx.scale(DPR * resScale, DPR * resScale);
+  ctx.imageSmoothingEnabled = true;
+  // @ts-ignore TS doesn't include literal union
+  ctx.imageSmoothingQuality = 'high';
 
   roundRect(ctx, 0, 0, w, h, radius);
   ctx.clip();
@@ -602,11 +653,8 @@ function getMaskedImageTile(
   const arBox = w / h;
   let dw = w,
     dh = h;
-  if (arImg > arBox) {
-    dw = dh * arImg;
-  } else {
-    dh = dw / arImg;
-  }
+  if (arImg > arBox) dw = dh * arImg;
+  else dh = dw / arImg;
   const dx = (w - dw) / 2;
   const dy = (h - dh) / 2;
   ctx.drawImage(img, dx, dy, dw, dh);
@@ -616,7 +664,7 @@ function getMaskedImageTile(
 }
 
 // =========================
-// Cached Renderers (REPLACEMENTS)
+// Cached Renderers
 // =========================
 
 const circleRenderer: NodeRenderer = (ctx, node, globalScale) => {
@@ -625,7 +673,7 @@ const circleRenderer: NodeRenderer = (ctx, node, globalScale) => {
   const w = r * 2,
     h = r * 2;
   ctx.drawImage(sprite, node.x - w / 2, node.y - h / 2, w, h);
-  drawLabelCached(ctx, node);
+  drawLabelCached(ctx, node, globalScale);
 };
 
 const tagRenderer: NodeRenderer = (ctx, node, globalScale) => {
@@ -634,7 +682,7 @@ const tagRenderer: NodeRenderer = (ctx, node, globalScale) => {
   const w = r * 2,
     h = r * 2;
   ctx.drawImage(sprite, node.x - w / 2, node.y - h / 2, w, h);
-  drawLabelCached(ctx, node);
+  drawLabelCached(ctx, node, globalScale);
 };
 
 const folderRenderer: NodeRenderer = (ctx, node, globalScale) => {
@@ -643,7 +691,7 @@ const folderRenderer: NodeRenderer = (ctx, node, globalScale) => {
   const h = r * 2.0 * 1.0;
   const sprite = getFolderSpriteNode(node, globalScale);
   ctx.drawImage(sprite, node.x - w / 2, node.y - h / 2, w, h);
-  drawLabelCached(ctx, node);
+  drawLabelCached(ctx, node, globalScale);
 };
 
 const documentRenderer: NodeRenderer = (ctx, node, globalScale) => {
@@ -652,7 +700,7 @@ const documentRenderer: NodeRenderer = (ctx, node, globalScale) => {
   const h = r * 2.0 * 1.3;
   const sprite = getDocumentSpriteNode(node, globalScale);
   ctx.drawImage(sprite, node.x - w / 2, node.y - h / 2, w, h);
-  drawLabelCached(ctx, node);
+  drawLabelCached(ctx, node, globalScale);
 };
 
 const imageRenderer: NodeRenderer = (ctx, node, globalScale) => {
@@ -660,7 +708,7 @@ const imageRenderer: NodeRenderer = (ctx, node, globalScale) => {
   const baseSize = r * 2.0;
   const side = baseSize * 1.2;
 
-  const palette = getGraphPaletteInternal();
+  const palette = getGraphPalette();
   const bg = node.bgColor ?? withAlpha(palette.imageBg, 0.9);
   const fg = node.fgColor ?? palette.imageBorder;
   const scaleB = bucketScale(globalScale);
@@ -670,63 +718,81 @@ const imageRenderer: NodeRenderer = (ctx, node, globalScale) => {
   const clipRadius = Math.max(2, radius - padding * 0.5);
 
   const backKey = `imgback|${side}|${radius}|${bg}|${fg}|${scaleB}`;
-  const backplate = getOrCreateSprite(backKey, side, side, g => {
-    roundRect(g, 0, 0, side, side, radius);
-    g.fillStyle = bg;
-    g.fill();
-    g.strokeStyle = fg;
-    g.stroke();
-  });
+  const backplate = getOrCreateSprite(
+    backKey,
+    side,
+    side,
+    g => {
+      roundRect(g, 0, 0, side, side, radius);
+      g.fillStyle = bg;
+      g.fill();
+      g.strokeStyle = fg;
+      g.stroke();
+    },
+    scaleB,
+  );
 
   ctx.drawImage(backplate, node.x - side / 2, node.y - side / 2, side, side);
 
   const src = resolveImageSrc(node);
   let tile: HTMLCanvasElement | undefined;
-  if (src) tile = getMaskedImageTile(src, contentSize, contentSize, clipRadius);
+  if (src) tile = getMaskedImageTile(src, contentSize, contentSize, clipRadius, scaleB);
 
-  if (tile) {
-    ctx.drawImage(
-      tile,
-      node.x - contentSize / 2,
-      node.y - contentSize / 2,
-      contentSize,
-      contentSize,
-    );
-  } else {
-    const phKey = `imgph|${side}|${radius}|${padding}|${clipRadius}|${scaleB}`;
-    const placeholder = getOrCreateSprite(phKey, side, side, g => {
-      roundRect(g, padding, padding, contentSize, contentSize, clipRadius);
-      g.strokeStyle = palette.placeholderStroke;
-      g.lineWidth = Math.max(1, 1.5 / Math.max(0.001, scaleB));
-      g.stroke();
+  withCtx(ctx, () => {
+    ctx.imageSmoothingEnabled = true;
+    // @ts-ignore
+    ctx.imageSmoothingQuality = 'high';
 
-      g.beginPath();
-      g.arc(
-        padding + contentSize * 0.28,
-        padding + contentSize * 0.32,
-        contentSize * 0.12,
-        0,
-        Math.PI * 2,
+    if (tile) {
+      ctx.drawImage(
+        tile,
+        node.x - contentSize / 2,
+        node.y - contentSize / 2,
+        contentSize,
+        contentSize,
       );
-      g.fillStyle = palette.placeholderAccent;
-      g.fill();
+    } else {
+      const phKey = `imgph|${side}|${radius}|${padding}|${clipRadius}|${scaleB}`;
+      const placeholder = getOrCreateSprite(
+        phKey,
+        side,
+        side,
+        g => {
+          roundRect(g, padding, padding, contentSize, contentSize, clipRadius);
+          g.strokeStyle = palette.placeholderStroke;
+          g.lineWidth = Math.max(1, 1.5 / Math.max(0.001, scaleB));
+          g.stroke();
 
-      g.beginPath();
-      const baseY = padding + contentSize * 0.78;
-      g.moveTo(padding + contentSize * 0.08, baseY);
-      g.lineTo(padding + contentSize * 0.35, padding + contentSize * 0.48);
-      g.lineTo(padding + contentSize * 0.55, baseY);
-      g.lineTo(padding + contentSize * 0.48, baseY);
-      g.lineTo(padding + contentSize * 0.72, padding + contentSize * 0.58);
-      g.lineTo(padding + contentSize * 0.92, baseY);
-      g.closePath();
-      g.fillStyle = palette.placeholderFill;
-      g.fill();
-    });
-    ctx.drawImage(placeholder, node.x - side / 2, node.y - side / 2, side, side);
-  }
+          g.beginPath();
+          g.arc(
+            padding + contentSize * 0.28,
+            padding + contentSize * 0.32,
+            contentSize * 0.12,
+            0,
+            Math.PI * 2,
+          );
+          g.fillStyle = palette.placeholderAccent;
+          g.fill();
 
-  // drawLabelCached(ctx, node);
+          g.beginPath();
+          const baseY = padding + contentSize * 0.78;
+          g.moveTo(padding + contentSize * 0.08, baseY);
+          g.lineTo(padding + contentSize * 0.35, padding + contentSize * 0.48);
+          g.lineTo(padding + contentSize * 0.55, baseY);
+          g.lineTo(padding + contentSize * 0.48, baseY);
+          g.lineTo(padding + contentSize * 0.72, padding + contentSize * 0.58);
+          g.lineTo(padding + contentSize * 0.92, baseY);
+          g.closePath();
+          g.fillStyle = palette.placeholderFill;
+          g.fill();
+        },
+        scaleB,
+      );
+      ctx.drawImage(placeholder, node.x - side / 2, node.y - side / 2, side, side);
+    }
+  });
+
+  // drawLabelCached(ctx, node, globalScale); // enable if you want labels under images
 };
 
 // =========================
@@ -734,8 +800,6 @@ const imageRenderer: NodeRenderer = (ctx, node, globalScale) => {
 // =========================
 
 type NodeRendererType = { [key in GraphNodeType]: NodeRenderer };
-
-export const getGraphPalette = () => graphPalette;
 
 export default (key: GraphNodeType): NodeRenderer => {
   const map: Partial<NodeRendererType> = {
@@ -749,7 +813,7 @@ export default (key: GraphNodeType): NodeRenderer => {
 };
 
 // =========================
-// Maintenance helpers (optional)
+// Maintenance helpers
 // =========================
 
 export function clearNodeSpriteCaches() {
