@@ -136,18 +136,19 @@ pub async fn ensure_base_thumbnail(
     let encoded = task::spawn_blocking({
         let buffer = dst_image.into_vec();
         move || -> Result<Vec<u8>> {
-            let mut buf = Vec::new();
-            let mut encoder =
-                image::codecs::webp::WebPEncoder::new_lossless(&mut buf);
-            encoder
-                .encode(
-                    &buffer,
-                    target_w,
-                    target_h,
-                    image::ExtendedColorType::Rgba8,
-                )
-                .context("webp encode failed")?;
-            Ok(buf)
+            let mut rgb = Vec::with_capacity((w as usize) * (h as usize) * 3);
+            for px in buffer.chunks_exact(4) {
+                rgb.extend_from_slice(&[px[0], px[1], px[2]]);
+            }
+
+            let mut out = Vec::new();
+            // JPEG with quality ~75 is a good thumbnail default
+            let mut enc = image::codecs::jpeg::JpegEncoder::new_with_quality(
+                &mut out, 75,
+            );
+            enc.encode(&rgb, w, h, image::ExtendedColorType::Rgb8)
+                .context("jpeg encode failed")?;
+            Ok(out)
         }
     })
     .await??;
@@ -437,16 +438,7 @@ async fn process_job(app: &AppHandle, job: ThumbnailJob) -> Result<()> {
         move || -> Result<Vec<u8>> {
             let mut buf = Vec::new();
             match format {
-                Some(ImageFmt::Jpeg) => {
-                    let mut encoder =
-                        image::codecs::jpeg::JpegEncoder::new_with_quality(
-                            &mut buf, 75,
-                        );
-                    encoder
-                        .encode(&buffer, w, h, image::ExtendedColorType::Rgba8)
-                        .context("jpeg encode failed")?;
-                }
-                _ => {
+                Some(ImageFmt::Webp) => {
                     let mut encoder =
                         image::codecs::webp::WebPEncoder::new_lossless(
                             &mut buf,
@@ -454,6 +446,21 @@ async fn process_job(app: &AppHandle, job: ThumbnailJob) -> Result<()> {
                     encoder
                         .encode(&buffer, w, h, image::ExtendedColorType::Rgba8)
                         .context("webp encode failed")?;
+                }
+                _ => {
+                    let mut rgb =
+                        Vec::with_capacity((w as usize) * (h as usize) * 3);
+                    for px in buffer.chunks_exact(4) {
+                        rgb.extend_from_slice(&[px[0], px[1], px[2]]);
+                    }
+
+                    // JPEG with quality ~75 is a good thumbnail default
+                    let mut enc =
+                        image::codecs::jpeg::JpegEncoder::new_with_quality(
+                            &mut buf, 75,
+                        );
+                    enc.encode(&rgb, w, h, image::ExtendedColorType::Rgb8)
+                        .context("jpeg encode failed")?;
                 }
             }
             Ok(buf)
