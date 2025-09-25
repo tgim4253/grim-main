@@ -59,6 +59,7 @@ const CroquisCaptureOverlay: React.FC = () => {
   const [selection, setSelection] = useState<SelectionRect | null>(null);
   const [busy, setBusy] = useState(false);
   const [baseUrl, setBaseUrl] = useState<string | null>(null);
+  const [windowOffset, setWindowOffset] = useState<PointerPoint>({ x: 0, y: 0 });
 
   const startRef = useRef<PointerPoint | null>(null);
   const isPointerDownRef = useRef(false);
@@ -134,6 +135,33 @@ const CroquisCaptureOverlay: React.FC = () => {
   }, [context, monitorInfo]);
 
   useEffect(() => {
+    if (!monitorInfo) return;
+    let cancelled = false;
+
+    const resolveWindowOffset = async () => {
+      try {
+        const windowPosition = await windowRef.current.innerPosition();
+        if (cancelled) return;
+        setWindowOffset({
+          x: windowPosition.x - monitorInfo.x,
+          y: windowPosition.y - monitorInfo.y,
+        });
+      } catch (error) {
+        console.error('[Croquis] Failed to resolve window offset', error);
+        if (!cancelled) {
+          setWindowOffset({ x: 0, y: 0 });
+        }
+      }
+    };
+
+    void resolveWindowOffset();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [monitorInfo]);
+
+  useEffect(() => {
     const body = document.body;
     if (phase === 'selecting') {
       body.style.cursor = 'crosshair';
@@ -203,6 +231,7 @@ const CroquisCaptureOverlay: React.FC = () => {
     async (event: React.PointerEvent<HTMLDivElement>) => {
       if (!isPointerDownRef.current || phase !== 'selecting') return;
       event.preventDefault();
+
       isPointerDownRef.current = false;
       if (!selection || !monitorInfo) {
         setSelection(null);
@@ -219,9 +248,24 @@ const CroquisCaptureOverlay: React.FC = () => {
         const previousOpacity = body.style.opacity;
         try {
           body.style.opacity = '0';
+          let offsetX = windowOffset.x;
+          let offsetY = windowOffset.y;
+          try {
+            const windowPosition = await windowRef.current.innerPosition();
+            offsetX = windowPosition.x - monitorInfo.x;
+            offsetY = windowPosition.y - monitorInfo.y;
+            setWindowOffset({ x: offsetX, y: offsetY });
+          } catch (error) {
+            console.error('[Croquis] Failed to refresh window offset', error);
+          }
+
+          const fallbackScale = window.devicePixelRatio ?? 1;
+          const scale = monitorInfo.scaleFactor > 0 ? monitorInfo.scaleFactor : fallbackScale;
+          const offsetLogicalX = offsetX / scale;
+          const offsetLogicalY = offsetY / scale;
           const logical: CroquisCaptureRect = {
-            x: Math.round(selection.x),
-            y: Math.round(selection.y),
+            x: Math.round(selection.x + offsetLogicalX),
+            y: Math.round(selection.y + offsetLogicalY),
             width: Math.round(selection.width),
             height: Math.round(selection.height),
           };
@@ -244,7 +288,7 @@ const CroquisCaptureOverlay: React.FC = () => {
         }
       })();
     },
-    [monitorInfo, phase, selection],
+    [monitorInfo, phase, selection, windowOffset],
   );
 
   const handleRetake = useCallback(() => {
