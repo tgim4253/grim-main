@@ -97,7 +97,7 @@ pub fn launch_croquis_capture(
     let mut builder =
         tauri::WebviewWindowBuilder::new(app, window_label.clone(), url)
             .title("")
-            .resizable(true)
+            .resizable(false)
             .maximizable(false)
             .always_on_top(true)
             .background_color(Color(0, 0, 0, 0))
