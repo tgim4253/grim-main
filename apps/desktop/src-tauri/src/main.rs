@@ -49,6 +49,7 @@ fn main() {
             commands::croquis::start_croquis_session,
             commands::croquis::load_croquis_session,
             commands::croquis::load_croquis_option,
+            commands::croquis::open_croquis_capture_overlay,
         ])
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_decorum::init())

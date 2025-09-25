@@ -9,8 +9,9 @@ use crate::{
     app_launcher,
     bootstrap::PATH_MANAGER,
     models::croquis::{
-        CroquisOption, CroquisPreferences, CroquisPreset, CroquisSession,
-        CroquisSessionImage, CroquisStartPayload, CroquisStartResponse,
+        CaptureOverlayPayload, CroquisOption, CroquisPreferences,
+        CroquisPreset, CroquisSession, CroquisSessionImage,
+        CroquisStartPayload, CroquisStartResponse,
     },
     services::file_service::{
         folder::fetch_one_file_path,
@@ -119,7 +120,7 @@ pub async fn start_session(
     };
 
     let window_label =
-        app_launcher::croquis::launch_croquis(app_handle, &session)
+        app_launcher::croquis::launch_croquis(app_handle, &moa_id, &session)
             .map_err(|err| anyhow!(err))?;
 
     {
@@ -232,6 +233,29 @@ async fn persist_preferences(
             file_path.display()
         )
     })?;
+
+    Ok(())
+}
+
+pub async fn open_croquis_capture_overlay(
+    app_handle: &tauri::AppHandle,
+    payload: CaptureOverlayPayload,
+) -> Result<()> {
+    let CaptureOverlayPayload { moa_id, hash, session_id } = payload;
+
+    let save_path = load_session(&session_id)
+        .await
+        .ok_or_else(|| anyhow!("Croquis session not found: {session_id}"))?;
+    let save_path = save_path.option.save_path.clone();
+
+    app_launcher::croquis::launch_croquis_capture(
+        app_handle,
+        &save_path,
+        &hash,
+        &moa_id,
+        &session_id,
+    )
+    .map_err(|err| anyhow!(err))?;
 
     Ok(())
 }

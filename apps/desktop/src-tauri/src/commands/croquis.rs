@@ -1,7 +1,8 @@
 use crate::{
+    app_launcher,
     models::croquis::{
-        CroquisPreferences, CroquisSession, CroquisStartPayload,
-        CroquisStartResponse,
+        CaptureOverlayPayload, CroquisPreferences, CroquisSession,
+        CroquisStartPayload, CroquisStartResponse,
     },
     services::croquis_service,
 };
@@ -33,4 +34,16 @@ pub async fn load_croquis_option(
     croquis_service::load_preferences(&moa_id)
         .await
         .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn open_croquis_capture_overlay(
+    app_handle: tauri::AppHandle,
+    payload: CaptureOverlayPayload,
+) -> Result<(), String> {
+    croquis_service::open_croquis_capture_overlay(&app_handle, payload)
+        .await
+        .map_err(|err| err.to_string())?;
+
+    Ok(())
 }

@@ -109,3 +109,11 @@ pub struct CroquisStartResponse {
     pub session_id: String,
     pub window_label: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CaptureOverlayPayload {
+    pub moa_id: String,
+    pub hash: String,
+    pub session_id: String,
+}

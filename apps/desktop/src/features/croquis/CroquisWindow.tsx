@@ -8,6 +8,7 @@ import { Pause, Play, SkipBack, SkipForward, Camera } from 'lucide-react';
 import { ipc } from '../../lib/ipc';
 import { platform } from '@tauri-apps/plugin-os';
 import TitleBar from './layout/TitleBar';
+import { useMoa } from '@tgim/hooks/useMoa';
 
 const shuffleImages = (images: CroquisSessionImage[]): CroquisSessionImage[] => {
   const next = [...images];
@@ -89,21 +90,6 @@ const CroquisWindow: React.FC = () => {
   useEffect(() => {
     setCurrentIndex(prev => (imageList.length ? Math.min(prev, imageList.length - 1) : 0));
   }, [imageList]);
-
-  // Re-apply size when image loads or index changes
-  // useEffect(() => {
-  //   const el = imgRef.current;
-  //   if (!el) return;
-
-  //   const handle = () => void applyWindowSizeToImage();
-  //   if (el.complete) handle();
-  //   el.addEventListener('load', handle);
-  //   el.addEventListener('error', handle);
-  //   return () => {
-  //     el.removeEventListener('load', handle);
-  //     el.removeEventListener('error', handle);
-  //   };
-  // }, [applyWindowSizeToImage, currentIndex]);
 
   const [isInitHeight, setIsInitHeight] = useState(false);
 
@@ -234,7 +220,7 @@ const CroquisWindow: React.FC = () => {
     };
   }, []);
 
-  const currentImage = imageList[currentIndex] ?? null;
+  const currentImage = useMemo(() => imageList[currentIndex] ?? null, [currentIndex, imageList]);
   const currentImageSrc = useMemo(
     () => (currentImage ? convertFileSrc(currentImage.basePath) : null),
     [currentImage],
@@ -253,9 +239,31 @@ const CroquisWindow: React.FC = () => {
     setCurrentIndex(prev => Math.min(imageList.length - 1, prev + 1));
   }, [hasNext, imageList.length]);
 
+  const { moaId } = useMoa(location);
+
   const handleCapture = useCallback(() => {
-    window.alert('Capture requested. (Not implemented yet)');
-  }, []);
+    let sessionId = session?.sessionId;
+    let hash = currentImage?.hash;
+
+    console.log('[Croquis] Opening capture overlay for', {
+      sessionId,
+      moaId,
+      hash,
+    });
+
+    if (!(moaId && sessionId && hash)) return;
+
+    console.log('[Croquis] Opening capture overlay for', {
+      sessionId,
+      moaId,
+      hash,
+    });
+    void ipc.croquis.openCaptureOverlay({
+      sessionId,
+      moaId,
+      hash,
+    });
+  }, [moaId, currentImage, session]);
 
   const elapsedSeconds =
     maxTimeSeconds > 0 ? Math.min(maxTimeSeconds, elapsedMs / 1000) : elapsedMs / 1000;
