@@ -8,7 +8,7 @@ use crate::utils::path_utils::normalize_path;
 use crate::utils::platform::get_current_platfrom;
 use anyhow::Result;
 use sqlx::{Sqlite, Transaction};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// Re-export platform-specific helpers behind a single interface.
 #[cfg(target_os = "macos")]

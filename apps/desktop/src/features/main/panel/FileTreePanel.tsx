@@ -74,6 +74,7 @@ export const FileTree = () => {
   const [activeModal, setActiveModal] = useState<'new-folder' | 'options' | null>(null);
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [optionNode, setOptionNode] = useState<FileTreeData | undefined>(undefined);
 
   // Select only what we need from the store (shallow compare to reduce re-renders)
   const {
@@ -97,6 +98,7 @@ export const FileTree = () => {
   );
 
   const { openFile } = usePanelsStore(useShallow(s => ({ openFile: s.addPanelWithoutContainer })));
+  const { moaId } = useMoa(location);
 
   const refreshTree = useCallback(async () => {
     if (!moaId) return;
@@ -104,10 +106,14 @@ export const FileTree = () => {
       const graph = (await ipc.graph.getGraphOne(moaId, 'root')) as GraphResponse;
       const next = convertToTreeData(graph);
       setTreeData(next);
+      if (optionNode) {
+        const updated = findNode(next, optionNode.id);
+        setOptionNode(updated ?? undefined);
+      }
     } catch (err) {
       console.error('Failed to refresh file tree', err);
     }
-  }, [convertToTreeData, moaId, setTreeData]);
+  }, [convertToTreeData, moaId, optionNode, setTreeData]);
 
   const handleManualSync = useCallback(async () => {
     if (!moaId || !optionNode) return;
@@ -179,8 +185,6 @@ export const FileTree = () => {
 
   const activeNode = activeId ? findNode(treeData, activeId) : null;
 
-  const [optionNode, setOptionNode] = useState<FileTreeData | undefined>(undefined);
-
   const handleOptionClick = useCallback(
     (node: FileTreeData | undefined, action: 'menu' | 'options' = 'menu') => {
       if (!node) return;
@@ -194,8 +198,6 @@ export const FileTree = () => {
     },
     [],
   );
-
-  const { moaId } = useMoa(location);
 
   const [importContext, setImportContext] = useState<ImportContext | null>(null);
   const [importProgress, setImportProgress] = useState<FolderImportProgressEvent | null>(null);
@@ -431,7 +433,13 @@ export const FileTree = () => {
         </DragOverlay>
       </DndContext>
       {showActionMenu && optionNode ? (
-        <Modal onClose={() => setShowActionMenu(false)} className="bg-modal-bg max-w-xs">
+        <Modal
+          onClose={() => {
+            setShowActionMenu(false);
+            setOptionNode(undefined);
+          }}
+          className="bg-modal-bg max-w-xs"
+        >
           <div className="flex flex-col gap-3 text-modal-text">
             <h3 className="text-lg font-semibold">폴더 작업</h3>
             <Button
@@ -443,11 +451,7 @@ export const FileTree = () => {
             >
               새 폴더 만들기
             </Button>
-            <Button
-              variant="default"
-              onClick={handleManualSync}
-              disabled={isSyncing}
-            >
+            <Button variant="default" onClick={handleManualSync} disabled={isSyncing}>
               폴더/파일 업서트
             </Button>
             <Button
@@ -466,7 +470,10 @@ export const FileTree = () => {
       {activeModal === 'new-folder' && (
         <Modal onClose={() => setActiveModal(null)} className="bg-modal-bg">
           <NewFolderModal
-            onClose={() => setActiveModal(null)}
+            onClose={() => {
+              setActiveModal(null);
+              setOptionNode(undefined);
+            }}
             onSubmit={async d => {
               if (!moaId) return;
               const hasPath = Boolean(d.path);
@@ -518,12 +525,19 @@ export const FileTree = () => {
         <FolderOptionsModal
           node={optionNode}
           moaId={moaId ?? ''}
-          onClose={() => setActiveModal(null)}
+          onClose={() => {
+            setActiveModal(null);
+            setOptionNode(undefined);
+          }}
           onUpdated={refreshTree}
         />
       ) : null}
       {isSyncing ? (
-        <Modal onClose={() => setIsSyncing(false)} dismissible={false} className="bg-modal-bg max-w-xs text-center text-modal-text">
+        <Modal
+          onClose={() => setIsSyncing(false)}
+          dismissible={false}
+          className="bg-modal-bg max-w-xs text-center text-modal-text"
+        >
           <div className="space-y-2 py-6">
             <p className="text-sm">동기화 중입니다...</p>
           </div>

@@ -1,21 +1,19 @@
 use anyhow::{anyhow, Context, Result};
 use core::fmt;
-use image::error;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Type};
 use std::{
-    convert::{From, TryFrom},
+    convert::From,
     fs::{self, Metadata},
     path::{Path, PathBuf},
     str::FromStr,
-    string,
     time::UNIX_EPOCH,
 };
 use tauri::{path::BaseDirectory, AppHandle, Manager};
 
 use crate::{
-    bootstrap::PATH_MANAGER, config::file::IntegrityCheckResult,
-    services::file_service::xxh3_64_of, utils::file_utils::guess_mime,
+    config::file::IntegrityCheckResult, services::file_service::xxh3_64_of,
+    utils::file_utils::guess_mime,
 };
 
 /// Aggregated health state for a mounted folder.
@@ -574,7 +572,7 @@ impl ThumbPath {
     /// path/to/ab/cd/<hash>/<hash>_<width>x<height>_dpr<1|2|3>[_modeToken].<ext>
     pub async fn new(
         app: &AppHandle,
-        moa_id: &String,
+        _moa_id: &String,
         spec: ThumbSpec,
         hash: String,
         schema_version: u8,

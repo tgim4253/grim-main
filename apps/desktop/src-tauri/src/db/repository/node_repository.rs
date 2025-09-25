@@ -1,9 +1,11 @@
+use super::file_repository::{FileRepository, MountWithFolder};
 use anyhow::Result;
 use sqlx::{Executor, Sqlite};
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     str::FromStr,
 };
+use tracing::warn;
 
 use crate::{
     config::file::IntegrityCheckResult,
@@ -11,7 +13,8 @@ use crate::{
     models::{
         connection::RelationType,
         file::{
-            FileContent, FileType, FolderHealthState, FolderMountState, NodeFolder,
+            FileContent, FileType, FolderHealthState, FolderMountState,
+            NodeFolder,
         },
         node::{Node, NodeData, NodeKind},
     },
@@ -22,6 +25,67 @@ use crate::{
 pub struct NodeRepository;
 
 impl NodeRepository {
+    fn mount_health_from_flag(
+        flag: IntegrityCheckResult,
+        suppress_warnings: bool,
+    ) -> FolderHealthState {
+        match flag {
+            IntegrityCheckResult::NotFound => FolderHealthState::Error,
+            IntegrityCheckResult::Mismatch => {
+                if suppress_warnings {
+                    FolderHealthState::Normal
+                } else {
+                    FolderHealthState::Warning
+                }
+            }
+            IntegrityCheckResult::Success => FolderHealthState::Normal,
+        }
+    }
+
+    fn merge_health(
+        current: FolderHealthState,
+        next: FolderHealthState,
+    ) -> FolderHealthState {
+        match (current, next) {
+            (FolderHealthState::Error, _) | (_, FolderHealthState::Error) => {
+                FolderHealthState::Error
+            }
+            (FolderHealthState::Warning, _)
+            | (_, FolderHealthState::Warning) => FolderHealthState::Warning,
+            _ => FolderHealthState::Normal,
+        }
+    }
+
+    fn convert_mounts(
+        mounts: Vec<MountWithFolder>,
+    ) -> (Vec<FolderMountState>, FolderHealthState) {
+        let mut out = Vec::with_capacity(mounts.len());
+        let mut health = FolderHealthState::Normal;
+
+        for mount in mounts {
+            let mount_health = Self::mount_health_from_flag(
+                mount.error_flag,
+                mount.suppress_warnings,
+            );
+            health = Self::merge_health(health, mount_health);
+
+            out.push(FolderMountState {
+                mount_id: mount.mount_id,
+                real_folder_id: mount.real_folder_id,
+                recursive: mount.recursive,
+                sync_enabled: mount.sync_enabled,
+                suppress_warnings: mount.suppress_warnings,
+                real_path: mount.abs_path,
+                error_flag: mount.error_flag,
+                error_msg: mount.error_msg,
+                last_seen_scan_id: mount.last_seen_scan_id,
+                last_seen_at: mount.last_seen_at,
+            });
+        }
+
+        (out, health)
+    }
+
     /// Fetch the node identifier associated with a given file-content id.
     pub async fn fetch_node_id_by_fc_id<'a, E>(
         executor: &mut E,
@@ -144,10 +208,16 @@ impl NodeRepository {
         .fetch_one(&mut *executor)
         .await?;
 
+        let mounts_info =
+            FileRepository::fetch_mount_rows(executor, &node_id).await?;
+        let (mounts, health) = Self::convert_mounts(mounts_info);
+
         Ok(NodeData::Folder(NodeFolder {
             folder_id: row.folder_id,
-            node_id: node_id,
+            node_id,
             folder_name: row.folder_name,
+            mounts,
+            health,
         }))
     }
 
@@ -203,8 +273,8 @@ impl NodeRepository {
             };
             out.push(Node {
                 id: node.id.clone(),
-                kind: kind,
-                data: data,
+                kind,
+                data,
                 created_at: node.created_at.clone(),
                 updated_at: node.updated_at.clone(),
             });
@@ -270,6 +340,8 @@ impl NodeRepository {
 
         let mut nodes_by_id: HashMap<String, Node> = HashMap::new();
         let mut ordered_ids: Vec<String> = Vec::new();
+        let mut mounts_by_node: HashMap<String, Vec<MountWithFolder>> =
+            HashMap::new();
 
         for row in rows {
             let node_kind = NodeKind::from_str(&row.kind)?;
@@ -294,64 +366,52 @@ impl NodeRepository {
                 }
             };
 
-            let Some(NodeData::Folder(folder)) = entry.data.as_mut() else {
+            if let Some(mount_id) = row.mount_id.clone() {
+                let error_flag = match row.error_flag.as_deref() {
+                    Some("notfound") => IntegrityCheckResult::NotFound,
+                    Some("mismatch") => IntegrityCheckResult::Mismatch,
+                    Some("success") => IntegrityCheckResult::Success,
+                    _ => IntegrityCheckResult::Success,
+                };
+
+                let recursive = row.recursive.unwrap_or(1) != 0;
+                let sync_enabled = row.sync_enabled.unwrap_or(0) != 0;
+                let suppress_warnings = row.suppress_warnings.unwrap_or(0) != 0;
+
+                let mount = MountWithFolder {
+                    mount_id,
+                    virtual_node_id: row.node_id.clone(),
+                    real_folder_id: row
+                        .real_folder_id
+                        .clone()
+                        .unwrap_or_else(String::new),
+                    recursive,
+                    sync_enabled,
+                    suppress_warnings,
+                    abs_path: row.real_path.clone(),
+                    error_flag,
+                    error_msg: row.error_msg.clone(),
+                    last_seen_scan_id: row.last_seen_scan_id.clone(),
+                    last_seen_at: row.last_seen_at.clone(),
+                };
+
+                mounts_by_node
+                    .entry(row.node_id.clone())
+                    .or_default()
+                    .push(mount);
+            }
+        }
+
+        for (node_id, node) in nodes_by_id.iter_mut() {
+            let Some(NodeData::Folder(folder)) = node.data.as_mut() else {
                 continue;
             };
 
-            let Some(mount_id) = row.mount_id.clone() else {
-                continue;
-            };
-
-            let error_flag = match row.error_flag.as_deref() {
-                Some("notfound") => IntegrityCheckResult::NotFound,
-                Some("mismatch") => IntegrityCheckResult::Mismatch,
-                Some("success") => IntegrityCheckResult::Success,
-                _ => IntegrityCheckResult::Success,
-            };
-
-            let recursive = row.recursive.unwrap_or(1) != 0;
-            let sync_enabled = row.sync_enabled.unwrap_or(0) != 0;
-            let suppress_warnings = row.suppress_warnings.unwrap_or(0) != 0;
-
-            let mount_state = FolderMountState {
-                mount_id,
-                real_folder_id: row
-                    .real_folder_id
-                    .clone()
-                    .unwrap_or_else(String::new),
-                recursive,
-                sync_enabled,
-                suppress_warnings,
-                real_path: row.real_path.clone(),
-                error_flag,
-                error_msg: row.error_msg.clone(),
-                last_seen_scan_id: row.last_seen_scan_id.clone(),
-                last_seen_at: row.last_seen_at.clone(),
-            };
-
-            folder.mounts.push(mount_state);
-
-            let mount_health = match error_flag {
-                IntegrityCheckResult::NotFound => FolderHealthState::Error,
-                IntegrityCheckResult::Mismatch => {
-                    if suppress_warnings {
-                        FolderHealthState::Normal
-                    } else {
-                        FolderHealthState::Warning
-                    }
-                }
-                IntegrityCheckResult::Success => FolderHealthState::Normal,
-            };
-
-            folder.health = match (folder.health, mount_health) {
-                (FolderHealthState::Error, _) | (_, FolderHealthState::Error) => {
-                    FolderHealthState::Error
-                }
-                (FolderHealthState::Warning, _) | (_, FolderHealthState::Warning) => {
-                    FolderHealthState::Warning
-                }
-                _ => FolderHealthState::Normal,
-            };
+            let mounts_info =
+                mounts_by_node.remove(node_id).unwrap_or_default();
+            let (mounts, health) = Self::convert_mounts(mounts_info);
+            folder.mounts = mounts;
+            folder.health = health;
         }
 
         let mut nodes: Vec<Node> = Vec::with_capacity(nodes_by_id.len());
@@ -599,14 +659,16 @@ impl NodeRepository {
         };
 
         // todo: upsert containse_edges?
-        if let Err(e) = Self::create_folder_file_edges(
+        if let Err(err) = Self::create_folder_file_edges(
             executor,
             parent_node_id,
             node_id,
             now,
         )
         .await
-        {};
+        {
+            warn!("failed to create folder/file edges: {}", err);
+        }
 
         Ok(())
     }

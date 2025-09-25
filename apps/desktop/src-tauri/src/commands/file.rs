@@ -2,12 +2,14 @@ use std::path::PathBuf;
 
 use crate::{
     models::file::{
-        FolderData, FolderOptionUpdatePayload, FolderPreview, ThumbRequest, ThumbResponse,
+        FolderData, FolderOptionUpdatePayload, FolderPreview, ThumbRequest,
+        ThumbResponse,
     },
     services::file_service::{
         self, clear_base_thumb_cache, clear_derived_thumb_cache,
         collect_folder_preview, collect_thumb_cache_usage, first_mount_folder,
-        get_thumbs, sync_virtual_folder, update_virtual_folder_options, ThumbCacheUsage,
+        get_thumbs, sync_virtual_folder, update_virtual_folder_options,
+        ThumbCacheUsage,
     },
 };
 #[tauri::command]

@@ -1,0 +1,110 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT\n                    n.id                         AS \"node_id!\",\n                    n.kind                       AS \"kind!\",\n                    nf.id                        AS \"folder_id!\",\n                    nf.display_name              AS \"folder_name!\",\n                    n.created_at                 AS \"created_at!\",\n                    n.updated_at                 AS \"updated_at!\",\n                    vfm.id                       AS \"mount_id?\",\n                    vfm.real_folder_id           AS \"real_folder_id?\",\n                    vfm.recursive                AS \"recursive?\",\n                    vfm.sync_enabled             AS \"sync_enabled?\",\n                    vfm.suppress_warnings        AS \"suppress_warnings?\",\n                    rf.abs_path_cached           AS \"real_path?\",\n                    rf.error_flag                AS \"error_flag?\",\n                    rf.error_msg                 AS \"error_msg?\",\n                    rf.last_seen_scan_id         AS \"last_seen_scan_id?\",\n                    rf.last_seen_at              AS \"last_seen_at?\"\n                FROM node n\n                JOIN node_folder nf ON nf.node_id = n.id\n                LEFT JOIN virtual_folder_mount vfm\n                    ON vfm.virtual_node_id = n.id AND vfm.enabled = 1\n                LEFT JOIN real_folder rf ON rf.id = vfm.real_folder_id\n                WHERE n.kind = 'folder'\n                ORDER BY n.created_at, vfm.priority\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "node_id!",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "kind!",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "folder_id!",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "folder_name!",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at!",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at!",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "mount_id?",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "real_folder_id?",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "recursive?",
+        "ordinal": 8,
+        "type_info": "Integer"
+      },
+      {
+        "name": "sync_enabled?",
+        "ordinal": 9,
+        "type_info": "Integer"
+      },
+      {
+        "name": "suppress_warnings?",
+        "ordinal": 10,
+        "type_info": "Integer"
+      },
+      {
+        "name": "real_path?",
+        "ordinal": 11,
+        "type_info": "Text"
+      },
+      {
+        "name": "error_flag?",
+        "ordinal": 12,
+        "type_info": "Text"
+      },
+      {
+        "name": "error_msg?",
+        "ordinal": 13,
+        "type_info": "Text"
+      },
+      {
+        "name": "last_seen_scan_id?",
+        "ordinal": 14,
+        "type_info": "Text"
+      },
+      {
+        "name": "last_seen_at?",
+        "ordinal": 15,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "d213d987637cca3f2db71f01ca76fe368f9d3dda0dbbd59c6fc84a5112201941"
+}

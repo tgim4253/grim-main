@@ -116,10 +116,6 @@ impl GraphRepository {
         )
         .await?;
 
-        Ok(GraphResponse {
-            nodes: nodes,
-            connections: connections,
-            root_node_id: root_node_id,
-        })
+        Ok(GraphResponse { nodes, connections, root_node_id })
     }
 }

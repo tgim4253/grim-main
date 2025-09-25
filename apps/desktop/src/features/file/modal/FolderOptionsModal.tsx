@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Modal } from '@tgim/ui/index';
 import { FolderMountState, FolderOptionUpdatePayload } from '@tgim/types/file';
-import { FileTreeData } from '@tgim/types';
+import { FileTreeData } from '@tgim/types/index';
 import { ipc } from '../../../lib/ipc';
 
 interface FolderOptionsModalProps {
@@ -38,6 +38,10 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({ node, moaId, on
 
   const handleSave = async () => {
     if (!mount) return;
+    if (!moaId) {
+      setError('MOA 컨텍스트를 찾을 수 없습니다.');
+      return;
+    }
     setIsSaving(true);
     setError(null);
     const payload: FolderOptionUpdatePayload = {
@@ -60,6 +64,10 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({ node, moaId, on
 
   const handleSync = async () => {
     if (!mount) return;
+    if (!moaId) {
+      setError('MOA 컨텍스트를 찾을 수 없습니다.');
+      return;
+    }
     setIsSyncing(true);
     setError(null);
     try {

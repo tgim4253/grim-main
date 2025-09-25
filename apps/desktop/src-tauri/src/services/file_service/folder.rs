@@ -19,9 +19,9 @@ use crate::{
     },
     models::{
         file::{
-            FileInfo, FileType, FolderData, FolderOptionUpdatePayload, FolderPreview,
-            FolderPreviewFileStat, FolderPreviewNode, FolderPreviewSummary,
-            FolderSelection, RealFolderData,
+            FileInfo, FileType, FolderData, FolderOptionUpdatePayload,
+            FolderPreview, FolderPreviewFileStat, FolderPreviewNode,
+            FolderPreviewSummary, FolderSelection, RealFolderData,
         },
         node::Node,
     },
@@ -594,20 +594,22 @@ pub async fn sync_virtual_folder(
 ) -> Result<()> {
     let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
 
-    let mount = FileRepository::fetch_mount_for_virtual_node(tx.as_mut(), virtual_node_id)
-        .await?
-        .ok_or_else(|| anyhow!("No mounted real folder for virtual node {virtual_node_id}"))?;
+    let mount = FileRepository::fetch_mount_for_virtual_node(
+        tx.as_mut(),
+        virtual_node_id,
+    )
+    .await?
+    .ok_or_else(|| {
+        anyhow!("No mounted real folder for virtual node {virtual_node_id}")
+    })?;
 
-    let abs_path = mount
-        .abs_path
-        .ok_or_else(|| anyhow!("Missing cached absolute path for mounted folder"))?;
+    let abs_path = mount.abs_path.ok_or_else(|| {
+        anyhow!("Missing cached absolute path for mounted folder")
+    })?;
     let abs_path = PathBuf::from(&abs_path);
 
     if !abs_path.exists() {
-        bail!(
-            "Mounted folder path {} no longer exists",
-            abs_path.display()
-        );
+        bail!("Mounted folder path {} no longer exists", abs_path.display());
     }
 
     let metadata = fs::metadata(&abs_path).await.with_context(|| {
@@ -619,7 +621,7 @@ pub async fn sync_virtual_folder(
     let mtime = FileInfo::file_mtime_epoch(&metadata)?;
 
     upsert_folder(
-        tx.as_mut(),
+        &mut tx,
         app,
         moa_id,
         mount.real_folder_id.clone(),
@@ -664,12 +666,17 @@ pub async fn update_virtual_folder_options(
 ) -> Result<()> {
     let mount = {
         let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
-        let mount = FileRepository::fetch_mount_for_virtual_node(tx.as_mut(), virtual_node_id)
-            .await?;
+        let mount = FileRepository::fetch_mount_for_virtual_node(
+            tx.as_mut(),
+            virtual_node_id,
+        )
+        .await?;
         tx.commit().await?;
         mount
     }
-    .ok_or_else(|| anyhow!("No mounted real folder for virtual node {virtual_node_id}"))?;
+    .ok_or_else(|| {
+        anyhow!("No mounted real folder for virtual node {virtual_node_id}")
+    })?;
 
     let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
 
@@ -680,8 +687,12 @@ pub async fn update_virtual_folder_options(
         let norm_str = norm_path.to_string_lossy();
         if mount.abs_path.as_deref() != Some(norm_str.as_ref()) {
             let sroot_info = storage_root::detect_storage_root(&norm_path)?;
-            let ensured = ensure_storage_root_and_real_folder(tx.as_mut(), &sroot_info, &norm_path)
-                .await?;
+            let ensured = ensure_storage_root_and_real_folder(
+                &mut tx,
+                &sroot_info,
+                &norm_path,
+            )
+            .await?;
             new_real_folder_id = Some(ensured);
         }
     }
@@ -860,7 +871,6 @@ async fn upsert_folder_impl(
         } else if file_type.is_file() {
             upsert_file_entry(
                 tx,
-                app,
                 moa_id,
                 &parent_real_folder_id,
                 &parent_virtual_folder_id,
@@ -943,7 +953,6 @@ async fn upsert_folder_impl(
 /// Upsert file metadata and associations for a single discovered entry.
 async fn upsert_file_entry(
     tx: &mut Transaction<'_, Sqlite>,
-    app: &AppHandle,
     moa_id: &str,
     parent_real_folder_id: &str,
     parent_virtual_folder_id: &str,

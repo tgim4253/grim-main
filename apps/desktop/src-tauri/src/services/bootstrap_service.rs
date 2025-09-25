@@ -12,11 +12,16 @@ use crate::utils::date::get_now_date;
 use crate::utils::identifier::get_unique_id;
 use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
+use sqlx::Row;
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::{Emitter, State};
-use tokio::{fs, sync::{Mutex, RwLock}};
+use tokio::{
+    fs,
+    sync::{Mutex, RwLock},
+};
 use tracing::{error, info};
 
 /// Progress payload emitted to the renderer while bootstrapping a workspace.
@@ -217,7 +222,11 @@ fn emit(
 }
 
 /// Perform a lightweight filesystem scan to record mount health and optionally sync.
-async fn perform_initial_scan(app: &tauri::AppHandle, moa_id: &str) -> Result<()> {
+async fn perform_initial_scan(
+    app: &tauri::AppHandle,
+    moa_id: &str,
+) -> Result<()> {
+    #[derive(sqlx::FromRow)]
     struct MountRow {
         virtual_node_id: String,
         real_folder_id: String,
@@ -231,14 +240,14 @@ async fn perform_initial_scan(app: &tauri::AppHandle, moa_id: &str) -> Result<()
 
     {
         let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
-        sqlx::query!(
-            r"""
+        sqlx::query(
+            r#"
             INSERT INTO scan_session (id, started_at)
-            VALUES (?1, ?2)
-            """,
-            scan_id,
-            now
+            VALUES (?, ?)
+            "#,
         )
+        .bind(&scan_id)
+        .bind(&now)
         .execute(tx.as_mut())
         .await?;
         tx.commit().await?;
@@ -246,55 +255,72 @@ async fn perform_initial_scan(app: &tauri::AppHandle, moa_id: &str) -> Result<()
 
     let mounts = {
         let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
-        let rows = sqlx::query_as!(
-            MountRow,
-            r"""
+        let rows = sqlx::query(
+            r#"
             SELECT
-                vfm.virtual_node_id AS "virtual_node_id!",
-                vfm.real_folder_id  AS "real_folder_id!",
-                vfm.sync_enabled    AS "sync_enabled!",
-                rf.abs_path_cached  AS "abs_path?",
-                rf.mtime            AS "stored_mtime!"
+                vfm.virtual_node_id,
+                vfm.real_folder_id,
+                vfm.sync_enabled,
+                rf.abs_path_cached,
+                rf.mtime
             FROM virtual_folder_mount vfm
             JOIN real_folder rf ON rf.id = vfm.real_folder_id
             WHERE vfm.enabled = 1
-            """
+            "#,
         )
         .fetch_all(tx.as_mut())
         .await?;
         tx.commit().await?;
-        rows
+
+        rows.into_iter()
+            .map(|row| MountRow {
+                virtual_node_id: row.get::<String, _>("virtual_node_id"),
+                real_folder_id: row.get::<String, _>("real_folder_id"),
+                sync_enabled: row.get::<i64, _>("sync_enabled"),
+                abs_path: row.get::<Option<String>, _>("abs_path_cached"),
+                stored_mtime: row.get::<i64, _>("mtime"),
+            })
+            .collect::<Vec<_>>()
     };
 
     for mount in mounts {
         let mut status = IntegrityCheckResult::Success;
         let mut error_msg: Option<String> = None;
         let mut current_mtime = mount.stored_mtime;
-        let mut path_buf: Option<PathBuf> = None;
-
         if let Some(path) = mount.abs_path.as_ref() {
             let pb = PathBuf::from(path);
-            path_buf = Some(pb.clone());
             match fs::metadata(&pb).await {
                 Ok(meta) => {
                     current_mtime = FileInfo::file_mtime_epoch(&meta)?;
                     if current_mtime != mount.stored_mtime {
                         status = IntegrityCheckResult::Mismatch;
-                        error_msg = Some("Detected filesystem changes".to_string());
+                        error_msg =
+                            Some("Detected filesystem changes".to_string());
 
                         if mount.sync_enabled != 0 {
-                            match sync_virtual_folder(app, moa_id, &mount.virtual_node_id).await {
+                            match sync_virtual_folder(
+                                app,
+                                moa_id,
+                                &mount.virtual_node_id,
+                            )
+                            .await
+                            {
                                 Ok(()) => {
-                                    if let Some(pb) = path_buf.as_ref() {
-                                        if let Ok(meta) = fs::metadata(pb).await {
-                                            current_mtime = FileInfo::file_mtime_epoch(&meta)?;
-                                        }
+                                    if let Ok(meta) = fs::metadata(&pb).await
+                                    {
+                                        current_mtime =
+                                            FileInfo::file_mtime_epoch(
+                                                &meta,
+                                            )?;
                                     }
                                     status = IntegrityCheckResult::Success;
                                     error_msg = None;
                                 }
                                 Err(sync_err) => {
-                                    error_msg = Some(format("Sync failed: {}", sync_err));
+                                    error_msg = Some(format!(
+                                        "Sync failed: {}",
+                                        sync_err,
+                                    ));
                                 }
                             }
                         }
@@ -307,43 +333,45 @@ async fn perform_initial_scan(app: &tauri::AppHandle, moa_id: &str) -> Result<()
             }
         } else {
             status = IntegrityCheckResult::NotFound;
-            error_msg = Some("Missing cached path for mounted folder".to_string());
+            error_msg =
+                Some("Missing cached path for mounted folder".to_string());
         }
 
         let mut update_tx = DB_MANAGER.create_new_tx(moa_id).await?;
-        sqlx::query!(
-            r"""
+        sqlx::query(
+            r#"
             UPDATE real_folder
-               SET error_flag = ?2,
-                   error_msg = ?3,
-                   last_seen_scan_id = ?4,
-                   last_seen_at = ?5,
-                   updated_at = ?5
-             WHERE id = ?1
-            """,
-            mount.real_folder_id,
-            match status {
-                IntegrityCheckResult::NotFound => "notfound",
-                IntegrityCheckResult::Mismatch => "mismatch",
-                IntegrityCheckResult::Success => "success",
-            },
-            error_msg,
-            scan_id,
-            now
+               SET error_flag = ?,
+                   error_msg = ?,
+                   last_seen_scan_id = ?,
+                   last_seen_at = ?,
+                   updated_at = ?
+             WHERE id = ?
+            "#,
         )
+        .bind(match status {
+            IntegrityCheckResult::NotFound => "notfound",
+            IntegrityCheckResult::Mismatch => "mismatch",
+            IntegrityCheckResult::Success => "success",
+        })
+        .bind(&error_msg)
+        .bind(&scan_id)
+        .bind(&now)
+        .bind(&now)
+        .bind(&mount.real_folder_id)
         .execute(update_tx.as_mut())
         .await?;
 
         if status == IntegrityCheckResult::Success {
-            sqlx::query!(
-                r"""
+            sqlx::query(
+                r#"
                 UPDATE real_folder
-                   SET mtime = ?2
-                 WHERE id = ?1
-                """,
-                mount.real_folder_id,
-                current_mtime
+                   SET mtime = ?
+                 WHERE id = ?
+                "#,
             )
+            .bind(current_mtime)
+            .bind(&mount.real_folder_id)
             .execute(update_tx.as_mut())
             .await?;
         }
@@ -354,15 +382,15 @@ async fn perform_initial_scan(app: &tauri::AppHandle, moa_id: &str) -> Result<()
     {
         let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
         let finished = get_now_date();
-        sqlx::query!(
-            r"""
+        sqlx::query(
+            r#"
             UPDATE scan_session
-               SET finished_at = ?2
-             WHERE id = ?1
-            """,
-            scan_id,
-            finished
+               SET finished_at = ?
+             WHERE id = ?
+            "#,
         )
+        .bind(&finished)
+        .bind(&scan_id)
         .execute(tx.as_mut())
         .await?;
         tx.commit().await?;
@@ -390,10 +418,7 @@ pub async fn fetch_init_data_for_front(
 
     tx.commit().await?;
 
-    Ok(NodeWithConnections {
-        nodes: folder_and_files,
-        connections: connections,
-    })
+    Ok(NodeWithConnections { nodes: folder_and_files, connections })
 }
 
 /// Ensure the workspace database is created and migrated before use.
@@ -583,12 +608,6 @@ async fn ensure_mounted_volume(moa_id: &str) -> Result<()> {
     }
 
     tx.commit().await?;
-
-    // enqueue scan jobs for roots that changed (availability or primary mount)
-    for r in roots_changed {
-        // Ignore enqueue errors
-        // let _ = enqueue_scan_session(r).await;
-    }
 
     Ok(())
 }
