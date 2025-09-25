@@ -135,8 +135,13 @@ pub async fn ensure_base_thumbnail(
 
     let encoded = task::spawn_blocking({
         let buffer = dst_image.into_vec();
+        let target_w = target_w;
+        let target_h = target_h;
+
         move || -> Result<Vec<u8>> {
-            let mut rgb = Vec::with_capacity((w as usize) * (h as usize) * 3);
+            let mut rgb = Vec::with_capacity(
+                (target_w as usize) * (target_h as usize) * 3,
+            );
             for px in buffer.chunks_exact(4) {
                 rgb.extend_from_slice(&[px[0], px[1], px[2]]);
             }
@@ -146,8 +151,13 @@ pub async fn ensure_base_thumbnail(
             let mut enc = image::codecs::jpeg::JpegEncoder::new_with_quality(
                 &mut out, 75,
             );
-            enc.encode(&rgb, w, h, image::ExtendedColorType::Rgb8)
-                .context("jpeg encode failed")?;
+            enc.encode(
+                &rgb,
+                target_w,
+                target_h,
+                image::ExtendedColorType::Rgb8,
+            )
+            .context("jpeg encode failed")?;
             Ok(out)
         }
     })
