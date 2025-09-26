@@ -521,7 +521,7 @@ async fn register_capture_in_workspace(
         .to_string();
 
     let file_info =
-        FileInfo::new(&file_path, real_folder_id.clone(), file_name)
+        FileInfo::new(&moa_id, &file_path, real_folder_id.clone(), file_name)
             .await
             .context("Failed to derive capture metadata")?;
 

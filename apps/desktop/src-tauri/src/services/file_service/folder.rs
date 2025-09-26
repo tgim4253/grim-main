@@ -322,6 +322,64 @@ impl SelectionPlan {
     }
 }
 
+fn normalize_extension_list(list: Vec<String>) -> Vec<String> {
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut normalized = Vec::new();
+
+    for value in list {
+        let trimmed = value.trim().trim_start_matches('.').to_lowercase();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if seen.insert(trimmed.clone()) {
+            normalized.push(trimmed);
+        }
+    }
+
+    normalized
+}
+
+#[derive(Default, Clone)]
+pub struct ExtensionFilter {
+    pub include: Option<HashSet<String>>,
+    pub exclude: HashSet<String>,
+}
+
+impl ExtensionFilter {
+    pub fn new(include: &[String], exclude: &[String]) -> Self {
+        let include = if include.is_empty() {
+            None
+        } else {
+            Some(include.iter().cloned().collect())
+        };
+
+        let exclude = exclude.iter().cloned().collect();
+
+        ExtensionFilter { include, exclude }
+    }
+
+    pub fn allows(&self, path: &Path) -> bool {
+        let ext = path
+            .extension()
+            .and_then(|value| value.to_str())
+            .map(|value| value.trim_start_matches('.').to_lowercase());
+
+        if let Some(ref ext) = ext {
+            if self.exclude.contains(ext) {
+                return false;
+            }
+
+            if let Some(include) = &self.include {
+                return include.contains(ext);
+            }
+        } else if self.include.is_some() {
+            return false;
+        }
+
+        true
+    }
+}
+
 #[derive(Default)]
 struct PreviewAccumulator {
     total_folders: u64,
@@ -550,6 +608,8 @@ pub async fn first_mount_folder(
         guard.notify_start();
     }
 
+    let extension_filter = ExtensionFilter::default();
+
     let upsert_result = upsert_folder(
         &mut tx,
         &app,
@@ -562,6 +622,7 @@ pub async fn first_mount_folder(
         selection_plan.as_ref(),
         &norm_path,
         Some(progress.clone()),
+        &extension_filter,
     )
     .await;
 
@@ -620,6 +681,11 @@ pub async fn sync_virtual_folder(
     })?;
     let mtime = FileInfo::file_mtime_epoch(&metadata)?;
 
+    let extension_filter = ExtensionFilter::new(
+        &mount.include_extensions,
+        &mount.exclude_extensions,
+    );
+
     upsert_folder(
         &mut tx,
         app,
@@ -632,6 +698,7 @@ pub async fn sync_virtual_folder(
         None,
         abs_path.as_path(),
         None,
+        &extension_filter,
     )
     .await?;
 
@@ -697,6 +764,11 @@ pub async fn update_virtual_folder_options(
         }
     }
 
+    let include_extensions =
+        payload.include_extensions.map(normalize_extension_list);
+    let exclude_extensions =
+        payload.exclude_extensions.map(normalize_extension_list);
+
     FileRepository::update_mount_options(
         tx.as_mut(),
         &mount.mount_id,
@@ -704,6 +776,8 @@ pub async fn update_virtual_folder_options(
         payload.recursive,
         payload.sync_enabled,
         payload.suppress_warnings,
+        include_extensions.as_deref(),
+        exclude_extensions.as_deref(),
     )
     .await?;
 
@@ -733,6 +807,7 @@ async fn upsert_folder(
     selection: Option<&SelectionPlan>,
     root_path: &Path,
     progress: Option<Arc<Mutex<ImportProgressTracker>>>,
+    extension_filter: &ExtensionFilter,
 ) -> Result<()> {
     let mut metrics = UpsertFolderMetrics::default();
     let total_timer = Instant::now();
@@ -748,6 +823,7 @@ async fn upsert_folder(
         make_virtual_folder,
         selection,
         root_path,
+        extension_filter,
         None,
         &mut metrics,
         progress,
@@ -773,6 +849,7 @@ async fn upsert_folder_impl(
     make_virtual_folder: Option<bool>,
     selection: Option<&SelectionPlan>,
     root_path: &Path,
+    extension_filter: &ExtensionFilter,
     inherited_allowed_types: Option<HashSet<FileType>>,
     metrics: &mut UpsertFolderMetrics,
     progress: Option<Arc<Mutex<ImportProgressTracker>>>,
@@ -875,6 +952,7 @@ async fn upsert_folder_impl(
                 &parent_real_folder_id,
                 &parent_virtual_folder_id,
                 &entry,
+                extension_filter,
                 current_allowed.as_ref(),
                 metrics,
                 progress.clone(),
@@ -936,6 +1014,7 @@ async fn upsert_folder_impl(
                 Some(make_vf),
                 selection,
                 root_path,
+                extension_filter,
                 child_allowed,
                 metrics,
                 progress.clone(),
@@ -957,12 +1036,16 @@ async fn upsert_file_entry(
     parent_real_folder_id: &str,
     parent_virtual_folder_id: &str,
     entry: &fs::DirEntry,
+    extension_filter: &ExtensionFilter,
     allowed_types: Option<&HashSet<FileType>>,
     metrics: &mut UpsertFolderMetrics,
     progress: Option<Arc<Mutex<ImportProgressTracker>>>,
 ) -> Result<()> {
     let file_timer = Instant::now();
     let file_path = entry.path();
+    if !extension_filter.allows(file_path.as_path()) {
+        return Ok(());
+    }
     let kind_guess = FileType::from(file_path.as_path());
 
     if let Some(allowed) = allowed_types {
@@ -972,9 +1055,13 @@ async fn upsert_file_entry(
     }
 
     let file_name = entry.file_name().to_string_lossy().to_string();
-    let file_info =
-        FileInfo::new(&file_path, parent_real_folder_id.to_string(), file_name)
-            .await?;
+    let file_info = FileInfo::new(
+        &moa_id,
+        &file_path,
+        parent_real_folder_id.to_string(),
+        file_name,
+    )
+    .await?;
 
     let file_path_id =
         FileRepository::insert_file_path(tx.as_mut(), &file_info).await?;
