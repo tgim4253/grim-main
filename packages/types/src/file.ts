@@ -60,9 +60,9 @@ export interface ThumbRequest {
 export interface ThumbResSpec {
   status: ThumbStatus;
   url?: string;
-  thumb_key: string;
+  thumbKey: string;
   enqueued: boolean;
-  error_msg?: string;
+  errorMsg?: string;
 }
 
 export interface ThumbResInfo {
