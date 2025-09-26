@@ -153,3 +153,40 @@ export interface FolderOptionUpdatePayload {
   syncEnabled: boolean;
   suppressWarnings: boolean;
 }
+
+export type FilePathStatus = 'ok' | 'warning' | 'error';
+
+export interface FilePathInfo {
+  id: string;
+  path?: string | null;
+  exists: boolean;
+  storedMtime?: number | null;
+  currentMtime?: number | null;
+  hashMatches?: boolean | null;
+  status: FilePathStatus;
+  warning?: string | null;
+  error?: string | null;
+}
+
+export interface FileFolderInfo {
+  nodeId: string;
+  name: string;
+}
+
+export interface FileSummary {
+  fileId: string;
+  nodeId: string;
+  fileName: string;
+  mime: string;
+  size: number;
+  hash: string;
+  kind: FileType;
+  width?: number | null;
+  height?: number | null;
+}
+
+export interface FileDetail {
+  file: FileSummary;
+  folders: FileFolderInfo[];
+  paths: FilePathInfo[];
+}

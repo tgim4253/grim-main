@@ -3,11 +3,12 @@ import { invoke } from '@tauri-apps/api/core';
 import { GraphResponse } from '@tgim/types/graph';
 import {
   CreateFolderPayload,
+  FileDetail,
+  FolderOptionUpdatePayload,
   FolderPreview,
   ThumbRequest,
   ThumbResponse,
   ThumbnailUsage,
-  FolderOptionUpdatePayload,
 } from '@tgim/types/file';
 import {
   CroquisCaptureContext,
@@ -90,6 +91,34 @@ const fileIpc = {
     options: FolderOptionUpdatePayload,
   ) => {
     await invoke('update_folder_mount_options', { moaId, virtualNodeId, options });
+  },
+  getFileDetail: async (moaId: string, hash: string): Promise<FileDetail> => {
+    const response = await invoke('get_file_detail', { moaId, hash });
+    return response as FileDetail;
+  },
+  linkFilePath: async (
+    moaId: string,
+    hash: string,
+    payload: { path: string; replacePathId?: string | null },
+  ): Promise<FileDetail> => {
+    const response = await invoke('link_file_path', {
+      moaId,
+      hash,
+      path: payload.path,
+      replacePathId: payload.replacePathId ?? null,
+    });
+    return response as FileDetail;
+  },
+  removeFilePath: async (
+    moaId: string,
+    hash: string,
+    filePathId: string,
+  ): Promise<FileDetail> => {
+    const response = await invoke('remove_file_path', { moaId, hash, filePathId });
+    return response as FileDetail;
+  },
+  revealInExplorer: async (path: string): Promise<void> => {
+    await invoke('reveal_file_in_explorer', { path });
   },
 };
 

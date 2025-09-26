@@ -25,6 +25,8 @@ import { FileType, ThumbResSpec } from '@tgim/types/file';
 import { Button } from '@tgim/ui';
 import cn from '@tgim/utils/cn';
 import { GitBranch, LayoutGrid } from 'lucide-react';
+import { Split } from '@tgim/ui/Splitter';
+import FileDetailSidebar from './panels/FileDetailSidebar';
 
 interface PanelProps {
   panelId: string;
@@ -38,6 +40,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [gridData, setGridData] = useState<GridData | null>(null);
   const [rootNodeId, setRootNodeId] = useState<string | null>(null);
+  const [activeImage, setActiveImage] = useState<ImageItem | null>(null);
 
   const { panel, containerId, isActive } = usePanelsStore(
     useShallow(state => ({
@@ -234,6 +237,26 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     });
     return id;
   }, [graphData, rootNodeId]);
+  useEffect(() => {
+    if (!gridData || !activeImage) return;
+    const exists = gridData.images.some(img => img.hash === activeImage.hash);
+    if (!exists) {
+      setActiveImage(null);
+    }
+  }, [gridData, activeImage?.hash]);
+
+  useEffect(() => {
+    if (!gridData) {
+      setActiveImage(null);
+    }
+  }, [gridData]);
+
+  useEffect(() => {
+    if (viewType !== 'grid') {
+      setActiveImage(null);
+    }
+  }, [viewType]);
+
   if (!panel || !container) return null;
 
   const showGraph = viewType === 'graph' && graphData && rootNodeId && rootGraphNodeId;
@@ -283,7 +306,32 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
             graphData={graphData}
           />
         ) : showGrid && gridData ? (
-          <GridView gridData={gridData} />
+          <Split position="horizontal" className="w-full h-full">
+            {({ Panel: SplitPanel }) => (
+              <>
+                <SplitPanel key="grid" minSize={320}>
+                  <GridView
+                    gridData={gridData}
+                    onImageOpen={setActiveImage}
+                    onClearPreview={() => setActiveImage(null)}
+                  />
+                </SplitPanel>
+                <SplitPanel
+                  key="sidebar"
+                  canHidden
+                  hidden={!activeImage}
+                  minSize={280}
+                  initialSize={360}
+                >
+                  <FileDetailSidebar
+                    moaId={moaId}
+                    image={activeImage}
+                    onClose={() => setActiveImage(null)}
+                  />
+                </SplitPanel>
+              </>
+            )}
+          </Split>
         ) : null}
       </div>
     </div>,
