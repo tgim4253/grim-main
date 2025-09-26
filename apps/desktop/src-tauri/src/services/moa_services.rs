@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::ErrorKind, sync::RwLock};
+use std::{collections::HashMap, io::ErrorKind, path::Path, sync::RwLock};
 
 use anyhow::{anyhow, Context, Result};
 use once_cell::sync::Lazy;
@@ -65,6 +65,12 @@ pub async fn load_moas(app: &tauri::AppHandle) -> Result<Vec<Moa>> {
 
     let mut moas = serde_json::from_str::<Vec<Moa>>(&content)
         .context("Failed to parse stored moa list")?;
+
+    for moa in &mut moas {
+        let absolute_path =
+            path_utils::to_executable_absolute_path(Path::new(&moa.path));
+        moa.path = absolute_path.to_string_lossy().to_string();
+    }
     moas.sort_by(|a, b| b.last_opened_at.cmp(&a.last_opened_at));
 
     let mut moa_data = MOA_DATA.write().unwrap();
@@ -86,8 +92,19 @@ pub async fn load_latest_moas(app: &tauri::AppHandle) -> Result<Option<Moa>> {
 pub async fn save_moas(app: &tauri::AppHandle, moas: &[Moa]) -> Result<()> {
     let moa_file_path = path_utils::get_moa_file_path(app);
 
-    let file_content =
-        serde_json::to_string(moas).context("Failed to serialize moas")?;
+    let stored_moas: Vec<Moa> = moas
+        .iter()
+        .cloned()
+        .map(|mut moa| {
+            let relative_path =
+                path_utils::to_executable_relative_path(Path::new(&moa.path));
+            moa.path = relative_path.to_string_lossy().to_string();
+            moa
+        })
+        .collect();
+
+    let file_content = serde_json::to_string(&stored_moas)
+        .context("Failed to serialize moas")?;
 
     if let Some(parent) = moa_file_path.parent() {
         fs::create_dir_all(parent).await.with_context(|| {
