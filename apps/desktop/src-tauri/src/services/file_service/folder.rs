@@ -3,7 +3,7 @@ use async_recursion::async_recursion;
 use serde::Serialize;
 use sqlx::{Sqlite, Transaction};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
     path::{Path, PathBuf},
     sync::Arc,
     time::{Duration, Instant},
@@ -339,6 +339,26 @@ fn normalize_extension_list(list: Vec<String>) -> Vec<String> {
     normalized
 }
 
+fn derive_root_extension_list(
+    selection: Option<&SelectionPlan>,
+) -> Option<Vec<String>> {
+    let root = selection?.get("");
+    let allowed = root?.allowed_types.as_ref()?;
+
+    let mut set: BTreeSet<String> = BTreeSet::new();
+    for file_type in allowed.iter() {
+        for ext in file_type.extensions() {
+            set.insert(ext.to_string());
+        }
+    }
+
+    if set.is_empty() {
+        None
+    } else {
+        Some(set.into_iter().collect())
+    }
+}
+
 #[derive(Default, Clone)]
 pub struct ExtensionFilter {
     pub include: Option<HashSet<String>>,
@@ -580,6 +600,7 @@ pub async fn first_mount_folder(
     let norm_path = normalize_path(Path::new(&path));
 
     let selection_plan = selection.map(SelectionPlan::from_selection);
+    let include_filters = derive_root_extension_list(selection_plan.as_ref());
 
     let sroot_info = storage_root::detect_storage_root(&norm_path)?;
 
@@ -588,12 +609,22 @@ pub async fn first_mount_folder(
         ensure_storage_root_and_real_folder(&mut tx, &sroot_info, &norm_path)
             .await?;
 
-    FileRepository::create_virtual_folder_mount(
+    let mount_id = FileRepository::create_virtual_folder_mount(
         tx.as_mut(),
         virtual_folder_id.clone(),
         real_folder_id.clone(),
     )
     .await?;
+
+    if let Some(include_list) = include_filters.as_ref() {
+        FileRepository::update_mount_extension_filters(
+            tx.as_mut(),
+            &mount_id,
+            Some(include_list.as_slice()),
+            None,
+        )
+        .await?;
+    }
 
     let progress = Arc::new(Mutex::new(ImportProgressTracker::new(
         app.clone(),

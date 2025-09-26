@@ -2,8 +2,9 @@ use std::path::PathBuf;
 
 use crate::{
     models::file::{
-        FileDetail, FolderData, FolderOptionUpdatePayload, FolderPreview,
-        ThumbRequest, ThumbResponse,
+        file_type_extension_groups, FileDetail, FileTypeExtensionGroup,
+        FolderData, FolderOptionUpdatePayload, FolderPreview, ThumbRequest,
+        ThumbResponse,
     },
     services::file_service::{
         self, clear_base_thumb_cache, clear_derived_thumb_cache,
@@ -170,4 +171,10 @@ pub async fn remove_file_path(
 pub async fn reveal_file_in_explorer(path: String) -> Result<(), String> {
     let path_buf = PathBuf::from(&path);
     reveal_in_file_manager(path_buf.as_path()).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_file_type_extensions(
+) -> Result<Vec<FileTypeExtensionGroup>, String> {
+    Ok(file_type_extension_groups())
 }
