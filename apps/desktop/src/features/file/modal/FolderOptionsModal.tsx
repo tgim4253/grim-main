@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Modal } from '@tgim/ui/index';
 import { FolderMountState, FolderOptionUpdatePayload } from '@tgim/types/file';
 import { FileTreeData } from '@tgim/types/index';
@@ -18,13 +18,26 @@ const formatDate = (value?: string | null) => {
   return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
 };
 
-const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({ node, moaId, onClose, onUpdated }) => {
+const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({
+  node,
+  moaId,
+  onClose,
+  onUpdated,
+}) => {
   const mount: FolderMountState | undefined = useMemo(() => node.mounts?.[0], [node.mounts]);
 
   const [path, setPath] = useState<string>(mount?.realPath ?? '');
   const [recursive, setRecursive] = useState<boolean>(mount?.recursive ?? true);
   const [syncEnabled, setSyncEnabled] = useState<boolean>(mount?.syncEnabled ?? false);
-  const [suppressWarnings, setSuppressWarnings] = useState<boolean>(mount?.suppressWarnings ?? false);
+  const [suppressWarnings, setSuppressWarnings] = useState<boolean>(
+    mount?.suppressWarnings ?? false,
+  );
+  const [includeExtensionsInput, setIncludeExtensionsInput] = useState<string>(
+    (mount?.includeExtensions ?? []).join(', '),
+  );
+  const [excludeExtensionsInput, setExcludeExtensionsInput] = useState<string>(
+    (mount?.excludeExtensions ?? []).join(', '),
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +47,23 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({ node, moaId, on
     setRecursive(mount?.recursive ?? true);
     setSyncEnabled(mount?.syncEnabled ?? false);
     setSuppressWarnings(mount?.suppressWarnings ?? false);
-  }, [mount?.realPath, mount?.recursive, mount?.syncEnabled, mount?.suppressWarnings]);
+    setIncludeExtensionsInput((mount?.includeExtensions ?? []).join(', '));
+    setExcludeExtensionsInput((mount?.excludeExtensions ?? []).join(', '));
+  }, [
+    mount?.realPath,
+    mount?.recursive,
+    mount?.syncEnabled,
+    mount?.suppressWarnings,
+    mount?.includeExtensions,
+    mount?.excludeExtensions,
+  ]);
+
+  const parseExtensions = useCallback((value: string): string[] => {
+    return value
+      .split(',')
+      .map(entry => entry.trim().replace(/^[.]+/, '').toLowerCase())
+      .filter(Boolean);
+  }, []);
 
   const handleSave = async () => {
     if (!mount) return;
@@ -44,11 +73,15 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({ node, moaId, on
     }
     setIsSaving(true);
     setError(null);
+    const includeExtensions = parseExtensions(includeExtensionsInput);
+    const excludeExtensions = parseExtensions(excludeExtensionsInput);
     const payload: FolderOptionUpdatePayload = {
       path: path.trim() || undefined,
       recursive,
       syncEnabled,
       suppressWarnings,
+      includeExtensions,
+      excludeExtensions,
     };
     try {
       await ipc.file.updateFolderOptions(moaId, node.id, payload);
@@ -82,11 +115,16 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({ node, moaId, on
   };
 
   return (
-    <Modal onClose={onClose} className="bg-modal-bg max-w-xl text-modal-text">
+    <Modal
+      onClose={onClose}
+      className="bg-modal-bg max-w-xl max-h-[80vh] overflow-y-auto text-modal-text"
+    >
       <div className="flex flex-col gap-6">
         <header className="space-y-1">
           <h2 className="text-xl font-semibold">폴더 옵션</h2>
-          <p className="text-sm text-modal-text-secondary">가상 폴더와 연결된 실 폴더 경로 및 동기화 동작을 관리합니다.</p>
+          <p className="text-sm text-modal-text-secondary">
+            가상 폴더와 연결된 실 폴더 경로 및 동기화 동작을 관리합니다.
+          </p>
         </header>
 
         {!mount ? (
@@ -135,6 +173,38 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({ node, moaId, on
               />
             </div>
 
+            <div className="space-y-3 rounded-lg border border-modal-input-bg/60 p-4 text-sm">
+              <h3 className="font-medium">파일 확장자 필터</h3>
+              <p className="text-xs text-modal-text-secondary">
+                여러 값을 입력할 때는 쉼표로 구분하세요. `png, jpg`처럼 확장자 앞의 점은 생략해도
+                됩니다.
+              </p>
+              <div className="space-y-2">
+                <label className="text-sm font-medium" htmlFor="include-extensions">
+                  포함할 확장자
+                </label>
+                <input
+                  id="include-extensions"
+                  className="w-full rounded-md border border-modal-input-bg bg-modal-input-bg px-3 py-2 text-sm text-modal-text focus:border-primary focus:outline-none"
+                  value={includeExtensionsInput}
+                  onChange={event => setIncludeExtensionsInput(event.target.value)}
+                  placeholder="예: png, jpg"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium" htmlFor="exclude-extensions">
+                  제외할 확장자
+                </label>
+                <input
+                  id="exclude-extensions"
+                  className="w-full rounded-md border border-modal-input-bg bg-modal-input-bg px-3 py-2 text-sm text-modal-text focus:border-primary focus:outline-none"
+                  value={excludeExtensionsInput}
+                  onChange={event => setExcludeExtensionsInput(event.target.value)}
+                  placeholder="예: psd, tmp"
+                />
+              </div>
+            </div>
+
             <section className="space-y-2 rounded-lg border border-modal-input-bg/60 p-4 text-sm">
               <h3 className="font-medium">최근 상태</h3>
               <div className="grid gap-1">
@@ -144,8 +214,8 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({ node, moaId, on
                     {mount.errorFlag === 'success'
                       ? '정상'
                       : mount.errorFlag === 'mismatch'
-                      ? '변경 감지'
-                      : '경로 오류'}
+                        ? '변경 감지'
+                        : '경로 오류'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -164,11 +234,7 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({ node, moaId, on
 
         <footer className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              onClick={handleSync}
-              disabled={!mount || isSyncing}
-            >
+            <Button variant="secondary" onClick={handleSync} disabled={!mount || isSyncing}>
               {isSyncing ? '동기화 중...' : '지금 동기화'}
             </Button>
           </div>

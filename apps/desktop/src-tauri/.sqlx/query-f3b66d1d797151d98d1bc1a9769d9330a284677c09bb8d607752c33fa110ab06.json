@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT file_name, folder_id\n            FROM file_path\n            WHERE id = ?1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "file_name",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "folder_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "f3b66d1d797151d98d1bc1a9769d9330a284677c09bb8d607752c33fa110ab06"
+}

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT mount_path FROM storage_root_mount\n            WHERE storage_root_id = ?1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "mount_path",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a0b3d8837b885f35bb4dc6d7cb8693a9f34218c7b87db89f56ab626c4af953e0"
+}
