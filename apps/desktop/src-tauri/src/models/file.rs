@@ -5,6 +5,7 @@ use sqlx::{FromRow, Type};
 use std::{
     convert::From,
     fs::{self, Metadata},
+    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     str::FromStr,
     time::UNIX_EPOCH,
@@ -12,7 +13,9 @@ use std::{
 use tauri::{path::BaseDirectory, AppHandle, Manager};
 
 use crate::{
-    config::file::IntegrityCheckResult, services::file_service::xxh3_64_of,
+    config::file::IntegrityCheckResult,
+    db::repository::file_repository::FileRepository,
+    services::file_service::{self, hash, xxh3_64_of},
     utils::file_utils::guess_mime,
 };
 
@@ -44,6 +47,10 @@ pub struct FolderMountState {
     pub error_msg: Option<String>,
     pub last_seen_scan_id: Option<String>,
     pub last_seen_at: Option<String>,
+    #[serde(default)]
+    pub include_extensions: Vec<String>,
+    #[serde(default)]
+    pub exclude_extensions: Vec<String>,
 }
 
 impl Default for FolderMountState {
@@ -59,6 +66,8 @@ impl Default for FolderMountState {
             error_msg: None,
             last_seen_scan_id: None,
             last_seen_at: None,
+            include_extensions: Vec::new(),
+            exclude_extensions: Vec::new(),
         }
     }
 }
@@ -112,6 +121,10 @@ pub struct FolderOptionUpdatePayload {
     pub sync_enabled: bool,
     #[serde(default)]
     pub suppress_warnings: bool,
+    #[serde(default)]
+    pub include_extensions: Option<Vec<String>>,
+    #[serde(default)]
+    pub exclude_extensions: Option<Vec<String>>,
 }
 
 /// Describes the folder/file-type filters chosen by the user before import.
@@ -413,6 +426,7 @@ pub struct FileInfo {
 impl FileInfo {
     /// Build a `FileInfo` record by reading metadata from disk.
     pub async fn new(
+        moa_id: &str,
         file_path: &Path,
         real_folder_id: String,
         file_name: String,
@@ -435,15 +449,30 @@ impl FileInfo {
             None
         };
 
+        let xxh3_64 = if let Some(hash) = {
+            if let Some(mtime) = file_mtime {
+                file_service::hash::fetch_hash_by_file_info(
+                    moa_id,
+                    &real_folder_id,
+                    &file_name_norm,
+                    mtime,
+                )
+                .await?
+            } else {
+                None
+            }
+        } {
+            hash
+        } else {
+            xxh3_64_of(file_path).await.with_context(|| {
+                format!("Failed to calculate xxHash64 for {:?}", file_path)
+            })?
+        };
         // let sha256_image: Option<String> = if kind_guess == FileType::Image {
         //     Some(crate::services::file_service::sha256_of_img(file_path)?)
         // } else {
         //     None
         // };
-        let xxh3_64 = xxh3_64_of(file_path).await.with_context(|| {
-            format!("Failed to calculate xxHash64 for {:?}", file_path)
-        })?;
-
         Ok(FileInfo {
             mime_guess,
             kind_guess,

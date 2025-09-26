@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf, str::FromStr};
 
 use anyhow::{anyhow, Result};
 use sqlx::{Executor, Row, Sqlite};
@@ -7,7 +7,9 @@ use crate::{
     config::file::{IntegrityCheckResult, MatchStates},
     db::repository::node_repository::NodeRepository,
     models::{
-        file::{FileInfo, FolderHealthState, NodeFolder, RealFolderData},
+        file::{
+            FileInfo, FileType, FolderHealthState, NodeFolder, RealFolderData,
+        },
         node::{Node, NodeData, NodeKind},
     },
     utils::{date::get_now_date, identifier::get_unique_id},
@@ -30,9 +32,121 @@ pub struct MountWithFolder {
     pub error_msg: Option<String>,
     pub last_seen_scan_id: Option<String>,
     pub last_seen_at: Option<String>,
+    pub include_extensions: Vec<String>,
+    pub exclude_extensions: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct MountInfo {
+    pub virtual_node_id: String,
+    pub real_folder_id: String,
+    pub recursive: bool,
+    pub sync_enabled: bool,
+    pub abs_path: Option<String>,
+    pub stored_mtime: i64,
+    pub include_extensions: Vec<String>,
+    pub exclude_extensions: Vec<String>,
 }
 
 impl FileRepository {
+    fn normalize_extension_vec(list: Vec<String>) -> Vec<String> {
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut normalized = Vec::new();
+
+        for value in list {
+            let trimmed = value.trim().trim_start_matches('.').to_lowercase();
+            if trimmed.is_empty() {
+                continue;
+            }
+            if seen.insert(trimmed.clone()) {
+                normalized.push(trimmed);
+            }
+        }
+
+        normalized
+    }
+
+    pub(crate) fn decode_extension_list(raw: Option<String>) -> Vec<String> {
+        let Some(text) = raw else {
+            return Vec::new();
+        };
+
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return Vec::new();
+        }
+
+        if let Ok(values) = serde_json::from_str::<Vec<String>>(trimmed) {
+            return Self::normalize_extension_vec(values);
+        }
+
+        let fallback = trimmed
+            .split(',')
+            .map(|item| item.trim().to_string())
+            .collect::<Vec<_>>();
+
+        Self::normalize_extension_vec(fallback)
+    }
+
+    pub(crate) async fn fetch_mounts_rows<'a, E>(
+        executor: &mut E,
+    ) -> Result<Vec<MountInfo>>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        #[derive(sqlx::FromRow)]
+        struct MountRow {
+            virtual_node_id: String,
+            real_folder_id: String,
+            sync_enabled: i64,
+            abs_path: Option<String>,
+            stored_mtime: i64,
+            recursive: i64,
+            include_glob: Option<String>,
+            exclude_glob: Option<String>,
+        }
+
+        let rows = sqlx::query_as_unchecked!(
+            MountRow,
+            r#"
+            SELECT
+                vfm.virtual_node_id   AS virtual_node_id,
+                vfm.real_folder_id    AS real_folder_id,
+                vfm.sync_enabled      AS sync_enabled,
+                vfm.include_glob      AS include_glob,
+                vfm.exclude_glob      AS exclude_glob,
+                vfm.recursive         AS recursive,
+                rf.abs_path_cached    AS abs_path,
+                rf.mtime              AS stored_mtime
+            FROM virtual_folder_mount vfm
+            JOIN real_folder rf ON rf.id = vfm.real_folder_id
+            WHERE vfm.enabled = 1
+            "#,
+        )
+        .fetch_all(&mut *executor)
+        .await?;
+
+        let mut out = Vec::with_capacity(rows.len());
+        for row in rows {
+            out.push(MountInfo {
+                virtual_node_id: row.virtual_node_id,
+                real_folder_id: row.real_folder_id,
+                recursive: row.recursive != 0,
+                sync_enabled: row.sync_enabled != 0,
+                abs_path: row.abs_path,
+                stored_mtime: row.stored_mtime,
+                include_extensions: Self::decode_extension_list(
+                    row.include_glob,
+                ),
+                exclude_extensions: Self::decode_extension_list(
+                    row.exclude_glob,
+                ),
+            });
+        }
+
+        Ok(out)
+    }
+
     pub(crate) async fn fetch_mount_rows<'a, E>(
         executor: &mut E,
         virtual_node_id: &str,
@@ -49,6 +163,8 @@ impl FileRepository {
                 vfm.recursive         AS recursive,
                 vfm.sync_enabled      AS sync_enabled,
                 vfm.suppress_warnings AS suppress_warnings,
+                vfm.include_glob      AS include_glob,
+                vfm.exclude_glob      AS exclude_glob,
                 rf.abs_path_cached    AS abs_path,
                 rf.error_flag         AS error_flag,
                 rf.error_msg          AS error_msg,
@@ -66,11 +182,12 @@ impl FileRepository {
 
         let mut out = Vec::with_capacity(rows.len());
         for row in rows {
-            let error_flag = match row.get::<Option<String>, _>("error_flag").as_deref() {
-                Some("notfound") => IntegrityCheckResult::NotFound,
-                Some("mismatch") => IntegrityCheckResult::Mismatch,
-                _ => IntegrityCheckResult::Success,
-            };
+            let error_flag =
+                match row.get::<Option<String>, _>("error_flag").as_deref() {
+                    Some("notfound") => IntegrityCheckResult::NotFound,
+                    Some("mismatch") => IntegrityCheckResult::Mismatch,
+                    _ => IntegrityCheckResult::Success,
+                };
 
             out.push(MountWithFolder {
                 mount_id: row.get::<String, _>("mount_id"),
@@ -82,8 +199,15 @@ impl FileRepository {
                 abs_path: row.get::<Option<String>, _>("abs_path"),
                 error_flag,
                 error_msg: row.get::<Option<String>, _>("error_msg"),
-                last_seen_scan_id: row.get::<Option<String>, _>("last_seen_scan_id"),
+                last_seen_scan_id: row
+                    .get::<Option<String>, _>("last_seen_scan_id"),
                 last_seen_at: row.get::<Option<String>, _>("last_seen_at"),
+                include_extensions: Self::decode_extension_list(
+                    row.get::<Option<String>, _>("include_glob"),
+                ),
+                exclude_extensions: Self::decode_extension_list(
+                    row.get::<Option<String>, _>("exclude_glob"),
+                ),
             });
         }
 
@@ -142,7 +266,7 @@ impl FileRepository {
             last_seen_at: Option<String>,
         }
 
-        let mut mounts = Self::fetch_mount_rows(executor, virtual_node_id).await?;
+        let mounts = Self::fetch_mount_rows(executor, virtual_node_id).await?;
 
         Ok(mounts.into_iter().next())
     }
@@ -155,23 +279,25 @@ impl FileRepository {
         recursive: bool,
         sync_enabled: bool,
         suppress_warnings: bool,
+        include_extensions: Option<&[String]>,
+        exclude_extensions: Option<&[String]>,
     ) -> Result<()>
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
     {
-        let recursive = if recursive { 1 } else { 0 };
-        let sync_enabled = if sync_enabled { 1 } else { 0 };
-        let suppress_warnings = if suppress_warnings { 1 } else { 0 };
+        let recursive = if recursive { 1_i64 } else { 0_i64 };
+        let sync_enabled = if sync_enabled { 1_i64 } else { 0_i64 };
+        let suppress_warnings = if suppress_warnings { 1_i64 } else { 0_i64 };
 
         if let Some(new_real_folder_id) = new_real_folder_id {
             sqlx::query!(
                 r#"
                     UPDATE virtual_folder_mount
-                    SET recursive = ?,
-                        sync_enabled = ?,
-                        suppress_warnings = ?,
-                        real_folder_id = ?
-                    WHERE id = ?
+                    SET recursive = ?1,
+                        sync_enabled = ?2,
+                        suppress_warnings = ?3,
+                        real_folder_id = ?4
+                    WHERE id = ?5
                 "#,
                 recursive,
                 sync_enabled,
@@ -185,10 +311,10 @@ impl FileRepository {
             sqlx::query!(
                 r#"
                     UPDATE virtual_folder_mount
-                    SET recursive = ?,
-                        sync_enabled = ?,
-                        suppress_warnings = ?
-                    WHERE id = ?
+                    SET recursive = ?1,
+                        sync_enabled = ?2,
+                        suppress_warnings = ?3
+                    WHERE id = ?4
                 "#,
                 recursive,
                 sync_enabled,
@@ -197,6 +323,62 @@ impl FileRepository {
             )
             .execute(&mut *executor)
             .await?;
+        }
+
+        if let Some(include_extensions) = include_extensions {
+            if include_extensions.is_empty() {
+                sqlx::query!(
+                    r#"
+                        UPDATE virtual_folder_mount
+                        SET include_glob = NULL
+                        WHERE id = ?1
+                    "#,
+                    mount_id
+                )
+                .execute(&mut *executor)
+                .await?;
+            } else {
+                let encoded = serde_json::to_string(include_extensions)?;
+                sqlx::query!(
+                    r#"
+                        UPDATE virtual_folder_mount
+                        SET include_glob = ?1
+                        WHERE id = ?2
+                    "#,
+                    encoded,
+                    mount_id
+                )
+                .execute(&mut *executor)
+                .await?;
+            }
+        }
+
+        if let Some(exclude_extensions) = exclude_extensions {
+            if exclude_extensions.is_empty() {
+                sqlx::query!(
+                    r#"
+                        UPDATE virtual_folder_mount
+                        SET exclude_glob = NULL
+                        WHERE id = ?1
+                    "#,
+                    mount_id
+                )
+                .execute(&mut *executor)
+                .await?;
+            } else {
+                let encoded = serde_json::to_string(exclude_extensions)?;
+                sqlx::query!(
+                    r#"
+                        UPDATE virtual_folder_mount
+                        SET exclude_glob = ?1
+                        WHERE id = ?2
+                    "#,
+                    encoded,
+                    mount_id
+                )
+                .execute(&mut *executor)
+                .await?;
+            }
         }
 
         Ok(())
@@ -559,5 +741,102 @@ impl FileRepository {
         }
 
         Ok(None)
+    }
+
+    pub async fn fetch_file_path_by_info<'a, E>(
+        executor: &mut E,
+        real_folder_id: &str,
+        file_name_norm: &str,
+
+        mtime: i64,
+    ) -> Result<Option<String>>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let file_path_id = sqlx::query_scalar!(
+            r#"
+            SELECT id AS "id!"
+            FROM file_path
+            WHERE folder_id = ?1 AND file_name_norm = ?2 AND mtime = ?3
+            "#,
+            real_folder_id,
+            file_name_norm,
+            mtime
+        )
+        .fetch_optional(&mut *executor)
+        .await?;
+
+        Ok(file_path_id)
+    }
+
+    pub async fn fetch_file_info<'a, E>(
+        executor: &mut E,
+        file_path_id: &str,
+    ) -> Result<Option<FileInfo>>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        #[derive(sqlx::FromRow)]
+        struct FileInfoRow {
+            file_name: String,
+            folder_id: String,
+            file_name_norm: String,
+            mtime: i64,
+            is_found: i64,
+            mime: String,
+            size: i64,
+            xxh3_64: String,
+            sha256: Option<String>,
+            kind: String,
+            display_name: String,
+        }
+
+        let Some(file_info_row) = sqlx::query_as_unchecked!(
+            FileInfoRow,
+            r#"
+            SELECT
+                fp.file_name,
+                fp.folder_id,
+                fp.file_name_norm,
+                fp.mtime,
+                fp.is_found,
+                fc.mime,
+                fc.size,
+                fc.xxh3_64,
+                fc.sha256,
+                fc.kind,
+                fc.display_name
+            FROM file_path fp
+            JOIN file_path_content_binding fpcb ON fp.id = fpcb.file_path_id
+            JOIN file_content fc ON fpcb.file_content_id = fc.id
+            WHERE fp.id = ?1 AND fpcb.is_active = 1
+            "#,
+            file_path_id
+        )
+        .fetch_optional(&mut *executor)
+        .await
+        .map_err(|e| {
+            anyhow!(
+                "Failed to fetch file info for file_path_id {}: {}",
+                file_path_id,
+                e
+            )
+        })?
+        else {
+            return Ok(None);
+        };
+
+        Ok(Some(FileInfo {
+            real_folder_id: file_info_row.folder_id,
+            file_name: file_info_row.file_name,
+            file_name_norm: file_info_row.file_name_norm,
+            file_mtime: Some(file_info_row.mtime),
+            file_exists: file_info_row.is_found != 0,
+            mime_guess: file_info_row.mime,
+            file_size: Some(file_info_row.size),
+            xxh3_64: file_info_row.xxh3_64,
+            sha256: file_info_row.sha256,
+            kind_guess: FileType::from_str(&file_info_row.kind)?,
+        }))
     }
 }

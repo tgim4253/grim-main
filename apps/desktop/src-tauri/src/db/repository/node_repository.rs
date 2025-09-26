@@ -21,6 +21,28 @@ use crate::{
     utils::identifier::get_unique_id,
 };
 
+#[derive(sqlx::FromRow)]
+struct FolderNodeAggregateRow {
+    node_id: String,
+    kind: String,
+    folder_id: String,
+    folder_name: String,
+    created_at: String,
+    updated_at: String,
+    mount_id: Option<String>,
+    real_folder_id: Option<String>,
+    recursive: Option<i64>,
+    sync_enabled: Option<i64>,
+    suppress_warnings: Option<i64>,
+    real_path: Option<String>,
+    error_flag: Option<String>,
+    error_msg: Option<String>,
+    last_seen_scan_id: Option<String>,
+    last_seen_at: Option<String>,
+    include_glob: Option<String>,
+    exclude_glob: Option<String>,
+}
+
 /// Repository responsible for loading and mutating node metadata.
 pub struct NodeRepository;
 
@@ -80,6 +102,8 @@ impl NodeRepository {
                 error_msg: mount.error_msg,
                 last_seen_scan_id: mount.last_seen_scan_id,
                 last_seen_at: mount.last_seen_at,
+                include_extensions: mount.include_extensions,
+                exclude_extensions: mount.exclude_extensions,
             });
         }
 
@@ -189,6 +213,7 @@ impl NodeRepository {
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
     {
+        #[derive(sqlx::FromRow)]
         struct FolderNodeRow {
             folder_id: String,
             folder_name: String,
@@ -304,28 +329,31 @@ impl NodeRepository {
             error_msg: Option<String>,
             last_seen_scan_id: Option<String>,
             last_seen_at: Option<String>,
+            include_glob: Option<String>,
+            exclude_glob: Option<String>,
         }
 
-        let rows: Vec<FolderNodeRow> = sqlx::query_as!(
-            FolderNodeRow,
+        let rows: Vec<FolderNodeAggregateRow> = sqlx::query_as::<_, FolderNodeAggregateRow>(
             r#"
                 SELECT
-                    n.id                         AS "node_id!",
-                    n.kind                       AS "kind!",
-                    nf.id                        AS "folder_id!",
-                    nf.display_name              AS "folder_name!",
-                    n.created_at                 AS "created_at!",
-                    n.updated_at                 AS "updated_at!",
-                    vfm.id                       AS "mount_id?",
-                    vfm.real_folder_id           AS "real_folder_id?",
-                    vfm.recursive                AS "recursive?",
-                    vfm.sync_enabled             AS "sync_enabled?",
-                    vfm.suppress_warnings        AS "suppress_warnings?",
-                    rf.abs_path_cached           AS "real_path?",
-                    rf.error_flag                AS "error_flag?",
-                    rf.error_msg                 AS "error_msg?",
-                    rf.last_seen_scan_id         AS "last_seen_scan_id?",
-                    rf.last_seen_at              AS "last_seen_at?"
+                    n.id                         AS node_id,
+                    n.kind                       AS kind,
+                    nf.id                        AS folder_id,
+                    nf.display_name              AS folder_name,
+                    n.created_at                 AS created_at,
+                    n.updated_at                 AS updated_at,
+                    vfm.id                       AS mount_id,
+                    vfm.real_folder_id           AS real_folder_id,
+                    vfm.recursive                AS recursive,
+                    vfm.sync_enabled             AS sync_enabled,
+                    vfm.suppress_warnings        AS suppress_warnings,
+                    vfm.include_glob             AS include_glob,
+                    vfm.exclude_glob             AS exclude_glob,
+                    rf.abs_path_cached           AS real_path,
+                    rf.error_flag                AS error_flag,
+                    rf.error_msg                 AS error_msg,
+                    rf.last_seen_scan_id         AS last_seen_scan_id,
+                    rf.last_seen_at              AS last_seen_at
                 FROM node n
                 JOIN node_folder nf ON nf.node_id = n.id
                 LEFT JOIN virtual_folder_mount vfm
@@ -393,6 +421,12 @@ impl NodeRepository {
                     error_msg: row.error_msg.clone(),
                     last_seen_scan_id: row.last_seen_scan_id.clone(),
                     last_seen_at: row.last_seen_at.clone(),
+                    include_extensions: FileRepository::decode_extension_list(
+                        row.include_glob.clone(),
+                    ),
+                    exclude_extensions: FileRepository::decode_extension_list(
+                        row.exclude_glob.clone(),
+                    ),
                 };
 
                 mounts_by_node

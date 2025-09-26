@@ -1,11 +1,14 @@
 use crate::bootstrap;
 use crate::config::file::IntegrityCheckResult;
 use crate::db::repository::connection_repository::ConnectionRepository;
+use crate::db::repository::file_repository::FileRepository;
 use crate::db::repository::node_repository::NodeRepository;
 use crate::models::file::FileInfo;
 use crate::models::node::{NodeKind, NodeWithConnections};
 use crate::services::db::DB_MANAGER;
-use crate::services::file_service::folder::sync_virtual_folder;
+use crate::services::file_service::folder::{
+    sync_virtual_folder, ExtensionFilter,
+};
 use crate::services::storage_root::enumerate_mounted_root;
 use crate::services::{db, integrity, moa_services};
 use crate::utils::date::get_now_date;
@@ -165,7 +168,11 @@ async fn run_bootstrap_pipeline(
     step(&app, &state, &moa_id, Stage::InitialScan, 60, Some("Indexing files"))
         .await;
 
+    let t3 = Instant::now();
+
     perform_initial_scan(&app, &moa_id).await?;
+
+    info!("Indexing files: {:?} ms", t3.elapsed().as_millis());
 
     step(&app, &state, &moa_id, Stage::Ready, 100, Some("Done")).await;
 
@@ -233,6 +240,8 @@ async fn perform_initial_scan(
         sync_enabled: i64,
         abs_path: Option<String>,
         stored_mtime: i64,
+        include_blob: Option<String>,
+        exclude_blob: Option<String>,
     }
 
     let scan_id = get_unique_id();
@@ -255,32 +264,9 @@ async fn perform_initial_scan(
 
     let mounts = {
         let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
-        let rows = sqlx::query(
-            r#"
-            SELECT
-                vfm.virtual_node_id,
-                vfm.real_folder_id,
-                vfm.sync_enabled,
-                rf.abs_path_cached,
-                rf.mtime
-            FROM virtual_folder_mount vfm
-            JOIN real_folder rf ON rf.id = vfm.real_folder_id
-            WHERE vfm.enabled = 1
-            "#,
-        )
-        .fetch_all(tx.as_mut())
-        .await?;
+        let mounts = FileRepository::fetch_mounts_rows(tx.as_mut()).await?;
         tx.commit().await?;
-
-        rows.into_iter()
-            .map(|row| MountRow {
-                virtual_node_id: row.get::<String, _>("virtual_node_id"),
-                real_folder_id: row.get::<String, _>("real_folder_id"),
-                sync_enabled: row.get::<i64, _>("sync_enabled"),
-                abs_path: row.get::<Option<String>, _>("abs_path_cached"),
-                stored_mtime: row.get::<i64, _>("mtime"),
-            })
-            .collect::<Vec<_>>()
+        mounts
     };
 
     for mount in mounts {
@@ -289,6 +275,12 @@ async fn perform_initial_scan(
         let mut current_mtime = mount.stored_mtime;
         if let Some(path) = mount.abs_path.as_ref() {
             let pb = PathBuf::from(path);
+
+            let extension_filter = ExtensionFilter::new(
+                &mount.include_extensions,
+                &mount.exclude_extensions,
+            );
+
             match fs::metadata(&pb).await {
                 Ok(meta) => {
                     current_mtime = FileInfo::file_mtime_epoch(&meta)?;
@@ -297,7 +289,7 @@ async fn perform_initial_scan(
                         error_msg =
                             Some("Detected filesystem changes".to_string());
 
-                        if mount.sync_enabled != 0 {
+                        if mount.sync_enabled && extension_filter.allows(&pb) {
                             match sync_virtual_folder(
                                 app,
                                 moa_id,
@@ -306,12 +298,9 @@ async fn perform_initial_scan(
                             .await
                             {
                                 Ok(()) => {
-                                    if let Ok(meta) = fs::metadata(&pb).await
-                                    {
+                                    if let Ok(meta) = fs::metadata(&pb).await {
                                         current_mtime =
-                                            FileInfo::file_mtime_epoch(
-                                                &meta,
-                                            )?;
+                                            FileInfo::file_mtime_epoch(&meta)?;
                                     }
                                     status = IntegrityCheckResult::Success;
                                     error_msg = None;
