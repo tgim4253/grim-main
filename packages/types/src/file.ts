@@ -145,6 +145,8 @@ export interface FolderMountState {
   errorMsg?: string | null;
   lastSeenScanId?: string | null;
   lastSeenAt?: string | null;
+  includeExtensions: string[];
+  excludeExtensions: string[];
 }
 
 export interface FolderOptionUpdatePayload {
@@ -152,4 +154,6 @@ export interface FolderOptionUpdatePayload {
   recursive: boolean;
   syncEnabled: boolean;
   suppressWarnings: boolean;
+  includeExtensions?: string[];
+  excludeExtensions?: string[];
 }

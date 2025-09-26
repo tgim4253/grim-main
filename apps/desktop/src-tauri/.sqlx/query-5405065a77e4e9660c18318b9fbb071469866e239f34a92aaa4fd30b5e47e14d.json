@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT file_path_id AS \"file_path_id!\"\n            FROM file_path_content_binding\n            WHERE file_content_id = ?1 AND is_active = 1 AND match_states = 'match'\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "file_path_id!",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5405065a77e4e9660c18318b9fbb071469866e239f34a92aaa4fd30b5e47e14d"
+}
