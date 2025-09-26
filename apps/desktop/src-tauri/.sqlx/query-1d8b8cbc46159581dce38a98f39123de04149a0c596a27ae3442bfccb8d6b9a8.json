@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT node_id\n                FROM node_file_binding\n                WHERE file_content_id = ?1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "node_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1d8b8cbc46159581dce38a98f39123de04149a0c596a27ae3442bfccb8d6b9a8"
+}

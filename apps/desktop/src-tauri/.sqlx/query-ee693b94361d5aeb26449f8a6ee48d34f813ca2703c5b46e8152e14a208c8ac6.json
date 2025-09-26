@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                n.id\n            FROM node n\n            JOIN node_folder nf ON nf.node_id = n.id\n            JOIN connection c ON c.src_node_id = ?2 AND c.dst_node_id = n.id\n            JOIN connection_kind_rule nk ON nk.kind = ?4\n            WHERE nf.display_name = ?1 AND n.kind = ?3 AND c.kind_id = nk.id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ee693b94361d5aeb26449f8a6ee48d34f813ca2703c5b46e8152e14a208c8ac6"
+}

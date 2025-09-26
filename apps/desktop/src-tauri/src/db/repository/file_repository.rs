@@ -48,6 +48,18 @@ pub struct MountInfo {
     pub exclude_extensions: Vec<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct FilePathRecord {
+    pub id: String,
+    pub folder_id: String,
+    pub folder_name: Option<String>,
+    pub file_name: String,
+    pub stored_mtime: Option<i64>,
+    pub is_found: bool,
+    pub abs_path_cached: Option<String>,
+    pub match_state: MatchStates,
+}
+
 impl FileRepository {
     fn normalize_extension_vec(list: Vec<String>) -> Vec<String> {
         let mut seen: HashSet<String> = HashSet::new();
@@ -232,9 +244,9 @@ impl FileRepository {
                 (id, virtual_node_id, real_folder_id, created_at, enabled, priority, recursive, sync_enabled, suppress_warnings)
             VALUES
                 (?1, ?2, ?3, ?4, 1, 0, 1, 0, 0)
-            ON CONFLICT(virtual_node_id, real_folder_id) DO NOTHING; 
+            ON CONFLICT(virtual_node_id, real_folder_id) DO NOTHING;
         "#,
-            mount_id, 
+            mount_id,
             virtual_node_id,
             real_folder_id,
             now
@@ -761,6 +773,79 @@ impl FileRepository {
         }
 
         Ok(None)
+    }
+
+    /// Load all active file paths bound to the provided file content identifier.
+    pub async fn fetch_paths_for_content<'a, E>(
+        executor: &mut E,
+        file_content_id: &str,
+    ) -> Result<Vec<FilePathRecord>>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        #[derive(sqlx::FromRow)]
+        struct Row {
+            file_path_id: String,
+            folder_id: String,
+            file_name: String,
+            mtime: Option<i64>,
+            is_found: i64,
+            abs_path_cached: Option<String>,
+            folder_name: Option<String>,
+            match_states: MatchStates,
+        }
+
+        let rows = sqlx::query_as!(
+            Row,
+            r#"
+            SELECT
+                fp.id                AS "file_path_id!",
+                fp.folder_id         AS "folder_id!",
+                fp.file_name         AS "file_name!",
+                fp.mtime             AS "mtime?",
+                fp.is_found          AS "is_found!",
+                rf.abs_path_cached   AS "abs_path_cached?",
+                rf.name              AS "folder_name?",
+                fpcb.match_states    AS "match_states!: MatchStates"
+            FROM file_path_content_binding fpcb
+            JOIN file_path fp ON fp.id = fpcb.file_path_id
+            LEFT JOIN real_folder rf ON rf.id = fp.folder_id
+            WHERE fpcb.file_content_id = ?1 AND fpcb.is_active = 1
+            ORDER BY fp.updated_at DESC
+            "#,
+            file_content_id,
+        )
+        .fetch_all(&mut *executor)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| FilePathRecord {
+                id: row.file_path_id,
+                folder_id: row.folder_id,
+                folder_name: row.folder_name,
+                file_name: row.file_name,
+                stored_mtime: row.mtime,
+                is_found: row.is_found != 0,
+                abs_path_cached: row.abs_path_cached,
+                match_state: row.match_states,
+            })
+            .collect())
+    }
+
+    /// Remove a file-path row and its bindings.
+    pub async fn delete_file_path<'a, E>(
+        executor: &mut E,
+        file_path_id: &str,
+    ) -> Result<()>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        sqlx::query!("DELETE FROM file_path WHERE id = ?1", file_path_id)
+            .execute(&mut *executor)
+            .await?;
+
+        Ok(())
     }
 
     pub async fn fetch_file_path_by_info<'a, E>(

@@ -25,6 +25,8 @@ import { FileType, ThumbResSpec } from '@tgim/types/file';
 import { Button } from '@tgim/ui';
 import cn from '@tgim/utils/cn';
 import { GitBranch, LayoutGrid } from 'lucide-react';
+import { Split } from '@tgim/ui/Splitter';
+import FileDetailSidebar from './panels/FileDetailSidebar';
 
 interface PanelProps {
   panelId: string;
@@ -38,6 +40,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [gridData, setGridData] = useState<GridData | null>(null);
   const [rootNodeId, setRootNodeId] = useState<string | null>(null);
+  const [activeImage, setActiveImage] = useState<ImageItem | null>(null);
 
   const { panel, containerId, isActive } = usePanelsStore(
     useShallow(state => ({
@@ -70,7 +73,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     as();
   }, [moaId]);
   const transformDataToGraphData = useCallback((graphData: GraphResponse): GraphData => {
-    setRootNodeId(graphData.root_node_id);
+    setRootNodeId(graphData.rootNodeId);
 
     const nodesMap: Record<string, Node> = {};
     graphData.nodes.forEach(node => {
@@ -78,10 +81,10 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     });
     const connectionsMap: Record<string, Connection[]> = {};
     graphData.connections.forEach(connection => {
-      if (!connectionsMap[connection.src_node_id]) {
-        connectionsMap[connection.src_node_id] = [];
+      if (!connectionsMap[connection.srcNodeId]) {
+        connectionsMap[connection.srcNodeId] = [];
       }
-      connectionsMap[connection.src_node_id].push(connection);
+      connectionsMap[connection.srcNodeId].push(connection);
     });
 
     const nodes: GraphNode[] = [];
@@ -89,7 +92,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
 
     const getGraphNodeData = (node: Node, graphNodeId?: string): GraphNode => {
       const defaultSize = 14;
-      const nodeSize = node.id == graphData.root_node_id ? defaultSize * 1.6 : defaultSize;
+      const nodeSize = node.id == graphData.rootNodeId ? defaultSize * 1.6 : defaultSize;
       if (!graphNodeId) graphNodeId = createNewId();
 
       if (node.kind == NodeKind.File && node.data['File']) {
@@ -105,10 +108,10 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         return {
           id: graphNodeId,
           nodeId: node.id,
-          label: data.file_name ?? 'file',
+          label: data.fileName ?? 'file',
           size: nodeSize,
           type: type,
-          hash: data.xxh3_64,
+          hash: data.xxh364,
         };
       } else if (node.kind == NodeKind.Folder && node.data['Folder']) {
         let data = node.data['Folder'];
@@ -116,7 +119,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         return {
           id: graphNodeId,
           nodeId: node.id,
-          label: data.folder_name ?? 'folder',
+          label: data.folderName ?? 'folder',
           size: nodeSize,
           type: 'folder',
         };
@@ -145,12 +148,8 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       // This mirrors the original recursive function (children are not shared).
       let rootNewId: string | undefined;
 
-      const seen: Set<string> = new Set();
-
       while (stack.length > 0) {
         const { origId, parentNewId, via, prevLevel, depth } = stack.pop()!;
-        if (seen.has(origId)) continue;
-        seen.add(origId);
 
         if (maxDepth && depth > maxDepth) continue;
 
@@ -159,7 +158,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         const node = nodesMap[origId];
         const newNode = getGraphNodeData(node, newId);
         newNode.depth = depth;
-        if (node.id == graphData.root_node_id) {
+        if (node.id == graphData.rootNodeId) {
           newNode.fx = 0;
           newNode.fy = 0;
         }
@@ -185,7 +184,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         for (const connection of connections) {
           if (prevLevel !== 3)
             stack.push({
-              origId: connection.dst_node_id,
+              origId: connection.dstNodeId,
               parentNewId: newId,
               via: connection,
               prevLevel: connection.level,
@@ -196,7 +195,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
 
       // rootNewId must exist because startNodeId produced at least one node
       return rootNewId!;
-    })(graphData.root_node_id, 99);
+    })(graphData.rootNodeId, 99);
 
     return {
       nodes,
@@ -204,7 +203,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     };
   }, []);
   const transformDataToGridData = useCallback(async (data: GraphResponse): Promise<GridData> => {
-    const items = data.nodes.filter(node => node.id !== data.root_node_id);
+    const items = data.nodes.filter(node => node.id !== data.rootNodeId);
     const imageItems: ImageItem[] = [];
     items.forEach(item => {
       if (item.kind == NodeKind.File && item.data['File']) {
@@ -213,10 +212,10 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         imageItems.push({
           id: createNewId(),
           nodeId: item.id,
-          name: data.file_name,
+          name: data.fileName,
           type: data.kind,
           size: data.size,
-          hash: data.xxh3_64,
+          hash: data.xxh364,
         });
       }
     });
@@ -234,6 +233,26 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     });
     return id;
   }, [graphData, rootNodeId]);
+  useEffect(() => {
+    if (!gridData || !activeImage) return;
+    const exists = gridData.images.some(img => img.hash === activeImage.hash);
+    if (!exists) {
+      setActiveImage(null);
+    }
+  }, [gridData, activeImage?.hash]);
+
+  useEffect(() => {
+    if (!gridData) {
+      setActiveImage(null);
+    }
+  }, [gridData]);
+
+  useEffect(() => {
+    if (viewType !== 'grid') {
+      setActiveImage(null);
+    }
+  }, [viewType]);
+
   if (!panel || !container) return null;
 
   const showGraph = viewType === 'graph' && graphData && rootNodeId && rootGraphNodeId;
@@ -283,7 +302,37 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
             graphData={graphData}
           />
         ) : showGrid && gridData ? (
-          <GridView gridData={gridData} />
+          <Split position="horizontal" className="w-full h-full">
+            {({ Panel: SplitPanel }) => (
+              <>
+                <SplitPanel key="grid" minSize={320}>
+                  <GridView
+                    gridData={gridData}
+                    onImageOpen={image => {
+                      setActiveImage(image);
+                    }}
+                    onClearPreview={() => setActiveImage(null)}
+                  />
+                </SplitPanel>
+                {activeImage && (
+                  <SplitPanel
+                    key="sidebar"
+                    canHidden
+                    onHidden={hidden => hidden && setActiveImage(null)}
+                    hiddenSize={200}
+                    minSize={280}
+                    initialSize={360}
+                  >
+                    <FileDetailSidebar
+                      moaId={moaId}
+                      image={activeImage}
+                      onClose={() => setActiveImage(null)}
+                    />
+                  </SplitPanel>
+                )}
+              </>
+            )}
+          </Split>
         ) : null}
       </div>
     </div>,

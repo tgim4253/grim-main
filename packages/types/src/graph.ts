@@ -3,7 +3,7 @@ import { FileType, FolderHealthState, FolderMountState } from './file';
 export interface GraphResponse {
   nodes: Node[];
   connections: Connection[];
-  root_node_id: string;
+  rootNodeId: string;
 }
 
 export interface GraphData {
@@ -39,9 +39,9 @@ export interface GraphConnection {
 
 export interface Connection {
   id: string;
-  src_node_id: string;
-  dst_node_id: string;
-  kind_rule_id: string;
+  srcNodeId: string;
+  dstNodeId: string;
+  kindRuleId: string;
   kind: RelationType;
   level: number;
 }
@@ -53,8 +53,8 @@ export interface Node {
     ['File']?: NodeFile;
     ['Folder']?: NodeFolder;
   };
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export enum NodeKind {
@@ -63,20 +63,20 @@ export enum NodeKind {
 }
 
 export interface NodeFolder {
-  folder_id: string;
-  node_id: string;
-  folder_name: string | null;
+  folderId: string;
+  nodeId: string;
+  folderName: string | null;
   mounts?: FolderMountState[];
   health?: FolderHealthState;
 }
 
 export interface NodeFile {
-  file_id: string;
-  node_id: string;
+  fileId: string;
+  nodeId: string;
   sha256: string | null;
-  xxh3_64: string;
+  xxh364: string;
   kind: FileType;
-  file_name: string;
+  fileName: string;
   size: number;
 }
 

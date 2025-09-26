@@ -337,7 +337,7 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
     void (async () => {
       try {
         const moas = await ipc.moa.loadMoas();
-        const target = moas.find(moa => moa.moa_id === moaId);
+        const target = moas.find(moa => moa.moaId === moaId);
         if (!target) return;
         const defaultPath = await join(target.path, target.name, 'croquis');
         if (cancelled) return;

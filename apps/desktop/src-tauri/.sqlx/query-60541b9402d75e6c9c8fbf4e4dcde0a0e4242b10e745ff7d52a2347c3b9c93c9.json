@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                        UPDATE virtual_folder_mount\n                        SET include_glob = ?1\n                        WHERE id = ?2\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "60541b9402d75e6c9c8fbf4e4dcde0a0e4242b10e745ff7d52a2347c3b9c93c9"
+}

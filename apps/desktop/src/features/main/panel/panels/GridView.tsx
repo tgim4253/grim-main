@@ -65,6 +65,8 @@ const MasonryIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 interface Props {
   gridData: GridData;
+  onImageOpen?: (image: ImageItem) => void;
+  onClearPreview?: () => void;
 }
 
 type Size = 'small' | 'medium' | 'large';
@@ -215,7 +217,7 @@ function useElementSize<T extends HTMLElement>(ref: React.RefObject<T>) {
 /* ---------------------------------------------
  * Main Component
  * --------------------------------------------- */
-const GridView: React.FC<Props> = ({ gridData }) => {
+const GridView: React.FC<Props> = ({ gridData, onImageOpen, onClearPreview }) => {
   const { moaId } = useMoa(location);
   const [layout, setLayout] = useState<Layout>('grid');
   const [size, setSize] = useState<Size>('medium');
@@ -396,23 +398,25 @@ const GridView: React.FC<Props> = ({ gridData }) => {
         clearSelection();
         return false;
       }
+      onClearPreview?.();
       return true;
     });
-  }, [clearSelection]);
+  }, [clearSelection, onClearPreview]);
 
   const handleBackgroundClick = useCallback(() => {
     clearSelection();
-  }, [clearSelection]);
+    onClearPreview?.();
+  }, [clearSelection, onClearPreview]);
 
   const handleItemClick = useCallback(
     (event: React.MouseEvent, img: ImageItem) => {
       handleSelectionClick(event, img.hash);
 
       if (!selectMode) {
-        console.log(img);
+        onImageOpen?.(img);
       }
     },
-    [handleSelectionClick, selectMode],
+    [handleSelectionClick, selectMode, onImageOpen],
   );
 
   return (
