@@ -333,8 +333,9 @@ impl NodeRepository {
             exclude_glob: Option<String>,
         }
 
-        let rows: Vec<FolderNodeAggregateRow> = sqlx::query_as::<_, FolderNodeAggregateRow>(
-            r#"
+        let rows: Vec<FolderNodeAggregateRow> =
+            sqlx::query_as::<_, FolderNodeAggregateRow>(
+                r#"
                 SELECT
                     n.id                         AS node_id,
                     n.kind                       AS kind,
@@ -362,9 +363,9 @@ impl NodeRepository {
                 WHERE n.kind = 'folder'
                 ORDER BY n.created_at, vfm.priority
             "#,
-        )
-        .fetch_all(&mut *executor)
-        .await?;
+            )
+            .fetch_all(&mut *executor)
+            .await?;
 
         let mut nodes_by_id: HashMap<String, Node> = HashMap::new();
         let mut ordered_ids: Vec<String> = Vec::new();
@@ -768,5 +769,34 @@ impl NodeRepository {
         .await?;
 
         Ok(())
+    }
+
+    pub async fn fetch_folder_node_id_by_name<'a, E>(
+        executor: &mut E,
+        name: String,
+        parent_node_id: String,
+    ) -> Result<Option<String>>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let id: Option<String> = sqlx::query_scalar_unchecked!(
+            r#"
+            SELECT
+                n.id
+            FROM node n
+            JOIN node_folder nf ON nf.node_id = n.id
+            JOIN connection c ON c.src_node_id = ?2 AND c.dst_node_id = n.id
+            JOIN connection_kind_rule nk ON nk.kind = ?4
+            WHERE nf.display_name = ?1 AND n.kind = ?3 AND c.kind_id = nk.id
+            "#,
+            name,
+            parent_node_id,
+            NodeKind::Folder,
+            RelationType::ChildFolder,
+        )
+        .fetch_optional(&mut *executor)
+        .await?;
+
+        Ok(id)
     }
 }

@@ -226,18 +226,19 @@ impl FileRepository {
         let mount_id = get_unique_id();
         let now = crate::utils::date::get_now_date();
         // todo: enable, priority, recursive setting from front
-        sqlx::query(
+        sqlx::query!(
             r#"
-        INSERT INTO virtual_folder_mount
-            (id, virtual_node_id, real_folder_id, created_at, enabled, priority, recursive, sync_enabled, suppress_warnings)
-        VALUES
-            (?1, ?2, ?3, ?4, 1, 0, 1, 0, 0)
+            INSERT INTO virtual_folder_mount
+                (id, virtual_node_id, real_folder_id, created_at, enabled, priority, recursive, sync_enabled, suppress_warnings)
+            VALUES
+                (?1, ?2, ?3, ?4, 1, 0, 1, 0, 0)
+            ON CONFLICT(virtual_node_id, real_folder_id) DO NOTHING; 
         "#,
+            mount_id, 
+            virtual_node_id,
+            real_folder_id,
+            now
         )
-        .bind(&mount_id)
-        .bind(&virtual_node_id)
-        .bind(&real_folder_id)
-        .bind(&now)
         .execute(&mut *executor)
         .await?;
 
@@ -419,6 +420,25 @@ impl FileRepository {
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
     {
+        if let Some(folder_node_id) =
+            NodeRepository::fetch_folder_node_id_by_name(
+                executor,
+                name.clone(),
+                parent_id.clone(),
+            )
+            .await?
+        {
+            let node = NodeRepository::fetch_nodes_by_ids(
+                executor,
+                vec![folder_node_id.clone()],
+            )
+            .await?
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow!("node not found"))?;
+            return Ok(node);
+        };
+
         let folder_id = get_unique_id();
         let now = get_now_date();
 

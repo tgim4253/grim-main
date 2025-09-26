@@ -276,10 +276,10 @@ async fn perform_initial_scan(
         if let Some(path) = mount.abs_path.as_ref() {
             let pb = PathBuf::from(path);
 
-            let extension_filter = ExtensionFilter::new(
-                &mount.include_extensions,
-                &mount.exclude_extensions,
-            );
+            // let extension_filter = ExtensionFilter::new(
+            //     &mount.include_extensions,
+            //     &mount.exclude_extensions,
+            // );
 
             match fs::metadata(&pb).await {
                 Ok(meta) => {
@@ -289,7 +289,7 @@ async fn perform_initial_scan(
                         error_msg =
                             Some("Detected filesystem changes".to_string());
 
-                        if mount.sync_enabled && extension_filter.allows(&pb) {
+                        if mount.sync_enabled {
                             match sync_virtual_folder(
                                 app,
                                 moa_id,
