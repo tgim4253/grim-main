@@ -338,6 +338,26 @@ impl FileRepository {
             .await?;
         }
 
+        Self::update_mount_extension_filters(
+            executor,
+            mount_id,
+            include_extensions,
+            exclude_extensions,
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn update_mount_extension_filters<'a, E>(
+        executor: &mut E,
+        mount_id: &str,
+        include_extensions: Option<&[String]>,
+        exclude_extensions: Option<&[String]>,
+    ) -> Result<()>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
         if let Some(include_extensions) = include_extensions {
             if include_extensions.is_empty() {
                 sqlx::query!(

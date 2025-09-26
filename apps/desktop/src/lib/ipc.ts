@@ -3,8 +3,9 @@ import { invoke } from '@tauri-apps/api/core';
 import { GraphResponse } from '@tgim/types/graph';
 import {
   CreateFolderPayload,
-  FileDetail,
+  FileTypeExtensionGroup,
   FolderOptionUpdatePayload,
+  FileDetail,
   FolderPreview,
   ThumbRequest,
   ThumbResponse,
@@ -103,6 +104,10 @@ const fileIpc = {
   ) => {
     await invoke('update_folder_mount_options', { moaId, virtualNodeId, options });
   },
+  listFileTypeExtensions: async (): Promise<FileTypeExtensionGroup[]> => {
+    const response = await invoke('list_file_type_extensions');
+    return response as FileTypeExtensionGroup[];
+  },
   getFileDetail: async (moaId: string, hash: string): Promise<FileDetail> => {
     const response = await invoke('get_file_detail', { moaId, hash });
     return response as FileDetail;
@@ -120,11 +125,7 @@ const fileIpc = {
     });
     return response as FileDetail;
   },
-  removeFilePath: async (
-    moaId: string,
-    hash: string,
-    filePathId: string,
-  ): Promise<FileDetail> => {
+  removeFilePath: async (moaId: string, hash: string, filePathId: string): Promise<FileDetail> => {
     const response = await invoke('remove_file_path', { moaId, hash, filePathId });
     return response as FileDetail;
   },

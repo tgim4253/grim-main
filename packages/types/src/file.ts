@@ -111,6 +111,11 @@ export interface FolderPreview {
   summary: FolderPreviewSummary;
 }
 
+export interface FileTypeExtensionGroup {
+  fileType: FileType;
+  extensions: string[];
+}
+
 export interface FolderSelectionEntry {
   relativePath: string;
   include: boolean;

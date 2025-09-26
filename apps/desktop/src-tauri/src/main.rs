@@ -53,6 +53,7 @@ fn main() {
             commands::file::link_file_path,
             commands::file::remove_file_path,
             commands::file::reveal_file_in_explorer,
+            commands::file::list_file_type_extensions,
             commands::croquis::start_croquis_session,
             commands::croquis::load_croquis_session,
             commands::croquis::load_croquis_option,
