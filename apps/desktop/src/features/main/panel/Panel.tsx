@@ -145,12 +145,8 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       // This mirrors the original recursive function (children are not shared).
       let rootNewId: string | undefined;
 
-      const seen: Set<string> = new Set();
-
       while (stack.length > 0) {
         const { origId, parentNewId, via, prevLevel, depth } = stack.pop()!;
-        if (seen.has(origId)) continue;
-        seen.add(origId);
 
         if (maxDepth && depth > maxDepth) continue;
 
