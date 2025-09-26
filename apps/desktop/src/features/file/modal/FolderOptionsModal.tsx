@@ -29,11 +29,23 @@ const collectExtensions = (selection: ExtensionSelection, custom: string) => {
   return Array.from(result).sort();
 };
 
+const initialSelections = () => {
+  return {
+    [FileType.Image]: new Set<string>(),
+    [FileType.Video]: new Set<string>(),
+    [FileType.GraphicTool]: new Set<string>(),
+    [FileType.Audio]: new Set<string>(),
+    [FileType.Document]: new Set<string>(),
+    [FileType.Archive]: new Set<string>(),
+    [FileType.Unknown]: new Set<string>(),
+  };
+};
+
 const partitionExtensions = (
   lookup: Map<string, FileType>,
   extensions?: string[],
 ): { selections: ExtensionSelection; remainder: string[] } => {
-  const selections: ExtensionSelection = {};
+  const selections: ExtensionSelection = initialSelections();
   const remainder: string[] = [];
 
   if (!extensions) {
@@ -96,8 +108,8 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [extensionGroups, setExtensionGroups] = useState<FileTypeExtensionGroup[]>([]);
   const [loadingExtensions, setLoadingExtensions] = useState(true);
-  const [includeSelection, setIncludeSelection] = useState<ExtensionSelection>({});
-  const [excludeSelection, setExcludeSelection] = useState<ExtensionSelection>({});
+  const [includeSelection, setIncludeSelection] = useState<ExtensionSelection>(initialSelections());
+  const [excludeSelection, setExcludeSelection] = useState<ExtensionSelection>(initialSelections());
   const [includeCustom, setIncludeCustom] = useState('');
   const [excludeCustom, setExcludeCustom] = useState('');
   const [expandedInclude, setExpandedInclude] = useState<Set<FileType>>(() => new Set());
@@ -145,8 +157,8 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({
 
   useEffect(() => {
     if (!mount) {
-      setIncludeSelection({});
-      setExcludeSelection({});
+      setIncludeSelection(initialSelections());
+      setExcludeSelection(initialSelections());
       setIncludeCustom('');
       setExcludeCustom('');
       setExpandedInclude(new Set());
@@ -337,8 +349,6 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({
       recursive,
       syncEnabled,
       suppressWarnings,
-      includeExtensions,
-      excludeExtensions,
       includeExtensions,
       excludeExtensions,
     };
