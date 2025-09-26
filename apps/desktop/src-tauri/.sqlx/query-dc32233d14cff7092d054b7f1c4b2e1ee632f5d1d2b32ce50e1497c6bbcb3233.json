@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO connection (id, src_node_id, dst_node_id, kind_id, created_at)\n            VALUES (\n                ?1,\n                ?2,\n                ?3,\n                (SELECT id FROM connection_kind_rule WHERE kind = ?4),\n                ?5\n            )\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "dc32233d14cff7092d054b7f1c4b2e1ee632f5d1d2b32ce50e1497c6bbcb3233"
+}

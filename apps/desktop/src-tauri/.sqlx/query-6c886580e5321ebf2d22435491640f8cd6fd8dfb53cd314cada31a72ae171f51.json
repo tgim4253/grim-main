@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO storage_root_mount\n                (id, storage_root_id, mount_path, created_at, updated_at)\n            VALUES\n                (?1, ?2, ?3, ?4, ?5)\n            ON CONFLICT(storage_root_id, mount_path) DO UPDATE SET\n                updated_at   = excluded.updated_at\n            RETURNING id as \"id!: String\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "6c886580e5321ebf2d22435491640f8cd6fd8dfb53cd314cada31a72ae171f51"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO node_file_binding (id, node_id, file_content_id, created_at)\n            VALUES (?1, ?2, ?3, ?4)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "6b524d282e2287510cddc7a1d50bbbd6c0b0bbbce724465fef3803f93dc7ba92"
+}

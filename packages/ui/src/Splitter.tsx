@@ -101,7 +101,8 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
     const rendered = children({ Panel: SplitPanel });
 
     const panels = React.useMemo(() => {
-      return collectPanelsAtFirstDepth(rendered);
+      // limit two panels
+      return collectPanelsAtFirstDepth(rendered).slice(0, 2);
     }, [rendered]);
     const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -399,8 +400,10 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
     const enhancedChildren = (
       <>
         {panels.map((child, index) => {
-          const sizePct = sizes[index] ?? 0;
           const isHidden = hiddens[index];
+
+          const hiddenIndex = hiddens.findIndex(el => el === true);
+          const sizePct = hiddenIndex !== -1 && hiddenIndex !== index ? 100 : (sizes[index] ?? 0);
 
           const sizeStyle = isHidden
             ? { display: 'none' }
