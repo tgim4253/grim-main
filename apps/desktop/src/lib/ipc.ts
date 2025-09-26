@@ -90,6 +90,10 @@ const fileIpc = {
     const response = await invoke('get_file_path', { moaId, hash });
     return response as string;
   },
+  expandPreferredUrls: async (url: string) => {
+    const response = await invoke('expand_preferred_urls', { url });
+    return response as string[];
+  },
   previewFolderImport: async (path: string): Promise<FolderPreview> => {
     const response = await invoke('preview_folder_import', { path });
     return convertKeysToCamel(response) as FolderPreview;
@@ -103,6 +107,20 @@ const fileIpc = {
     options: FolderOptionUpdatePayload,
   ) => {
     await invoke('update_folder_mount_options', { moaId, virtualNodeId, options });
+  },
+  importPanelDrop: async (payload: {
+    moaId: string;
+    virtualNodeId: string;
+    urls?: string[];
+    baseUrls?: string[];
+    paths?: string[];
+    files?: {
+      name: string;
+      mimeType?: string | null;
+      dataBase64: string;
+    }[];
+  }) => {
+    await invoke('import_panel_drop', { payload });
   },
   listFileTypeExtensions: async (): Promise<FileTypeExtensionGroup[]> => {
     const response = await invoke('list_file_type_extensions');

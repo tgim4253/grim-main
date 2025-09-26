@@ -8,11 +8,14 @@ use crate::{
     },
     services::file_service::{
         self, clear_base_thumb_cache, clear_derived_thumb_cache,
-        collect_folder_preview, collect_thumb_cache_usage, first_mount_folder,
-        get_file_detail as service_get_file_detail, get_thumbs,
+        collect_folder_preview, collect_thumb_cache_usage,
+        expand_preferred_urls as service_expand_preferred_urls,
+        first_mount_folder, get_file_detail as service_get_file_detail,
+        get_thumbs, import_panel_drop as import_panel_drop_service,
         link_file_path as service_link_file_path,
         remove_file_path as service_remove_file_path, reveal_in_file_manager,
-        sync_virtual_folder, update_virtual_folder_options, ThumbCacheUsage,
+        sync_virtual_folder, update_virtual_folder_options, PanelDropRequest,
+        PanelDropResponse, ThumbCacheUsage,
     },
 };
 #[tauri::command]
@@ -25,7 +28,6 @@ pub async fn create_folder(
     let node = file_service::create_folder(moa_id.clone(), data.clone())
         .await
         .map_err(|e| e.to_string())?;
-
     if let Some(path) = data.path.as_ref().filter(|path| !path.is_empty()) {
         first_mount_folder(
             app_handle,
@@ -67,6 +69,12 @@ pub async fn get_file_path(
         .map_err(|e| e.to_string())?;
 
     Ok(path.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+/// Expand a candidate URL list for a dropped resource.
+pub async fn expand_preferred_urls(url: String) -> Result<Vec<String>, String> {
+    Ok(service_expand_preferred_urls(&url))
 }
 
 #[tauri::command]
@@ -124,6 +132,15 @@ pub async fn update_folder_mount_options(
     update_virtual_folder_options(&moa_id, &virtual_node_id, options)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn import_panel_drop(
+    app_handle: tauri::AppHandle,
+    payload: PanelDropRequest,
+) -> Result<PanelDropResponse, String> {
+    let _ = app_handle; // reserved for future use (logging/scoping)
+    import_panel_drop_service(payload).await.map_err(|err| err.to_string())
 }
 
 #[tauri::command]

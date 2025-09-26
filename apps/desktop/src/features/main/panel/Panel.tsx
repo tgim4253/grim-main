@@ -1,5 +1,5 @@
 import { usePanelsStore } from '@tgim/stores/index';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { shallow, useShallow } from 'zustand/shallow';
 import ReactDOM from 'react-dom';
 import { ipc } from '../../../lib/ipc';
@@ -20,7 +20,6 @@ import {
 import { createNewId } from '@tgim/utils/identifier';
 import GridView from './panels/GridView';
 import { GridData, ImageItem } from '@tgim/types/grid';
-import { listen } from '@tauri-apps/api/event';
 import { FileType, ThumbResSpec } from '@tgim/types/file';
 import { Button } from '@tgim/ui';
 import cn from '@tgim/utils/cn';
@@ -28,6 +27,7 @@ import { Split } from '@tgim/ui/Splitter';
 import FileDetailSidebar from './panels/FileDetailSidebar';
 import { Eye, GitBranch, LayoutGrid } from 'lucide-react';
 import FileViewer from './panels/FileViewer';
+import { usePanelDrop } from './usePanelDrop';
 
 interface PanelProps {
   panelId: string;
@@ -43,7 +43,9 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [rootNodeId, setRootNodeId] = useState<string | null>(null);
   const [activeImage, setActiveImage] = useState<ImageItem | null>(null);
   const [rootNode, setRootNode] = useState<Node | null>(null);
-
+  const [graphRefreshKey, setGraphRefreshKey] = useState(0);
+  const [gridRefreshKey, setGridRefreshKey] = useState(0);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const { panel, containerId, isActive } = usePanelsStore(
     useShallow(state => ({
       panel: state.panelEntities[panelId],
@@ -53,14 +55,6 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   );
   const { moaId } = useMoa(location);
   const [container, setContainer] = useState<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (containerId) {
-      const el = document.getElementById(containerId);
-
-      if (el) setContainer(el);
-    }
-  }, [containerId]);
   const transformDataToGraphData = useCallback((graphData: GraphResponse): GraphData => {
     setRootNodeId(graphData.rootNodeId);
     setRootNode(graphData.nodes.find(node => node.id === graphData.rootNodeId) ?? null);
@@ -212,6 +206,30 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
 
     return { images: imageItems };
   }, []);
+  useEffect(() => {
+    if (containerId) {
+      const el = document.getElementById(containerId);
+
+      if (el) setContainer(el);
+    }
+  }, [containerId]);
+  const refreshPanelData = useCallback(async () => {
+    if (!moaId) return;
+    try {
+      const data = await ipc.graph.getGraphOne(moaId, panel.nodeId.toString());
+      setRootNode(data.nodes.find(node => node.id === data.rootNodeId) ?? null);
+      setGraphData(transformDataToGraphData(data));
+      setGridData(await transformDataToGridData(data));
+      setGraphRefreshKey(prev => prev + 1);
+      setGridRefreshKey(prev => prev + 1);
+    } catch (e) {
+      console.error('Failed to load panel data', e);
+    }
+  }, [moaId, panel.nodeId, transformDataToGraphData, transformDataToGridData]);
+
+  useEffect(() => {
+    void refreshPanelData();
+  }, [refreshPanelData]);
 
   useEffect(() => {
     if (!moaId || !panel?.nodeId) return;
@@ -228,6 +246,8 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
 
         setGraphData(nextGraphData);
         setGridData(nextGridData);
+        setGraphRefreshKey(prev => prev + 1);
+        setGridRefreshKey(prev => prev + 1);
       } catch (e) {
         console.error(e);
       }
@@ -293,6 +313,22 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     return rootNode.data?.['File'] ?? null;
   }, [rootNode]);
 
+  const rootFolder = useMemo(() => {
+    if (!rootNode) return null;
+    if (rootNode.kind !== NodeKind.Folder) return null;
+    return rootNode.data['Folder'] ?? null;
+  }, [rootNode]);
+
+  const dropEnabled = useMemo(() => Boolean(rootFolder && moaId), [rootFolder, moaId]);
+
+  const { isDropActive, handleDrop, handleDragEnter, handleDragLeave, handleDragOver } =
+    usePanelDrop({
+      dropEnabled,
+      rootNodeId,
+      moaId: moaId ?? null,
+      refreshPanelData,
+    });
+
   const showGraph = viewType === 'graph' && graphData && rootNodeId && rootGraphNodeId;
   const showGrid = viewType === 'grid' && !!gridData && availableViews.includes('grid');
   const showViewer = viewType === 'viewer' && !!rootFile;
@@ -313,10 +349,23 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
 
   return ReactDOM.createPortal(
     <div
+      ref={panelRef}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      onDragEnter={handleDragEnter}
+      onDragStart={ev => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        ev.dataTransfer.setData('text/plain', 'yo');
+        ev.dataTransfer.effectAllowed = 'all';
+        ev.dataTransfer.dropEffect = 'move';
+      }}
+      onDragLeave={handleDragLeave}
       className={cn(
         'flex h-full w-full flex-col overflow-hidden rounded-xl border bg-surface shadow-sm transition-colors',
         isActive ? 'border-accent' : 'border-border',
         hidden && 'hidden',
+        dropEnabled && isDropActive && 'ring-2 ring-accent/60',
       )}
     >
       <div className="flex items-center justify-end border-b border-border bg-surface-raised px-3 py-2">
@@ -353,6 +402,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       <div className="relative flex-1 min-h-0 bg-surface">
         {showGraph ? (
           <GraphView
+            key={graphRefreshKey}
             rootNodeId={rootNodeId}
             rootGraphNodeId={rootGraphNodeId}
             graphData={graphData}
@@ -363,6 +413,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
               <>
                 <SplitPanel key="grid" minSize={320}>
                   <GridView
+                    key={gridRefreshKey}
                     gridData={gridData}
                     onImageOpen={image => {
                       setActiveImage(image);

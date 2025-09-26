@@ -355,7 +355,6 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
   }, [loadingPreview, name, path, preview, previewError]);
 
   const handleSubmit = useCallback(async () => {
-    if (!preview) return;
     setSubmitting(true);
     try {
       const payload = buildSelectionPayload(selection, rootKey);
@@ -376,6 +375,8 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
   }, [name, onClose, onSubmit, path, preview, rootKey, selection]);
 
   const canProceed = !!name.trim() && !!path && !!preview && !loadingPreview && !previewError;
+  const canSubmit = !!name.trim();
+  const isUpsert = !!path;
 
   return (
     <div className="text-modal-text">
@@ -588,6 +589,10 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
                 업서트
               </Button>
             </>
+          ) : !isUpsert ? (
+            <Button variant="primary" onClick={handleSubmit} disabled={!canSubmit}>
+              생성
+            </Button>
           ) : (
             <Button variant="primary" onClick={handleNext} disabled={!canProceed}>
               다음
