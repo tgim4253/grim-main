@@ -287,6 +287,17 @@ pub enum FileType {
     Unknown,
 }
 
+const IMAGE_EXTENSIONS: &[&str] =
+    &["jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp", "heic"];
+const VIDEO_EXTENSIONS: &[&str] =
+    &["mp4", "mov", "avi", "mkv", "webm", "flv", "wmv"];
+const AUDIO_EXTENSIONS: &[&str] = &["mp3", "wav", "flac", "aac", "ogg", "m4a"];
+const DOCUMENT_EXTENSIONS: &[&str] =
+    &["pdf", "txt", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "md"];
+const GRAPHIC_TOOL_EXTENSIONS: &[&str] =
+    &["psd", "ai", "xd", "fig", "clip", "kra", "sai", "pur"];
+const ARCHIVE_EXTENSIONS: &[&str] = &["zip", "rar", "7z", "tar", "gz"];
+
 impl FromStr for FileType {
     type Err = anyhow::Error;
 
@@ -304,49 +315,44 @@ impl FromStr for FileType {
 }
 impl From<&Path> for FileType {
     fn from(path: &Path) -> Self {
-        match path
+        let ext = path
             .extension()
             .and_then(|s| s.to_str())
-            .unwrap_or("")
-            .to_lowercase()
-            .as_str()
-        {
-            // Image
-            "jpg" | "jpeg" | "png" | "gif" | "bmp" | "tiff" | "webp"
-            | "heic" => FileType::Image,
+            .map(|s| s.to_lowercase())
+            .unwrap_or_default();
+        let ext = ext.as_str();
 
-            // Video
-            "mp4" | "mov" | "avi" | "mkv" | "webm" | "flv" | "wmv" => {
-                FileType::Video
-            }
-
-            // Audio
-            "mp3" | "wav" | "flac" | "aac" | "ogg" | "m4a" => FileType::Audio,
-
-            // Document
-            "pdf" | "txt" | "doc" | "docx" | "xls" | "xlsx" | "ppt"
-            | "pptx" | "odt" | "md" => FileType::Document,
-
-            // Graphic / Tool-specific
-            "psd" => FileType::GraphicTool, // Photoshop
-            "ai" => FileType::GraphicTool,  // Illustrator
-            "xd" => FileType::GraphicTool,  // Adobe XD
-            "fig" => FileType::GraphicTool, // Figma
-            "clip" => FileType::GraphicTool, // Clip Studio
-            "kra" => FileType::GraphicTool, // Krita
-            "sai" => FileType::GraphicTool, // Paint Tool SAI
-            "pur" => FileType::GraphicTool, // PureRef
-
-            // Zip
-            "zip" | "rar" | "7z" | "tar" | "gz" => FileType::Archive,
-
-            // Default
-            _ => FileType::Unknown,
+        if IMAGE_EXTENSIONS.contains(&ext) {
+            FileType::Image
+        } else if VIDEO_EXTENSIONS.contains(&ext) {
+            FileType::Video
+        } else if AUDIO_EXTENSIONS.contains(&ext) {
+            FileType::Audio
+        } else if DOCUMENT_EXTENSIONS.contains(&ext) {
+            FileType::Document
+        } else if GRAPHIC_TOOL_EXTENSIONS.contains(&ext) {
+            FileType::GraphicTool
+        } else if ARCHIVE_EXTENSIONS.contains(&ext) {
+            FileType::Archive
+        } else {
+            FileType::Unknown
         }
     }
 }
 
 impl FileType {
+    pub fn extensions(&self) -> &'static [&'static str] {
+        match self {
+            FileType::Image => IMAGE_EXTENSIONS,
+            FileType::Video => VIDEO_EXTENSIONS,
+            FileType::Document => DOCUMENT_EXTENSIONS,
+            FileType::GraphicTool => GRAPHIC_TOOL_EXTENSIONS,
+            FileType::Audio => AUDIO_EXTENSIONS,
+            FileType::Archive => ARCHIVE_EXTENSIONS,
+            FileType::Unknown => &[],
+        }
+    }
+
     /// Validate an image file with size, signature, and pixel constraints.
     pub fn check_is_img(path: &Path) -> Result<()> {
         const MAX_BYTES: u64 = 20 * 1024 * 1024; // 20MB
@@ -404,6 +410,36 @@ impl FileType {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileTypeExtensionGroup {
+    pub file_type: FileType,
+    #[serde(default)]
+    pub extensions: Vec<String>,
+}
+
+pub fn file_type_extension_groups() -> Vec<FileTypeExtensionGroup> {
+    [
+        FileType::Image,
+        FileType::Video,
+        FileType::Document,
+        FileType::GraphicTool,
+        FileType::Audio,
+        FileType::Archive,
+        FileType::Unknown,
+    ]
+    .into_iter()
+    .map(|file_type| FileTypeExtensionGroup {
+        file_type,
+        extensions: file_type
+            .extensions()
+            .iter()
+            .map(|ext| ext.to_string())
+            .collect(),
+    })
+    .collect()
+}
+
 /// Computed metadata used when ingesting file paths.
 #[derive(Debug, Clone, FromRow, Serialize)]
 pub struct FileInfo {
@@ -421,6 +457,62 @@ pub struct FileInfo {
 
     pub file_name: String,
     pub file_name_norm: String,
+}
+
+/// Summary information about a file content used by the detail sidebar.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileSummary {
+    pub file_id: String,
+    pub node_id: String,
+    pub file_name: String,
+    pub mime: String,
+    pub size: i64,
+    pub hash: String,
+    pub kind: FileType,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+}
+
+/// Virtual folder nodes that currently reference the file.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileFolderInfo {
+    pub node_id: String,
+    pub name: String,
+}
+
+/// Health state for a specific file path.
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FilePathStatus {
+    Ok,
+    Warning,
+    Error,
+}
+
+/// Computed status for each filesystem path bound to a file content.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FilePathDetail {
+    pub id: String,
+    pub path: Option<String>,
+    pub exists: bool,
+    pub stored_mtime: Option<i64>,
+    pub current_mtime: Option<i64>,
+    pub hash_matches: Option<bool>,
+    pub status: FilePathStatus,
+    pub warning: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Full detail payload consumed by the renderer sidebar.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileDetail {
+    pub file: FileSummary,
+    pub folders: Vec<FileFolderInfo>,
+    pub paths: Vec<FilePathDetail>,
 }
 
 impl FileInfo {

@@ -42,12 +42,20 @@ fn main() {
             commands::moa::bootstrap_status,
             commands::graph::get_graph_one,
             commands::file::get_thumbnails,
+            commands::file::get_file_path,
+            commands::file::expand_preferred_urls,
             commands::file::preview_folder_import,
             commands::file::get_thumbnail_usage,
             commands::file::clear_thumbnail_cache,
             commands::file::clear_base_thumbnail_cache,
             commands::file::sync_folder_mount,
             commands::file::update_folder_mount_options,
+            commands::file::import_panel_drop,
+            commands::file::get_file_detail,
+            commands::file::link_file_path,
+            commands::file::remove_file_path,
+            commands::file::reveal_file_in_explorer,
+            commands::file::list_file_type_extensions,
             commands::croquis::start_croquis_session,
             commands::croquis::load_croquis_session,
             commands::croquis::load_croquis_option,
@@ -58,6 +66,7 @@ fn main() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_decorum::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_http::init())
         .manage(AppState::default())
         .setup(|app| {
             let latest_moa = tauri::async_runtime::block_on(async {

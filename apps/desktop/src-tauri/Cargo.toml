@@ -48,6 +48,11 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 screenshots = "0.8.10"
 base64 = "0.22.1"
+reqwest = { version = "0.12.9", default-features = false, features = ["stream", "blocking", "json", "gzip", "brotli", "deflate"] }
+regex = "1.11.3"
+futures = "0.3.31"
+bytes = "1.10.1"
+tauri-plugin-http = "2.5.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 plist = "1.7.4"
