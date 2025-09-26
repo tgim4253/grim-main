@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO virtual_folder_mount\n                (id, virtual_node_id, real_folder_id, created_at, enabled, priority, recursive, sync_enabled, suppress_warnings)\n            VALUES\n                (?1, ?2, ?3, ?4, 1, 0, 1, 0, 0)\n            ON CONFLICT(virtual_node_id, real_folder_id) DO NOTHING;\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "b27c8145559885159a756823f5be39b5c87ccdc5a9146224e6c8d78f09deb9fa"
+}

@@ -18,6 +18,7 @@ import { ThumbResSpec } from '@tgim/types/file';
 import useThumbStore from '@tgim/stores/thumbStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { convertKeysToCamel } from '@tgim/utils/object';
+import { ToastContainer } from 'react-toastify';
 
 interface LayoutPorps {
   layoutId: string;
@@ -291,6 +292,7 @@ const Main: React.FC = () => {
       ) : (
         <ProgressWindow progress={progress} />
       )}
+      <ToastContainer position="bottom-right"></ToastContainer>
     </div>
   );
 };

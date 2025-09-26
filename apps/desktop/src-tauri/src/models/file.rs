@@ -423,6 +423,62 @@ pub struct FileInfo {
     pub file_name_norm: String,
 }
 
+/// Summary information about a file content used by the detail sidebar.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileSummary {
+    pub file_id: String,
+    pub node_id: String,
+    pub file_name: String,
+    pub mime: String,
+    pub size: i64,
+    pub hash: String,
+    pub kind: FileType,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+}
+
+/// Virtual folder nodes that currently reference the file.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileFolderInfo {
+    pub node_id: String,
+    pub name: String,
+}
+
+/// Health state for a specific file path.
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FilePathStatus {
+    Ok,
+    Warning,
+    Error,
+}
+
+/// Computed status for each filesystem path bound to a file content.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FilePathDetail {
+    pub id: String,
+    pub path: Option<String>,
+    pub exists: bool,
+    pub stored_mtime: Option<i64>,
+    pub current_mtime: Option<i64>,
+    pub hash_matches: Option<bool>,
+    pub status: FilePathStatus,
+    pub warning: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Full detail payload consumed by the renderer sidebar.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileDetail {
+    pub file: FileSummary,
+    pub folders: Vec<FileFolderInfo>,
+    pub paths: Vec<FilePathDetail>,
+}
+
 impl FileInfo {
     /// Build a `FileInfo` record by reading metadata from disk.
     pub async fn new(
