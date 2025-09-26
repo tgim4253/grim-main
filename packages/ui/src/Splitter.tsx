@@ -83,6 +83,9 @@ const collectPanelsAtFirstDepth = (
   return result;
 };
 
+const resolveState = <T,>(updater: React.SetStateAction<T>, prev: T): T =>
+  typeof updater === 'function' ? (updater as (value: T) => T)(prev) : updater;
+
 // ---- Component -----------------------------------------------------------
 export const Split = forwardRef<HTMLDivElement, SplitProps>(
   (
@@ -106,11 +109,68 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
     const containerRef = useRef<HTMLDivElement | null>(null);
 
     // panel sizes in % of container main axis
-    const [sizes, setSizes] = useState<number[]>([]);
-    const [hiddens, setHiddens] = useState<boolean[]>([]);
+    const [sizes, setSizesState] = useState<number[]>([]);
+    const [hiddens, setHiddensState] = useState<boolean[]>([]);
 
     // dynamic intrinsic mins reported from nested Splits (px)
-    const [intrinsicMins, setIntrinsicMins] = useState<number[]>([]);
+    const [intrinsicMins, setIntrinsicMinsState] = useState<number[]>([]);
+
+    const sizesRef = useRef<number[]>(sizes);
+    const hiddensRef = useRef<boolean[]>(hiddens);
+    const panelsRef = useRef(panels);
+    const intrinsicMinsRef = useRef(intrinsicMins);
+
+    const setSizes = useCallback((updater: React.SetStateAction<number[]>) => {
+      setSizesState(prev => {
+        const next = resolveState(updater, prev);
+        if (next === prev) return prev;
+        if (next.length === prev.length && next.every((v, i) => v === prev[i])) {
+          return prev;
+        }
+        sizesRef.current = next;
+        return next;
+      });
+    }, []);
+
+    const setHiddens = useCallback((updater: React.SetStateAction<boolean[]>) => {
+      setHiddensState(prev => {
+        const next = resolveState(updater, prev);
+        if (next === prev) return prev;
+        if (next.length === prev.length && next.every((v, i) => v === prev[i])) {
+          return prev;
+        }
+        hiddensRef.current = next;
+        return next;
+      });
+    }, []);
+
+    const setIntrinsicMins = useCallback((updater: React.SetStateAction<number[]>) => {
+      setIntrinsicMinsState(prev => {
+        const next = resolveState(updater, prev);
+        if (next === prev) return prev;
+        if (next.length === prev.length && next.every((v, i) => v === prev[i])) {
+          return prev;
+        }
+        intrinsicMinsRef.current = next;
+        return next;
+      });
+    }, []);
+
+    useEffect(() => {
+      sizesRef.current = sizes;
+    }, [sizes]);
+
+    useEffect(() => {
+      hiddensRef.current = hiddens;
+    }, [hiddens]);
+
+    useEffect(() => {
+      panelsRef.current = panels;
+    }, [panels]);
+
+    useEffect(() => {
+      intrinsicMinsRef.current = intrinsicMins;
+    }, [intrinsicMins]);
 
     // merge external ref and internal containerRef
     const mergedRef = useCallback(
@@ -190,8 +250,16 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
     useEffect(() => {
       const newSizes = getInitialSize(panels);
       if (newSizes) setSizes(newSizes);
-      setHiddens(Array(panels.length).fill(false));
-      setIntrinsicMins(Array(panels.length).fill(0));
+      setHiddens(() => {
+        const arr = Array(panels.length).fill(false);
+        hiddensRef.current = arr;
+        return arr;
+      });
+      setIntrinsicMins(() => {
+        const arr = Array(panels.length).fill(0);
+        intrinsicMinsRef.current = arr;
+        return arr;
+      });
     }, [panels.length]);
 
     // ---- Drag-resize handler ------------------------------------------------
@@ -206,13 +274,15 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
         if (containerSize === 0) return;
 
         const deltaPercent = (deltaPx / containerSize) * 100;
-        const newSizes = [...sizes];
-
-        const leftPanel = panels[leftIdx];
-        const rightPanel = panels[rightIdx];
+        const currentSizes = sizesRef.current;
+        const leftPanel = panelsRef.current[leftIdx];
+        const rightPanel = panelsRef.current[rightIdx];
 
         const getLimits = (panel: React.ReactElement<SplitPanelProps>, idx: number) => ({
-          min: (Math.max(panel.props.minSize ?? 0, intrinsicMins[idx] ?? 0) / containerSize) * 100,
+          min:
+            (Math.max(panel.props.minSize ?? 0, intrinsicMinsRef.current[idx] ?? 0) /
+              containerSize) *
+            100,
           max: ((panel.props.maxSize ?? containerSize) / containerSize) * 100,
           hidden: panel.props.canHidden ?? false,
           hiddenSize: ((panel.props.hiddenSize ?? panel.props.minSize ?? 0) / containerSize) * 100,
@@ -221,35 +291,62 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
         const leftLimits = getLimits(leftPanel, leftIdx);
         const rightLimits = getLimits(rightPanel, rightIdx);
 
-        let newLeft = newSizes[leftIdx] + deltaPercent;
-        let newRight = newSizes[rightIdx] - deltaPercent;
+        let newLeft = (currentSizes[leftIdx] ?? 0) + deltaPercent;
+        let newRight = (currentSizes[rightIdx] ?? 0) - deltaPercent;
+
+        const ensureHiddenState = (idx: number, value: boolean) => {
+          setHiddens(prev => {
+            if (prev.length !== panelsRef.current.length) {
+              const base = Array(panelsRef.current.length).fill(false);
+              base[idx] = value;
+              hiddensRef.current = base;
+              return base;
+            }
+            if (prev[idx] === value) return prev;
+            const next = [...prev];
+            next[idx] = value;
+            hiddensRef.current = next;
+            return next;
+          });
+        };
+
+        const resetHiddenState = () => {
+          setHiddens(prev => {
+            if (prev.length === panelsRef.current.length && prev.every(h => !h)) {
+              return prev;
+            }
+            const base = Array(panelsRef.current.length).fill(false);
+            hiddensRef.current = base;
+            return base;
+          });
+        };
 
         // handle hiding thresholds (left)
         if (leftLimits.hidden && newLeft < leftLimits.hiddenSize) {
           if (isEnd) {
-            setHiddens(Array(panels.length).fill(false));
+            resetHiddenState();
             leftPanel.props.onSizeChange?.((leftLimits.min * containerSize) / 100);
             leftPanel.props.onHidden?.(true);
           } else {
-            setHiddens(prev => prev.map((h, i) => (i === leftIdx ? true : h)));
+            ensureHiddenState(leftIdx, true);
           }
           return;
         } else {
-          setHiddens(prev => prev.map((h, i) => (i === leftIdx ? false : h)));
+          ensureHiddenState(leftIdx, false);
         }
 
         // handle hiding thresholds (right)
         if (rightLimits.hidden && newRight < rightLimits.hiddenSize) {
           if (isEnd) {
-            setHiddens(Array(panels.length).fill(false));
+            resetHiddenState();
             rightPanel.props.onSizeChange?.((rightLimits.min * containerSize) / 100);
             rightPanel.props.onHidden?.(true);
           } else {
-            setHiddens(prev => prev.map((h, i) => (i === rightIdx ? true : h)));
+            ensureHiddenState(rightIdx, true);
           }
           return;
         } else {
-          setHiddens(prev => prev.map((h, i) => (i === rightIdx ? false : h)));
+          ensureHiddenState(rightIdx, false);
         }
 
         if (isEnd) {
@@ -261,11 +358,24 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
         if (newLeft < leftLimits.min || newRight < rightLimits.min) return;
         if (newLeft > leftLimits.max || newRight > rightLimits.max) return;
 
-        newSizes[leftIdx] = newLeft;
-        newSizes[rightIdx] = newRight;
-        setSizes(newSizes);
+        setSizes(prev => {
+          if (prev.length !== panelsRef.current.length) return prev;
+          const currentLeft = prev[leftIdx];
+          const currentRight = prev[rightIdx];
+          if (
+            Math.abs((currentLeft ?? 0) - newLeft) < 0.0001 &&
+            Math.abs((currentRight ?? 0) - newRight) < 0.0001
+          ) {
+            return prev;
+          }
+          const next = [...prev];
+          next[leftIdx] = newLeft;
+          next[rightIdx] = newRight;
+          sizesRef.current = next;
+          return next;
+        });
       },
-      [sizes, panels, position, intrinsicMins],
+      [position, setHiddens, setSizes],
     );
 
     // ---- Container resize → water-filling redistribution ------------------
