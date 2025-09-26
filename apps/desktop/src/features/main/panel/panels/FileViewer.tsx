@@ -36,7 +36,7 @@ const FileViewer: React.FC<FileViewerProps> = ({ file, moaId }) => {
 
     const fetchImage = async () => {
       try {
-        const path = await ipc.file.getFilePath(moaId, file.xxh3_64);
+        const path = await ipc.file.getFilePath(moaId, file.xxh364);
         if (isCancelled) return;
         setImageSrc(convertFileSrc(path));
         setStatus('ready');
@@ -53,7 +53,7 @@ const FileViewer: React.FC<FileViewerProps> = ({ file, moaId }) => {
     return () => {
       isCancelled = true;
     };
-  }, [file.kind, file.xxh3_64, moaId]);
+  }, [file.kind, file.xxh364, moaId]);
 
   const fileDescription = useMemo(() => {
     switch (file.kind) {
@@ -77,18 +77,24 @@ const FileViewer: React.FC<FileViewerProps> = ({ file, moaId }) => {
   return (
     <div className="flex h-full w-full flex-col gap-4 p-6 text-foreground">
       <div className="flex flex-col items-center gap-1 text-center">
-        <p className="max-w-full truncate text-lg font-semibold">{file.file_name}</p>
+        <p className="max-w-full truncate text-lg font-semibold">{file.fileName}</p>
         <p className="text-sm text-muted-foreground">{fileDescription}</p>
       </div>
 
       {file.kind === FileType.Image ? (
         <div className="flex flex-1 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-muted">
           {status === 'ready' && imageSrc ? (
-            <img src={imageSrc} alt={file.file_name} className="max-h-full max-w-full object-contain" />
+            <img
+              src={imageSrc}
+              alt={file.fileName}
+              className="max-h-full max-w-full object-contain"
+            />
           ) : status === 'loading' ? (
             <p className="text-sm text-muted-foreground">이미지를 불러오는 중...</p>
           ) : (
-            <p className="text-sm text-destructive">{errorMessage ?? '이미지를 불러오지 못했습니다.'}</p>
+            <p className="text-sm text-destructive">
+              {errorMessage ?? '이미지를 불러오지 못했습니다.'}
+            </p>
           )}
         </div>
       ) : (
@@ -96,7 +102,9 @@ const FileViewer: React.FC<FileViewerProps> = ({ file, moaId }) => {
           <FileText className="h-12 w-12 text-muted-foreground" />
           <div className="flex flex-col items-center gap-1 text-center">
             <p className="text-sm text-muted-foreground">미리보기를 지원하지 않는 파일입니다.</p>
-            <p className="text-xs text-muted-foreground">그래프 보기에서 다른 관계를 탐색해 보세요.</p>
+            <p className="text-xs text-muted-foreground">
+              그래프 보기에서 다른 관계를 탐색해 보세요.
+            </p>
           </div>
         </div>
       )}

@@ -293,8 +293,6 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     return rootNode.data?.['File'] ?? null;
   }, [rootNode]);
 
-  if (!panel || !container) return null;
-
   const showGraph = viewType === 'graph' && graphData && rootNodeId && rootGraphNodeId;
   const showGrid = viewType === 'grid' && !!gridData && availableViews.includes('grid');
   const showViewer = viewType === 'viewer' && !!rootFile;
@@ -310,6 +308,8 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         return GitBranch;
     }
   }, []);
+
+  if (!panel || !container) return null;
 
   return ReactDOM.createPortal(
     <div
