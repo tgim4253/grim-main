@@ -24,16 +24,17 @@ import { listen } from '@tauri-apps/api/event';
 import { FileType, ThumbResSpec } from '@tgim/types/file';
 import { Button } from '@tgim/ui';
 import cn from '@tgim/utils/cn';
-import { GitBranch, LayoutGrid } from 'lucide-react';
 import { Split } from '@tgim/ui/Splitter';
 import FileDetailSidebar from './panels/FileDetailSidebar';
+import { Eye, GitBranch, LayoutGrid } from 'lucide-react';
+import FileViewer from './panels/FileViewer';
 
 interface PanelProps {
   panelId: string;
   hidden?: boolean;
 }
 
-type ViewType = 'graph' | 'node' | 'grid';
+type ViewType = 'graph' | 'grid' | 'viewer';
 
 const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [viewType, setViewType] = useState<ViewType>('graph');
@@ -41,6 +42,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [gridData, setGridData] = useState<GridData | null>(null);
   const [rootNodeId, setRootNodeId] = useState<string | null>(null);
   const [activeImage, setActiveImage] = useState<ImageItem | null>(null);
+  const [rootNode, setRootNode] = useState<Node | null>(null);
 
   const { panel, containerId, isActive } = usePanelsStore(
     useShallow(state => ({
@@ -59,21 +61,9 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       if (el) setContainer(el);
     }
   }, [containerId]);
-  useEffect(() => {
-    if (!moaId) return;
-    let as = async () => {
-      try {
-        const data = await ipc.graph.getGraphOne(moaId, panel.nodeId.toString());
-        setGraphData(transformDataToGraphData(data));
-        setGridData(await transformDataToGridData(data));
-      } catch (e) {
-        console.error(e);
-      }
-    };
-    as();
-  }, [moaId]);
   const transformDataToGraphData = useCallback((graphData: GraphResponse): GraphData => {
     setRootNodeId(graphData.rootNodeId);
+    setRootNode(graphData.nodes.find(node => node.id === graphData.rootNodeId) ?? null);
 
     const nodesMap: Record<string, Node> = {};
     graphData.nodes.forEach(node => {
@@ -223,6 +213,33 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     return { images: imageItems };
   }, []);
 
+  useEffect(() => {
+    if (!moaId || !panel?.nodeId) return;
+
+    let isCancelled = false;
+
+    const load = async () => {
+      try {
+        const data = await ipc.graph.getGraphOne(moaId, panel.nodeId.toString());
+        const nextGraphData = transformDataToGraphData(data);
+        const nextGridData = await transformDataToGridData(data);
+
+        if (isCancelled) return;
+
+        setGraphData(nextGraphData);
+        setGridData(nextGridData);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    void load();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [moaId, panel?.nodeId, transformDataToGraphData, transformDataToGridData]);
+
   const rootGraphNodeId = useMemo(() => {
     if (!graphData) return null;
     let id = null;
@@ -233,6 +250,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     });
     return id;
   }, [graphData, rootNodeId]);
+
   useEffect(() => {
     if (!gridData || !activeImage) return;
     const exists = gridData.images.some(img => img.hash === activeImage.hash);
@@ -252,11 +270,46 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       setActiveImage(null);
     }
   }, [viewType]);
+  const availableViews = useMemo<ViewType[]>(() => {
+    if (rootNode?.kind === NodeKind.Folder) {
+      return ['grid', 'graph'];
+    }
+    if (rootNode?.kind === NodeKind.File) {
+      return ['viewer', 'graph'];
+    }
+    return ['graph'];
+  }, [rootNode?.kind]);
 
-  if (!panel || !container) return null;
+  const defaultView = useMemo<ViewType>(() => availableViews[0] ?? 'graph', [availableViews]);
+
+  useEffect(() => {
+    if (!availableViews.includes(viewType)) {
+      setViewType(defaultView);
+    }
+  }, [availableViews, defaultView, viewType]);
+
+  const rootFile = useMemo<NodeFile | null>(() => {
+    if (rootNode?.kind !== NodeKind.File) return null;
+    return rootNode.data?.['File'] ?? null;
+  }, [rootNode]);
 
   const showGraph = viewType === 'graph' && graphData && rootNodeId && rootGraphNodeId;
-  const showGrid = viewType === 'grid' && !!gridData;
+  const showGrid = viewType === 'grid' && !!gridData && availableViews.includes('grid');
+  const showViewer = viewType === 'viewer' && !!rootFile;
+
+  const getViewIcon = useCallback((type: ViewType) => {
+    switch (type) {
+      case 'grid':
+        return LayoutGrid;
+      case 'viewer':
+        return Eye;
+      case 'graph':
+      default:
+        return GitBranch;
+    }
+  }, []);
+
+  if (!panel || !container) return null;
 
   return ReactDOM.createPortal(
     <div
@@ -267,32 +320,35 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       )}
     >
       <div className="flex items-center justify-end border-b border-border bg-surface-raised px-3 py-2">
-        <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-muted p-1 shadow-inner">
-          <Button
-            type="button"
-            variant="icon"
-            active={viewType === 'graph'}
-            aria-pressed={viewType === 'graph'}
-            aria-label="그래프 보기"
-            title="그래프 보기"
-            onClick={() => setViewType('graph')}
-            className="h-8 w-8"
-          >
-            <GitBranch className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="icon"
-            active={viewType === 'grid'}
-            aria-pressed={viewType === 'grid'}
-            aria-label="그리드 보기"
-            title="그리드 보기"
-            onClick={() => setViewType('grid')}
-            className="h-8 w-8"
-          >
-            <LayoutGrid className="h-4 w-4" />
-          </Button>
-        </div>
+        {availableViews.length > 1 ? (
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-muted p-1 shadow-inner">
+            {availableViews.map(type => {
+              const Icon = getViewIcon(type);
+              const isActive = viewType === type;
+              const labels: Record<ViewType, string> = {
+                graph: '그래프 보기',
+                grid: '그리드 보기',
+                viewer: '뷰어 보기',
+              };
+
+              return (
+                <Button
+                  key={type}
+                  type="button"
+                  variant="icon"
+                  active={isActive}
+                  aria-pressed={isActive}
+                  aria-label={labels[type]}
+                  title={labels[type]}
+                  onClick={() => setViewType(type)}
+                  className="h-8 w-8"
+                >
+                  <Icon className="h-4 w-4" />
+                </Button>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
       <div className="relative flex-1 min-h-0 bg-surface">
         {showGraph ? (
@@ -333,6 +389,8 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
               </>
             )}
           </Split>
+        ) : showViewer && rootFile ? (
+          <FileViewer file={rootFile} moaId={moaId} />
         ) : null}
       </div>
     </div>,

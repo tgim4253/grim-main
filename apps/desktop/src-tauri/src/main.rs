@@ -42,6 +42,7 @@ fn main() {
             commands::moa::bootstrap_status,
             commands::graph::get_graph_one,
             commands::file::get_thumbnails,
+            commands::file::get_file_path,
             commands::file::preview_folder_import,
             commands::file::get_thumbnail_usage,
             commands::file::clear_thumbnail_cache,

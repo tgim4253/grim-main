@@ -56,6 +56,19 @@ pub async fn get_thumbnails(
 }
 
 #[tauri::command]
+/// Resolve the absolute file path for a file hash stored in the MOA.
+pub async fn get_file_path(
+    moa_id: String,
+    hash: String,
+) -> Result<String, String> {
+    let path = file_service::folder::fetch_one_file_path(moa_id, hash)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(path.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
 /// Produce a preview of the selected folder prior to import.
 pub async fn preview_folder_import(
     path: String,
