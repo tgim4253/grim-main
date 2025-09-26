@@ -517,11 +517,8 @@ impl FileRepository {
             ON CONFLICT(storage_root_id, parent_key, name_norm) DO UPDATE SET
                 name        = excluded.name,
                 name_norm   = excluded.name_norm,
-                mtime       = excluded.mtime,
                 root_rel_path = excluded.root_rel_path,
                 abs_path_cached = excluded.abs_path_cached,
-                error_flag  = 'success',
-                error_msg   = NULL,
                 updated_at  = ?10
             RETURNING id as "id!: String"
             "#,
