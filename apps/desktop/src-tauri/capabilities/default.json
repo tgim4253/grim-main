@@ -30,6 +30,12 @@
     "core:webview:allow-internal-toggle-devtools",
     "dialog:default",
     "decorum:allow-show-snap-overlay",
-    "core:window:allow-set-size"
+    "core:window:allow-set-size",
+    "http:allow-fetch",
+    "http:default",
+    {
+      "identifier": "http:default",
+      "allow": [{ "url": "https://i.pinimg.com/*" }]
+    }
   ]
 }

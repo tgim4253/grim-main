@@ -23,7 +23,8 @@ pub fn launch_moa(
 
     let web_builder = tauri::WebviewWindowBuilder::new(app, "moa-main", url)
         .title(moa.name.clone())
-        .inner_size(1200.0, 600.0);
+        .inner_size(1200.0, 600.0)
+        .disable_drag_drop_handler();
 
     #[cfg(target_os = "macos")]
     let web_builder =

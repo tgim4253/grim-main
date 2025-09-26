@@ -1,9 +1,16 @@
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
+use ::bytes::Bytes;
 use anyhow::{anyhow, Context, Result};
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
-use reqwest::Client;
+use futures::{stream, StreamExt};
+use regex::bytes;
+use reqwest::{Client, ClientBuilder, Response};
 use serde::{Deserialize, Serialize};
+use sha2::digest::typenum::Len;
 use tokio::fs;
 use uuid::Uuid;
 
@@ -12,10 +19,19 @@ use crate::{
     db::repository::{
         file_repository::FileRepository, node_repository::NodeRepository,
     },
-    models::file::FileInfo,
+    models::file::{FileInfo, FileType},
     services::{db::DB_MANAGER, storage_root},
     utils::path_utils::normalize_path,
 };
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PanelDropFile {
+    pub name: String,
+    #[serde(default)]
+    pub mime_type: Option<String>,
+    pub data_base64: String,
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,6 +44,8 @@ pub struct PanelDropRequest {
     pub base_urls: Vec<String>,
     #[serde(default)]
     pub paths: Vec<String>,
+    #[serde(default)]
+    pub files: Vec<PanelDropFile>,
 }
 
 #[derive(Debug, Serialize)]
@@ -46,40 +64,54 @@ pub async fn import_panel_drop(
         return Err(anyhow!("virtual node id is required"));
     }
 
-    let mut imported_paths: Vec<PathBuf> = Vec::new();
+    let mut imported_paths: Vec<(PathBuf, bool)> = Vec::new();
 
-    if !payload.urls.is_empty() || !payload.base_urls.is_empty() {
-        let download_dir = resolve_download_directory(&payload.moa_id).await?;
-        if !payload.urls.is_empty() {
-            imported_paths.extend(
-                download_remote_assets(&download_dir, &payload.urls).await?,
-            );
-        }
+    let requires_download_dir = !payload.urls.is_empty()
+        || !payload.base_urls.is_empty()
+        || !payload.files.is_empty();
+
+    let download_dir = if requires_download_dir {
+        Some(resolve_download_directory(&payload.moa_id).await?)
+    } else {
+        None
+    };
+
+    if let Some(dir) = download_dir.as_ref() {
         if !payload.base_urls.is_empty() {
-            imported_paths.extend(
-                persist_base_urls(&download_dir, &payload.base_urls).await?,
-            );
+            for path in persist_base_urls(dir, &payload.base_urls).await? {
+                imported_paths.push((path, true));
+            }
+        }
+        if !payload.files.is_empty() {
+            for path in persist_uploaded_files(dir, &payload.files).await? {
+                imported_paths.push((path, true));
+            }
         }
     }
 
     if !payload.paths.is_empty() {
-        for path in payload.paths {
+        for path in &payload.paths {
             let candidate = PathBuf::from(path);
             if candidate.exists() {
-                imported_paths.push(candidate);
+                imported_paths.push((candidate, false));
             }
         }
     }
 
     let mut imported_count = 0_usize;
-    for path in imported_paths {
-        register_path_with_virtual_folder(
+    for (path, should_cleanup) in imported_paths.into_iter() {
+        let imported = register_path_with_virtual_folder(
             &payload.moa_id,
             &payload.virtual_node_id,
             &path,
         )
         .await?;
-        imported_count = imported_count.saturating_add(1);
+
+        if imported {
+            imported_count = imported_count.saturating_add(1);
+        } else if should_cleanup {
+            let _ = fs::remove_file(&path).await;
+        }
     }
 
     Ok(PanelDropResponse { imported: imported_count })
@@ -98,50 +130,6 @@ async fn resolve_download_directory(moa_id: &str) -> Result<PathBuf> {
         )
     })?;
     Ok(download_dir)
-}
-
-async fn download_remote_assets(
-    dir: &Path,
-    urls: &[String],
-) -> Result<Vec<PathBuf>> {
-    let client = Client::new();
-    let mut out = Vec::with_capacity(urls.len());
-
-    for url in urls {
-        let response = client
-            .get(url)
-            .send()
-            .await
-            .with_context(|| format!("failed to download {url}"))?
-            .error_for_status()
-            .with_context(|| {
-                format!("unexpected response while downloading {url}")
-            })?;
-
-        let bytes = response.bytes().await.with_context(|| {
-            format!("failed to read response body for {url}")
-        })?;
-
-        let file_name = derive_file_name_from_url(url)
-            .unwrap_or_else(|| generate_default_name("download"));
-        let extension = response
-            .headers()
-            .get(reqwest::header::CONTENT_TYPE)
-            .and_then(|value| value.to_str().ok())
-            .and_then(extract_extension_from_mime)
-            .or_else(|| infer_extension(bytes.as_ref()));
-
-        let target_path = ensure_unique_path(
-            dir.join(apply_extension(&file_name, extension.as_deref())),
-        )
-        .await?;
-        fs::write(&target_path, &bytes).await.with_context(|| {
-            format!("failed to persist {url} to {}", target_path.display())
-        })?;
-        out.push(target_path);
-    }
-
-    Ok(out)
 }
 
 async fn persist_base_urls(
@@ -170,11 +158,49 @@ async fn persist_base_urls(
     Ok(out)
 }
 
+async fn persist_uploaded_files(
+    dir: &Path,
+    files: &[PanelDropFile],
+) -> Result<Vec<PathBuf>> {
+    let mut out = Vec::with_capacity(files.len());
+
+    for file in files {
+        let bytes =
+            BASE64_STANDARD.decode(file.data_base64.trim()).map_err(|err| {
+                anyhow!("failed to decode dropped file {}: {err}", file.name)
+            })?;
+
+        let sanitized_name = sanitize_file_name(&file.name);
+        let has_extension = Path::new(&sanitized_name).extension().is_some();
+        let extension_hint = file
+            .mime_type
+            .as_deref()
+            .and_then(|mime| extract_extension_from_mime(mime));
+        let final_name = if has_extension {
+            sanitized_name.clone()
+        } else {
+            apply_extension(&sanitized_name, extension_hint.as_deref())
+        };
+
+        let target_path = ensure_unique_path(dir.join(&final_name)).await?;
+        fs::write(&target_path, &bytes).await.with_context(|| {
+            format!(
+                "failed to persist dropped file {} to {}",
+                file.name,
+                target_path.display()
+            )
+        })?;
+        out.push(target_path);
+    }
+
+    Ok(out)
+}
+
 async fn register_path_with_virtual_folder(
     moa_id: &str,
     virtual_node_id: &str,
     path: &Path,
-) -> Result<()> {
+) -> Result<bool> {
     let normalized = normalize_path(path);
     if !normalized.exists() {
         return Err(anyhow!("{} does not exist", normalized.display()));
@@ -199,7 +225,7 @@ async fn register_path_with_virtual_folder(
         .context("failed to open transaction")?;
 
     let real_folder_id = storage_root::ensure_storage_root_and_real_folder(
-        tx.as_mut(),
+        &mut tx,
         &sroot_info,
         &parent_norm,
     )
@@ -225,6 +251,13 @@ async fn register_path_with_virtual_folder(
                     normalized.display()
                 )
             })?;
+
+    if file_info.kind_guess != FileType::Image {
+        tx.rollback()
+            .await
+            .context("failed to rollback skipped file import transaction")?;
+        return Ok(false);
+    }
 
     let file_path_id =
         FileRepository::insert_file_path(tx.as_mut(), &file_info)
@@ -254,7 +287,7 @@ async fn register_path_with_virtual_folder(
 
     tx.commit().await.context("failed to commit file import transaction")?;
 
-    Ok(())
+    Ok(true)
 }
 
 fn derive_file_name_from_url(url: &str) -> Option<String> {

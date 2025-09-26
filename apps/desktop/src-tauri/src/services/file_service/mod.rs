@@ -2,6 +2,7 @@
 
 pub mod cache;
 pub mod detail;
+pub mod expand;
 pub mod folder;
 pub mod hash;
 pub mod job_queue;
@@ -16,6 +17,7 @@ pub use cache::{
 pub use detail::{
     get_file_detail, link_file_path, remove_file_path, reveal_in_file_manager,
 };
+pub use expand::expand_preferred_urls;
 pub use folder::{
     collect_folder_preview, create_folder, ensure_real_folder,
     first_mount_folder, sync_virtual_folder, update_virtual_folder_options,

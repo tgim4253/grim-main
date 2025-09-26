@@ -43,6 +43,7 @@ fn main() {
             commands::graph::get_graph_one,
             commands::file::get_thumbnails,
             commands::file::get_file_path,
+            commands::file::expand_preferred_urls,
             commands::file::preview_folder_import,
             commands::file::get_thumbnail_usage,
             commands::file::clear_thumbnail_cache,
@@ -65,6 +66,7 @@ fn main() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_decorum::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_http::init())
         .manage(AppState::default())
         .setup(|app| {
             let latest_moa = tauri::async_runtime::block_on(async {
