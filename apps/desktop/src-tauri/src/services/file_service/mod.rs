@@ -4,6 +4,7 @@ pub mod cache;
 pub mod folder;
 pub mod hash;
 pub mod job_queue;
+pub mod scan;
 pub mod thumbnail;
 pub mod utils;
 
@@ -17,4 +18,8 @@ pub use folder::{
 };
 pub use hash::xxh3_64_of;
 pub use job_queue::THUMBNAIL_WORKER_STATE;
-pub use thumbnail::{get_thumbs, worker_loop};
+pub use scan::{
+    init_worker as init_scan_worker, worker_loop as scan_worker_loop,
+    SCAN_WORKER_STATE,
+};
+pub use thumbnail::{get_thumbs, worker_loop as thumbnail_worker_loop};

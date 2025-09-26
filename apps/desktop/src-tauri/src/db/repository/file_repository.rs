@@ -66,11 +66,12 @@ impl FileRepository {
 
         let mut out = Vec::with_capacity(rows.len());
         for row in rows {
-            let error_flag = match row.get::<Option<String>, _>("error_flag").as_deref() {
-                Some("notfound") => IntegrityCheckResult::NotFound,
-                Some("mismatch") => IntegrityCheckResult::Mismatch,
-                _ => IntegrityCheckResult::Success,
-            };
+            let error_flag =
+                match row.get::<Option<String>, _>("error_flag").as_deref() {
+                    Some("notfound") => IntegrityCheckResult::NotFound,
+                    Some("mismatch") => IntegrityCheckResult::Mismatch,
+                    _ => IntegrityCheckResult::Success,
+                };
 
             out.push(MountWithFolder {
                 mount_id: row.get::<String, _>("mount_id"),
@@ -82,7 +83,8 @@ impl FileRepository {
                 abs_path: row.get::<Option<String>, _>("abs_path"),
                 error_flag,
                 error_msg: row.get::<Option<String>, _>("error_msg"),
-                last_seen_scan_id: row.get::<Option<String>, _>("last_seen_scan_id"),
+                last_seen_scan_id: row
+                    .get::<Option<String>, _>("last_seen_scan_id"),
                 last_seen_at: row.get::<Option<String>, _>("last_seen_at"),
             });
         }
@@ -142,7 +144,8 @@ impl FileRepository {
             last_seen_at: Option<String>,
         }
 
-        let mut mounts = Self::fetch_mount_rows(executor, virtual_node_id).await?;
+        let mut mounts =
+            Self::fetch_mount_rows(executor, virtual_node_id).await?;
 
         Ok(mounts.into_iter().next())
     }

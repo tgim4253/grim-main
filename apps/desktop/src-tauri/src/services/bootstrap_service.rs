@@ -5,7 +5,9 @@ use crate::db::repository::node_repository::NodeRepository;
 use crate::models::file::FileInfo;
 use crate::models::node::{NodeKind, NodeWithConnections};
 use crate::services::db::DB_MANAGER;
-use crate::services::file_service::folder::sync_virtual_folder;
+use crate::services::file_service::folder::{
+    start_scan_job, sync_virtual_folder,
+};
 use crate::services::storage_root::enumerate_mounted_root;
 use crate::services::{db, integrity, moa_services};
 use crate::utils::date::get_now_date;
@@ -22,7 +24,7 @@ use tokio::{
     fs,
     sync::{Mutex, RwLock},
 };
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 /// Progress payload emitted to the renderer while bootstrapping a workspace.
 #[derive(Clone, Serialize)]
@@ -306,12 +308,9 @@ async fn perform_initial_scan(
                             .await
                             {
                                 Ok(()) => {
-                                    if let Ok(meta) = fs::metadata(&pb).await
-                                    {
+                                    if let Ok(meta) = fs::metadata(&pb).await {
                                         current_mtime =
-                                            FileInfo::file_mtime_epoch(
-                                                &meta,
-                                            )?;
+                                            FileInfo::file_mtime_epoch(&meta)?;
                                     }
                                     status = IntegrityCheckResult::Success;
                                     error_msg = None;
@@ -377,6 +376,16 @@ async fn perform_initial_scan(
         }
 
         update_tx.commit().await?;
+
+        if let Err(err) =
+            start_scan_job(moa_id.to_string(), mount.real_folder_id.clone())
+                .await
+        {
+            warn!(
+                "failed to queue scan job for {}: {}",
+                mount.real_folder_id, err
+            );
+        }
     }
 
     {

@@ -18,7 +18,10 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 use crate::services::{
     bootstrap_service::AppState,
-    file_service::{worker_loop, THUMBNAIL_WORKER_STATE},
+    file_service::{
+        init_scan_worker, scan_worker_loop, thumbnail_worker_loop,
+        SCAN_WORKER_STATE, THUMBNAIL_WORKER_STATE,
+    },
 };
 
 /// Entry point for the Grim desktop application.
@@ -81,12 +84,23 @@ fn main() {
                 }
             }
 
-            let (tx, rx) = mpsc::channel::<()>(64);
-            THUMBNAIL_WORKER_STATE.signal.set(tx).map_err(|_| {
+            let app_handle = app.handle().clone();
+
+            let (thumb_tx, thumb_rx) = mpsc::channel::<()>(64);
+            THUMBNAIL_WORKER_STATE.signal.set(thumb_tx).map_err(|_| {
                 anyhow::anyhow!("thumbnail worker already initialized")
             })?;
-            let app_handle = app.handle().clone();
-            tauri::async_runtime::spawn(worker_loop(app_handle, rx));
+            tauri::async_runtime::spawn(thumbnail_worker_loop(
+                app_handle.clone(),
+                thumb_rx,
+            ));
+
+            init_scan_worker(&app.handle())?;
+            let (scan_tx, scan_rx) = mpsc::channel::<()>(64);
+            SCAN_WORKER_STATE.signal.set(scan_tx).map_err(|_| {
+                anyhow::anyhow!("scan worker already initialized")
+            })?;
+            tauri::async_runtime::spawn(scan_worker_loop(scan_rx));
 
             Ok(())
         })

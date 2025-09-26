@@ -29,11 +29,15 @@ use crate::{
         db::DB_MANAGER,
         storage_root::{self, ensure_storage_root_and_real_folder},
     },
-    utils::{file_utils::file_mtime_epoch, path_utils::normalize_path},
+    utils::{
+        file_utils::file_mtime_epoch, identifier::get_unique_id,
+        path_utils::normalize_path,
+    },
 };
 
 use super::{
     job_queue::{enqueue_base_job, BaseThumbnailJob},
+    scan,
     utils::check_is_hidden,
 };
 
@@ -714,10 +718,24 @@ pub async fn update_virtual_folder_options(
 
 /// Spawn a background job that scans a real folder.
 pub async fn start_scan_job(
-    _moa_id: String,
-    _real_folder_id: String,
+    moa_id: String,
+    real_folder_id: String,
 ) -> Result<String> {
-    Ok(String::new())
+    let scan_id = get_unique_id();
+
+    if scan::SCAN_WORKER_STATE.app_handle.get().is_none()
+        || scan::SCAN_WORKER_STATE.signal.get().is_none()
+    {
+        warn!(
+            "scan worker not initialised, skipping scan job for {}",
+            real_folder_id
+        );
+        return Ok(scan_id);
+    }
+
+    scan::queue_scan_job(moa_id, real_folder_id, Some(scan_id.clone())).await;
+
+    Ok(scan_id)
 }
 
 /// Recursively upsert folder and file information.
