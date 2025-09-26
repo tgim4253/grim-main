@@ -25,7 +25,7 @@ const MoaIcon = () => (
 
 // Sidebar for switching between existing MOAs and language preferences.
 const ManageMoaSideBar: React.FC = () => {
-  const [moas, setMoas] = useState<{ name: string; path: string; moa_id: string }[]>([]);
+  const [moas, setMoas] = useState<{ name: string; path: string; moaId: string }[]>([]);
 
   const { t, i18n } = useTranslation(['common', 'moa']);
 
@@ -64,7 +64,10 @@ const ManageMoaSideBar: React.FC = () => {
       style={{ WebkitAppRegion: 'drag', width: '300px' } as React.CSSProperties}
     >
       {/* Item list */}
-      <div className="flex flex-col gap-1 px-4" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+      <div
+        className="flex flex-col gap-1 px-4"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      >
         {moas.length === 0 ? (
           <div className="mt-6 rounded-lg border border-dashed border-border-sidebar bg-surface-muted px-4 py-6 text-sm text-text-soft">
             {t('moa:empty_recent', { defaultValue: '최근에 연 보관함이 없습니다.' })}
@@ -76,7 +79,7 @@ const ManageMoaSideBar: React.FC = () => {
                 variant="list-item"
                 key={moa.name + moa.path}
                 onClick={() => {
-                  void handleMoaClick(moa.moa_id);
+                  void handleMoaClick(moa.moaId);
                 }}
                 className="flex items-start justify-between rounded-lg px-3 py-2 transition-colors"
               >

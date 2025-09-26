@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { FileTreeData, GraphResponse, NodeFolder, NodeKind, RelationType } from '@tgim/types/index';
-import { convertKeysToCamel, snakeToCamel } from '@tgim/utils/object';
+import { convertKeysToCamel } from '@tgim/utils/object';
 
 interface FileTreeState {
   // current tree data
@@ -175,7 +175,7 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
 
       nodeMap.set(n.id, {
         id: n.id,
-        name: folderData?.folder_name ?? '',
+        name: folderData?.folderName ?? '',
         icon: 'folder',
         type: NodeKind.Folder,
         children: [],
@@ -190,8 +190,8 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
     for (const conn of connections) {
       if (conn.kind !== RelationType.ChildFolder) continue;
 
-      const parent = nodeMap.get(conn.src_node_id);
-      const child = nodeMap.get(conn.dst_node_id);
+      const parent = nodeMap.get(conn.srcNodeId);
+      const child = nodeMap.get(conn.dstNodeId);
 
       if (!parent || !child) continue;
       if (parent.id === child.id) continue;

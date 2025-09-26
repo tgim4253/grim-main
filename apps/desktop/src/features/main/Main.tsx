@@ -17,6 +17,7 @@ import PanelContainer from './panel/Container';
 import { ThumbResSpec } from '@tgim/types/file';
 import useThumbStore from '@tgim/stores/thumbStore';
 import { useTheme } from '../../theme/ThemeProvider';
+import { convertKeysToCamel } from '@tgim/utils/object';
 
 interface LayoutPorps {
   layoutId: string;
@@ -168,8 +169,9 @@ const Main: React.FC = () => {
     let unlisten: (() => void) | undefined;
     const initListener = async () => {
       unlisten = await listen<{ items: ThumbResSpec[] }>('thumbnails://created', event => {
-        event.payload.items.forEach(item => {
-          upsertThumb(item.thumb_key, {
+        const payload = convertKeysToCamel(event.payload) as { items: ThumbResSpec[] };
+        payload.items.forEach(item => {
+          upsertThumb(item.thumbKey, {
             status: 'ready',
             url: item.url,
             updatedAt: Date.now(),

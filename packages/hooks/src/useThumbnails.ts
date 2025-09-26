@@ -95,7 +95,7 @@ export function useThumbnails({ moaId, maxBatchSize = DEFAULT_MAX_BATCH }: UseTh
           const response = await ipc.file.getThumbnails(moaId, { items: chunk });
           response.items.forEach(item => {
             item.specs.forEach(spec => {
-              const key = spec.thumb_key;
+              const key = spec.thumbKey;
               if (!key) return;
 
               switch (spec.status) {
@@ -103,7 +103,7 @@ export function useThumbnails({ moaId, maxBatchSize = DEFAULT_MAX_BATCH }: UseTh
                   upsertThumb(key, { status: 'ready', url: spec.url });
                   break;
                 case ThumbStatus.Error:
-                  upsertThumb(key, { status: 'error', error: spec.error_msg });
+                  upsertThumb(key, { status: 'error', error: spec.errorMsg });
                   break;
                 default:
                   upsertThumb(key, { status: 'pending' });
