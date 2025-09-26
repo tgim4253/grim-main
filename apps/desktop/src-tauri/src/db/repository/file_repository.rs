@@ -232,9 +232,9 @@ impl FileRepository {
                 (id, virtual_node_id, real_folder_id, created_at, enabled, priority, recursive, sync_enabled, suppress_warnings)
             VALUES
                 (?1, ?2, ?3, ?4, 1, 0, 1, 0, 0)
-            ON CONFLICT(virtual_node_id, real_folder_id) DO NOTHING; 
+            ON CONFLICT(virtual_node_id, real_folder_id) DO NOTHING;
         "#,
-            mount_id, 
+            mount_id,
             virtual_node_id,
             real_folder_id,
             now
