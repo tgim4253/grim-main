@@ -85,6 +85,10 @@ const fileIpc = {
     const response = await invoke('get_thumbnails', { data, moaId });
     return convertKeysToCamel(response) as ThumbResponse;
   },
+  getFilePath: async (moaId: string, hash: string) => {
+    const response = await invoke('get_file_path', { moaId, hash });
+    return response as string;
+  },
   previewFolderImport: async (path: string): Promise<FolderPreview> => {
     const response = await invoke('preview_folder_import', { path });
     return convertKeysToCamel(response) as FolderPreview;
