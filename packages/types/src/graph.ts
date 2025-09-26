@@ -20,6 +20,8 @@ export interface GraphNode {
   type: GraphNodeType;
   depth?: number;
   isLeaf?: boolean;
+  hasCroquisLink?: boolean;
+  isCroquis?: boolean;
   url?: string;
   x?: number;
   y?: number;

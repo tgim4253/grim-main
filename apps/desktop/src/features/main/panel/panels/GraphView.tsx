@@ -1,7 +1,7 @@
 import usePanelsStore from '@tgim/stores/panelStore';
 import { Connection, GraphConnection, GraphData, GraphNode } from '@tgim/types/graph';
 import { NodeRenderer, clearNodeSpriteCaches, getGraphPalette } from '@tgim/ui/index';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d';
 import { useShallow } from 'zustand/shallow';
 import * as d3 from 'd3-force';
@@ -12,15 +12,18 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { useThumbnails } from '../../../../hooks';
 import { useTheme } from '../../../../theme/ThemeProvider';
 
+type CroquisFilter = 'all' | 'with' | 'without';
+
 interface Props {
   graphData: GraphData;
   rootNodeId: string;
   rootGraphNodeId: string;
+  croquisFilter: CroquisFilter;
 }
 
 const GRAPH_THUMB_SIZE = 64;
 
-const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) => {
+const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId, croquisFilter }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<ForceGraphMethods | undefined>(undefined);
   const { theme } = useTheme();
@@ -68,25 +71,67 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
 
   const GAP = 90;
 
-  const getPrunedTree = () => {
-    const visibleNodes = [];
-    const visibleLinks = [];
-    (function traverseTree(node = nodesById[rootGraphNodeId]) {
+  const matchesCroquisFilter = useCallback(
+    (node: GraphNode | undefined) => {
+      if (!node) return false;
+      if (node.nodeId === rootNodeId) {
+        return true;
+      }
+
+      if (croquisFilter === 'with') {
+        return Boolean(node.hasCroquisLink || node.isCroquis);
+      }
+
+      if (croquisFilter === 'without') {
+        return !(node.hasCroquisLink || node.isCroquis);
+      }
+
+      return true;
+    },
+    [croquisFilter, rootNodeId],
+  );
+
+  const getPrunedTree = useCallback(() => {
+    const visibleNodes: GraphNode[] = [];
+    const visibleLinks: GraphConnection[] = [];
+    const rootNode = nodesById[rootGraphNodeId];
+    if (!rootNode) {
+      return { nodes: visibleNodes, links: visibleLinks };
+    }
+
+    (function traverseTree(node: GraphNode) {
+      if (!matchesCroquisFilter(node)) {
+        return;
+      }
+
       visibleNodes.push(node);
-      const filteredLinks = node.childLinks.filter((link: any) => {
-        const target = typeof link.target === 'object' ? link.target : nodesById[link.target];
-        return !target.isHidden;
+
+      const filteredLinks = (node.childLinks ?? []).filter((link: any) => {
+        const target =
+          typeof link.target === 'object' ? (link.target as GraphNode) : nodesById[link.target];
+
+        return matchesCroquisFilter(target) && !target.isHidden;
       });
+
       visibleLinks.push(...filteredLinks);
+
       filteredLinks
         .map((link: any) =>
-          typeof link.target === 'object' ? link.target : nodesById[link.target],
+          typeof link.target === 'object' ? (link.target as GraphNode) : nodesById[link.target],
         )
-        .forEach(traverseTree);
-    })();
+        .forEach(child => {
+          if (child) {
+            traverseTree(child);
+          }
+        });
+    })(rootNode);
+
     return { nodes: visibleNodes, links: visibleLinks };
-  };
-  const [prunedTree, setPrunedTree] = useState(getPrunedTree());
+  }, [matchesCroquisFilter, nodesById, rootGraphNodeId]);
+  const [prunedTree, setPrunedTree] = useState(() => getPrunedTree());
+  useEffect(() => {
+    setPrunedTree(getPrunedTree());
+  }, [getPrunedTree]);
   const imageNodes = useMemo(
     () => prunedTree.nodes.filter(node => node.type === 'image' && node.hash),
     [prunedTree.nodes],

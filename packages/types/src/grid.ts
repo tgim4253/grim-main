@@ -13,4 +13,6 @@ export interface ImageItem {
   name: string;
   hash: string;
   size: number;
+  hasCroquisLink?: boolean;
+  isCroquis?: boolean;
 }

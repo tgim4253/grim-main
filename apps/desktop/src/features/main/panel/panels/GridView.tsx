@@ -63,8 +63,11 @@ const MasonryIcon = (props: React.SVGProps<SVGSVGElement>) => (
  * Types, Constants, Hooks (unchanged)
  * --------------------------------------------- */
 
+type CroquisFilter = 'all' | 'with' | 'without';
+
 interface Props {
   gridData: GridData;
+  croquisFilter: CroquisFilter;
 }
 
 type Size = 'small' | 'medium' | 'large';
@@ -215,14 +218,34 @@ function useElementSize<T extends HTMLElement>(ref: React.RefObject<T>) {
 /* ---------------------------------------------
  * Main Component
  * --------------------------------------------- */
-const GridView: React.FC<Props> = ({ gridData }) => {
+const GridView: React.FC<Props> = ({ gridData, croquisFilter }) => {
   const { moaId } = useMoa(location);
   const [layout, setLayout] = useState<Layout>('grid');
   const [size, setSize] = useState<Size>('medium');
   const [selectMode, setSelectMode] = useState(false);
-  const [images] = useState(gridData.images);
+  const images = useMemo(() => gridData.images, [gridData.images]);
 
-  const visibleOrder = useMemo(() => images.map(img => img.hash), [images]);
+  const matchesCroquisFilter = useCallback(
+    (image: ImageItem) => {
+      if (croquisFilter === 'with') {
+        return Boolean(image.hasCroquisLink || image.isCroquis);
+      }
+
+      if (croquisFilter === 'without') {
+        return !(image.hasCroquisLink || image.isCroquis);
+      }
+
+      return true;
+    },
+    [croquisFilter],
+  );
+
+  const filteredImages = useMemo(
+    () => images.filter(matchesCroquisFilter),
+    [images, matchesCroquisFilter],
+  );
+
+  const visibleOrder = useMemo(() => filteredImages.map(img => img.hash), [filteredImages]);
 
   const {
     selected,
@@ -237,9 +260,9 @@ const GridView: React.FC<Props> = ({ gridData }) => {
   // Map for quick lookup by hash
   const hashToImgMap = useMemo(() => {
     const map: Record<string, ImageItem> = {};
-    images.forEach(img => (map[img.hash] = img));
+    filteredImages.forEach(img => (map[img.hash] = img));
     return map;
-  }, [images]);
+  }, [filteredImages]);
 
   const [croquisModalOpen, setCroquisModalOpen] = useState(false);
   const [croquisPreferences, setCroquisPreferences] = useState<CroquisPreferences>(() =>
@@ -356,13 +379,13 @@ const GridView: React.FC<Props> = ({ gridData }) => {
       return;
     }
 
-    const initialItems = images.slice(0, INITIAL_FETCH_COUNT);
+    const initialItems = filteredImages.slice(0, INITIAL_FETCH_COUNT);
     if (initialItems.length === 0) {
       return;
     }
 
     stableFetchThumbnails.current(initialItems);
-  }, [images, moaId]);
+  }, [filteredImages, moaId]);
 
   /* -------------------------------------------------
    * Fetch for Masonry via IntersectionObserver
@@ -477,7 +500,7 @@ const GridView: React.FC<Props> = ({ gridData }) => {
       <div ref={scrollRef} className="flex-1 overflow-auto p-4" onClick={handleBackgroundClick}>
         {layout === 'grid' ? (
           <VirtualGridLayout
-            images={images}
+            images={filteredImages}
             size={size}
             onItemClick={handleItemClick}
             // For grid we *don't* rely on IO to fetch; pass stable no-op to avoid overhead
@@ -490,7 +513,7 @@ const GridView: React.FC<Props> = ({ gridData }) => {
           />
         ) : (
           <MasonryLayout
-            images={images}
+            images={filteredImages}
             selectMode={selectMode}
             onItemClick={handleItemClick}
             observe={observe}
