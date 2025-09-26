@@ -1,5 +1,5 @@
 import { usePanelsStore } from '@tgim/stores/index';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { shallow, useShallow } from 'zustand/shallow';
 import ReactDOM from 'react-dom';
 import { ipc } from '../../../lib/ipc';
@@ -20,7 +20,7 @@ import {
 import { createNewId } from '@tgim/utils/identifier';
 import GridView from './panels/GridView';
 import { GridData, ImageItem } from '@tgim/types/grid';
-import { listen } from '@tauri-apps/api/event';
+import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { FileType, ThumbResSpec } from '@tgim/types/file';
 import { Button } from '@tgim/ui';
 import cn from '@tgim/utils/cn';
@@ -28,6 +28,12 @@ import { Split } from '@tgim/ui/Splitter';
 import FileDetailSidebar from './panels/FileDetailSidebar';
 import { Eye, GitBranch, LayoutGrid } from 'lucide-react';
 import FileViewer from './panels/FileViewer';
+
+type TauriFileDropEvent = {
+  type: 'hover' | 'drop' | 'cancel';
+  paths: string[];
+  position?: { x: number; y: number };
+};
 
 interface PanelProps {
   panelId: string;
@@ -43,7 +49,8 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [rootNodeId, setRootNodeId] = useState<string | null>(null);
   const [activeImage, setActiveImage] = useState<ImageItem | null>(null);
   const [rootNode, setRootNode] = useState<Node | null>(null);
-
+  const [isDropActive, setIsDropActive] = useState(false);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const { panel, containerId, isActive } = usePanelsStore(
     useShallow(state => ({
       panel: state.panelEntities[panelId],
@@ -53,14 +60,6 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   );
   const { moaId } = useMoa(location);
   const [container, setContainer] = useState<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (containerId) {
-      const el = document.getElementById(containerId);
-
-      if (el) setContainer(el);
-    }
-  }, [containerId]);
   const transformDataToGraphData = useCallback((graphData: GraphResponse): GraphData => {
     setRootNodeId(graphData.rootNodeId);
     setRootNode(graphData.nodes.find(node => node.id === graphData.rootNodeId) ?? null);
@@ -212,6 +211,28 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
 
     return { images: imageItems };
   }, []);
+  useEffect(() => {
+    if (containerId) {
+      const el = document.getElementById(containerId);
+
+      if (el) setContainer(el);
+    }
+  }, [containerId]);
+  const refreshPanelData = useCallback(async () => {
+    if (!moaId) return;
+    try {
+      const data = await ipc.graph.getGraphOne(moaId, panel.nodeId.toString());
+      setRootNode(data.nodes.find(node => node.id === data.rootNodeId) ?? null);
+      setGraphData(transformDataToGraphData(data));
+      setGridData(await transformDataToGridData(data));
+    } catch (e) {
+      console.error('Failed to load panel data', e);
+    }
+  }, [moaId, panel.nodeId, transformDataToGraphData, transformDataToGridData]);
+
+  useEffect(() => {
+    void refreshPanelData();
+  }, [refreshPanelData]);
 
   useEffect(() => {
     if (!moaId || !panel?.nodeId) return;
@@ -293,6 +314,178 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     return rootNode.data?.['File'] ?? null;
   }, [rootNode]);
 
+  const rootFolder = useMemo(() => {
+    if (!rootNode) return null;
+    if (rootNode.kind !== NodeKind.Folder) return null;
+    return rootNode.data['Folder'] ?? null;
+  }, [rootNode]);
+
+  const dropEnabled = useMemo(() => Boolean(rootFolder && moaId), [rootFolder, moaId]);
+
+  const isPointInside = useCallback((position: { x: number; y: number }, rect: DOMRect) => {
+    return (
+      position.x >= rect.left &&
+      position.x <= rect.right &&
+      position.y >= rect.top &&
+      position.y <= rect.bottom
+    );
+  }, []);
+
+  const handleFileDropPaths = useCallback(
+    async (paths: string[]) => {
+      if (!dropEnabled || !rootNodeId || !moaId || paths.length === 0) {
+        return;
+      }
+      try {
+        await ipc.file.importPanelDrop({
+          moaId,
+          virtualNodeId: rootNodeId,
+          paths,
+        });
+        await refreshPanelData();
+      } catch (error) {
+        console.error('Failed to import dropped files', error);
+      }
+    },
+    [dropEnabled, moaId, refreshPanelData, rootNodeId],
+  );
+
+  useEffect(() => {
+    if (!dropEnabled) return;
+    let active = true;
+    const setupListener = async () => {
+      try {
+        const unlisten = await listen<TauriFileDropEvent>('tauri://file-drop', async event => {
+          if (!active) return;
+          const payload = event.payload;
+          if (!payload || payload.type !== 'drop' || !payload.paths?.length) return;
+          if (!panelRef.current) return;
+          if (!payload.position) {
+            await handleFileDropPaths(payload.paths);
+            return;
+          }
+
+          const rect = panelRef.current.getBoundingClientRect();
+          const scale = window.devicePixelRatio || 1;
+          const cssPosition = { x: payload.position.x / scale, y: payload.position.y / scale };
+          const matchesDirect = isPointInside(payload.position, rect);
+          const matchesCss = isPointInside(cssPosition, rect);
+
+          if (matchesDirect || matchesCss) {
+            await handleFileDropPaths(payload.paths);
+          }
+        });
+        return unlisten;
+      } catch (error) {
+        console.error('Failed to register file drop listener', error);
+        return undefined;
+      }
+    };
+
+    let cleanup: UnlistenFn | undefined;
+    void (async () => {
+      cleanup = await setupListener();
+    })();
+
+    return () => {
+      active = false;
+      cleanup?.();
+    };
+  }, [dropEnabled, handleFileDropPaths, isPointInside]);
+
+  const extractDropData = useCallback((dt: DataTransfer | null) => {
+    if (!dt) {
+      return { urls: [] as string[], baseUrls: [] as string[] };
+    }
+    const uriList = dt.getData('text/uri-list') ?? '';
+    const text = dt.getData('text/plain') ?? '';
+    const rawCandidates = new Set<string>();
+
+    uriList
+      .split('\n')
+      .map(value => value.trim())
+      .filter(Boolean)
+      .forEach(value => rawCandidates.add(value));
+
+    if (text) {
+      text
+        .split('\n')
+        .map(value => value.trim())
+        .filter(Boolean)
+        .forEach(value => rawCandidates.add(value));
+    }
+
+    const urls: string[] = [];
+    const baseUrls: string[] = [];
+
+    rawCandidates.forEach(value => {
+      if (value.startsWith('data:')) {
+        baseUrls.push(value);
+        return;
+      }
+      if (value.startsWith('http://') || value.startsWith('https://')) {
+        urls.push(value);
+        return;
+      }
+    });
+
+    return { urls, baseUrls };
+  }, []);
+
+  const shouldHandleDrag = useCallback(
+    (dt: DataTransfer | null) => {
+      if (!dropEnabled || !dt) return false;
+      const types = Array.from(dt.types ?? []);
+      return (
+        types.includes('Files') || types.includes('text/uri-list') || types.includes('text/plain')
+      );
+    },
+    [dropEnabled],
+  );
+
+  const handleDrop = useCallback(
+    async (event: React.DragEvent<HTMLDivElement>) => {
+      if (!dropEnabled) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setIsDropActive(false);
+
+      const { urls, baseUrls } = extractDropData(event.dataTransfer);
+      if ((!urls.length && !baseUrls.length) || !rootNodeId || !moaId) {
+        return;
+      }
+
+      try {
+        await ipc.file.importPanelDrop({
+          moaId,
+          virtualNodeId: rootNodeId,
+          urls: urls.length ? urls : undefined,
+          baseUrls: baseUrls.length ? baseUrls : undefined,
+        });
+        await refreshPanelData();
+      } catch (error) {
+        console.error('Failed to import dropped content', error);
+      }
+    },
+    [dropEnabled, extractDropData, moaId, refreshPanelData, rootNodeId],
+  );
+
+  const handleDragOver = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      if (!shouldHandleDrag(event.dataTransfer)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.dataTransfer.dropEffect = 'copy';
+      setIsDropActive(true);
+    },
+    [shouldHandleDrag],
+  );
+
+  const handleDragLeave = useCallback(() => {
+    setIsDropActive(false);
+  }, []);
+  if (!panel || !container) return null;
+
   const showGraph = viewType === 'graph' && graphData && rootNodeId && rootGraphNodeId;
   const showGrid = viewType === 'grid' && !!gridData && availableViews.includes('grid');
   const showViewer = viewType === 'viewer' && !!rootFile;
@@ -313,10 +506,15 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
 
   return ReactDOM.createPortal(
     <div
+      ref={panelRef}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      onDragLeave={handleDragLeave}
       className={cn(
         'flex h-full w-full flex-col overflow-hidden rounded-xl border bg-surface shadow-sm transition-colors',
         isActive ? 'border-accent' : 'border-border',
         hidden && 'hidden',
+        dropEnabled && isDropActive && 'ring-2 ring-accent/60',
       )}
     >
       <div className="flex items-center justify-end border-b border-border bg-surface-raised px-3 py-2">

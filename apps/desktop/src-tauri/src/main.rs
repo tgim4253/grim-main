@@ -49,6 +49,7 @@ fn main() {
             commands::file::clear_base_thumbnail_cache,
             commands::file::sync_folder_mount,
             commands::file::update_folder_mount_options,
+            commands::file::import_panel_drop,
             commands::file::get_file_detail,
             commands::file::link_file_path,
             commands::file::remove_file_path,

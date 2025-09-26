@@ -104,6 +104,15 @@ const fileIpc = {
   ) => {
     await invoke('update_folder_mount_options', { moaId, virtualNodeId, options });
   },
+  importPanelDrop: async (payload: {
+    moaId: string;
+    virtualNodeId: string;
+    urls?: string[];
+    baseUrls?: string[];
+    paths?: string[];
+  }) => {
+    await invoke('import_panel_drop', { payload });
+  },
   listFileTypeExtensions: async (): Promise<FileTypeExtensionGroup[]> => {
     const response = await invoke('list_file_type_extensions');
     return response as FileTypeExtensionGroup[];

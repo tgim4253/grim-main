@@ -5,6 +5,7 @@ pub mod detail;
 pub mod folder;
 pub mod hash;
 pub mod job_queue;
+pub mod manual;
 pub mod thumbnail;
 pub mod utils;
 
@@ -21,4 +22,5 @@ pub use folder::{
 };
 pub use hash::xxh3_64_of;
 pub use job_queue::THUMBNAIL_WORKER_STATE;
+pub use manual::{import_panel_drop, PanelDropRequest, PanelDropResponse};
 pub use thumbnail::{get_thumbs, worker_loop};
