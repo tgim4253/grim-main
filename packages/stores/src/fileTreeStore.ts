@@ -166,7 +166,6 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
     const incoming = new Map<string, number>();
 
     for (const n of nodes) {
-      console.log(n);
       if (n.kind !== NodeKind.Folder) continue;
 
       const folderData = (n.data?.['Folder'] as NodeFolder) ?? undefined;

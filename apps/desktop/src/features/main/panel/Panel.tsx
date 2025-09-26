@@ -308,23 +308,28 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
                 <SplitPanel key="grid" minSize={320}>
                   <GridView
                     gridData={gridData}
-                    onImageOpen={setActiveImage}
+                    onImageOpen={image => {
+                      setActiveImage(image);
+                    }}
                     onClearPreview={() => setActiveImage(null)}
                   />
                 </SplitPanel>
-                <SplitPanel
-                  key="sidebar"
-                  canHidden
-                  hidden={!activeImage}
-                  minSize={280}
-                  initialSize={360}
-                >
-                  <FileDetailSidebar
-                    moaId={moaId}
-                    image={activeImage}
-                    onClose={() => setActiveImage(null)}
-                  />
-                </SplitPanel>
+                {activeImage && (
+                  <SplitPanel
+                    key="sidebar"
+                    canHidden
+                    onHidden={hidden => hidden && setActiveImage(null)}
+                    hiddenSize={200}
+                    minSize={280}
+                    initialSize={360}
+                  >
+                    <FileDetailSidebar
+                      moaId={moaId}
+                      image={activeImage}
+                      onClose={() => setActiveImage(null)}
+                    />
+                  </SplitPanel>
+                )}
               </>
             )}
           </Split>

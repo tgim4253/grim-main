@@ -1,11 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@tgim/ui';
 import { ImageItem } from '@tgim/types/grid';
-import {
-  FileDetail,
-  FilePathInfo,
-  FilePathStatus,
-} from '@tgim/types/file';
+import { FileDetail, FilePathInfo, FilePathStatus } from '@tgim/types/file';
 import { ipc } from '../../../../lib/ipc';
 import { formatBytes } from '../../../../lib/format';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
@@ -14,16 +10,9 @@ import useThumbStore, { convertToThumbKey } from '@tgim/stores/thumbStore';
 import { useShallow } from 'zustand/shallow';
 import { useThumbnails } from '../../../../hooks';
 import { ResizeMode } from '@tgim/types/file';
-import { cn } from '@tgim/utils/cn';
-import {
-  FolderOpen,
-  Loader2,
-  PencilLine,
-  Plus,
-  RefreshCw,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { cn } from '@tgim/utils/index';
+import { FolderOpen, Loader2, PencilLine, Plus, RefreshCw, Trash2, X } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 type Props = {
   moaId: string | null;
@@ -64,7 +53,6 @@ const FileDetailSidebar: React.FC<Props> = ({ moaId, image, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionState, setActionState] = useState<ActionState>({ busy: false });
-  const [actionError, setActionError] = useState<string | null>(null);
 
   const { ensureThumbnails } = useThumbnails({ moaId, maxBatchSize: 20 });
 
@@ -149,6 +137,10 @@ const FileDetailSidebar: React.FC<Props> = ({ moaId, image, onClose }) => {
     }
   };
 
+  const setActionError = (err: string | null) => {
+    toast.error(err);
+  };
+
   const performPathAction = async (fn: () => Promise<FileDetail>, targetId?: string) => {
     setActionState({ busy: true, targetId });
     setActionError(null);
@@ -156,7 +148,7 @@ const FileDetailSidebar: React.FC<Props> = ({ moaId, image, onClose }) => {
       const result = await fn();
       setDetail(result);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : '파일 경로 작업 중 오류가 발생했습니다');
+      setActionError(err instanceof Error ? err.message : '잘못된 파일 경로입니다.');
     } finally {
       setActionState({ busy: false, targetId: undefined });
     }
@@ -166,9 +158,7 @@ const FileDetailSidebar: React.FC<Props> = ({ moaId, image, onClose }) => {
     if (!moaId || !image) return;
     const selection = extractPath(await openDialog({ multiple: false }));
     if (!selection) return;
-    await performPathAction(() =>
-      ipc.file.linkFilePath(moaId, image.hash, { path: selection }),
-    );
+    await performPathAction(() => ipc.file.linkFilePath(moaId, image.hash, { path: selection }));
   };
 
   const handleReplacePath = async (info: FilePathInfo) => {
@@ -187,10 +177,7 @@ const FileDetailSidebar: React.FC<Props> = ({ moaId, image, onClose }) => {
 
   const handleRemovePath = async (info: FilePathInfo) => {
     if (!moaId || !image) return;
-    await performPathAction(
-      () => ipc.file.removeFilePath(moaId, image.hash, info.id),
-      info.id,
-    );
+    await performPathAction(() => ipc.file.removeFilePath(moaId, image.hash, info.id), info.id);
   };
 
   const handleReveal = async (info: FilePathInfo) => {
@@ -215,22 +202,18 @@ const FileDetailSidebar: React.FC<Props> = ({ moaId, image, onClose }) => {
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex flex-col">
           <h2 className="text-base font-semibold text-text">{image.name}</h2>
-          {detail?.file.mime && (
-            <span className="text-xs text-text-soft">{detail.file.mime}</span>
-          )}
+          {detail?.file.mime && <span className="text-xs text-text-soft">{detail.file.mime}</span>}
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleRefresh}
-            disabled={loading}
-            title="새로고침"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          <Button variant="icon" onClick={handleRefresh} disabled={loading} title="새로고침">
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
           </Button>
           {onClose && (
-            <Button variant="ghost" size="icon" onClick={onClose} title="닫기">
+            <Button variant="icon" onClick={onClose} title="닫기">
               <X className="h-4 w-4" />
             </Button>
           )}
@@ -242,19 +225,10 @@ const FileDetailSidebar: React.FC<Props> = ({ moaId, image, onClose }) => {
             {error}
           </div>
         )}
-        {actionError && (
-          <div className="rounded-md border border-amber-400/70 bg-amber-100/70 px-3 py-2 text-sm text-amber-700 dark:bg-amber-500/10 dark:text-amber-200">
-            {actionError}
-          </div>
-        )}
         <div className="space-y-3">
           <div className="aspect-video w-full overflow-hidden rounded-lg border border-border bg-surface-muted">
             {previewSrc ? (
-              <img
-                src={previewSrc}
-                alt={image.name}
-                className="h-full w-full object-contain"
-              />
+              <img src={previewSrc} alt={image.name} className="h-full w-full object-contain" />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-text-soft text-sm">
                 미리보기를 준비 중입니다
@@ -264,7 +238,9 @@ const FileDetailSidebar: React.FC<Props> = ({ moaId, image, onClose }) => {
           <dl className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <dt className="text-xs text-text-soft">파일 이름</dt>
-              <dd className="font-medium text-text break-all">{detail?.file.fileName ?? image.name}</dd>
+              <dd className="font-medium text-text break-all">
+                {detail?.file.fileName ?? image.name}
+              </dd>
             </div>
             <div>
               <dt className="text-xs text-text-soft">용량</dt>
@@ -332,26 +308,27 @@ const FileDetailSidebar: React.FC<Props> = ({ moaId, image, onClose }) => {
                           {pathInfo.path ?? '저장된 경로 정보 없음'}
                         </p>
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-soft">
-                          <span className={cn('font-semibold', status.tone)}>
-                            {status.label}
-                          </span>
+                          <span className={cn('font-semibold', status.tone)}>{status.label}</span>
                           {pathInfo.warning && <span>{pathInfo.warning}</span>}
-                          {pathInfo.error && <span className="text-rose-500 dark:text-rose-300">{pathInfo.error}</span>}
+                          {pathInfo.error && (
+                            <span className="text-rose-500 dark:text-rose-300">
+                              {pathInfo.error}
+                            </span>
+                          )}
                           {!pathInfo.exists && !pathInfo.error && (
-                            <span className="text-rose-500 dark:text-rose-300">파일을 찾을 수 없습니다</span>
+                            <span className="text-rose-500 dark:text-rose-300">
+                              파일을 찾을 수 없습니다
+                            </span>
                           )}
                           {pathInfo.hashMatches === false && (
                             <span className="text-rose-500 dark:text-rose-300">해시 불일치</span>
                           )}
-                          {pathInfo.hashMatches && (
-                            <span>해시 일치</span>
-                          )}
+                          {pathInfo.hashMatches && <span>해시 일치</span>}
                         </div>
                       </div>
                       <div className="flex flex-col gap-2">
                         <Button
-                          variant="ghost"
-                          size="icon"
+                          variant="icon"
                           title="파일 위치 열기"
                           onClick={() => handleReveal(pathInfo)}
                           disabled={!pathInfo.path || busy}
@@ -359,8 +336,7 @@ const FileDetailSidebar: React.FC<Props> = ({ moaId, image, onClose }) => {
                           <FolderOpen className="h-4 w-4" />
                         </Button>
                         <Button
-                          variant="ghost"
-                          size="icon"
+                          variant="icon"
                           title="경로 수정"
                           onClick={() => handleReplacePath(pathInfo)}
                           disabled={busy}
@@ -372,8 +348,7 @@ const FileDetailSidebar: React.FC<Props> = ({ moaId, image, onClose }) => {
                           )}
                         </Button>
                         <Button
-                          variant="ghost"
-                          size="icon"
+                          variant="icon"
                           title="경로 제거"
                           onClick={() => handleRemovePath(pathInfo)}
                           disabled={busy}
@@ -384,11 +359,15 @@ const FileDetailSidebar: React.FC<Props> = ({ moaId, image, onClose }) => {
                     </div>
                     <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-text-soft">
                       <div>
-                        <span className="block text-[10px] uppercase tracking-wide">기록된 수정시간</span>
+                        <span className="block text-[10px] uppercase tracking-wide">
+                          기록된 수정시간
+                        </span>
                         <span>{formatMtime(pathInfo.storedMtime)}</span>
                       </div>
                       <div>
-                        <span className="block text-[10px] uppercase tracking-wide">현재 수정시간</span>
+                        <span className="block text-[10px] uppercase tracking-wide">
+                          현재 수정시간
+                        </span>
                         <span>{formatMtime(pathInfo.currentMtime)}</span>
                       </div>
                     </div>

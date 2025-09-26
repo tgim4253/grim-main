@@ -306,7 +306,7 @@ pub async fn link_file_path(
     let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
 
     let real_folder_id = storage_root::ensure_storage_root_and_real_folder(
-        tx.as_mut(),
+        &mut tx,
         &storage_info,
         &parent,
     )

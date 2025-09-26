@@ -24,7 +24,6 @@ const NewMoa: React.FC = () => {
         name,
         path,
       });
-      console.log(data);
     } catch (err) {
       toast.error(err?.toString() || '알 수 없는 오류 발생');
     }
@@ -41,9 +40,7 @@ const NewMoa: React.FC = () => {
         <Button variant="card" className="shadow-lg aspect-square" onClick={pickFolder}>
           <div className="flex flex-col items-center justify-center p-4">
             <h2 className="text-xl font-semibold mt-4">폴더 선택</h2>
-            <p className="mt-1 text-sm text-text-soft text-center">
-              보관할 폴더를 선택합니다.
-            </p>
+            <p className="mt-1 text-sm text-text-soft text-center">보관할 폴더를 선택합니다.</p>
           </div>
         </Button>
       </div>

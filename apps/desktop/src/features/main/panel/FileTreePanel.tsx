@@ -395,7 +395,6 @@ export const FileTree = () => {
           nodes={treeData}
           expandedSet={expanded}
           onToggle={id => {
-            console.log(id);
             setExpanded(prev => {
               const n = new Set(prev);
               n.has(id) ? n.delete(id) : n.add(id);
