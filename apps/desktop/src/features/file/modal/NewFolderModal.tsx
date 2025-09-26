@@ -6,6 +6,7 @@ import { FileType, FolderPreview, FolderPreviewFileStat, FolderSelection } from 
 
 import { ipc } from '../../../lib/ipc';
 import { formatBytes } from '../../../lib/format';
+import { FILE_TYPE_LABELS, FILE_TYPE_ORDER } from '../constants';
 
 interface Props {
   onClose: () => void;
@@ -31,26 +32,6 @@ type EffectiveSelection = {
 type NodeIndexEntry = {
   node: FolderPreview['root'];
   parent: string | null;
-};
-
-const FILE_TYPE_ORDER: FileType[] = [
-  FileType.Image,
-  FileType.Video,
-  FileType.Document,
-  FileType.GraphicTool,
-  FileType.Audio,
-  FileType.Archive,
-  FileType.Unknown,
-];
-
-const FILE_TYPE_LABELS: Record<FileType, string> = {
-  [FileType.Image]: '이미지',
-  [FileType.Video]: '비디오',
-  [FileType.Document]: '문서',
-  [FileType.GraphicTool]: '그래픽',
-  [FileType.Audio]: '오디오',
-  [FileType.Archive]: '압축',
-  [FileType.Unknown]: '기타',
 };
 
 const getStatForType = (stats: FolderPreviewFileStat[] | undefined, fileType: FileType) =>

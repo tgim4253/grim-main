@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                id              AS \"folder_id!\",\n                display_name    AS \"folder_name!\"\n            FROM node_folder\n            WHERE node_id = ?1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "folder_id!",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "folder_name!",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "b4b676b43448a4efab108746a72c79097191e4f2c824dbea5d227bbe6a8a15ea"
+}

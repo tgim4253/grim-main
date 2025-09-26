@@ -60,9 +60,9 @@ export interface ThumbRequest {
 export interface ThumbResSpec {
   status: ThumbStatus;
   url?: string;
-  thumb_key: string;
+  thumbKey: string;
   enqueued: boolean;
-  error_msg?: string;
+  errorMsg?: string;
 }
 
 export interface ThumbResInfo {
@@ -111,6 +111,11 @@ export interface FolderPreview {
   summary: FolderPreviewSummary;
 }
 
+export interface FileTypeExtensionGroup {
+  fileType: FileType;
+  extensions: string[];
+}
+
 export interface FolderSelectionEntry {
   relativePath: string;
   include: boolean;
@@ -145,6 +150,8 @@ export interface FolderMountState {
   errorMsg?: string | null;
   lastSeenScanId?: string | null;
   lastSeenAt?: string | null;
+  includeExtensions: string[];
+  excludeExtensions: string[];
 }
 
 export interface FolderOptionUpdatePayload {
@@ -152,4 +159,43 @@ export interface FolderOptionUpdatePayload {
   recursive: boolean;
   syncEnabled: boolean;
   suppressWarnings: boolean;
+  includeExtensions?: string[];
+  excludeExtensions?: string[];
+}
+
+export type FilePathStatus = 'ok' | 'warning' | 'error';
+
+export interface FilePathInfo {
+  id: string;
+  path?: string | null;
+  exists: boolean;
+  storedMtime?: number | null;
+  currentMtime?: number | null;
+  hashMatches?: boolean | null;
+  status: FilePathStatus;
+  warning?: string | null;
+  error?: string | null;
+}
+
+export interface FileFolderInfo {
+  nodeId: string;
+  name: string;
+}
+
+export interface FileSummary {
+  fileId: string;
+  nodeId: string;
+  fileName: string;
+  mime: string;
+  size: number;
+  hash: string;
+  kind: FileType;
+  width?: number | null;
+  height?: number | null;
+}
+
+export interface FileDetail {
+  file: FileSummary;
+  folders: FileFolderInfo[];
+  paths: FilePathInfo[];
 }

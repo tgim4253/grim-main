@@ -2,14 +2,17 @@ use std::path::PathBuf;
 
 use crate::{
     models::file::{
+        file_type_extension_groups, FileDetail, FileTypeExtensionGroup,
         FolderData, FolderOptionUpdatePayload, FolderPreview, ThumbRequest,
         ThumbResponse,
     },
     services::file_service::{
         self, clear_base_thumb_cache, clear_derived_thumb_cache,
         collect_folder_preview, collect_thumb_cache_usage, first_mount_folder,
-        get_thumbs, sync_virtual_folder, update_virtual_folder_options,
-        ThumbCacheUsage,
+        get_file_detail as service_get_file_detail, get_thumbs,
+        link_file_path as service_link_file_path,
+        remove_file_path as service_remove_file_path, reveal_in_file_manager,
+        sync_virtual_folder, update_virtual_folder_options, ThumbCacheUsage,
     },
 };
 #[tauri::command]
@@ -51,6 +54,19 @@ pub async fn get_thumbnails(
         .map_err(|e| e.to_string())?;
 
     Ok(response)
+}
+
+#[tauri::command]
+/// Resolve the absolute file path for a file hash stored in the MOA.
+pub async fn get_file_path(
+    moa_id: String,
+    hash: String,
+) -> Result<String, String> {
+    let path = file_service::folder::fetch_one_file_path(moa_id, hash)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(path.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
@@ -108,4 +124,57 @@ pub async fn update_folder_mount_options(
     update_virtual_folder_options(&moa_id, &virtual_node_id, options)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+/// Retrieve detailed information for a file content displayed in the sidebar.
+pub async fn get_file_detail(
+    moa_id: String,
+    hash: String,
+) -> Result<FileDetail, String> {
+    service_get_file_detail(&moa_id, &hash).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+/// Attach a filesystem path to the specified file content.
+pub async fn link_file_path(
+    moa_id: String,
+    hash: String,
+    path: String,
+    replace_path_id: Option<String>,
+) -> Result<FileDetail, String> {
+    let path_buf = PathBuf::from(&path);
+    service_link_file_path(
+        &moa_id,
+        &hash,
+        path_buf.as_path(),
+        replace_path_id.as_deref(),
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+/// Remove a bound filesystem path from the file content.
+pub async fn remove_file_path(
+    moa_id: String,
+    hash: String,
+    file_path_id: String,
+) -> Result<FileDetail, String> {
+    service_remove_file_path(&moa_id, &hash, &file_path_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+/// Open the provided filesystem path inside the platform file explorer.
+pub async fn reveal_file_in_explorer(path: String) -> Result<(), String> {
+    let path_buf = PathBuf::from(&path);
+    reveal_in_file_manager(path_buf.as_path()).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_file_type_extensions(
+) -> Result<Vec<FileTypeExtensionGroup>, String> {
+    Ok(file_type_extension_groups())
 }
