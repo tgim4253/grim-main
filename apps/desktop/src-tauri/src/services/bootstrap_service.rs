@@ -488,12 +488,6 @@ async fn detect_mount_changes(
         match fs::metadata(&path).await {
             Ok(meta) => {
                 let current_mtime = FileInfo::file_mtime_epoch(&meta)?;
-                println!(
-                    "{}: {} vs {}",
-                    path.display(),
-                    current_mtime,
-                    mount.stored_mtime
-                );
                 if current_mtime != mount.stored_mtime {
                     if mount.sync_enabled {
                         match sync_virtual_folder(
