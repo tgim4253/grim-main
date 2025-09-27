@@ -44,6 +44,20 @@ use crate::{
 static CROQUIS_SESSIONS: Lazy<RwLock<HashMap<String, CroquisSession>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
+const DEFAULT_PRESET_NAME: &str = "Preset 1";
+
+fn build_single_preset(option: CroquisOption) -> CroquisPreferences {
+    let preset_id = get_unique_id();
+    CroquisPreferences {
+        active_preset_id: preset_id.clone(),
+        presets: vec![CroquisPreset {
+            id: preset_id,
+            name: DEFAULT_PRESET_NAME.to_string(),
+            option,
+        }],
+    }
+}
+
 /// Launch a new Croquis session by ensuring base images and spawning the window.
 pub async fn start_session(
     app_handle: &tauri::AppHandle,
@@ -62,17 +76,8 @@ pub async fn start_session(
     }
 
     if save_option {
-        let preferences_to_persist = preferences.unwrap_or_else(|| {
-            let preset_id = get_unique_id();
-            CroquisPreferences {
-                active_preset_id: preset_id.clone(),
-                presets: vec![CroquisPreset {
-                    id: preset_id,
-                    name: "Preset 1".to_string(),
-                    option: option.clone(),
-                }],
-            }
-        });
+        let preferences_to_persist =
+            preferences.unwrap_or_else(|| build_single_preset(option.clone()));
         persist_preferences(&moa_id, &preferences_to_persist).await?;
     }
 
@@ -174,13 +179,8 @@ pub async fn load_preferences(
             match serde_json::from_slice::<CroquisPreferences>(&payload) {
                 Ok(mut preferences) => {
                     if preferences.presets.is_empty() {
-                        let preset_id = get_unique_id();
-                        preferences.presets.push(CroquisPreset {
-                            id: preset_id.clone(),
-                            name: "Preset 1".to_string(),
-                            option: CroquisOption::default(),
-                        });
-                        preferences.active_preset_id = preset_id;
+                        preferences =
+                            build_single_preset(CroquisOption::default());
                     } else if preferences.active_preset_id.is_empty()
                         || !preferences.presets.iter().any(|preset| {
                             preset.id == preferences.active_preset_id
@@ -196,15 +196,7 @@ pub async fn load_preferences(
                 Err(primary_error) => {
                     match serde_json::from_slice::<CroquisOption>(&payload) {
                         Ok(option) => {
-                            let preset_id = get_unique_id();
-                            let preferences = CroquisPreferences {
-                                active_preset_id: preset_id.clone(),
-                                presets: vec![CroquisPreset {
-                                    id: preset_id,
-                                    name: "Preset 1".to_string(),
-                                    option,
-                                }],
-                            };
+                            let preferences = build_single_preset(option);
                             Ok(Some(preferences))
                         }
                         Err(_) => Err(primary_error).context(format!(
