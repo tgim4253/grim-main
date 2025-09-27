@@ -39,8 +39,9 @@ pub fn launch_moa(
 
     let window = web_builder.build().map_err(|e| e.to_string())?;
 
-    tauri::async_runtime::block_on(async {
-        register_moa_window(&moa_id).await;
+    let register_id = moa_id.clone();
+    tauri::async_runtime::spawn(async move {
+        register_moa_window(&register_id).await;
     });
 
     {
