@@ -27,6 +27,7 @@ use super::{
     job_queue::{
         cancel_pending_base_job, enqueue_jobs, finish_base_job, finish_job,
         take_next_base_job, take_next_job, BaseThumbnailJob, ThumbnailJob,
+        THUMBNAIL_WORKER_STATE,
     },
 };
 
@@ -251,6 +252,15 @@ pub async fn worker_loop(app: AppHandle, mut rx: mpsc::Receiver<()>) {
         let _ = rx.recv().await;
 
         loop {
+            let has_active = {
+                let active = THUMBNAIL_WORKER_STATE.active_moas.lock().await;
+                !active.is_empty()
+            };
+
+            if !has_active {
+                break;
+            }
+
             let mut made_progress = false;
 
             if let Some(base_job) = take_next_base_job().await {

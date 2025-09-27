@@ -1,6 +1,10 @@
-use tauri::WebviewUrl;
+use tauri::{WebviewUrl, WindowEvent};
 #[cfg(target_os = "macos")]
 use tauri_plugin_decorum::WebviewWindowExt;
+
+use crate::services::file_service::job_queue::{
+    register_moa_window, unregister_moa_window,
+};
 
 /// Launch the primary Moa window for the provided workspace identifier.
 pub fn launch_moa(
@@ -34,6 +38,22 @@ pub fn launch_moa(
     let web_builder = web_builder.decorations(false);
 
     let window = web_builder.build().map_err(|e| e.to_string())?;
+
+    tauri::async_runtime::block_on(async {
+        register_moa_window(&moa_id).await;
+    });
+
+    {
+        let event_id = moa_id.clone();
+        window.on_window_event(move |event| {
+            if matches!(event, WindowEvent::Destroyed) {
+                let event_id = event_id.clone();
+                tauri::async_runtime::spawn(async move {
+                    unregister_moa_window(&event_id).await;
+                });
+            }
+        });
+    }
 
     #[cfg(target_os = "macos")]
     window.create_overlay_titlebar().map_err(|e| e.to_string())?;
