@@ -224,7 +224,7 @@ async fn register_path_with_virtual_folder(
         .await
         .context("failed to open transaction")?;
 
-    let real_folder_id = storage_root::ensure_storage_root_and_real_folder(
+    let ensured_folder = storage_root::ensure_storage_root_and_real_folder(
         &mut tx,
         &sroot_info,
         &parent_norm,
@@ -233,6 +233,7 @@ async fn register_path_with_virtual_folder(
     .with_context(|| {
         format!("failed to ensure real folder for {}", parent_norm.display())
     })?;
+    let real_folder_id = ensured_folder.real_folder_id.clone();
 
     let file_name = normalized
         .file_name()

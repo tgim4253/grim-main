@@ -51,9 +51,19 @@ CREATE INDEX IF NOT EXISTS idx_conn_src_dst    ON connection(src_node_id, dst_no
 CREATE INDEX IF NOT EXISTS idx_conn_src_kind   ON connection(src_node_id, kind_id);
 CREATE INDEX IF NOT EXISTS idx_conn_dst_kind   ON connection(dst_node_id, kind_id);
 
+/* ---------------------------------------- Device registry ------------------------------------------ */
+CREATE TABLE IF NOT EXISTS device (
+  id          TEXT PRIMARY KEY NOT NULL,                        -- uuid
+  device_uuid TEXT NOT NULL UNIQUE,
+  name        TEXT,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 /* ---------------------------- Storage roots & mounts (portable across OS) -------------------------- */
 CREATE TABLE IF NOT EXISTS storage_root (
   id            TEXT PRIMARY KEY NOT NULL,                             -- uuid
+  device_id     TEXT NOT NULL REFERENCES device(id) ON DELETE CASCADE,
   platform      TEXT,                                         -- 'windows'|'macos'|'linux'|'unknown'
   stable_id     TEXT NOT NULL,                                -- Volume GUID/UUID or //host/share
   secondary_id  TEXT,
@@ -62,7 +72,7 @@ CREATE TABLE IF NOT EXISTS storage_root (
   is_available  INTEGER DEFAULT 0,                            -- boolean
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
-  UNIQUE(platform, stable_id)
+  UNIQUE(device_id, platform, stable_id)
 );
 
 CREATE TABLE IF NOT EXISTS storage_root_mount (
@@ -88,9 +98,9 @@ CREATE TABLE IF NOT EXISTS scan_session (
 /* -------------------------------- Real folder tree (physical) ------------------------------------- */
 CREATE TABLE IF NOT EXISTS real_folder (
   id                TEXT PRIMARY KEY NOT NULL,                         -- uuid
-  storage_root_id   TEXT REFERENCES storage_root(id) ON DELETE SET NULL,
+  tree_id           TEXT NOT NULL,
   parent_id         TEXT REFERENCES real_folder(id) ON DELETE CASCADE,
-  parent_key        TEXT GENERATED ALWAYS AS (COALESCE(parent_id, '_root_')) STORED,
+  parent_key        TEXT GENERATED ALWAYS AS (COALESCE(parent_id, tree_id)) STORED,
   name              TEXT NOT NULL,                            -- single segment
   name_norm         TEXT NOT NULL,                                     -- lowercased for case-insensitive FS
   root_rel_path     TEXT,                                     -- optional cache
@@ -103,11 +113,21 @@ CREATE TABLE IF NOT EXISTS real_folder (
   created_at        TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
 
-  UNIQUE (storage_root_id, parent_key, name_norm)
+  UNIQUE (tree_id, parent_key, name_norm)
 );
 
 CREATE INDEX IF NOT EXISTS idx_real_folder_err    ON real_folder(error_flag);
 CREATE INDEX IF NOT EXISTS idx_real_folder_parent ON real_folder(parent_id);
+
+CREATE TABLE IF NOT EXISTS storage_root_tree (
+  storage_root_id TEXT NOT NULL REFERENCES storage_root(id) ON DELETE CASCADE,
+  tree_id         TEXT NOT NULL,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (storage_root_id, tree_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_storage_root_tree_tree ON storage_root_tree(tree_id);
 
 /* ---------------------------- File content, paths and binds ------------------------------------ */
 CREATE TABLE IF NOT EXISTS file_content (

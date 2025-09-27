@@ -795,7 +795,9 @@ async fn ensure_mounted_volume(moa_id: &str) -> Result<()> {
                    ELSE rtrim($2, '/') || '/' || ltrim(root_rel_path, '/')
                END,
                    updated_at = $3
-             WHERE storage_root_id = $1
+             WHERE tree_id IN (
+                 SELECT tree_id FROM storage_root_tree WHERE storage_root_id = $1
+             )
             "#,
         )
         .bind(rid)
@@ -813,7 +815,9 @@ async fn ensure_mounted_volume(moa_id: &str) -> Result<()> {
                     ELSE rtrim($2, '\') || '\' || ltrim(root_rel_path, '\')
                 END,
                     updated_at = $3
-            WHERE storage_root_id = $1
+            WHERE tree_id IN (
+                SELECT tree_id FROM storage_root_tree WHERE storage_root_id = $1
+            )
             "#,
         )
         .bind(rid)

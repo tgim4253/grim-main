@@ -2,6 +2,7 @@ use anyhow::Result;
 use sqlx::{Executor, Sqlite};
 
 use crate::{
+    db::repository::device_repository::DeviceRepository,
     models::file::StorageRootInfo,
     utils::{date::get_now_date, identifier::get_unique_id},
 };
@@ -34,6 +35,7 @@ impl SrootRepository {
     /// Upsert a storage-root row and return its identifier.
     pub async fn upsert_storage_root<'a, E>(
         executor: &mut E,
+        device_id: &str,
         sroot_info: &crate::models::file::StorageRootInfo,
     ) -> Result<String>
     where
@@ -45,10 +47,10 @@ impl SrootRepository {
         let sroot_id = sqlx::query_scalar!(
             r#"
             INSERT INTO storage_root
-                (id, platform, stable_id, secondary_id, kind, label, is_available, created_at, updated_at)
+                (id, device_id, platform, stable_id, secondary_id, kind, label, is_available, created_at, updated_at)
             VALUES
-                (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-            ON CONFLICT(platform, stable_id) DO UPDATE SET
+                (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+            ON CONFLICT(device_id, platform, stable_id) DO UPDATE SET
                 secondary_id = excluded.secondary_id,
                 kind         = excluded.kind,
                 is_available = excluded.is_available,
@@ -56,6 +58,7 @@ impl SrootRepository {
             RETURNING id as "id!: String"
             "#,
             new_id,
+            device_id,
             sroot_info.platform,
             sroot_info.stable_id,
             sroot_info.secondary_id,
@@ -113,9 +116,17 @@ impl SrootRepository {
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
     {
+        let device_id = DeviceRepository::ensure_device(
+            &mut *executor,
+            &sroot_info.device_uuid,
+            sroot_info.device_name.as_deref(),
+        )
+        .await?;
+
         // Ensure StorageRoot exists or create it
         let sroot_id =
-            Self::upsert_storage_root(&mut *executor, sroot_info).await?;
+            Self::upsert_storage_root(&mut *executor, &device_id, sroot_info)
+                .await?;
 
         // Ensure StorageRootMount exists or create/update it
         let _sroot_mount_id = Self::upsert_storage_root_mount(

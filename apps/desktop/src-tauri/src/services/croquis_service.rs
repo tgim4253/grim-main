@@ -499,12 +499,13 @@ async fn register_capture_in_workspace(
     let sroot_info = storage_root::detect_storage_root(&parent_norm)?;
 
     let mut tx = DB_MANAGER.create_new_tx(&moa_id).await?;
-    let real_folder_id = storage_root::ensure_storage_root_and_real_folder(
+    let ensured_folder = storage_root::ensure_storage_root_and_real_folder(
         &mut tx,
         &sroot_info,
         &parent_norm,
     )
     .await?;
+    let real_folder_id = ensured_folder.real_folder_id.clone();
 
     let file_name = file_path
         .file_name()

@@ -420,7 +420,7 @@ impl FileRepository {
     /// Look up a real-folder identifier by normalized path components.
     pub async fn _find_folder_id<'a, E>(
         executor: &mut E,
-        sroot_id: String,
+        tree_id: &str,
         current_parent_id: Option<String>,
         name_norm: String,
     ) -> Result<Option<String>>
@@ -431,9 +431,9 @@ impl FileRepository {
             r#"
             SELECT id AS "id!"
             FROM real_folder
-            WHERE storage_root_id = ?1 AND parent_id IS ?2 AND name_norm = ?3
+            WHERE tree_id = ?1 AND parent_id IS ?2 AND name_norm = ?3
             "#,
-            sroot_id,
+            tree_id,
             current_parent_id,
             name_norm
         )
@@ -441,6 +441,102 @@ impl FileRepository {
         .await?;
 
         Ok(folder_id)
+    }
+
+    pub async fn fetch_tree_id_for_storage_root<'a, E>(
+        executor: &mut E,
+        storage_root_id: &str,
+    ) -> Result<Option<String>>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let tree_id = sqlx::query_scalar!(
+            r#"
+            SELECT tree_id AS "tree_id?: String"
+              FROM storage_root_tree
+             WHERE storage_root_id = ?1
+             ORDER BY updated_at DESC
+             LIMIT 1
+            "#,
+            storage_root_id
+        )
+        .fetch_optional(&mut *executor)
+        .await?;
+
+        Ok(tree_id)
+    }
+
+    pub async fn bind_storage_root_to_tree<'a, E>(
+        executor: &mut E,
+        storage_root_id: &str,
+        tree_id: &str,
+    ) -> Result<()>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let now = crate::utils::date::get_now_date();
+
+        sqlx::query!(
+            r#"
+            INSERT INTO storage_root_tree
+                (storage_root_id, tree_id, created_at, updated_at)
+            VALUES
+                (?1, ?2, ?3, ?3)
+            ON CONFLICT(storage_root_id, tree_id) DO UPDATE SET
+                updated_at = excluded.updated_at
+            "#,
+            storage_root_id,
+            tree_id,
+            now
+        )
+        .execute(&mut *executor)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn fetch_tree_id_for_real_folder<'a, E>(
+        executor: &mut E,
+        real_folder_id: &str,
+    ) -> Result<Option<String>>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let tree_id = sqlx::query_scalar!(
+            r#"
+            SELECT tree_id AS "tree_id?: String"
+              FROM real_folder
+             WHERE id = ?1
+            "#,
+            real_folder_id
+        )
+        .fetch_optional(&mut *executor)
+        .await?;
+
+        Ok(tree_id)
+    }
+
+    pub async fn fetch_storage_root_id_for_tree<'a, E>(
+        executor: &mut E,
+        tree_id: &str,
+    ) -> Result<Option<String>>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let storage_root_id = sqlx::query_scalar!(
+            r#"
+            SELECT storage_root_id AS "storage_root_id?: String"
+              FROM storage_root_tree
+             WHERE tree_id = ?1
+             ORDER BY updated_at DESC
+             LIMIT 1
+            "#,
+            tree_id
+        )
+        .fetch_optional(&mut *executor)
+        .await?;
+
+        Ok(storage_root_id)
     }
 
     /// Create a virtual folder node under the specified parent.
@@ -511,19 +607,19 @@ impl FileRepository {
         let folder_id = sqlx::query_scalar!(
             r#"
             INSERT INTO real_folder
-                (id, storage_root_id, parent_id, name, name_norm, root_rel_path, abs_path_cached, mtime, error_flag, error_msg, created_at, updated_at)
+                (id, tree_id, parent_id, name, name_norm, root_rel_path, abs_path_cached, mtime, error_flag, error_msg, created_at, updated_at)
             VALUES
                 (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'success', NULL, ?9, ?10)
-            ON CONFLICT(storage_root_id, parent_key, name_norm) DO UPDATE SET
-                name        = excluded.name,
-                name_norm   = excluded.name_norm,
-                root_rel_path = excluded.root_rel_path,
+            ON CONFLICT(tree_id, parent_key, name_norm) DO UPDATE SET
+                name           = excluded.name,
+                name_norm      = excluded.name_norm,
+                root_rel_path  = excluded.root_rel_path,
                 abs_path_cached = excluded.abs_path_cached,
-                updated_at  = ?10
+                updated_at     = excluded.updated_at
             RETURNING id as "id!: String"
             "#,
             new_id,
-            folder_info.storage_root_id,
+            folder_info.tree_id,
             folder_info.parent_id,
             folder_info.name,
             folder_info.name_norm,

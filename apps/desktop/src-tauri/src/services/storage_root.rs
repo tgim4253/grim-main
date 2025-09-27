@@ -3,12 +3,71 @@
 use crate::db::repository::sroot_repository::SrootRepository;
 use crate::models::file::{StorageKind, StorageRootInfo};
 use crate::services::file_service::ensure_real_folder;
-use crate::utils::date::get_now_date;
-use crate::utils::path_utils::normalize_path;
-use crate::utils::platform::get_current_platfrom;
-use anyhow::Result;
+use crate::utils::{
+    date::get_now_date, identifier::get_unique_id, path_utils::normalize_path,
+    platform::get_current_platfrom,
+};
+use anyhow::{anyhow, Result};
+use dirs_next::home_dir;
 use sqlx::{Sqlite, Transaction};
-use std::path::PathBuf;
+use std::{env, fs, path::PathBuf};
+use tracing::warn;
+
+/// Result returned when ensuring a storage root and its backing real folder.
+pub struct StorageRootEnsureResult {
+    pub storage_root_id: String,
+    pub real_folder_id: String,
+    pub tree_id: String,
+}
+
+fn detect_device_name() -> Option<String> {
+    let candidates = ["GRIM_DEVICE_NAME", "COMPUTERNAME", "HOSTNAME"];
+    for key in candidates {
+        if let Ok(value) = env::var(key) {
+            let trimmed = value.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn resolve_device_identity() -> Result<(String, Option<String>)> {
+    if let Ok(value) = env::var("GRIM_DEVICE_UUID") {
+        let trimmed = value.trim();
+        if !trimmed.is_empty() {
+            return Ok((trimmed.to_string(), detect_device_name()));
+        }
+    }
+
+    let device_name = detect_device_name();
+
+    if let Some(home) = home_dir() {
+        let device_dir = home.join(".grim");
+        let device_file = device_dir.join("device_uuid");
+
+        if let Ok(stored) = fs::read_to_string(&device_file) {
+            let trimmed = stored.trim();
+            if !trimmed.is_empty() {
+                return Ok((trimmed.to_string(), device_name));
+            }
+        }
+
+        if let Err(err) = fs::create_dir_all(&device_dir) {
+            warn!("failed to prepare device uuid directory: {err}");
+        } else {
+            let new_uuid = get_unique_id();
+            if let Err(err) = fs::write(&device_file, &new_uuid) {
+                warn!("failed to persist device uuid: {err}");
+                return Ok((new_uuid, device_name));
+            }
+            return Ok((new_uuid, device_name));
+        }
+    }
+
+    Ok((get_unique_id(), device_name))
+}
 
 /// Re-export platform-specific helpers behind a single interface.
 #[cfg(target_os = "macos")]
@@ -522,6 +581,7 @@ pub fn get_mount_paths() -> Result<Vec<PathBuf>> {
 pub fn enumerate_mounted_root() -> Result<Vec<StorageRootInfo>> {
     let mut roots = Vec::new();
     let now_s = get_now_date();
+    let (device_uuid, device_name) = resolve_device_identity()?;
 
     let mount_paths = get_mount_paths()?;
     for mp in mount_paths {
@@ -542,6 +602,8 @@ pub fn enumerate_mounted_root() -> Result<Vec<StorageRootInfo>> {
         let is_available = mp.exists();
 
         roots.push(StorageRootInfo {
+            device_uuid: device_uuid.clone(),
+            device_name: device_name.clone(),
             platform: get_current_platfrom(),
             kind,
             stable_id,
@@ -561,6 +623,7 @@ pub fn enumerate_mounted_root() -> Result<Vec<StorageRootInfo>> {
 pub fn detect_storage_root(path: &PathBuf) -> Result<StorageRootInfo> {
     let now_s = get_now_date();
     let norm = normalize_path(path);
+    let (device_uuid, device_name) = resolve_device_identity()?;
 
     // Best-prefix mount point
     let mount_path =
@@ -581,6 +644,8 @@ pub fn detect_storage_root(path: &PathBuf) -> Result<StorageRootInfo> {
     let is_available = mount_path.exists();
 
     Ok(StorageRootInfo {
+        device_uuid,
+        device_name,
         platform: get_current_platfrom(),
         kind,
         stable_id,
@@ -598,14 +663,17 @@ pub async fn ensure_storage_root_and_real_folder(
     tx: &mut Transaction<'_, Sqlite>,
     sroot_info: &StorageRootInfo,
     norm_path: &PathBuf,
-) -> Result<String> {
+) -> Result<StorageRootEnsureResult> {
     // Ensure StorageRoot exists or create it
     let sroot_id =
         SrootRepository::ensure_storage_root(tx.as_mut(), sroot_info).await?;
 
     // Ensure RealFolder exists or create it
-    let real_folder_id =
-        ensure_real_folder(tx, sroot_id.clone(), norm_path).await?;
+    let ensured = ensure_real_folder(tx, &sroot_id, norm_path).await?;
 
-    Ok(real_folder_id)
+    Ok(StorageRootEnsureResult {
+        storage_root_id: sroot_id,
+        real_folder_id: ensured.real_folder_id,
+        tree_id: ensured.tree_id,
+    })
 }

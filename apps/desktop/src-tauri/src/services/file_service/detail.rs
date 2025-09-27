@@ -305,12 +305,13 @@ pub async fn link_file_path(
 
     let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
 
-    let real_folder_id = storage_root::ensure_storage_root_and_real_folder(
+    let ensured_folder = storage_root::ensure_storage_root_and_real_folder(
         &mut tx,
         &storage_info,
         &parent,
     )
     .await?;
+    let real_folder_id = ensured_folder.real_folder_id;
 
     let file_info =
         FileInfo::new(moa_id, &norm_path, real_folder_id, file_name)

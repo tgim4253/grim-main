@@ -29,7 +29,10 @@ use crate::{
         db::DB_MANAGER,
         storage_root::{self, ensure_storage_root_and_real_folder},
     },
-    utils::{file_utils::file_mtime_epoch, path_utils::normalize_path},
+    utils::{
+        file_utils::file_mtime_epoch, identifier::get_unique_id,
+        path_utils::normalize_path,
+    },
 };
 
 use super::{
@@ -605,9 +608,10 @@ pub async fn first_mount_folder(
     let sroot_info = storage_root::detect_storage_root(&norm_path)?;
 
     let virtual_folder_id = node.id.clone();
-    let real_folder_id =
+    let ensured_root =
         ensure_storage_root_and_real_folder(&mut tx, &sroot_info, &norm_path)
             .await?;
+    let real_folder_id = ensured_root.real_folder_id.clone();
 
     let mount_id = FileRepository::create_virtual_folder_mount(
         tx.as_mut(),
@@ -647,6 +651,7 @@ pub async fn first_mount_folder(
         &moa_id,
         real_folder_id.clone(),
         virtual_folder_id.clone(),
+        ensured_root.storage_root_id.clone(),
         &norm_path,
         true,
         Some(true),
@@ -712,6 +717,25 @@ pub async fn sync_virtual_folder(
     })?;
     let mtime = FileInfo::file_mtime_epoch(&metadata)?;
 
+    let tree_id = FileRepository::fetch_tree_id_for_real_folder(
+        tx.as_mut(),
+        &mount.real_folder_id,
+    )
+    .await?
+    .ok_or_else(|| {
+        anyhow!(
+            "Failed to resolve tree for real folder {}",
+            mount.real_folder_id
+        )
+    })?;
+
+    let storage_root_id =
+        FileRepository::fetch_storage_root_id_for_tree(tx.as_mut(), &tree_id)
+            .await?
+            .ok_or_else(|| {
+                anyhow!("No storage root associated with tree {tree_id}")
+            })?;
+
     let extension_filter = ExtensionFilter::new(
         &mount.include_extensions,
         &mount.exclude_extensions,
@@ -723,6 +747,7 @@ pub async fn sync_virtual_folder(
         moa_id,
         mount.real_folder_id.clone(),
         virtual_node_id.to_string(),
+        storage_root_id,
         abs_path.as_path(),
         mount.recursive,
         Some(true),
@@ -791,7 +816,7 @@ pub async fn update_virtual_folder_options(
                 &norm_path,
             )
             .await?;
-            new_real_folder_id = Some(ensured);
+            new_real_folder_id = Some(ensured.real_folder_id);
         }
     }
 
@@ -832,6 +857,7 @@ async fn upsert_folder(
     moa_id: &str,
     parent_real_folder_id: String,
     parent_virtual_folder_id: String,
+    storage_root_id: String,
     abs_dir: &Path,
     recursive: bool,
     make_virtual_folder: Option<bool>,
@@ -849,6 +875,7 @@ async fn upsert_folder(
         moa_id,
         parent_real_folder_id,
         parent_virtual_folder_id,
+        &storage_root_id,
         abs_dir,
         recursive,
         make_virtual_folder,
@@ -875,6 +902,7 @@ async fn upsert_folder_impl(
     moa_id: &str,
     parent_real_folder_id: String,
     parent_virtual_folder_id: String,
+    storage_root_id: &str,
     abs_dir: &Path,
     recursive: bool,
     make_virtual_folder: Option<bool>,
@@ -996,15 +1024,6 @@ async fn upsert_folder_impl(
     }
     metrics.record_tree_scanning(tree_scan_timer.elapsed());
 
-    let sroot_id: String = sqlx::query_scalar(
-        "SELECT storage_root_id FROM real_folder\n                     WHERE id = ?",
-    )
-    .bind(&parent_real_folder_id)
-    .fetch_optional(tx.as_mut())
-    .await
-    .with_context(|| "failed to load storage_root for parent_real_folder_id")?
-    .ok_or_else(|| anyhow!("parent_real_folder_id not found: {}", parent_real_folder_id))?;
-
     if recursive {
         for (entry_path, name, child_allowed) in folder_entries {
             let folder_timer = Instant::now();
@@ -1020,8 +1039,9 @@ async fn upsert_folder_impl(
 
             let normalized = normalize_path(&entry_path);
 
-            let child_real_folder_id =
-                ensure_real_folder(tx, sroot_id.clone(), &normalized).await?;
+            let ensured_child =
+                ensure_real_folder(tx, storage_root_id, &normalized).await?;
+            let child_real_folder_id = ensured_child.real_folder_id;
 
             FileRepository::create_virtual_folder_mount(
                 tx.as_mut(),
@@ -1040,6 +1060,7 @@ async fn upsert_folder_impl(
                 moa_id,
                 child_real_folder_id,
                 child_vf.id,
+                storage_root_id,
                 &entry_path,
                 recursive,
                 Some(make_vf),
@@ -1133,38 +1154,81 @@ async fn upsert_file_entry(
 }
 
 /// Ensure that a real folder record exists for the provided path.
+pub struct RealFolderEnsureState {
+    pub real_folder_id: String,
+    pub tree_id: String,
+}
+
 pub async fn ensure_real_folder(
     tx: &mut Transaction<'_, Sqlite>,
-    sroot_id: String,
+    sroot_id: &str,
     norm_path: &PathBuf,
-) -> Result<String> {
-    let mut current_parent_id: Option<String> = None;
-
-    let mount_path = SrootRepository::fetch_mount_path(tx.as_mut(), &sroot_id)
+) -> Result<RealFolderEnsureState> {
+    let mount_path = SrootRepository::fetch_mount_path(tx.as_mut(), sroot_id)
         .await?
         .ok_or_else(|| anyhow!("Failed to fetch mount path"))?;
 
-    let components_path =
-        if let Ok(sub_path) = norm_path.strip_prefix(&mount_path) {
-            sub_path
-        } else {
-            norm_path
-        };
-
-    let components: Vec<&str> = if components_path.as_os_str().is_empty() {
-        vec![""]
+    let tree_id = if let Some(existing) =
+        FileRepository::fetch_tree_id_for_storage_root(tx.as_mut(), sroot_id)
+            .await?
+    {
+        FileRepository::bind_storage_root_to_tree(
+            tx.as_mut(),
+            sroot_id,
+            &existing,
+        )
+        .await?;
+        existing
     } else {
-        components_path
-            .components()
-            .filter_map(|c| c.as_os_str().to_str())
-            .filter(|s| !s.is_empty())
-            .collect()
+        let new_tree_id = get_unique_id();
+        FileRepository::bind_storage_root_to_tree(
+            tx.as_mut(),
+            sroot_id,
+            &new_tree_id,
+        )
+        .await?;
+        new_tree_id
     };
 
-    let mut rel_path = PathBuf::from("");
-    let mut abs_path = PathBuf::from(&mount_path);
-
+    let mount_path_buf = PathBuf::from(&mount_path);
+    let metadata = fs::metadata(&mount_path_buf).await?;
+    let root_mtime = file_mtime_epoch(&metadata)?;
     let now = crate::utils::date::get_now_date();
+
+    let root_data = RealFolderData {
+        id: String::new(),
+        tree_id: tree_id.clone(),
+        parent_id: None,
+        name: String::new(),
+        name_norm: String::new(),
+        root_rel_path: Some(String::new()),
+        abs_path_cached: Some(mount_path.clone()),
+        mtime: root_mtime,
+        error_flag: crate::config::file::IntegrityCheckResult::Success,
+        error_msg: None,
+        last_seen_scan_id: None,
+        last_seen_at: None,
+        created_at: now.clone(),
+        updated_at: now.clone(),
+    };
+
+    let mut current_parent_id = Some(
+        FileRepository::upsert_real_folder(tx.as_mut(), &root_data).await?,
+    );
+
+    let mut rel_path = PathBuf::new();
+    let mut abs_path = mount_path_buf.clone();
+
+    let components_path = match norm_path.strip_prefix(&mount_path_buf) {
+        Ok(sub_path) => sub_path.to_path_buf(),
+        Err(_) => PathBuf::new(),
+    };
+
+    let components: Vec<&str> = components_path
+        .components()
+        .filter_map(|c| c.as_os_str().to_str())
+        .filter(|s| !s.is_empty())
+        .collect();
 
     for component in components {
         abs_path.push(component);
@@ -1175,7 +1239,7 @@ pub async fn ensure_real_folder(
 
         let data = RealFolderData {
             id: String::new(),
-            storage_root_id: Some(sroot_id.to_owned()),
+            tree_id: tree_id.clone(),
             parent_id: current_parent_id.clone(),
             name: component.to_string(),
             name_norm: component.to_lowercase(),
@@ -1194,8 +1258,10 @@ pub async fn ensure_real_folder(
         current_parent_id = Some(id);
     }
 
-    current_parent_id
-        .ok_or_else(|| anyhow!("Failed to create or find real_folder ID"))
+    let real_folder_id = current_parent_id
+        .ok_or_else(|| anyhow!("Failed to create or find real_folder ID"))?;
+
+    Ok(RealFolderEnsureState { real_folder_id, tree_id })
 }
 
 /// Fetch a single active file path for the provided xxHash.

@@ -248,6 +248,9 @@ impl From<&str> for OsPlatform {
 /// Metadata describing a discovered storage root.
 #[derive(Debug, Clone, FromRow, Serialize)]
 pub struct StorageRootInfo {
+    pub device_uuid: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub device_name: Option<String>,
     pub platform: OsPlatform,
     pub kind: StorageKind,
     pub stable_id: String,
@@ -606,7 +609,7 @@ impl FileInfo {
 /// Payload used to upsert real-folder records in the database.
 pub struct RealFolderData {
     pub id: String,
-    pub storage_root_id: Option<String>,
+    pub tree_id: String,
     pub parent_id: Option<String>,
     pub name: String,
     pub name_norm: String,
