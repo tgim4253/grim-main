@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     hash::{Hash, Hasher},
     path::PathBuf,
     sync::Arc,
@@ -93,8 +93,16 @@ impl ThumbnailQueue {
 #[derive(Default)]
 struct BaseThumbnailQueue {
     queue: VecDeque<BaseThumbnailJob>,
-    pending: HashSet<String>,
-    inflight: HashSet<String>,
+    pending: HashMap<String, String>,
+    inflight: HashMap<String, String>,
+}
+
+impl BaseThumbnailQueue {
+    fn cancel_by_moa(&mut self, moa_id: &str) {
+        self.queue.retain(|job| job.moa_id != moa_id);
+        self.pending.retain(|_, pending_moa| pending_moa != moa_id);
+        self.inflight.retain(|_, inflight_moa| inflight_moa != moa_id);
+    }
 }
 
 /// Shared state for the thumbnail worker queue.
@@ -161,11 +169,12 @@ pub async fn enqueue_base_job(job: BaseThumbnailJob) {
     {
         let mut queue = state.base_queue.lock().await;
 
-        if queue.inflight.contains(&job.xxhs) {
+        if queue.inflight.contains_key(&job.xxhs) {
             return;
         }
 
-        if queue.pending.contains(&job.xxhs) {
+        if queue.pending.contains_key(&job.xxhs) {
+            queue.pending.insert(job.xxhs.clone(), job.moa_id.clone());
             if let Some(existing) =
                 queue.queue.iter_mut().find(|item| item.xxhs == job.xxhs)
             {
@@ -174,7 +183,7 @@ pub async fn enqueue_base_job(job: BaseThumbnailJob) {
             return;
         }
 
-        queue.pending.insert(job.xxhs.clone());
+        queue.pending.insert(job.xxhs.clone(), job.moa_id.clone());
         queue.queue.push_back(job);
     }
 
@@ -211,7 +220,7 @@ pub async fn take_next_base_job() -> Option<BaseThumbnailJob> {
 
     if let Some(ref job) = job {
         queue.pending.remove(&job.xxhs);
-        queue.inflight.insert(job.xxhs.clone());
+        queue.inflight.insert(job.xxhs.clone(), job.moa_id.clone());
     }
 
     job
@@ -227,7 +236,7 @@ pub async fn finish_base_job(job: &BaseThumbnailJob) {
 pub async fn cancel_pending_base_job(hash: &str) {
     let mut queue = THUMBNAIL_WORKER_STATE.base_queue.lock().await;
 
-    if queue.pending.remove(hash) {
+    if queue.pending.remove(hash).is_some() {
         queue.queue.retain(|job| job.xxhs != hash);
     }
 }
@@ -257,5 +266,10 @@ pub async fn unregister_moa_window(moa_id: &str) {
     {
         let mut queue = state.queue.lock().await;
         queue.cancel_by_moa(moa_id);
+    }
+
+    {
+        let mut base_queue = state.base_queue.lock().await;
+        base_queue.cancel_by_moa(moa_id);
     }
 }
