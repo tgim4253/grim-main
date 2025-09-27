@@ -66,30 +66,6 @@ struct ThumbnailQueue {
     inflight: HashSet<ThumbnailJobKey>,
 }
 
-impl ThumbnailQueue {
-    fn cancel_by_moa(&mut self, moa_id: &str) {
-        let mut removed = HashSet::new();
-
-        for job in self.high.iter().filter(|job| job.moa_id == moa_id) {
-            removed.insert(ThumbnailJobKey {
-                xxhs: job.xxhs.clone(),
-                thumb_key: job.thumb_key.clone(),
-            });
-        }
-
-        for job in self.low.iter().filter(|job| job.moa_id == moa_id) {
-            removed.insert(ThumbnailJobKey {
-                xxhs: job.xxhs.clone(),
-                thumb_key: job.thumb_key.clone(),
-            });
-        }
-
-        self.high.retain(|job| job.moa_id != moa_id);
-        self.low.retain(|job| job.moa_id != moa_id);
-        self.pending.retain(|key| !removed.contains(key));
-    }
-}
-
 #[derive(Default)]
 struct BaseThumbnailQueue {
     queue: VecDeque<BaseThumbnailJob>,
@@ -101,7 +77,6 @@ struct BaseThumbnailQueue {
 pub struct ThumbnailWorkerState {
     pub queue: Mutex<ThumbnailQueue>,
     pub base_queue: Mutex<BaseThumbnailQueue>,
-    pub active_moas: Mutex<HashSet<String>>,
     pub signal: OnceCell<mpsc::Sender<()>>,
 }
 
@@ -110,7 +85,6 @@ impl Default for ThumbnailWorkerState {
         Self {
             queue: Mutex::new(ThumbnailQueue::default()),
             base_queue: Mutex::new(BaseThumbnailQueue::default()),
-            active_moas: Mutex::new(HashSet::new()),
             signal: OnceCell::new(),
         }
     }
@@ -128,13 +102,9 @@ pub async fn enqueue_jobs(mut jobs: Vec<ThumbnailJob>) {
     }
 
     let state = THUMBNAIL_WORKER_STATE.clone();
-    let active_moas = { state.active_moas.lock().await.clone() };
     {
         let mut queue = state.queue.lock().await;
         for job in jobs.drain(..) {
-            if !active_moas.contains(&job.moa_id) {
-                continue;
-            }
             let key: ThumbnailJobKey = (&job).into();
             if queue.pending.contains(&key) || queue.inflight.contains(&key) {
                 continue;
@@ -186,7 +156,7 @@ pub async fn enqueue_base_job(job: BaseThumbnailJob) {
 /// Take the next job from the queue, prioritising high priority jobs.
 pub async fn take_next_job() -> Option<ThumbnailJob> {
     let mut queue = THUMBNAIL_WORKER_STATE.queue.lock().await;
-    let job = queue.high.pop_back().or_else(|| queue.low.pop_back());
+    let job = queue.high.pop_front().or_else(|| queue.low.pop_front());
 
     if let Some(ref job) = job {
         let key: ThumbnailJobKey = job.into();
@@ -207,7 +177,7 @@ pub async fn finish_job(job: &ThumbnailJob) {
 /// Take the next base thumbnail job from the queue.
 pub async fn take_next_base_job() -> Option<BaseThumbnailJob> {
     let mut queue = THUMBNAIL_WORKER_STATE.base_queue.lock().await;
-    let job = queue.queue.pop_back();
+    let job = queue.queue.pop_front();
 
     if let Some(ref job) = job {
         queue.pending.remove(&job.xxhs);
@@ -229,33 +199,5 @@ pub async fn cancel_pending_base_job(hash: &str) {
 
     if queue.pending.remove(hash) {
         queue.queue.retain(|job| job.xxhs != hash);
-    }
-}
-
-/// Mark the provided Moa as having an open window so jobs can be processed.
-pub async fn register_moa_window(moa_id: &str) {
-    let state = THUMBNAIL_WORKER_STATE.clone();
-    {
-        let mut active = state.active_moas.lock().await;
-        if active.insert(moa_id.to_string()) {
-            if let Some(tx) = state.signal.get() {
-                let _ = tx.try_send(());
-            }
-        }
-    }
-}
-
-/// Remove the Moa from the active set and cancel any queued jobs for it.
-pub async fn unregister_moa_window(moa_id: &str) {
-    let state = THUMBNAIL_WORKER_STATE.clone();
-
-    {
-        let mut active = state.active_moas.lock().await;
-        active.remove(moa_id);
-    }
-
-    {
-        let mut queue = state.queue.lock().await;
-        queue.cancel_by_moa(moa_id);
     }
 }
