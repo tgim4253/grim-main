@@ -6,16 +6,13 @@ use crate::db::repository::node_repository::NodeRepository;
 use crate::models::file::FileInfo;
 use crate::models::node::{NodeKind, NodeWithConnections};
 use crate::services::db::DB_MANAGER;
-use crate::services::file_service::folder::{
-    sync_virtual_folder, ExtensionFilter,
-};
+use crate::services::file_service::folder::sync_virtual_folder;
 use crate::services::storage_root::enumerate_mounted_root;
 use crate::services::{db, integrity, moa_services};
 use crate::utils::date::get_now_date;
 use crate::utils::identifier::get_unique_id;
 use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
-use sqlx::Row;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -23,9 +20,10 @@ use std::time::Instant;
 use tauri::{Emitter, State};
 use tokio::{
     fs,
-    sync::{Mutex, RwLock},
+    sync::{watch, Mutex, RwLock},
+    time::{interval, Duration},
 };
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 /// Progress payload emitted to the renderer while bootstrapping a workspace.
 #[derive(Clone, Serialize)]
@@ -73,6 +71,8 @@ pub struct AppStatus {
 pub struct AppState {
     /// Cached bootstrap status keyed by Moa identifier.
     pub statuses: Arc<RwLock<HashMap<String, Arc<Mutex<AppStatus>>>>>,
+    /// Active filesystem monitor senders keyed by Moa identifier.
+    pub watchers: Arc<RwLock<HashMap<String, watch::Sender<bool>>>>,
 }
 
 impl AppState {
@@ -175,6 +175,8 @@ async fn run_bootstrap_pipeline(
     info!("Indexing files: {:?} ms", t3.elapsed().as_millis());
 
     step(&app, &state, &moa_id, Stage::Ready, 100, Some("Done")).await;
+
+    ensure_mount_watchers(&app, &state, &moa_id).await?;
 
     Ok(())
 }
@@ -386,6 +388,237 @@ async fn perform_initial_scan(
     }
 
     Ok(())
+}
+
+async fn ensure_mount_watchers(
+    app: &tauri::AppHandle,
+    state: &AppState,
+    moa_id: &str,
+) -> Result<()> {
+    {
+        let existing = state.watchers.read().await;
+        if existing.contains_key(moa_id) {
+            return Ok(());
+        }
+    }
+
+    let (tx, rx) = watch::channel(false);
+    let app_handle = app.clone();
+    let moa_id_owned = moa_id.to_string();
+
+    tauri::async_runtime::spawn(async move {
+        run_mount_watch_loop(app_handle, moa_id_owned, rx).await;
+    });
+
+    let mut guard = state.watchers.write().await;
+    guard.insert(moa_id.to_string(), tx);
+    Ok(())
+}
+
+async fn run_mount_watch_loop(
+    app: tauri::AppHandle,
+    moa_id: String,
+    mut shutdown_rx: watch::Receiver<bool>,
+) {
+    if let Err(err) = detect_mount_changes(&app, &moa_id).await {
+        warn!("Initial mount scan failed for {moa_id}: {err}");
+    }
+
+    let mut ticker = interval(Duration::from_secs(15));
+    loop {
+        tokio::select! {
+            changed = shutdown_rx.changed() => {
+                match changed {
+                    Ok(_) => {
+                        if *shutdown_rx.borrow() {
+                            break;
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+            _ = ticker.tick() => {
+                if let Err(err) = detect_mount_changes(&app, &moa_id).await {
+                    warn!("Mount monitor tick failed for {moa_id}: {err}");
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FolderStatusEvent {
+    virtual_node_ids: Vec<String>,
+}
+
+async fn detect_mount_changes(
+    app: &tauri::AppHandle,
+    moa_id: &str,
+) -> Result<()> {
+    let mounts = {
+        let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
+        let mounts = FileRepository::fetch_mounts_rows(tx.as_mut()).await?;
+        tx.commit().await?;
+        mounts
+    };
+
+    if mounts.is_empty() {
+        return Ok(());
+    }
+
+    let mut changed: Vec<String> = Vec::new();
+
+    for mount in mounts {
+        let Some(abs_path) = mount.abs_path.clone() else {
+            let updated = update_real_folder_status(
+                moa_id,
+                &mount.real_folder_id,
+                IntegrityCheckResult::NotFound,
+                Some("Missing cached path for mounted folder".to_string()),
+            )
+            .await?;
+            if updated {
+                changed.push(mount.virtual_node_id.clone());
+            }
+            continue;
+        };
+
+        let path = PathBuf::from(&abs_path);
+        match fs::metadata(&path).await {
+            Ok(meta) => {
+                let current_mtime = FileInfo::file_mtime_epoch(&meta)?;
+                println!(
+                    "{}: {} vs {}",
+                    path.display(),
+                    current_mtime,
+                    mount.stored_mtime
+                );
+                if current_mtime != mount.stored_mtime {
+                    if mount.sync_enabled {
+                        match sync_virtual_folder(
+                            app,
+                            moa_id,
+                            &mount.virtual_node_id,
+                        )
+                        .await
+                        {
+                            Ok(()) => {
+                                changed.push(mount.virtual_node_id.clone());
+                            }
+                            Err(err) => {
+                                warn!(
+                                    "Auto-sync failed for {} ({}): {}",
+                                    mount.virtual_node_id,
+                                    path.display(),
+                                    err
+                                );
+                                let updated = update_real_folder_status(
+                                    moa_id,
+                                    &mount.real_folder_id,
+                                    IntegrityCheckResult::Mismatch,
+                                    Some(format!("Sync failed: {err}")),
+                                )
+                                .await?;
+                                if updated {
+                                    changed.push(mount.virtual_node_id.clone());
+                                }
+                            }
+                        }
+                    } else {
+                        let updated = update_real_folder_status(
+                            moa_id,
+                            &mount.real_folder_id,
+                            IntegrityCheckResult::Mismatch,
+                            Some("Detected filesystem changes".to_string()),
+                        )
+                        .await?;
+                        if updated {
+                            changed.push(mount.virtual_node_id.clone());
+                        }
+                    }
+                } else {
+                    let updated = update_real_folder_status(
+                        moa_id,
+                        &mount.real_folder_id,
+                        IntegrityCheckResult::Success,
+                        None,
+                    )
+                    .await?;
+                    if updated {
+                        changed.push(mount.virtual_node_id.clone());
+                    }
+                }
+            }
+            Err(err) => {
+                warn!(
+                    "Failed to read metadata for {} ({}): {}",
+                    mount.virtual_node_id,
+                    path.display(),
+                    err
+                );
+                let updated = update_real_folder_status(
+                    moa_id,
+                    &mount.real_folder_id,
+                    IntegrityCheckResult::NotFound,
+                    Some(err.to_string()),
+                )
+                .await?;
+                if updated {
+                    changed.push(mount.virtual_node_id.clone());
+                }
+            }
+        }
+    }
+
+    if !changed.is_empty() {
+        changed.sort();
+        changed.dedup();
+        let payload = FolderStatusEvent { virtual_node_ids: changed };
+        let _ = app.emit(&format!("folder-status://changed/{moa_id}"), payload);
+    }
+
+    Ok(())
+}
+
+async fn update_real_folder_status(
+    moa_id: &str,
+    real_folder_id: &str,
+    status: IntegrityCheckResult,
+    error_msg: Option<String>,
+) -> Result<bool> {
+    let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
+    let now = get_now_date();
+    let status_str = match status {
+        IntegrityCheckResult::Success => "success",
+        IntegrityCheckResult::Mismatch => "mismatch",
+        IntegrityCheckResult::NotFound => "notfound",
+    };
+
+    let error_msg_ref = error_msg.as_deref();
+
+    let rows = sqlx::query(
+        r#"
+        UPDATE real_folder
+           SET error_flag = ?2,
+               error_msg = ?3,
+               last_seen_at = ?4,
+               updated_at = ?4
+         WHERE id = ?1
+           AND (error_flag IS NULL OR error_flag != ?2 OR COALESCE(error_msg, '') != COALESCE(?3, ''))
+        "#,
+    )
+    .bind(real_folder_id)
+    .bind(status_str)
+    .bind(error_msg_ref)
+    .bind(&now)
+    .execute(tx.as_mut())
+    .await?
+    .rows_affected();
+
+    tx.commit().await?;
+
+    Ok(rows > 0)
 }
 
 /// Fetch the initial node graph needed by the renderer after bootstrap.

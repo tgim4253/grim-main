@@ -41,6 +41,10 @@ declare global {
     totalFiles?: number | null;
     elapsedMs: number;
   }
+
+  interface FolderStatusChangeEvent {
+    virtualNodeIds: string[];
+  }
 }
 
 export {};

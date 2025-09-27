@@ -345,6 +345,33 @@ export const FileTree = () => {
     };
   }, [moaId]);
 
+  useEffect(() => {
+    if (!moaId) {
+      return;
+    }
+
+    let unlisten: (() => void) | undefined;
+
+    const setup = async () => {
+      try {
+        unlisten = await listen<FolderStatusChangeEvent>(
+          `folder-status://changed/${moaId}`,
+          () => {
+            void refreshTree();
+          },
+        );
+      } catch (error) {
+        console.error('Failed to listen for folder status updates', error);
+      }
+    };
+
+    void setup();
+
+    return () => {
+      unlisten?.();
+    };
+  }, [moaId, refreshTree]);
+
   const handleImportModalClose = () => {
     setImportModalOpen(false);
     setImportProgress(null);
