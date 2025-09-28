@@ -4,7 +4,7 @@ import { shallow, useShallow } from 'zustand/shallow';
 import ReactDOM from 'react-dom';
 import { ipc } from '../../../lib/ipc';
 import { useMoa } from '@tgim/hooks/useMoa';
-import { dirname } from '@tauri-apps/api/path';
+import { dirname, join } from '@tauri-apps/api/path';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import GraphView from './panels/GraphView';
 import {
@@ -195,6 +195,17 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       links,
     };
   }, []);
+  const [defaultDownloadPath, setDefaultDownloadPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const moas = await ipc.moa.loadMoas();
+      const target = moas.find(moa => moa.moaId === moaId);
+      if (!target) return;
+      const defaultPath = await join(target.path, target.name, 'download');
+      setDefaultDownloadPath(defaultPath);
+    })();
+  }, [moaId]);
   const transformDataToGridData = useCallback(async (data: GraphResponse): Promise<GridData> => {
     const items = data.nodes.filter(node => node.id !== data.rootNodeId);
     const imageItems: ImageItem[] = [];
@@ -243,12 +254,9 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   useEffect(() => {
     if (!moaId) return;
 
-    let unlistenPromise: Promise<UnlistenFn> | null = listen(
-      `capture://completed/${moaId}`,
-      () => {
-        void refreshPanelData();
-      },
-    );
+    let unlistenPromise: Promise<UnlistenFn> | null = listen(`capture://completed/${moaId}`, () => {
+      void refreshPanelData();
+    });
 
     unlistenPromise.catch(error => {
       console.error('[Panel] Failed to register capture listener', error);
@@ -338,6 +346,11 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
 
   const defaultView = useMemo<ViewType>(() => availableViews[0] ?? 'graph', [availableViews]);
 
+  const rootFolder = useMemo(() => {
+    if (!rootNode) return null;
+    if (rootNode.kind !== NodeKind.Folder) return null;
+    return rootNode.data['Folder'] ?? null;
+  }, [rootNode]);
   useEffect(() => {
     if (!availableViews.includes(viewType)) {
       setViewType(defaultView);
@@ -376,17 +389,24 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
           nodeId: rootNode.id,
           path: mountWithPath.realPath,
         };
+      } else if (defaultDownloadPath) {
+        return {
+          type: 'folder' as const,
+          nodeId: rootNode.id,
+          path: defaultDownloadPath,
+        };
       }
     }
 
     return null;
-  }, [activeImage?.hash, activeImage?.nodeId, rootFile?.xxh364, rootFolder, rootNode]);
-
-  const rootFolder = useMemo(() => {
-    if (!rootNode) return null;
-    if (rootNode.kind !== NodeKind.Folder) return null;
-    return rootNode.data['Folder'] ?? null;
-  }, [rootNode]);
+  }, [
+    activeImage?.hash,
+    activeImage?.nodeId,
+    rootFile?.xxh364,
+    rootFolder,
+    rootNode,
+    defaultDownloadPath,
+  ]);
 
   const dropEnabled = useMemo(() => Boolean(rootFolder && moaId), [rootFolder, moaId]);
   const canCapture = useMemo(() => Boolean(moaId && captureAnchor), [captureAnchor, moaId]);

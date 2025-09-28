@@ -94,15 +94,7 @@ const CaptureOverlay: React.FC = () => {
       linkTypeForward,
       linkTypeReverse,
     });
-  }, [
-    moaId,
-    sourceHash,
-    sourceNodeId,
-    savePath,
-    sessionId,
-    linkTypeForward,
-    linkTypeReverse,
-  ]);
+  }, [moaId, sourceHash, sourceNodeId, savePath, sessionId, linkTypeForward, linkTypeReverse]);
 
   useEffect(() => {
     let cancelled = false;
@@ -250,7 +242,7 @@ const CaptureOverlay: React.FC = () => {
     async (event: React.PointerEvent<HTMLDivElement>) => {
       if (!isPointerDownRef.current || phase !== 'selecting') return;
       event.preventDefault();
-      document.body.style.backgroundColor = IDLE_OVERLAY_COLOR;
+      document.body.style.backgroundColor = ACTIVE_OVERLAY_COLOR;
 
       isPointerDownRef.current = false;
       if (!selection || !monitorInfo) {
