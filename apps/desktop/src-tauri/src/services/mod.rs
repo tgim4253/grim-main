@@ -1,6 +1,7 @@
 //! Backend services that power the desktop application.
 
 pub mod bootstrap_service;
+pub mod capture_service;
 pub mod croquis_service;
 pub mod db;
 pub mod file_service;

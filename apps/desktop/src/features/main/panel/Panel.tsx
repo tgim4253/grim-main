@@ -4,6 +4,8 @@ import { shallow, useShallow } from 'zustand/shallow';
 import ReactDOM from 'react-dom';
 import { ipc } from '../../../lib/ipc';
 import { useMoa } from '@tgim/hooks/useMoa';
+import { dirname, join } from '@tauri-apps/api/path';
+import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import GraphView from './panels/GraphView';
 import {
   Connection,
@@ -16,6 +18,7 @@ import {
   NodeFile,
   NodeFolder,
   NodeKind,
+  RelationType,
 } from '@tgim/types/graph';
 import { createNewId } from '@tgim/utils/identifier';
 import GridView from './panels/GridView';
@@ -25,9 +28,14 @@ import { Button } from '@tgim/ui';
 import cn from '@tgim/utils/cn';
 import { Split } from '@tgim/ui/Splitter';
 import FileDetailSidebar from './panels/FileDetailSidebar';
-import { Eye, GitBranch, LayoutGrid } from 'lucide-react';
+import { Camera, Eye, GitBranch, LayoutGrid } from 'lucide-react';
 import FileViewer from './panels/FileViewer';
 import { usePanelDrop } from './usePanelDrop';
+import { toast } from 'react-toastify';
+
+const DEFAULT_CAPTURE_LINK = 'relativeimage';
+const FOLDER_CAPTURE_FORWARD_LINK = RelationType.ContainsFile;
+const FOLDER_CAPTURE_REVERSE_LINK = RelationType.BelongToFolder;
 
 interface PanelProps {
   panelId: string;
@@ -42,6 +50,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [gridData, setGridData] = useState<GridData | null>(null);
   const [rootNodeId, setRootNodeId] = useState<string | null>(null);
   const [activeImage, setActiveImage] = useState<ImageItem | null>(null);
+  const [captureBusy, setCaptureBusy] = useState(false);
   const [rootNode, setRootNode] = useState<Node | null>(null);
   const [graphRefreshKey, setGraphRefreshKey] = useState(0);
   const [gridRefreshKey, setGridRefreshKey] = useState(0);
@@ -186,6 +195,17 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       links,
     };
   }, []);
+  const [defaultDownloadPath, setDefaultDownloadPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const moas = await ipc.moa.loadMoas();
+      const target = moas.find(moa => moa.moaId === moaId);
+      if (!target) return;
+      const defaultPath = await join(target.path, target.name, 'download');
+      setDefaultDownloadPath(defaultPath);
+    })();
+  }, [moaId]);
   const transformDataToGridData = useCallback(async (data: GraphResponse): Promise<GridData> => {
     const items = data.nodes.filter(node => node.id !== data.rootNodeId);
     const imageItems: ImageItem[] = [];
@@ -230,6 +250,30 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   useEffect(() => {
     void refreshPanelData();
   }, [refreshPanelData]);
+
+  useEffect(() => {
+    if (!moaId) return;
+
+    let unlistenPromise: Promise<UnlistenFn> | null = listen(`capture://completed/${moaId}`, () => {
+      void refreshPanelData();
+    });
+
+    unlistenPromise.catch(error => {
+      console.error('[Panel] Failed to register capture listener', error);
+    });
+
+    return () => {
+      if (!unlistenPromise) return;
+      unlistenPromise
+        .then(unlisten => {
+          unlisten();
+        })
+        .catch(error => {
+          console.error('[Panel] Failed to remove capture listener', error);
+        });
+      unlistenPromise = null;
+    };
+  }, [moaId, refreshPanelData]);
 
   useEffect(() => {
     if (!moaId || !panel?.nodeId) return;
@@ -302,6 +346,11 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
 
   const defaultView = useMemo<ViewType>(() => availableViews[0] ?? 'graph', [availableViews]);
 
+  const rootFolder = useMemo(() => {
+    if (!rootNode) return null;
+    if (rootNode.kind !== NodeKind.Folder) return null;
+    return rootNode.data['Folder'] ?? null;
+  }, [rootNode]);
   useEffect(() => {
     if (!availableViews.includes(viewType)) {
       setViewType(defaultView);
@@ -313,13 +362,54 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     return rootNode.data?.['File'] ?? null;
   }, [rootNode]);
 
-  const rootFolder = useMemo(() => {
+  const captureAnchor = useMemo(() => {
     if (!rootNode) return null;
-    if (rootNode.kind !== NodeKind.Folder) return null;
-    return rootNode.data['Folder'] ?? null;
-  }, [rootNode]);
+
+    if (activeImage?.hash && activeImage.nodeId) {
+      return {
+        type: 'file' as const,
+        hash: activeImage.hash,
+        nodeId: activeImage.nodeId,
+      };
+    }
+
+    if (rootNode.kind === NodeKind.File && rootFile?.xxh364) {
+      return {
+        type: 'file' as const,
+        hash: rootFile.xxh364,
+        nodeId: rootNode.id,
+      };
+    }
+
+    if (rootNode.kind === NodeKind.Folder && rootFolder) {
+      const mountWithPath = rootFolder.mounts?.find(mount => mount.realPath);
+      if (mountWithPath?.realPath) {
+        return {
+          type: 'folder' as const,
+          nodeId: rootNode.id,
+          path: mountWithPath.realPath,
+        };
+      } else if (defaultDownloadPath) {
+        return {
+          type: 'folder' as const,
+          nodeId: rootNode.id,
+          path: defaultDownloadPath,
+        };
+      }
+    }
+
+    return null;
+  }, [
+    activeImage?.hash,
+    activeImage?.nodeId,
+    rootFile?.xxh364,
+    rootFolder,
+    rootNode,
+    defaultDownloadPath,
+  ]);
 
   const dropEnabled = useMemo(() => Boolean(rootFolder && moaId), [rootFolder, moaId]);
+  const canCapture = useMemo(() => Boolean(moaId && captureAnchor), [captureAnchor, moaId]);
 
   const { isDropActive, handleDrop, handleDragEnter, handleDragLeave, handleDragOver } =
     usePanelDrop({
@@ -333,6 +423,43 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const showGrid = viewType === 'grid' && !!gridData && availableViews.includes('grid');
   const showViewer = viewType === 'viewer' && !!rootFile;
 
+  const handleStartCapture = useCallback(async () => {
+    if (!moaId || !captureAnchor) return;
+
+    setCaptureBusy(true);
+    try {
+      if (captureAnchor.type === 'file') {
+        const filePath = await ipc.file.getFilePath(moaId, captureAnchor.hash);
+        const targetDirectory = await dirname(filePath);
+        await ipc.capture.openOverlay({
+          moaId,
+          sourceHash: captureAnchor.hash,
+          sourceNodeId: captureAnchor.nodeId,
+          savePath: targetDirectory,
+          linkTypeForward: DEFAULT_CAPTURE_LINK,
+          linkTypeReverse: DEFAULT_CAPTURE_LINK,
+        });
+      } else if (captureAnchor.type === 'folder') {
+        if (!captureAnchor.path) {
+          toast.error('폴더 경로를 확인할 수 없습니다.');
+          return;
+        }
+        await ipc.capture.openOverlay({
+          moaId,
+          sourceNodeId: captureAnchor.nodeId,
+          savePath: captureAnchor.path,
+          linkTypeForward: FOLDER_CAPTURE_FORWARD_LINK,
+          linkTypeReverse: FOLDER_CAPTURE_REVERSE_LINK,
+        });
+      }
+    } catch (error) {
+      console.error('[Panel] Failed to open capture overlay', error);
+      toast.error('캡처를 시작할 수 없습니다.');
+    } finally {
+      setCaptureBusy(false);
+    }
+  }, [captureAnchor, moaId]);
+
   const getViewIcon = useCallback((type: ViewType) => {
     switch (type) {
       case 'grid':
@@ -344,6 +471,8 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         return GitBranch;
     }
   }, []);
+
+  const captureDisabled = !canCapture || captureBusy;
 
   if (!panel || !container) return null;
 
@@ -369,35 +498,48 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       )}
     >
       <div className="flex items-center justify-end border-b border-border bg-surface-raised px-3 py-2">
-        {availableViews.length > 1 ? (
-          <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-muted p-1 shadow-inner">
-            {availableViews.map(type => {
-              const Icon = getViewIcon(type);
-              const isActive = viewType === type;
-              const labels: Record<ViewType, string> = {
-                graph: '그래프 보기',
-                grid: '그리드 보기',
-                viewer: '뷰어 보기',
-              };
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="icon"
+            aria-label="캡처 시작"
+            title="캡처 시작"
+            onClick={handleStartCapture}
+            disabled={captureDisabled}
+            className="h-8 w-8"
+          >
+            <Camera className="h-4 w-4" />
+          </Button>
+          {availableViews.length > 1 ? (
+            <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-muted p-1 shadow-inner">
+              {availableViews.map(type => {
+                const Icon = getViewIcon(type);
+                const isActive = viewType === type;
+                const labels: Record<ViewType, string> = {
+                  graph: '그래프 보기',
+                  grid: '그리드 보기',
+                  viewer: '뷰어 보기',
+                };
 
-              return (
-                <Button
-                  key={type}
-                  type="button"
-                  variant="icon"
-                  active={isActive}
-                  aria-pressed={isActive}
-                  aria-label={labels[type]}
-                  title={labels[type]}
-                  onClick={() => setViewType(type)}
-                  className="h-8 w-8"
-                >
-                  <Icon className="h-4 w-4" />
-                </Button>
-              );
-            })}
-          </div>
-        ) : null}
+                return (
+                  <Button
+                    key={type}
+                    type="button"
+                    variant="icon"
+                    active={isActive}
+                    aria-pressed={isActive}
+                    aria-label={labels[type]}
+                    title={labels[type]}
+                    onClick={() => setViewType(type)}
+                    className="h-8 w-8"
+                  >
+                    <Icon className="h-4 w-4" />
+                  </Button>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
       </div>
       <div className="relative flex-1 min-h-0 bg-surface">
         {showGraph ? (

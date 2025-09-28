@@ -12,15 +12,18 @@ import {
   ThumbnailUsage,
 } from '@tgim/types/file';
 import {
-  CroquisCaptureContext,
-  CroquisCapturePreview,
-  CroquisCapturePreviewPayload,
   CroquisOption,
   CroquisPreferences,
   CroquisSession,
   CroquisStartPayload,
   CroquisStartResponse,
 } from '@tgim/types/croquis';
+import {
+  CaptureContext,
+  CaptureOverlayPayload,
+  CapturePreview,
+  CapturePreviewPayload,
+} from '@tgim/types/capture';
 import { convertKeysToCamel } from '@tgim/utils/object';
 
 const appWindow = getCurrentWindow();
@@ -178,16 +181,17 @@ const croquisIpc = {
     const response = await invoke('load_croquis_option', { moaId });
     return (convertKeysToCamel(response) as CroquisPreferences | null) ?? null;
   },
-  openCaptureOverlay: async (payload: { sessionId: string; moaId: string; hash: string }) => {
-    await invoke('open_croquis_capture_overlay', { payload });
+};
+
+const captureIpc = {
+  openOverlay: async (payload: CaptureOverlayPayload) => {
+    await invoke('open_capture_overlay', { payload });
   },
-  renderCapturePreview: async (
-    payload: CroquisCapturePreviewPayload,
-  ): Promise<CroquisCapturePreview> => {
-    return await invoke('render_croquis_capture_preview', { ...payload });
+  renderPreview: async (payload: CapturePreviewPayload): Promise<CapturePreview> => {
+    return await invoke('render_capture_preview', { ...payload });
   },
-  confirmCapture: async (payload: { baseUrl: string; context: CroquisCaptureContext }) => {
-    await invoke('confirm_croquis_capture', { ...payload });
+  confirm: async (payload: { baseUrl: string; context: CaptureContext }) => {
+    await invoke('confirm_capture', { ...payload });
   },
 };
 
@@ -197,5 +201,6 @@ export const ipc = {
   graph: graphIpc,
   file: fileIpc,
   croquis: croquisIpc,
+  capture: captureIpc,
   thumbnail: thumbnailIpc,
 };

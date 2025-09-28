@@ -242,26 +242,26 @@ const CroquisWindow: React.FC = () => {
   const { moaId } = useMoa(location);
 
   const handleCapture = useCallback(() => {
-    let sessionId = session?.sessionId;
-    let hash = currentImage?.hash;
+    const sessionId = session?.sessionId ?? null;
+    const hash = currentImage?.hash ?? null;
+    const savePath = session?.option?.savePath ?? '';
 
     console.log('[Croquis] Opening capture overlay for', {
       sessionId,
       moaId,
       hash,
+      savePath,
     });
 
-    if (!(moaId && sessionId && hash)) return;
+    if (!(moaId && hash)) return;
 
-    console.log('[Croquis] Opening capture overlay for', {
-      sessionId,
+    void ipc.capture.openOverlay({
       moaId,
-      hash,
-    });
-    void ipc.croquis.openCaptureOverlay({
+      sourceHash: hash,
+      savePath,
       sessionId,
-      moaId,
-      hash,
+      linkTypeForward: 'croquisreslink',
+      linkTypeReverse: 'croquisreflink',
     });
   }, [moaId, currentImage, session]);
 

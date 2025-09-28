@@ -22,8 +22,23 @@ pub enum RelationType {
     BelongToFolder,
     ParentFolder,
     ChildFolder,
+    RelativeImage,
     CroquisResLink,
     CroquisRefLink,
+}
+
+impl RelationType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RelationType::ContainsFile => "containsfile",
+            RelationType::BelongToFolder => "belongtofolder",
+            RelationType::ParentFolder => "parentfolder",
+            RelationType::ChildFolder => "childfolder",
+            RelationType::RelativeImage => "relativeimage",
+            RelationType::CroquisResLink => "croquisreslink",
+            RelationType::CroquisRefLink => "croquisreflink",
+        }
+    }
 }
 
 /// Describes how edges are treated during graph traversal.

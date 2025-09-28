@@ -4,3 +4,4 @@ export * from './graph';
 export * from './grid';
 export * from './file';
 export * from './croquis';
+export * from './capture';

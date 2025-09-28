@@ -104,6 +104,7 @@ pub async fn seed_initial_data(pool: &Pool<Sqlite>) -> Result<()> {
         (RelationType::BelongToFolder, 3, 0, "File -> Folder"),
         (RelationType::ParentFolder, 3, 0, "Folder(child) -> Folder(parent)"),
         (RelationType::ChildFolder, 1, 0, "Folder(parent) -> Folder(child)"),
+        (RelationType::RelativeImage, 3, 0, "File -> File (relative image)"),
         (RelationType::CroquisResLink, 1, 0, "origin -> croquis"),
         (RelationType::CroquisRefLink, 1, 0, "croquis -> origin"),
     ];
