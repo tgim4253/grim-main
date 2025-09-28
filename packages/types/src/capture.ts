@@ -24,7 +24,8 @@ export interface CapturePreview {
 
 export interface CaptureContext {
   moaId: string;
-  sourceHash: string;
+  sourceHash?: string | null;
+  sourceNodeId?: string | null;
   savePath: string;
   sessionId?: string | null;
   linkTypeForward?: string | null;

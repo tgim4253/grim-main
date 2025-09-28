@@ -33,10 +33,11 @@ pub async fn render_capture_preview(
 /// Persist a confirmed capture to disk and register it in the graph.
 #[tauri::command]
 pub async fn confirm_capture(
+    app_handle: tauri::AppHandle,
     base_url: String,
     context: CaptureContext,
 ) -> Result<(), String> {
-    capture_service::confirm_capture(base_url, context)
+    capture_service::confirm_capture(&app_handle, base_url, context)
         .await
         .map_err(|err| err.to_string())
 }

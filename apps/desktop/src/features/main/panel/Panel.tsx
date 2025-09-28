@@ -5,6 +5,7 @@ import ReactDOM from 'react-dom';
 import { ipc } from '../../../lib/ipc';
 import { useMoa } from '@tgim/hooks/useMoa';
 import { dirname } from '@tauri-apps/api/path';
+import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import GraphView from './panels/GraphView';
 import {
   Connection,
@@ -17,6 +18,7 @@ import {
   NodeFile,
   NodeFolder,
   NodeKind,
+  RelationType,
 } from '@tgim/types/graph';
 import { createNewId } from '@tgim/utils/identifier';
 import GridView from './panels/GridView';
@@ -32,6 +34,8 @@ import { usePanelDrop } from './usePanelDrop';
 import { toast } from 'react-toastify';
 
 const DEFAULT_CAPTURE_LINK = 'relativeimage';
+const FOLDER_CAPTURE_FORWARD_LINK = RelationType.ContainsFile;
+const FOLDER_CAPTURE_REVERSE_LINK = RelationType.BelongToFolder;
 
 interface PanelProps {
   panelId: string;
@@ -237,6 +241,33 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   }, [refreshPanelData]);
 
   useEffect(() => {
+    if (!moaId) return;
+
+    let unlistenPromise: Promise<UnlistenFn> | null = listen(
+      `capture://completed/${moaId}`,
+      () => {
+        void refreshPanelData();
+      },
+    );
+
+    unlistenPromise.catch(error => {
+      console.error('[Panel] Failed to register capture listener', error);
+    });
+
+    return () => {
+      if (!unlistenPromise) return;
+      unlistenPromise
+        .then(unlisten => {
+          unlisten();
+        })
+        .catch(error => {
+          console.error('[Panel] Failed to remove capture listener', error);
+        });
+      unlistenPromise = null;
+    };
+  }, [moaId, refreshPanelData]);
+
+  useEffect(() => {
     if (!moaId || !panel?.nodeId) return;
 
     let isCancelled = false;
@@ -318,11 +349,38 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     return rootNode.data?.['File'] ?? null;
   }, [rootNode]);
 
-  const captureTargetHash = useMemo(() => {
-    if (activeImage?.hash) return activeImage.hash;
-    if (rootFile?.xxh364) return rootFile.xxh364;
+  const captureAnchor = useMemo(() => {
+    if (!rootNode) return null;
+
+    if (activeImage?.hash && activeImage.nodeId) {
+      return {
+        type: 'file' as const,
+        hash: activeImage.hash,
+        nodeId: activeImage.nodeId,
+      };
+    }
+
+    if (rootNode.kind === NodeKind.File && rootFile?.xxh364) {
+      return {
+        type: 'file' as const,
+        hash: rootFile.xxh364,
+        nodeId: rootNode.id,
+      };
+    }
+
+    if (rootNode.kind === NodeKind.Folder && rootFolder) {
+      const mountWithPath = rootFolder.mounts?.find(mount => mount.realPath);
+      if (mountWithPath?.realPath) {
+        return {
+          type: 'folder' as const,
+          nodeId: rootNode.id,
+          path: mountWithPath.realPath,
+        };
+      }
+    }
+
     return null;
-  }, [activeImage?.hash, rootFile?.xxh364]);
+  }, [activeImage?.hash, activeImage?.nodeId, rootFile?.xxh364, rootFolder, rootNode]);
 
   const rootFolder = useMemo(() => {
     if (!rootNode) return null;
@@ -331,7 +389,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   }, [rootNode]);
 
   const dropEnabled = useMemo(() => Boolean(rootFolder && moaId), [rootFolder, moaId]);
-  const canCapture = useMemo(() => Boolean(moaId && captureTargetHash), [captureTargetHash, moaId]);
+  const canCapture = useMemo(() => Boolean(moaId && captureAnchor), [captureAnchor, moaId]);
 
   const { isDropActive, handleDrop, handleDragEnter, handleDragLeave, handleDragOver } =
     usePanelDrop({
@@ -346,26 +404,41 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const showViewer = viewType === 'viewer' && !!rootFile;
 
   const handleStartCapture = useCallback(async () => {
-    if (!moaId || !captureTargetHash) return;
+    if (!moaId || !captureAnchor) return;
 
     setCaptureBusy(true);
     try {
-      const filePath = await ipc.file.getFilePath(moaId, captureTargetHash);
-      const targetDirectory = await dirname(filePath);
-      await ipc.capture.openOverlay({
-        moaId,
-        sourceHash: captureTargetHash,
-        savePath: targetDirectory,
-        linkTypeForward: DEFAULT_CAPTURE_LINK,
-        linkTypeReverse: DEFAULT_CAPTURE_LINK,
-      });
+      if (captureAnchor.type === 'file') {
+        const filePath = await ipc.file.getFilePath(moaId, captureAnchor.hash);
+        const targetDirectory = await dirname(filePath);
+        await ipc.capture.openOverlay({
+          moaId,
+          sourceHash: captureAnchor.hash,
+          sourceNodeId: captureAnchor.nodeId,
+          savePath: targetDirectory,
+          linkTypeForward: DEFAULT_CAPTURE_LINK,
+          linkTypeReverse: DEFAULT_CAPTURE_LINK,
+        });
+      } else if (captureAnchor.type === 'folder') {
+        if (!captureAnchor.path) {
+          toast.error('폴더 경로를 확인할 수 없습니다.');
+          return;
+        }
+        await ipc.capture.openOverlay({
+          moaId,
+          sourceNodeId: captureAnchor.nodeId,
+          savePath: captureAnchor.path,
+          linkTypeForward: FOLDER_CAPTURE_FORWARD_LINK,
+          linkTypeReverse: FOLDER_CAPTURE_REVERSE_LINK,
+        });
+      }
     } catch (error) {
       console.error('[Panel] Failed to open capture overlay', error);
       toast.error('캡처를 시작할 수 없습니다.');
     } finally {
       setCaptureBusy(false);
     }
-  }, [captureTargetHash, moaId]);
+  }, [captureAnchor, moaId]);
 
   const getViewIcon = useCallback((type: ViewType) => {
     switch (type) {

@@ -48,6 +48,7 @@ const CaptureOverlay: React.FC = () => {
   const savePath = params.get('save_path') ?? '';
   const moaId = params.get('moa_id');
   const sourceHash = params.get('source_hash') ?? params.get('image_hash');
+  const sourceNodeId = params.get('source_node_id');
   const linkTypeForward = params.get('link_type_forward') ?? DEFAULT_LINK_TYPE;
   const linkTypeReverse = params.get('link_type_reverse') ?? DEFAULT_LINK_TYPE;
 
@@ -82,16 +83,26 @@ const CaptureOverlay: React.FC = () => {
   useEffect(() => {
     setPhase('loading');
 
-    if (!moaId || !sourceHash) return;
+    if (!moaId) return;
+    if (!sourceHash && !sourceNodeId) return;
     setContext({
       moaId,
-      sourceHash,
+      sourceHash: sourceHash ?? null,
+      sourceNodeId: sourceNodeId ?? null,
       savePath,
       sessionId: sessionId ?? null,
       linkTypeForward,
       linkTypeReverse,
     });
-  }, [moaId, sourceHash, savePath, sessionId, linkTypeForward, linkTypeReverse]);
+  }, [
+    moaId,
+    sourceHash,
+    sourceNodeId,
+    savePath,
+    sessionId,
+    linkTypeForward,
+    linkTypeReverse,
+  ]);
 
   useEffect(() => {
     let cancelled = false;

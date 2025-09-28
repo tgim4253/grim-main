@@ -9,6 +9,7 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use image::{DynamicImage, ImageFormat, RgbaImage};
 use screenshots::Screen;
+use tauri::Manager;
 use tokio::fs;
 use tracing::{debug, warn};
 
@@ -64,6 +65,7 @@ pub async fn render_capture_preview(
 
 /// Finalise a capture by writing it to disk and linking it in the graph.
 pub async fn confirm_capture(
+    app_handle: &tauri::AppHandle,
     base_url: String,
     context: CaptureContext,
 ) -> Result<()> {
@@ -76,14 +78,36 @@ pub async fn confirm_capture(
     let (file_path, binding_context) =
         persist_capture_bytes(&context, bytes).await?;
 
-    register_capture_in_workspace(binding_context).await?;
+    let file_node_id = register_capture_in_workspace(binding_context).await?;
 
     debug!(
         path = %file_path.display(),
         session = ?context.session_id,
-        hash = %context.source_hash,
+        hash = context
+            .source_hash
+            .as_deref()
+            .unwrap_or("n/a"),
         "Capture saved",
     );
+
+    #[derive(serde::Serialize)]
+    struct CaptureCompletedPayload {
+        file_path: String,
+        file_node_id: String,
+        moa_id: String,
+    }
+
+    let payload = CaptureCompletedPayload {
+        file_path: file_path.to_string_lossy().into_owned(),
+        file_node_id,
+        moa_id: context.moa_id.clone(),
+    };
+
+    app_handle
+        .emit_all(&format!("capture://completed/{}", context.moa_id), payload)
+        .map_err(|err| {
+            anyhow!("Failed to emit capture completion event: {err}")
+        })?;
 
     Ok(())
 }
@@ -92,7 +116,8 @@ pub async fn confirm_capture(
 struct CaptureRegistrationContext {
     moa_id: String,
     file_path: PathBuf,
-    source_hash: String,
+    source_hash: Option<String>,
+    anchor_node_id: Option<String>,
     link_type_forward: Option<RelationType>,
     link_type_reverse: Option<RelationType>,
 }
@@ -155,17 +180,22 @@ fn decode_data_url(data_url: &str) -> Result<Vec<u8>> {
 
 fn generate_capture_file_name(context: &CaptureContext) -> String {
     let timestamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
+    let hash_component = context
+        .source_hash
+        .as_deref()
+        .filter(|hash| !hash.is_empty())
+        .unwrap_or("capture");
     if let Some(session) = &context.session_id {
         format!(
             "capture_{session}_{hash}_{ts}.png",
             session = session,
-            hash = context.source_hash,
+            hash = hash_component,
             ts = timestamp
         )
     } else {
         format!(
             "capture_{hash}_{ts}.png",
-            hash = context.source_hash,
+            hash = hash_component,
             ts = timestamp
         )
     }
@@ -239,6 +269,7 @@ async fn persist_capture_bytes(
         moa_id: context.moa_id.clone(),
         file_path: prepared_path.clone(),
         source_hash: context.source_hash.clone(),
+        anchor_node_id: context.source_node_id.clone(),
         link_type_forward: context.link_type_forward,
         link_type_reverse: context.link_type_reverse,
     };
@@ -269,11 +300,12 @@ fn platform_capture_rect(
 
 async fn register_capture_in_workspace(
     context: CaptureRegistrationContext,
-) -> Result<()> {
+) -> Result<String> {
     let CaptureRegistrationContext {
         moa_id,
         file_path,
         source_hash,
+        anchor_node_id,
         link_type_forward,
         link_type_reverse,
     } = context;
@@ -332,51 +364,59 @@ async fn register_capture_in_workspace(
         .await?
     };
 
-    if let Some(original_fc_id) =
-        FileRepository::find_file_content_id(tx.as_mut(), source_hash.clone())
-            .await?
-    {
-        if let Some(original_node_id) = NodeRepository::fetch_node_id_by_fc_id(
-            tx.as_mut(),
-            original_fc_id.clone(),
-        )
-        .await?
-        {
-            let now = date::get_now_date();
-            if let Some(kind) = link_type_forward {
-                let _ = ConnectionRepository::insert_connection(
-                    tx.as_mut(),
-                    original_node_id.clone(),
-                    file_node_id.clone(),
-                    kind,
-                    now.clone(),
-                )
-                .await?;
+    let mut anchor_node_id = anchor_node_id;
+
+    if anchor_node_id.is_none() {
+        if let Some(hash) = source_hash.clone() {
+            if let Some(original_fc_id) =
+                FileRepository::find_file_content_id(tx.as_mut(), hash.clone())
+                    .await?
+            {
+                if let Some(original_node_id) =
+                    NodeRepository::fetch_node_id_by_fc_id(
+                        tx.as_mut(),
+                        original_fc_id.clone(),
+                    )
+                    .await?
+                {
+                    anchor_node_id = Some(original_node_id);
+                } else {
+                    warn!(hash = %hash, "Capture source node missing; skipping link");
+                }
+            } else {
+                warn!(
+                    hash = %hash,
+                    "Capture source file content missing; skipping link",
+                );
             }
-            if let Some(kind) = link_type_reverse {
-                let _ = ConnectionRepository::insert_connection(
-                    tx.as_mut(),
-                    file_node_id.clone(),
-                    original_node_id,
-                    kind,
-                    now,
-                )
-                .await?;
-            }
-        } else {
-            warn!(
-                hash = %source_hash,
-                "Capture source node missing; skipping link"
-            );
         }
-    } else {
-        warn!(
-            hash = %source_hash,
-            "Capture source file content missing; skipping link"
-        );
+    }
+
+    if let Some(anchor_id) = anchor_node_id {
+        let now = date::get_now_date();
+        if let Some(kind) = link_type_forward {
+            let _ = ConnectionRepository::insert_connection(
+                tx.as_mut(),
+                anchor_id.clone(),
+                file_node_id.clone(),
+                kind,
+                now.clone(),
+            )
+            .await?;
+        }
+        if let Some(kind) = link_type_reverse {
+            let _ = ConnectionRepository::insert_connection(
+                tx.as_mut(),
+                file_node_id.clone(),
+                anchor_id.clone(),
+                kind,
+                now,
+            )
+            .await?;
+        }
     }
 
     tx.commit().await?;
 
-    Ok(())
+    Ok(file_node_id)
 }

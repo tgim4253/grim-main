@@ -16,7 +16,10 @@ fn default_reverse_link() -> Option<RelationType> {
 pub struct CaptureContext {
     #[serde(default)]
     pub session_id: Option<String>,
-    pub source_hash: String,
+    #[serde(default)]
+    pub source_hash: Option<String>,
+    #[serde(default)]
+    pub source_node_id: Option<String>,
     pub moa_id: String,
     #[serde(default)]
     pub save_path: String,

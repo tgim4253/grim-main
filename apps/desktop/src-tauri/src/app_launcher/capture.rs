@@ -11,9 +11,16 @@ pub fn launch_capture_overlay(
 ) -> Result<String, String> {
     let mut params = vec![
         format!("moa_id={}", payload.moa_id),
-        format!("source_hash={}", payload.source_hash),
         format!("save_path={}", payload.save_path),
     ];
+
+    if let Some(hash) = &payload.source_hash {
+        params.push(format!("source_hash={}", hash));
+    }
+
+    if let Some(node_id) = &payload.source_node_id {
+        params.push(format!("source_node_id={}", node_id));
+    }
 
     if let Some(session_id) = &payload.session_id {
         params.push(format!("session_id={}", session_id));
