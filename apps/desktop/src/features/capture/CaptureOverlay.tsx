@@ -1,8 +1,4 @@
-import {
-  CroquisCaptureContext,
-  CroquisCaptureMonitor,
-  CroquisCaptureRect,
-} from '@tgim/types/croquis';
+import { CaptureContext, CaptureMonitor, CaptureRect } from '@tgim/types/capture';
 import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -28,10 +24,11 @@ type Phase = 'loading' | 'selecting' | 'preview';
 
 type CaptureMode = 'freeform' | 'square';
 
-const normaliseRect = (
-  rect: CroquisCaptureRect,
-  monitor: CroquisCaptureMonitor,
-): CroquisCaptureRect => {
+const IDLE_OVERLAY_COLOR = 'rgba(0, 0, 0, 0.35)';
+const ACTIVE_OVERLAY_COLOR = 'rgba(0, 0, 0, 0)';
+const DEFAULT_LINK_TYPE = 'relativeimage';
+
+const normaliseRect = (rect: CaptureRect, monitor: CaptureMonitor): CaptureRect => {
   const maxWidth = monitor.width;
   const maxHeight = monitor.height;
 
@@ -45,15 +42,17 @@ const normaliseRect = (
   return { x, y, width, height };
 };
 
-const CroquisCaptureOverlay: React.FC = () => {
+const CaptureOverlay: React.FC = () => {
   const [params] = useSearchParams();
   const sessionId = params.get('session_id');
-  const savePath = params.get('save_path');
+  const savePath = params.get('save_path') ?? '';
   const moaId = params.get('moa_id');
-  const imageHash = params.get('image_hash');
+  const sourceHash = params.get('source_hash') ?? params.get('image_hash');
+  const linkTypeForward = params.get('link_type_forward') ?? DEFAULT_LINK_TYPE;
+  const linkTypeReverse = params.get('link_type_reverse') ?? DEFAULT_LINK_TYPE;
 
-  const [context, setContext] = useState<CroquisCaptureContext | null>(null);
-  const [monitorInfo, setMonitorInfo] = useState<CroquisCaptureMonitor | null>(null);
+  const [context, setContext] = useState<CaptureContext | null>(null);
+  const [monitorInfo, setMonitorInfo] = useState<CaptureMonitor | null>(null);
   const [phase, setPhase] = useState<Phase>('loading');
   const [mode, setMode] = useState<CaptureMode>('freeform');
   const [selection, setSelection] = useState<SelectionRect | null>(null);
@@ -69,22 +68,30 @@ const CroquisCaptureOverlay: React.FC = () => {
 
   useEffect(() => {
     const body = document.body;
-    body.style.backgroundColor = 'rgba(0, 0, 0, 0.35)';
+    const prevColor = body.style.backgroundColor;
+    const prevSelect = body.style.userSelect;
+    body.style.backgroundColor = IDLE_OVERLAY_COLOR;
     body.style.userSelect = 'none';
+
+    return () => {
+      body.style.backgroundColor = prevColor;
+      body.style.userSelect = prevSelect;
+    };
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
     setPhase('loading');
 
-    if (!sessionId || !savePath || !moaId || !imageHash) return;
+    if (!moaId || !sourceHash) return;
     setContext({
-      sessionId,
-      imageHash,
       moaId,
+      sourceHash,
       savePath,
+      sessionId: sessionId ?? null,
+      linkTypeForward,
+      linkTypeReverse,
     });
-  }, [sessionId, savePath, moaId, imageHash]);
+  }, [moaId, sourceHash, savePath, sessionId, linkTypeForward, linkTypeReverse]);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,7 +118,7 @@ const CroquisCaptureOverlay: React.FC = () => {
           });
         }
       } catch (error) {
-        console.error('[Croquis] Failed to resolve monitor info', error);
+        console.error('[Capture] Failed to resolve monitor info', error);
         const scale = window.devicePixelRatio ?? 1;
         setMonitorInfo({
           x: 0,
@@ -147,7 +154,7 @@ const CroquisCaptureOverlay: React.FC = () => {
           y: windowPosition.y - monitorInfo.y,
         });
       } catch (error) {
-        console.error('[Croquis] Failed to resolve window offset', error);
+        console.error('[Capture] Failed to resolve window offset', error);
         if (!cancelled) {
           setWindowOffset({ x: 0, y: 0 });
         }
@@ -198,6 +205,7 @@ const CroquisCaptureOverlay: React.FC = () => {
     (event: React.PointerEvent<HTMLDivElement>) => {
       if (phase !== 'selecting' || busy) return;
       event.preventDefault();
+      document.body.style.backgroundColor = ACTIVE_OVERLAY_COLOR;
       const point = { x: event.clientX, y: event.clientY };
       startRef.current = point;
       isPointerDownRef.current = true;
@@ -231,6 +239,7 @@ const CroquisCaptureOverlay: React.FC = () => {
     async (event: React.PointerEvent<HTMLDivElement>) => {
       if (!isPointerDownRef.current || phase !== 'selecting') return;
       event.preventDefault();
+      document.body.style.backgroundColor = IDLE_OVERLAY_COLOR;
 
       isPointerDownRef.current = false;
       if (!selection || !monitorInfo) {
@@ -256,21 +265,21 @@ const CroquisCaptureOverlay: React.FC = () => {
             offsetY = windowPosition.y - monitorInfo.y;
             setWindowOffset({ x: offsetX, y: offsetY });
           } catch (error) {
-            console.error('[Croquis] Failed to refresh window offset', error);
+            console.error('[Capture] Failed to refresh window offset', error);
           }
 
           const fallbackScale = window.devicePixelRatio ?? 1;
           const scale = monitorInfo.scaleFactor > 0 ? monitorInfo.scaleFactor : fallbackScale;
           const offsetLogicalX = offsetX / scale;
           const offsetLogicalY = offsetY / scale;
-          const logical: CroquisCaptureRect = {
+          const logical: CaptureRect = {
             x: Math.round(selection.x + offsetLogicalX),
             y: Math.round(selection.y + offsetLogicalY),
             width: Math.round(selection.width),
             height: Math.round(selection.height),
           };
           const normalized = normaliseRect(logical, monitorInfo);
-          const response = await ipc.croquis.renderCapturePreview({
+          const response = await ipc.capture.renderPreview({
             rect: normalized,
             monitor: monitorInfo,
           });
@@ -278,7 +287,7 @@ const CroquisCaptureOverlay: React.FC = () => {
           setSelection(null);
           setPhase('preview');
         } catch (error) {
-          console.error('[Croquis] Failed to render capture preview', error);
+          console.error('[Capture] Failed to render capture preview', error);
           toast.error('Failed to capture selection. Please try again.');
           setSelection(null);
           setPhase('selecting');
@@ -295,6 +304,14 @@ const CroquisCaptureOverlay: React.FC = () => {
     setSelection(null);
     setBaseUrl(null);
     setPhase('selecting');
+    document.body.style.backgroundColor = IDLE_OVERLAY_COLOR;
+  }, []);
+
+  const handlePointerCancel = useCallback(() => {
+    if (!isPointerDownRef.current) return;
+    isPointerDownRef.current = false;
+    setSelection(null);
+    document.body.style.backgroundColor = IDLE_OVERLAY_COLOR;
   }, []);
 
   const handleCancel = useCallback(async () => {
@@ -306,12 +323,12 @@ const CroquisCaptureOverlay: React.FC = () => {
     setBusy(true);
     try {
       if (!context || !baseUrl) return;
-      await ipc.croquis.confirmCapture({ baseUrl, context });
+      await ipc.capture.confirm({ baseUrl, context });
       toast.success('Capture saved');
       confirmedRef.current = true;
       await windowRef.current.close();
     } catch (error) {
-      console.error('[Croquis] Failed to confirm capture', error);
+      console.error('[Capture] Failed to confirm capture', error);
       toast.error('Failed to save capture. Please try again.');
       setBusy(false);
       setPhase('selecting');
@@ -363,7 +380,7 @@ const CroquisCaptureOverlay: React.FC = () => {
             {baseUrl ? (
               <img
                 src={baseUrl}
-                alt="Croquis capture preview"
+                alt="Capture preview"
                 className="max-h-[70vh] max-w-full rounded border-2 border-border"
               />
             ) : (
@@ -423,6 +440,8 @@ const CroquisCaptureOverlay: React.FC = () => {
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onPointerLeave={handlePointerCancel}
     >
       <div className="absolute inset-0" />
       {phase === 'loading' && (
@@ -449,4 +468,4 @@ const CroquisCaptureOverlay: React.FC = () => {
   );
 };
 
-export default CroquisCaptureOverlay;
+export default CaptureOverlay;

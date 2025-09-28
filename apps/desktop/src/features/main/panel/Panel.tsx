@@ -4,6 +4,7 @@ import { shallow, useShallow } from 'zustand/shallow';
 import ReactDOM from 'react-dom';
 import { ipc } from '../../../lib/ipc';
 import { useMoa } from '@tgim/hooks/useMoa';
+import { dirname } from '@tauri-apps/api/path';
 import GraphView from './panels/GraphView';
 import {
   Connection,
@@ -25,9 +26,12 @@ import { Button } from '@tgim/ui';
 import cn from '@tgim/utils/cn';
 import { Split } from '@tgim/ui/Splitter';
 import FileDetailSidebar from './panels/FileDetailSidebar';
-import { Eye, GitBranch, LayoutGrid } from 'lucide-react';
+import { Camera, Eye, GitBranch, LayoutGrid } from 'lucide-react';
 import FileViewer from './panels/FileViewer';
 import { usePanelDrop } from './usePanelDrop';
+import { toast } from 'react-toastify';
+
+const DEFAULT_CAPTURE_LINK = 'relativeimage';
 
 interface PanelProps {
   panelId: string;
@@ -42,6 +46,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [gridData, setGridData] = useState<GridData | null>(null);
   const [rootNodeId, setRootNodeId] = useState<string | null>(null);
   const [activeImage, setActiveImage] = useState<ImageItem | null>(null);
+  const [captureBusy, setCaptureBusy] = useState(false);
   const [rootNode, setRootNode] = useState<Node | null>(null);
   const [graphRefreshKey, setGraphRefreshKey] = useState(0);
   const [gridRefreshKey, setGridRefreshKey] = useState(0);
@@ -313,6 +318,12 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     return rootNode.data?.['File'] ?? null;
   }, [rootNode]);
 
+  const captureTargetHash = useMemo(() => {
+    if (activeImage?.hash) return activeImage.hash;
+    if (rootFile?.xxh364) return rootFile.xxh364;
+    return null;
+  }, [activeImage?.hash, rootFile?.xxh364]);
+
   const rootFolder = useMemo(() => {
     if (!rootNode) return null;
     if (rootNode.kind !== NodeKind.Folder) return null;
@@ -320,6 +331,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   }, [rootNode]);
 
   const dropEnabled = useMemo(() => Boolean(rootFolder && moaId), [rootFolder, moaId]);
+  const canCapture = useMemo(() => Boolean(moaId && captureTargetHash), [captureTargetHash, moaId]);
 
   const { isDropActive, handleDrop, handleDragEnter, handleDragLeave, handleDragOver } =
     usePanelDrop({
@@ -333,6 +345,28 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const showGrid = viewType === 'grid' && !!gridData && availableViews.includes('grid');
   const showViewer = viewType === 'viewer' && !!rootFile;
 
+  const handleStartCapture = useCallback(async () => {
+    if (!moaId || !captureTargetHash) return;
+
+    setCaptureBusy(true);
+    try {
+      const filePath = await ipc.file.getFilePath(moaId, captureTargetHash);
+      const targetDirectory = await dirname(filePath);
+      await ipc.capture.openOverlay({
+        moaId,
+        sourceHash: captureTargetHash,
+        savePath: targetDirectory,
+        linkTypeForward: DEFAULT_CAPTURE_LINK,
+        linkTypeReverse: DEFAULT_CAPTURE_LINK,
+      });
+    } catch (error) {
+      console.error('[Panel] Failed to open capture overlay', error);
+      toast.error('캡처를 시작할 수 없습니다.');
+    } finally {
+      setCaptureBusy(false);
+    }
+  }, [captureTargetHash, moaId]);
+
   const getViewIcon = useCallback((type: ViewType) => {
     switch (type) {
       case 'grid':
@@ -344,6 +378,8 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         return GitBranch;
     }
   }, []);
+
+  const captureDisabled = !canCapture || captureBusy;
 
   if (!panel || !container) return null;
 
@@ -369,35 +405,48 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       )}
     >
       <div className="flex items-center justify-end border-b border-border bg-surface-raised px-3 py-2">
-        {availableViews.length > 1 ? (
-          <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-muted p-1 shadow-inner">
-            {availableViews.map(type => {
-              const Icon = getViewIcon(type);
-              const isActive = viewType === type;
-              const labels: Record<ViewType, string> = {
-                graph: '그래프 보기',
-                grid: '그리드 보기',
-                viewer: '뷰어 보기',
-              };
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="icon"
+            aria-label="캡처 시작"
+            title="캡처 시작"
+            onClick={handleStartCapture}
+            disabled={captureDisabled}
+            className="h-8 w-8"
+          >
+            <Camera className="h-4 w-4" />
+          </Button>
+          {availableViews.length > 1 ? (
+            <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-muted p-1 shadow-inner">
+              {availableViews.map(type => {
+                const Icon = getViewIcon(type);
+                const isActive = viewType === type;
+                const labels: Record<ViewType, string> = {
+                  graph: '그래프 보기',
+                  grid: '그리드 보기',
+                  viewer: '뷰어 보기',
+                };
 
-              return (
-                <Button
-                  key={type}
-                  type="button"
-                  variant="icon"
-                  active={isActive}
-                  aria-pressed={isActive}
-                  aria-label={labels[type]}
-                  title={labels[type]}
-                  onClick={() => setViewType(type)}
-                  className="h-8 w-8"
-                >
-                  <Icon className="h-4 w-4" />
-                </Button>
-              );
-            })}
-          </div>
-        ) : null}
+                return (
+                  <Button
+                    key={type}
+                    type="button"
+                    variant="icon"
+                    active={isActive}
+                    aria-pressed={isActive}
+                    aria-label={labels[type]}
+                    title={labels[type]}
+                    onClick={() => setViewType(type)}
+                    className="h-8 w-8"
+                  >
+                    <Icon className="h-4 w-4" />
+                  </Button>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
       </div>
       <div className="relative flex-1 min-h-0 bg-surface">
         {showGraph ? (

@@ -27,6 +27,7 @@ fn infer_relation_kind(kind: &str) -> RelationType {
         "containsfile" => RelationType::ContainsFile,
         "parentfolder" => RelationType::ParentFolder,
         "childfolder" => RelationType::ChildFolder,
+        "relativeimage" => RelationType::RelativeImage,
         "croquisreslink" => RelationType::CroquisResLink,
         "croquisreflink" => RelationType::CroquisRefLink,
         _ => RelationType::BelongToFolder,

@@ -60,39 +60,3 @@ export interface CroquisStartResponse {
   sessionId: string;
   windowLabel: string;
 }
-
-export interface CroquisCaptureStartPayload {
-  sessionId: string;
-  imageHash: string;
-}
-
-export interface CroquisCaptureContext {
-  sessionId: string;
-  imageHash: string;
-  moaId: string;
-  savePath: string;
-}
-
-export interface CroquisCaptureRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-export interface CroquisCaptureMonitor {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  scaleFactor: number;
-}
-
-export interface CroquisCapturePreviewPayload {
-  rect: CroquisCaptureRect;
-  monitor: CroquisCaptureMonitor;
-}
-
-export interface CroquisCapturePreview {
-  baseUrl: string;
-}
