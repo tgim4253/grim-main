@@ -9,7 +9,7 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use image::{DynamicImage, ImageFormat, RgbaImage};
 use screenshots::Screen;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tokio::fs;
 use tracing::{debug, warn};
 
@@ -90,7 +90,7 @@ pub async fn confirm_capture(
         "Capture saved",
     );
 
-    #[derive(serde::Serialize)]
+    #[derive(serde::Serialize, Clone)]
     struct CaptureCompletedPayload {
         file_path: String,
         file_node_id: String,
@@ -104,7 +104,7 @@ pub async fn confirm_capture(
     };
 
     app_handle
-        .emit_all(&format!("capture://completed/{}", context.moa_id), payload)
+        .emit(&format!("capture://completed/{}", context.moa_id), payload)
         .map_err(|err| {
             anyhow!("Failed to emit capture completion event: {err}")
         })?;
