@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO node_crop (\n                node_id,\n                origin_hash,\n                start_x,\n                start_y,\n                width,\n                height,\n                reference_width,\n                reference_height,\n                is_relative,\n                created_at,\n                updated_at\n            )\n            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "65b45fdc3f2d247890dd1b6e98adccac00f65514ac894b7820364f0973a766fd"
+}

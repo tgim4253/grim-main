@@ -15,6 +15,7 @@ import {
   GraphNodeType,
   GraphResponse,
   Node,
+  NodeCrop,
   NodeFile,
   NodeFolder,
   NodeKind,
@@ -28,10 +29,11 @@ import { Button } from '@tgim/ui';
 import cn from '@tgim/utils/cn';
 import { Split } from '@tgim/ui/Splitter';
 import FileDetailSidebar from './panels/FileDetailSidebar';
-import { Camera, Eye, GitBranch, LayoutGrid } from 'lucide-react';
+import { Camera, Crop, Eye, GitBranch, LayoutGrid } from 'lucide-react';
 import FileViewer from './panels/FileViewer';
 import { useFileDrop } from '../../../../../../packages/hooks/src/useFileDrop';
 import { toast } from 'react-toastify';
+import ImageCropView from './panels/ImageCropView';
 
 const DEFAULT_CAPTURE_LINK = 'relativeimage';
 const FOLDER_CAPTURE_FORWARD_LINK = RelationType.ContainsFile;
@@ -42,7 +44,7 @@ interface PanelProps {
   hidden?: boolean;
 }
 
-type ViewType = 'graph' | 'grid' | 'viewer';
+type ViewType = 'graph' | 'grid' | 'viewer' | 'crop';
 
 const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [viewType, setViewType] = useState<ViewType>('graph');
@@ -53,6 +55,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [rootNode, setRootNode] = useState<Node | null>(null);
   const [graphRefreshKey, setGraphRefreshKey] = useState(0);
   const [gridRefreshKey, setGridRefreshKey] = useState(0);
+  const [rawNodesById, setRawNodesById] = useState<Record<string, Node>>({});
   const panelRef = useRef<HTMLDivElement | null>(null);
   const { panel, containerId, isActive } = usePanelsStore(
     useShallow(state => ({
@@ -71,16 +74,67 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     graphData.nodes.forEach(node => {
       nodesMap[node.id] = node;
     });
+    setRawNodesById(nodesMap);
     const connectionsMap: Record<string, Connection[]> = {};
+    const incomingConnectionsMap: Record<string, Connection[]> = {};
     graphData.connections.forEach(connection => {
       if (!connectionsMap[connection.srcNodeId]) {
         connectionsMap[connection.srcNodeId] = [];
       }
       connectionsMap[connection.srcNodeId].push(connection);
+
+      if (!incomingConnectionsMap[connection.dstNodeId]) {
+        incomingConnectionsMap[connection.dstNodeId] = [];
+      }
+      incomingConnectionsMap[connection.dstNodeId].push(connection);
     });
 
     const nodes: GraphNode[] = [];
     const links: GraphConnection[] = [];
+
+    const clamp01 = (value: number) => {
+      if (!Number.isFinite(value)) return 0;
+      return Math.min(1, Math.max(0, value));
+    };
+
+    const toNormalizedCropRect = (crop: NodeCrop) => {
+      let startX = crop.startX;
+      let startY = crop.startY;
+      let width = crop.width;
+      let height = crop.height;
+
+      if (!crop.isRelative) {
+        const referenceWidth = crop.referenceWidth ?? null;
+        const referenceHeight = crop.referenceHeight ?? null;
+
+        if (!referenceWidth || !referenceHeight || referenceWidth <= 0 || referenceHeight <= 0) {
+          return null;
+        }
+
+        startX = startX / referenceWidth;
+        startY = startY / referenceHeight;
+        width = width / referenceWidth;
+        height = height / referenceHeight;
+      }
+
+      const startXClamped = clamp01(startX);
+      const startYClamped = clamp01(startY);
+      const endXClamped = clamp01(startX + width);
+      const endYClamped = clamp01(startY + height);
+      const normalizedWidth = endXClamped - startXClamped;
+      const normalizedHeight = endYClamped - startYClamped;
+
+      if (normalizedWidth <= 0 || normalizedHeight <= 0) {
+        return null;
+      }
+
+      return {
+        startX: startXClamped,
+        startY: startYClamped,
+        width: normalizedWidth,
+        height: normalizedHeight,
+      };
+    };
 
     const getGraphNodeData = (node: Node, graphNodeId?: string): GraphNode => {
       const defaultSize = 14;
@@ -104,6 +158,42 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
           size: nodeSize,
           type: type,
           hash: data.xxh364,
+        };
+      } else if (node.kind === NodeKind.Crop && node.data['Crop']) {
+        const crop = node.data['Crop'] as NodeCrop;
+        const outgoingConnections = connectionsMap[node.id] ?? [];
+        const incomingConnections = incomingConnectionsMap[node.id] ?? [];
+
+        const originConnection =
+          outgoingConnections.find(connection => connection.kind === RelationType.CroppedOrigin) ??
+          incomingConnections.find(connection => connection.kind === RelationType.Cropped);
+
+        let originHash: string | undefined;
+        let originNodeId: string | undefined;
+        if (originConnection) {
+          originNodeId =
+            originConnection.kind === RelationType.CroppedOrigin
+              ? originConnection.dstNodeId
+              : originConnection.srcNodeId;
+          const originNode = originNodeId ? nodesMap[originNodeId] : undefined;
+          const originFile = originNode?.data?.['File'];
+          if (originFile?.xxh364) {
+            originHash = originFile.xxh364;
+          }
+        }
+
+        const normalizedCropRect = toNormalizedCropRect(crop);
+
+        return {
+          id: graphNodeId,
+          nodeId: node.id,
+          label: 'Crop',
+          size: nodeSize,
+          type: 'crop',
+          crop,
+          originHash: originHash ?? crop.originHash,
+          originNodeId,
+          cropRect: normalizedCropRect ?? undefined,
         };
       } else if (node.kind == NodeKind.Folder && node.data['Folder']) {
         let data = node.data['Folder'];
@@ -314,17 +404,61 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     return id;
   }, [graphData, rootNodeId]);
 
+  const rootFile = useMemo<NodeFile | null>(() => {
+    if (!rootNode) return null;
+    if (rootNode.kind === NodeKind.File) {
+      return rootNode.data?.['File'] ?? null;
+    }
+    if (rootNode.kind === NodeKind.Crop) {
+      const crop = rootNode.data?.['Crop'];
+      if (!crop) return null;
+      const originHash = crop.originHash;
+      if (!originHash) return null;
+      const originNode = Object.values(rawNodesById).find(candidate => {
+        if (candidate.kind !== NodeKind.File) return false;
+        const file = candidate.data?.['File'];
+        return file?.xxh364 === originHash;
+      });
+      return originNode?.data?.['File'] ?? null;
+    }
+    return null;
+  }, [rawNodesById, rootNode]);
+
+  const cropEntries = useMemo(() => {
+    if (!graphData) return [] as { nodeId: string; crop: NodeCrop }[];
+    const unique = new Map<string, NodeCrop>();
+    graphData.nodes.forEach(node => {
+      if (node.type === 'crop' && node.crop) {
+        unique.set(node.nodeId, node.crop);
+      }
+    });
+    const entries = Array.from(unique.entries()).map(([nodeId, crop]) => ({ nodeId, crop }));
+    if (!rootFile?.xxh364) return entries;
+    return entries.filter(entry => entry.crop.originHash === rootFile.xxh364);
+  }, [graphData, rootFile?.xxh364]);
+
   const availableViews = useMemo<ViewType[]>(() => {
     if (rootNode?.kind === NodeKind.Folder) {
       return ['grid', 'graph'];
     }
     if (rootNode?.kind === NodeKind.File) {
+      if (rootFile?.kind === FileType.Image) {
+        return ['viewer', 'crop', 'graph'];
+      }
+      return ['viewer', 'graph'];
+    }
+    if (rootNode?.kind === NodeKind.Crop) {
       return ['viewer', 'graph'];
     }
     return ['graph'];
-  }, [rootNode?.kind]);
+  }, [rootFile?.kind, rootNode?.kind]);
 
-  const defaultView = useMemo<ViewType>(() => availableViews[0] ?? 'graph', [availableViews]);
+  const defaultView = useMemo<ViewType>(() => {
+    if (rootNode?.kind === NodeKind.Crop && availableViews.includes('viewer')) {
+      return 'viewer';
+    }
+    return availableViews[0] ?? 'graph';
+  }, [availableViews, rootNode?.kind]);
 
   const rootFolder = useMemo(() => {
     if (!rootNode) return null;
@@ -337,9 +471,21 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     }
   }, [availableViews, defaultView, viewType]);
 
-  const rootFile = useMemo<NodeFile | null>(() => {
-    if (rootNode?.kind !== NodeKind.File) return null;
-    return rootNode.data?.['File'] ?? null;
+  const previousCropRootIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (rootNode?.kind !== NodeKind.Crop) {
+      previousCropRootIdRef.current = null;
+      return;
+    }
+    if (!rootNode.id || !availableViews.includes('viewer')) return;
+    if (previousCropRootIdRef.current === rootNode.id) return;
+    previousCropRootIdRef.current = rootNode.id;
+    setViewType('viewer');
+  }, [availableViews, rootNode]);
+
+  const activeCrop = useMemo<NodeCrop | null>(() => {
+    if (rootNode?.kind !== NodeKind.Crop) return null;
+    return rootNode.data?.['Crop'] ?? null;
   }, [rootNode]);
 
   const captureAnchor = useMemo(() => {
@@ -387,6 +533,12 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const showGraph = viewType === 'graph' && graphData && rootNodeId && rootGraphNodeId;
   const showGrid = viewType === 'grid' && !!gridData && availableViews.includes('grid');
   const showViewer = viewType === 'viewer' && !!rootFile;
+  const showCrop =
+    viewType === 'crop' &&
+    !!rootFile &&
+    rootNode?.kind !== NodeKind.Crop &&
+    rootFile.kind === FileType.Image &&
+    !!moaId;
 
   const handleStartCapture = useCallback(async () => {
     if (!moaId || !captureAnchor) return;
@@ -431,6 +583,8 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         return LayoutGrid;
       case 'viewer':
         return Eye;
+      case 'crop':
+        return Crop;
       case 'graph':
       default:
         return GitBranch;
@@ -484,6 +638,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
                   graph: '그래프 보기',
                   grid: '그리드 보기',
                   viewer: '뷰어 보기',
+                  crop: '크롭 도구',
                 };
 
                 return (
@@ -522,7 +677,14 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
             onClearPreview={() => {}}
           />
         ) : showViewer && rootFile ? (
-          <FileViewer file={rootFile} moaId={moaId} />
+          <FileViewer file={rootFile} moaId={moaId} crop={activeCrop ?? undefined} />
+        ) : showCrop && rootFile && moaId ? (
+          <ImageCropView
+            file={rootFile}
+            moaId={moaId!}
+            crops={cropEntries}
+            onRefresh={refreshPanelData}
+          />
         ) : null}
       </div>
     </div>,

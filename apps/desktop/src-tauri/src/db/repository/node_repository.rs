@@ -1,5 +1,8 @@
-use super::file_repository::{FileRepository, MountWithFolder};
-use anyhow::Result;
+use super::{
+    crop_repository::CropRepository,
+    file_repository::{FileRepository, MountWithFolder},
+};
+use anyhow::{anyhow, Result};
 use sqlx::{Executor, Sqlite};
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
@@ -205,6 +208,24 @@ impl NodeRepository {
         }))
     }
 
+    /// Fetch crop node metadata for the specified node identifier.
+    pub async fn fetch_crop_node_data<'a, E>(
+        executor: &mut E,
+        node_id: String,
+    ) -> Result<NodeData>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let Some(crop) =
+            CropRepository::fetch_crop_by_node_id(&mut *executor, &node_id)
+                .await?
+        else {
+            return Err(anyhow!("Missing crop metadata for node {node_id}"));
+        };
+
+        Ok(NodeData::Crop(crop))
+    }
+
     /// Fetch folder node data for the specified node identifier.
     pub async fn fetch_folder_node_data<'a, E>(
         executor: &mut E,
@@ -292,6 +313,10 @@ impl NodeRepository {
                 ),
                 NodeKind::File => Some(
                     Self::fetch_file_node_data(&mut *executor, node.id.clone())
+                        .await?,
+                ),
+                NodeKind::Crop => Some(
+                    Self::fetch_crop_node_data(&mut *executor, node.id.clone())
                         .await?,
                 ),
                 _ => None,

@@ -21,13 +21,21 @@ export interface GraphNode {
   depth?: number;
   isLeaf?: boolean;
   url?: string;
+  crop?: NodeCrop;
   x?: number;
   y?: number;
   fx?: number;
   fy?: number;
 }
 
-export type GraphNodeType = 'folder' | 'tag' | 'image' | 'document' | 'default' | string;
+export type GraphNodeType =
+  | 'folder'
+  | 'tag'
+  | 'image'
+  | 'document'
+  | 'crop'
+  | 'default'
+  | string;
 
 export interface GraphConnection {
   source: string;
@@ -48,10 +56,11 @@ export interface Connection {
 
 export interface Node {
   id: string;
-  kind: string;
+  kind: NodeKind;
   data: {
     ['File']?: NodeFile;
     ['Folder']?: NodeFolder;
+    ['Crop']?: NodeCrop;
   };
   createdAt: string;
   updatedAt: string;
@@ -60,6 +69,11 @@ export interface Node {
 export enum NodeKind {
   Folder = 'folder',
   File = 'file',
+  Tag = 'tag',
+  Annotation = 'annotation',
+  Memo = 'memo',
+  Crop = 'crop',
+  Unknown = 'unknown',
 }
 
 export interface NodeFolder {
@@ -80,10 +94,45 @@ export interface NodeFile {
   size: number;
 }
 
+export interface NodeCrop {
+  nodeId: string;
+  originHash: string;
+  startX: number;
+  startY: number;
+  width: number;
+  height: number;
+  referenceWidth?: number | null;
+  referenceHeight?: number | null;
+  isRelative: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export enum RelationType {
   ContainsFile = 'containsfile',
   BelongToFolder = 'belongtofolder',
   ParentFolder = 'parentfolder',
   ChildFolder = 'childfolder',
-  CroquisLink = 'croquislink',
+  RelativeImage = 'relativeimage',
+  CroquisResLink = 'croquisreslink',
+  CroquisRefLink = 'croquisreflink',
+  Cropped = 'cropped',
+  CroppedOrigin = 'croppedorigin',
+}
+
+export interface CropRectangle {
+  startX: number;
+  startY: number;
+  width: number;
+  height: number;
+}
+
+export interface CreateImageCropPayload {
+  originNodeId: string;
+  originHash: string;
+  rect: CropRectangle;
+  referenceWidth?: number | null;
+  referenceHeight?: number | null;
+  isRelative?: boolean;
+  normalizedRect?: CropRectangle;
 }
