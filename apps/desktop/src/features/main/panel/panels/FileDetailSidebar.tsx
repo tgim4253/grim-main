@@ -13,9 +13,9 @@ import { ResizeMode } from '@tgim/types/file';
 import { cn } from '@tgim/utils/index';
 import { FolderOpen, Loader2, PencilLine, Plus, RefreshCw, Trash2, X } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { useMoa } from '@tgim/hooks/useMoa';
 
 type Props = {
-  moaId: string | null;
   image: ImageItem | null;
   onClose?: () => void;
 };
@@ -48,7 +48,8 @@ const formatMtime = (value?: number | null) => {
   }
 };
 
-const FileDetailSidebar: React.FC<Props> = ({ moaId, image, onClose }) => {
+const FileDetailSidebar: React.FC<Props> = ({ image, onClose }) => {
+  const { moaId } = useMoa(location);
   const [detail, setDetail] = useState<FileDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

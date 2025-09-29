@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import cn from '@tgim/utils/cn';
 import Button from './Button';
+import { useDebouncedEffect } from '@tgim/hooks/useDebouncedEffect';
 
 export const TreeNode: React.FC<{
   node: FileTreeData;
@@ -38,15 +39,16 @@ export const TreeNode: React.FC<{
 }) => {
   const isFolder = node.type === NodeKind.Folder;
   const isFile = node.type === NodeKind.File;
-  const clickTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const clearClickTimeout = React.useCallback(() => {
-    if (clickTimeoutRef.current) {
-      clearTimeout(clickTimeoutRef.current);
-      clickTimeoutRef.current = null;
-    }
-  }, []);
 
-  React.useEffect(() => () => clearClickTimeout(), [clearClickTimeout]);
+  const [queuedToggle, setQueuedToggle] = React.useState(false);
+
+  const runToggle = React.useCallback(() => {
+    if (!queuedToggle) return;
+    onToggle(node.id);
+    setQueuedToggle(false); // reset after running
+  }, [queuedToggle, onToggle, node.id]);
+
+  useDebouncedEffect(runToggle, [queuedToggle], 200);
 
   const hasModifierKey = (event: React.MouseEvent) =>
     event.shiftKey || event.metaKey || event.ctrlKey || event.altKey;
@@ -97,11 +99,7 @@ export const TreeNode: React.FC<{
           if (hasModifierKey(e)) return;
 
           if (isFolder) {
-            clearClickTimeout();
-            clickTimeoutRef.current = setTimeout(() => {
-              onToggle(node.id);
-              clearClickTimeout();
-            }, 200);
+            setQueuedToggle(true);
           } else if (isFile) {
             openFile(node);
           }
@@ -110,7 +108,7 @@ export const TreeNode: React.FC<{
           if (hasModifierKey(e)) return;
 
           if (isFolder) {
-            clearClickTimeout();
+            setQueuedToggle(false);
             if (!expanded) {
               onToggle(node.id);
             }

@@ -27,6 +27,7 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
+    "@tauri-apps/plugin-http": "^2.5.2",
     "@types/react": "^19.1.9",
     "zustand": "^5.0.8"
   }

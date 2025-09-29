@@ -21,7 +21,7 @@ import {
   RelationType,
 } from '@tgim/types/graph';
 import { createNewId } from '@tgim/utils/identifier';
-import GridView from './panels/GridView';
+import GridView from './panels/grid/GridView';
 import { GridData, ImageItem } from '@tgim/types/grid';
 import { FileType, ThumbResSpec } from '@tgim/types/file';
 import { Button } from '@tgim/ui';
@@ -30,7 +30,7 @@ import { Split } from '@tgim/ui/Splitter';
 import FileDetailSidebar from './panels/FileDetailSidebar';
 import { Camera, Eye, GitBranch, LayoutGrid } from 'lucide-react';
 import FileViewer from './panels/FileViewer';
-import { usePanelDrop } from './usePanelDrop';
+import { useFileDrop } from '../../../../../../packages/hooks/src/useFileDrop';
 import { toast } from 'react-toastify';
 
 const DEFAULT_CAPTURE_LINK = 'relativeimage';
@@ -49,12 +49,10 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [gridData, setGridData] = useState<GridData | null>(null);
   const [rootNodeId, setRootNodeId] = useState<string | null>(null);
-  const [activeImage, setActiveImage] = useState<ImageItem | null>(null);
   const [captureBusy, setCaptureBusy] = useState(false);
   const [rootNode, setRootNode] = useState<Node | null>(null);
   const [graphRefreshKey, setGraphRefreshKey] = useState(0);
   const [gridRefreshKey, setGridRefreshKey] = useState(0);
-  const [viewerSidebarVisible, setViewerSidebarVisible] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const { panel, containerId, isActive } = usePanelsStore(
     useShallow(state => ({
@@ -316,25 +314,6 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     return id;
   }, [graphData, rootNodeId]);
 
-  useEffect(() => {
-    if (!gridData || !activeImage) return;
-    const exists = gridData.images.some(img => img.hash === activeImage.hash);
-    if (!exists) {
-      setActiveImage(null);
-    }
-  }, [gridData, activeImage?.hash]);
-
-  useEffect(() => {
-    if (!gridData) {
-      setActiveImage(null);
-    }
-  }, [gridData]);
-
-  useEffect(() => {
-    if (viewType !== 'grid') {
-      setActiveImage(null);
-    }
-  }, [viewType]);
   const availableViews = useMemo<ViewType[]>(() => {
     if (rootNode?.kind === NodeKind.Folder) {
       return ['grid', 'graph'];
@@ -363,38 +342,8 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     return rootNode.data?.['File'] ?? null;
   }, [rootNode]);
 
-  const viewerSidebarImage = useMemo<ImageItem | null>(() => {
-    if (!rootFile || rootFile.kind !== FileType.Image) return null;
-
-    return {
-      id: rootFile.fileId,
-      nodeId: rootFile.nodeId,
-      name: rootFile.fileName,
-      type: rootFile.kind,
-      hash: rootFile.xxh364,
-      size: rootFile.size,
-    };
-  }, [rootFile]);
-
-  useEffect(() => {
-    if (viewType !== 'viewer') {
-      setViewerSidebarVisible(false);
-      return;
-    }
-
-    setViewerSidebarVisible(Boolean(viewerSidebarImage));
-  }, [viewType, viewerSidebarImage]);
-
   const captureAnchor = useMemo(() => {
     if (!rootNode) return null;
-
-    if (activeImage?.hash && activeImage.nodeId) {
-      return {
-        type: 'file' as const,
-        hash: activeImage.hash,
-        nodeId: activeImage.nodeId,
-      };
-    }
 
     if (rootNode.kind === NodeKind.File && rootFile?.xxh364) {
       return {
@@ -422,20 +371,13 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     }
 
     return null;
-  }, [
-    activeImage?.hash,
-    activeImage?.nodeId,
-    rootFile?.xxh364,
-    rootFolder,
-    rootNode,
-    defaultDownloadPath,
-  ]);
+  }, [rootFile?.xxh364, rootFolder, rootNode, defaultDownloadPath]);
 
   const dropEnabled = useMemo(() => Boolean(rootFolder && moaId), [rootFolder, moaId]);
   const canCapture = useMemo(() => Boolean(moaId && captureAnchor), [captureAnchor, moaId]);
 
   const { isDropActive, handleDrop, handleDragEnter, handleDragLeave, handleDragOver } =
-    usePanelDrop({
+    useFileDrop({
       dropEnabled,
       rootNodeId,
       moaId: moaId ?? null,
@@ -562,18 +504,6 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
               })}
             </div>
           ) : null}
-          {viewType === 'viewer' && viewerSidebarImage ? (
-            <Button
-              type="button"
-              variant="icon"
-              aria-label={viewerSidebarVisible ? '사이드바 닫기' : '사이드바 열기'}
-              title={viewerSidebarVisible ? '사이드바 닫기' : '사이드바 열기'}
-              onClick={() => setViewerSidebarVisible(prev => !prev)}
-              className="h-8 w-8"
-            >
-              {viewerSidebarVisible ? '>' : '<'}
-            </Button>
-          ) : null}
         </div>
       </div>
       <div className="relative flex-1 min-h-0 bg-surface">
@@ -585,65 +515,14 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
             graphData={graphData}
           />
         ) : showGrid && gridData ? (
-          <Split position="horizontal" className="w-full h-full">
-            {({ Panel: SplitPanel }) => (
-              <>
-                <SplitPanel key="grid" minSize={320}>
-                  <GridView
-                    key={gridRefreshKey}
-                    gridData={gridData}
-                    onImageOpen={image => {
-                      setActiveImage(image);
-                    }}
-                    onClearPreview={() => setActiveImage(null)}
-                  />
-                </SplitPanel>
-                {activeImage && (
-                  <SplitPanel
-                    key="sidebar"
-                    canHidden
-                    onHidden={hidden => hidden && setActiveImage(null)}
-                    hiddenSize={200}
-                    minSize={280}
-                    initialSize={360}
-                  >
-                    <FileDetailSidebar
-                      moaId={moaId}
-                      image={activeImage}
-                      onClose={() => setActiveImage(null)}
-                    />
-                  </SplitPanel>
-                )}
-              </>
-            )}
-          </Split>
+          <GridView
+            key={gridRefreshKey}
+            gridData={gridData}
+            onImageOpen={image => {}}
+            onClearPreview={() => {}}
+          />
         ) : showViewer && rootFile ? (
-          <Split position="horizontal" className="h-full w-full">
-            {({ Panel: SplitPanel }) => (
-              <>
-                <SplitPanel key="viewer" minSize={320}>
-                  <FileViewer file={rootFile} moaId={moaId} />
-                </SplitPanel>
-                {viewerSidebarImage ? (
-                  <SplitPanel
-                    key="viewer-sidebar"
-                    canHidden
-                    hidden={!viewerSidebarVisible}
-                    onHidden={hidden => hidden && setViewerSidebarVisible(false)}
-                    hiddenSize={200}
-                    minSize={280}
-                    initialSize={360}
-                  >
-                    <FileDetailSidebar
-                      moaId={moaId}
-                      image={viewerSidebarVisible ? viewerSidebarImage : null}
-                      onClose={() => setViewerSidebarVisible(false)}
-                    />
-                  </SplitPanel>
-                ) : null}
-              </>
-            )}
-          </Split>
+          <FileViewer file={rootFile} moaId={moaId} />
         ) : null}
       </div>
     </div>,
