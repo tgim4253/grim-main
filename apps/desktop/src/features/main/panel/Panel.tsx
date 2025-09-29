@@ -54,6 +54,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [rootNode, setRootNode] = useState<Node | null>(null);
   const [graphRefreshKey, setGraphRefreshKey] = useState(0);
   const [gridRefreshKey, setGridRefreshKey] = useState(0);
+  const [viewerSidebarVisible, setViewerSidebarVisible] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const { panel, containerId, isActive } = usePanelsStore(
     useShallow(state => ({
@@ -362,6 +363,28 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     return rootNode.data?.['File'] ?? null;
   }, [rootNode]);
 
+  const viewerSidebarImage = useMemo<ImageItem | null>(() => {
+    if (!rootFile || rootFile.kind !== FileType.Image) return null;
+
+    return {
+      id: rootFile.fileId,
+      nodeId: rootFile.nodeId,
+      name: rootFile.fileName,
+      type: rootFile.kind,
+      hash: rootFile.xxh364,
+      size: rootFile.size,
+    };
+  }, [rootFile]);
+
+  useEffect(() => {
+    if (viewType !== 'viewer') {
+      setViewerSidebarVisible(false);
+      return;
+    }
+
+    setViewerSidebarVisible(Boolean(viewerSidebarImage));
+  }, [viewType, viewerSidebarImage]);
+
   const captureAnchor = useMemo(() => {
     if (!rootNode) return null;
 
@@ -539,6 +562,18 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
               })}
             </div>
           ) : null}
+          {viewType === 'viewer' && viewerSidebarImage ? (
+            <Button
+              type="button"
+              variant="icon"
+              aria-label={viewerSidebarVisible ? '사이드바 닫기' : '사이드바 열기'}
+              title={viewerSidebarVisible ? '사이드바 닫기' : '사이드바 열기'}
+              onClick={() => setViewerSidebarVisible(prev => !prev)}
+              className="h-8 w-8"
+            >
+              {viewerSidebarVisible ? '>' : '<'}
+            </Button>
+          ) : null}
         </div>
       </div>
       <div className="relative flex-1 min-h-0 bg-surface">
@@ -583,7 +618,32 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
             )}
           </Split>
         ) : showViewer && rootFile ? (
-          <FileViewer file={rootFile} moaId={moaId} />
+          <Split position="horizontal" className="h-full w-full">
+            {({ Panel: SplitPanel }) => (
+              <>
+                <SplitPanel key="viewer" minSize={320}>
+                  <FileViewer file={rootFile} moaId={moaId} />
+                </SplitPanel>
+                {viewerSidebarImage ? (
+                  <SplitPanel
+                    key="viewer-sidebar"
+                    canHidden
+                    hidden={!viewerSidebarVisible}
+                    onHidden={hidden => hidden && setViewerSidebarVisible(false)}
+                    hiddenSize={200}
+                    minSize={280}
+                    initialSize={360}
+                  >
+                    <FileDetailSidebar
+                      moaId={moaId}
+                      image={viewerSidebarVisible ? viewerSidebarImage : null}
+                      onClose={() => setViewerSidebarVisible(false)}
+                    />
+                  </SplitPanel>
+                ) : null}
+              </>
+            )}
+          </Split>
         ) : null}
       </div>
     </div>,

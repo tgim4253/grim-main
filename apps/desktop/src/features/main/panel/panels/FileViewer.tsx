@@ -4,13 +4,15 @@ import { FileType } from '@tgim/types/file';
 import { NodeFile } from '@tgim/types/graph';
 import { ipc } from '../../../../lib/ipc';
 import { FileText } from 'lucide-react';
+import { cn } from '@tgim/utils/index';
 
 interface FileViewerProps {
   file: NodeFile;
   moaId: string | null;
+  className?: string;
 }
 
-const FileViewer: React.FC<FileViewerProps> = ({ file, moaId }) => {
+const FileViewer: React.FC<FileViewerProps> = ({ file, moaId, className }) => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>(
     file.kind === FileType.Image ? 'loading' : 'idle',
@@ -75,19 +77,24 @@ const FileViewer: React.FC<FileViewerProps> = ({ file, moaId }) => {
   }, [file.kind]);
 
   return (
-    <div className="flex h-full w-full flex-col gap-4 p-6 text-foreground">
-      <div className="flex flex-col items-center gap-1 text-center">
+    <div
+      className={cn(
+        'flex h-full min-h-0 w-full flex-col gap-4 overflow-hidden p-6 text-foreground',
+        className,
+      )}
+    >
+      <div className="flex flex-shrink-0 flex-col items-center gap-1 text-center">
         <p className="max-w-full truncate text-lg font-semibold">{file.fileName}</p>
         <p className="text-sm text-muted-foreground">{fileDescription}</p>
       </div>
 
       {file.kind === FileType.Image ? (
-        <div className="flex flex-1 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-muted">
+        <div className="flex flex-1 min-h-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-muted">
           {status === 'ready' && imageSrc ? (
             <img
               src={imageSrc}
               alt={file.fileName}
-              className="max-h-full max-w-full object-contain"
+              className="h-full w-full max-h-full max-w-full object-contain"
             />
           ) : status === 'loading' ? (
             <p className="text-sm text-muted-foreground">이미지를 불러오는 중...</p>
@@ -98,7 +105,7 @@ const FileViewer: React.FC<FileViewerProps> = ({ file, moaId }) => {
           )}
         </div>
       ) : (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border bg-surface-muted">
+        <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border bg-surface-muted">
           <FileText className="h-12 w-12 text-muted-foreground" />
           <div className="flex flex-col items-center gap-1 text-center">
             <p className="text-sm text-muted-foreground">미리보기를 지원하지 않는 파일입니다.</p>
