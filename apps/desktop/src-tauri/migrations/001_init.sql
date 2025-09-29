@@ -218,74 +218,20 @@ CREATE TABLE IF NOT EXISTS node_file_binding (
 
 CREATE INDEX IF NOT EXISTS idx_nfb_filepath ON node_file_binding(file_content_id);
 
-/* -------------------------------- Materialization pipeline ---------------------------------------- */
-CREATE TABLE IF NOT EXISTS materialization_target (
-  id                  TEXT PRIMARY KEY NOT NULL,                           -- uuid
-  name                TEXT NOT NULL,
-  dest_real_folder_id TEXT NOT NULL REFERENCES real_folder(id) ON DELETE CASCADE,
-  mode                TEXT NOT NULL DEFAULT 'auto',               -- 'auto'|'reflink'|'hardlink'|'symlink'|'copy'
-  conflict_policy     TEXT NOT NULL DEFAULT 'rename',             -- 'overwrite'|'skip'|'rename'
-  structure_policy    TEXT NOT NULL DEFAULT 'preserve',           -- 'preserve'|'flatten'|'by_tag'
-  delete_policy       TEXT NOT NULL DEFAULT 'prune',              -- 'keep'|'prune'
-  include_glob        TEXT,
-  exclude_glob        TEXT,
-  enabled             INTEGER DEFAULT 1,                          -- boolean
-  created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+/* ------------------------- Crop node ---------------------------------- */
+CREATE TABLE IF NOT EXISTS node_crop (
+  node_id                 TEXT PRIMARY KEY NOT NULL REFERENCES node(id) ON DELETE CASCADE,
+  origin_hash             TEXT NOT NULL,
+  start_x                 REAL NOT NULL,
+  start_y                 REAL NOT NULL,
+  width                   REAL NOT NULL,
+  height                  REAL NOT NULL,
+  reference_width         INTEGER,
+  reference_height        INTEGER,
+  is_relative             INTEGER NOT NULL DEFAULT 0 CHECK (is_relative IN (0,1)),
+  created_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at              TEXT NOT NULL DEFAULT (datetime('now'))
 );
-
-CREATE TABLE IF NOT EXISTS materialization_binding (
-  id               TEXT PRIMARY KEY NOT NULL,                             -- uuid
-  virtual_node_id  TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE, -- node.kind='folder'
-  target_id        TEXT NOT NULL REFERENCES materialization_target(id) ON DELETE CASCADE,
-  UNIQUE (virtual_node_id, target_id)
-);
-
-CREATE TABLE IF NOT EXISTS materialization_job (
-  id           TEXT PRIMARY KEY NOT NULL,                                 -- uuid
-  binding_id   TEXT NOT NULL REFERENCES materialization_binding(id) ON DELETE CASCADE,
-  started_at   TEXT DEFAULT (datetime('now')),
-  finished_at  TEXT,
-  status       TEXT,                                             -- 'running'|'success'|'failed'|'partial'
-  stats_json   TEXT,
-  error_msg    TEXT
-);
-
-CREATE TABLE IF NOT EXISTS materialization_map (
-  id                           TEXT PRIMARY KEY NOT NULL,                 -- uuid
-  binding_id                   TEXT NOT NULL REFERENCES materialization_binding(id) ON DELETE CASCADE,
-  src_file_path_id             TEXT NOT NULL REFERENCES file_path(id) ON DELETE CASCADE,
-  out_file_path_id             TEXT REFERENCES file_path(id) ON DELETE SET NULL,
-  last_materialized_content_id TEXT REFERENCES file_content(id) ON DELETE SET NULL,
-  last_job_id                  TEXT REFERENCES materialization_job(id) ON DELETE SET NULL,
-  UNIQUE (binding_id, src_file_path_id)
-);
-
-/* ------------------------------ Anchors & resolvers ----------------------------------------------- */
-CREATE TABLE IF NOT EXISTS location_anchor (
-  id          TEXT PRIMARY KEY NOT NULL,                                   -- uuid
-  name        TEXT NOT NULL UNIQUE,                               -- e.g., 'photos_root'
-  description TEXT,
-  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS location_resolver (
-  id                TEXT PRIMARY KEY NOT NULL,                             -- uuid
-  anchor_id         TEXT NOT NULL REFERENCES location_anchor(id) ON DELETE CASCADE,
-  priority          INTEGER DEFAULT 0,
-  enabled           INTEGER DEFAULT 1,                            -- boolean
-  platform          TEXT,                                         -- 'windows'|'macos'|'linux'|NULL(any)
-  strategy          TEXT NOT NULL,                                -- 'relative_to_db'|'storage_root'|'absolute'|'search'
-  template          TEXT,                                         -- './Photos' or '/Volumes/USB/Photos'
-  storage_stable_id TEXT,                                         -- for 'storage_root'
-  marker_uuid       TEXT,                                         -- for 'search' verification
-  created_at        TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE INDEX IF NOT EXISTS idx_locres_anchor       ON location_resolver(anchor_id);
-CREATE INDEX IF NOT EXISTS idx_locres_anchor_prio  ON location_resolver(anchor_id, priority);
-
 /* ------------------------------------ PRAGMA user_version ----------------------------------------- */
 -- TODO: Replace `1` with actual TARGET_DB_VERSION value.
 PRAGMA user_version = 1;

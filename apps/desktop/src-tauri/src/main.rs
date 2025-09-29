@@ -56,6 +56,7 @@ fn main() {
             commands::file::remove_file_path,
             commands::file::reveal_file_in_explorer,
             commands::file::list_file_type_extensions,
+            commands::image_crop::create_image_crop,
             commands::croquis::start_croquis_session,
             commands::croquis::load_croquis_session,
             commands::croquis::load_croquis_option,

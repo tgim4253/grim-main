@@ -15,6 +15,7 @@ import {
   GraphNodeType,
   GraphResponse,
   Node,
+  NodeCrop,
   NodeFile,
   NodeFolder,
   NodeKind,
@@ -104,6 +105,16 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
           size: nodeSize,
           type: type,
           hash: data.xxh364,
+        };
+      } else if (node.kind === NodeKind.Crop && node.data['Crop']) {
+        const crop = node.data['Crop'] as NodeCrop;
+        return {
+          id: graphNodeId,
+          nodeId: node.id,
+          label: 'Crop',
+          size: nodeSize,
+          type: 'crop',
+          crop,
         };
       } else if (node.kind == NodeKind.Folder && node.data['Folder']) {
         let data = node.data['Folder'];

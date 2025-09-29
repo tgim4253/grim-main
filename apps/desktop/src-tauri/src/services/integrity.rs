@@ -12,7 +12,7 @@ use crate::{
 };
 
 /// Desired `PRAGMA user_version` for schema compatibility.
-pub const TARGET_DB_VERSION: i32 = 1;
+pub const TARGET_DB_VERSION: i32 = 2;
 
 /// Open or create DB with a pool and per-connection PRAGMAs.
 pub async fn open_or_create_db(db_path: &Path) -> Result<Pool<Sqlite>> {
@@ -107,6 +107,8 @@ pub async fn seed_initial_data(pool: &Pool<Sqlite>) -> Result<()> {
         (RelationType::RelativeImage, 3, 0, "File -> File (relative image)"),
         (RelationType::CroquisResLink, 1, 0, "origin -> croquis"),
         (RelationType::CroquisRefLink, 1, 0, "croquis -> origin"),
+        (RelationType::Cropped, 1, 0, "origin -> crop"),
+        (RelationType::CroppedOrigin, 1, 0, "crop -> origin"),
     ];
 
     for (kind, default_level, editable, description) in seed_data {
