@@ -54,7 +54,7 @@ impl CropRepository {
             params.height,
             params.reference_width,
             params.reference_height,
-            if params.is_relative { 1 } else { 0 },
+            params.is_relative,
             params.now,
         )
         .execute(&mut *executor)
