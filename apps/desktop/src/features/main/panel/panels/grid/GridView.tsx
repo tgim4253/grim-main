@@ -1,20 +1,22 @@
 import { useMoa } from '@tgim/hooks/useMoa';
 import { useMultiSelect } from '@tgim/dnd/index';
-import { GridData, ImageItem } from '@tgim/types/grid';
+import { GridData, ImageItem, Layout, Size } from '@tgim/types/grid';
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import useThumbStore, { convertToThumbKey } from '@tgim/stores/thumbStore';
 import { ResizeMode } from '@tgim/types/file';
-import { useShallow } from 'zustand/shallow';
-import { convertFileSrc } from '@tauri-apps/api/core';
-import { useThumbnails } from '../../../../hooks';
-import { FixedSizeGrid as WindowGrid, GridChildComponentProps } from 'react-window';
+import { useThumbnails } from '../../../../../hooks';
 import { Button } from '@tgim/ui';
 import { CroquisPreferences } from '@tgim/types/croquis';
 import CroquisStartModal, {
   CroquisStartModalConfirmPayload,
-} from '../../../croquis/CroquisStartModal';
-import { createDefaultCroquisPreferences } from '../../../croquis/lib/preferences';
-import ThumbnailStorageModal from '../../../file/modal/ThumbnailStorageModal';
+} from '../../../../croquis/CroquisStartModal';
+import { createDefaultCroquisPreferences } from '../../../../croquis/lib/preferences';
+import ThumbnailStorageModal from '../../../../file/modal/ThumbnailStorageModal';
+import { MASONRY_COLUMN_GAP, MASONRY_CONFIG, MasonryLayout } from './MarsonryLayout';
+import { VirtualGridLayout } from './VirtualGridLayout';
+import { useElementSize } from '@tgim/hooks/useElementSize';
+import { Split } from '@tgim/ui/Splitter';
+import FileDetailSidebar from '../FileDetailSidebar';
+import { useDebouncedEffect } from '@tgim/hooks/useDebouncedEffect';
 
 /* ---------------------------------------------
  * Helper Icon Components (unchanged)
@@ -69,17 +71,9 @@ interface Props {
   onClearPreview?: () => void;
 }
 
-type Size = 'small' | 'medium' | 'large';
-type Layout = 'grid' | 'masonry';
-
 const SIZES: Size[] = ['small', 'medium', 'large'];
 const LAYOUTS: Layout[] = ['grid', 'masonry'];
-const MASONRY_CONFIG: Record<Size, { idealWidth: number; maxColumns: number }> = {
-  small: { idealWidth: 160, maxColumns: 8 },
-  medium: { idealWidth: 256, maxColumns: 6 },
-  large: { idealWidth: 320, maxColumns: 4 },
-};
-const MASONRY_COLUMN_GAP = 16;
+
 const SCROLL_CONTAINER_PADDING_X = 32;
 const MAX_ITEMS_PER_REQ = 100;
 const INITIAL_FETCH_COUNT = 50;
@@ -102,12 +96,6 @@ function calculateMasonryMetrics(containerWidth: number, size: Size) {
 }
 
 // Debounce Hook (unchanged)
-function useDebouncedEffect(fn: () => void, deps: React.DependencyList, delay: number) {
-  useEffect(() => {
-    const handler = setTimeout(() => fn(), delay);
-    return () => clearTimeout(handler);
-  }, [fn, ...deps]);
-}
 
 // Visibility Hook (unchanged)
 function useVisibilityMap(rootRef: React.RefObject<HTMLElement>, overscanPx = 600) {
@@ -198,31 +186,12 @@ function useVisibilityMap(rootRef: React.RefObject<HTMLElement>, overscanPx = 60
   return { visible, observe, unobserve };
 }
 
-// Element Size Hook (unchanged)
-function useElementSize<T extends HTMLElement>(ref: React.RefObject<T>) {
-  const [size, setSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const ro = new ResizeObserver(entries => {
-      const cr = entries[0].contentRect;
-      setSize({ width: cr.width, height: cr.height });
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [ref]);
-  return size;
-}
-
-/* ---------------------------------------------
- * Main Component
- * --------------------------------------------- */
-const GridView: React.FC<Props> = ({ gridData, onImageOpen, onClearPreview }) => {
+export const GridContent: React.FC<Props> = ({ gridData, onImageOpen, onClearPreview }) => {
   const { moaId } = useMoa(location);
   const [layout, setLayout] = useState<Layout>('grid');
   const [size, setSize] = useState<Size>('medium');
   const [selectMode, setSelectMode] = useState(false);
-  const [images] = useState(gridData.images);
+  const [images, setImages] = useState(gridData.images);
 
   const visibleOrder = useMemo(() => images.map(img => img.hash), [images]);
 
@@ -421,6 +390,7 @@ const GridView: React.FC<Props> = ({ gridData, onImageOpen, onClearPreview }) =>
 
   return (
     <div className="flex flex-col w-full h-full bg-surface text-text font-sans">
+      {/* Toolbar */}
       <div className="flex items-center justify-between flex-shrink-0 px-4 py-2 border-b border-border bg-surface-raised">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-1 rounded-full border border-border bg-surface-muted p-1 shadow-inner">
@@ -505,6 +475,7 @@ const GridView: React.FC<Props> = ({ gridData, onImageOpen, onClearPreview }) =>
           />
         )}
       </div>
+
       <CroquisStartModal
         open={croquisModalOpen && selectedCount > 0}
         preferences={croquisPreferences}
@@ -520,423 +491,56 @@ const GridView: React.FC<Props> = ({ gridData, onImageOpen, onClearPreview }) =>
 };
 
 /* ---------------------------------------------
- * Virtualized Grid (react-window)
+ * Backward-compatible wrapper (optional)
+ * - Keeps existing import defaults working
  * --------------------------------------------- */
+const GridView: React.FC<Props> = props => {
+  const { gridData, onClearPreview, onImageOpen } = props;
+  const [activeImage, setActiveImage] = useState<ImageItem | null>(null);
 
-type GridCellData = {
-  images: ImageItem[];
-  cols: number;
-  itemW: number;
-  itemH: number;
-  gap: number;
-  onItemClick: (event: React.MouseEvent, img: ImageItem) => void;
-  selectMode: boolean;
-  observe: (el: Element | null, key: string) => void;
-  unobserve: (el: Element | null) => void;
-  thumbSize: number;
-  isSelected: (id: string) => boolean;
-};
-
-function VirtualGridLayout({
-  images,
-  size,
-  onItemClick,
-  observe, // no-op in grid path
-  unobserve, // no-op in grid path
-  selectMode,
-  thumbSize,
-  onNeedThumbs,
-  isSelected,
-}: {
-  images: ImageItem[];
-  size: Size;
-  onItemClick: (event: React.MouseEvent, img: ImageItem) => void;
-  observe: (el: Element | null, key: string) => void;
-  unobserve: (el: Element | null) => void;
-  selectMode: boolean;
-  thumbSize: number;
-  onNeedThumbs: (items: ImageItem[]) => void;
-  isSelected: (id: string) => boolean;
-}) {
-  const itemW = size === 'small' ? 96 : size === 'large' ? 192 : 144;
-  const itemH = itemW;
-  const gap = 16;
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  //@ts-expect-error.
-  const { width, height } = useElementSize(containerRef);
-
-  const cols = Math.max(1, Math.floor((width + gap) / (itemW + gap)));
-  const rowCount = Math.ceil(images.length / cols);
-  const rowsInView = height > 0 ? height / (itemH + gap) : 0;
-  // ▶ Wider pre-render: about 1.5x viewport worth of rows
-  const overscanRowCount = rowsInView > 0 ? Math.max(2, Math.ceil(rowsInView * 1.5)) : 4;
-
-  // Request thumbs for rows/cols in overscan range (debounced via RAF) with extra buffer
-  const rafRef = useRef<number | null>(null);
-  const pendingRangeRef = useRef<{ rs: number; re: number } | null>(null);
-
-  const scheduleFetchForRange = useCallback(
-    (rs: number, re: number) => {
-      // Merge with pending range to reduce calls, and expand with buffer rows
-      const EXTRA = 3; // prefetch additional rows beyond overscan
-      rs = Math.max(0, rs - EXTRA);
-      re = re + EXTRA;
-
-      if (!pendingRangeRef.current) {
-        pendingRangeRef.current = { rs, re };
-      } else {
-        pendingRangeRef.current = {
-          rs: Math.min(pendingRangeRef.current.rs, rs),
-          re: Math.max(pendingRangeRef.current.re, re),
-        };
-      }
-      if (rafRef.current != null) return;
-      rafRef.current = requestAnimationFrame(() => {
-        const r = pendingRangeRef.current;
-        rafRef.current = null;
-        pendingRangeRef.current = null;
-        if (!r) return;
-        const startIdx = r.rs * cols;
-        const endIdxExclusive = Math.min(images.length, (r.re + 1) * cols);
-        const slice = images.slice(startIdx, endIdxExclusive);
-        onNeedThumbs(slice);
-      });
-    },
-    [cols, images, onNeedThumbs],
-  );
-
-  const cellData = useMemo<GridCellData>(
-    () => ({
-      images,
-      cols,
-      itemW,
-      itemH,
-      gap,
-      onItemClick,
-      selectMode,
-      observe,
-      unobserve,
-      thumbSize,
-      isSelected,
-    }),
-    [
-      images,
-      cols,
-      itemW,
-      itemH,
-      gap,
-      onItemClick,
-      selectMode,
-      observe,
-      unobserve,
-      thumbSize,
-      isSelected,
-    ],
-  );
-
-  // Stable key to prevent remount flicker when layout/size changes
-  const itemKey = useCallback(
-    ({
-      columnIndex,
-      rowIndex,
-      data,
-    }: {
-      columnIndex: number;
-      rowIndex: number;
-      data: GridCellData;
-    }) => {
-      const idx = rowIndex * data.cols + columnIndex;
-      return data.images[idx]?.hash ?? `row${rowIndex}-col${columnIndex}`;
-    },
-    [],
-  );
-
-  const Cell = useCallback(
-    ({
-      columnIndex,
-      rowIndex,
-      style,
-      data,
-      isScrolling,
-    }: GridChildComponentProps<GridCellData>) => {
-      const idx = rowIndex * data.cols + columnIndex;
-      if (idx >= data.images.length) return null;
-      const img = data.images[idx];
-      return (
-        <div
-          style={{
-            ...style,
-            left: (style.left as number) + data.gap,
-            top: (style.top as number) + data.gap,
-            width: data.itemW,
-            height: data.itemH,
-          }}
-        >
-          <ThumbCard
-            img={img}
-            onClick={data.onItemClick}
-            showCheckbox={data.selectMode}
-            layout="grid"
-            observe={data.observe}
-            unobserve={data.unobserve}
-            thumbSize={data.thumbSize}
-            selected={data.isSelected(img.hash)}
-            isScrolling={!!isScrolling}
-          />
-        </div>
-      );
-    },
-    [],
-  );
-
-  return (
-    <div ref={containerRef} className="w-full h-full">
-      {width > 0 && height > 0 && (
-        <WindowGrid
-          columnCount={cols}
-          columnWidth={itemW + gap}
-          height={height}
-          rowCount={rowCount}
-          rowHeight={itemH + gap}
-          width={width}
-          itemData={cellData}
-          overscanColumnCount={2}
-          overscanRowCount={overscanRowCount}
-          useIsScrolling
-          itemKey={itemKey}
-          onItemsRendered={({ overscanRowStartIndex, overscanRowStopIndex }) => {
-            // Proactively fetch thumbnails for overscanned rows (with buffer)
-            scheduleFetchForRange(overscanRowStartIndex, overscanRowStopIndex);
-          }}
-        >
-          {Cell}
-        </WindowGrid>
-      )}
-    </div>
-  );
-}
-
-/* ---------------------------------------------
- * Masonry layout via CSS columns
- * - Receives computed column counts to stay in sync with thumbnail sizing
- * - Works with IO-based visibility for thumbnail fetches
- * --------------------------------------------- */
-function MasonryLayout({
-  images,
-  onItemClick,
-  selectMode,
-  observe,
-  unobserve,
-  thumbSize,
-  isSelected,
-  columnCount,
-}: {
-  images: ImageItem[];
-  onItemClick: (event: React.MouseEvent, img: ImageItem) => void;
-  selectMode: boolean;
-  observe: (el: Element | null, key: string) => void;
-  unobserve: (el: Element | null) => void;
-  thumbSize: number;
-  isSelected: (id: string) => boolean;
-  columnCount: number;
-}) {
-  const columnStyle = useMemo<React.CSSProperties>(
-    () => ({
-      columnCount: Math.max(columnCount, 1),
-      columnGap: `${MASONRY_COLUMN_GAP}px`,
-      columnFill: 'balance',
-    }),
-    [columnCount],
-  );
-
-  return (
-    <div className="w-full" style={columnStyle}>
-      {images.map((img: ImageItem) => (
-        <div
-          key={img.id ?? img.hash}
-          className="mb-4 inline-block w-full align-top"
-          style={{ breakInside: 'avoid' }}
-        >
-          <ThumbCard
-            img={img}
-            onClick={onItemClick}
-            showCheckbox={selectMode}
-            layout="masonry"
-            observe={observe}
-            unobserve={unobserve}
-            thumbSize={thumbSize}
-            selected={isSelected(img.hash)}
-          />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ---------------------------------------------
- * Thumb Card (memoized)
- * - Persist loaded state across remounts to avoid re-fade flicker
- * - Disable heavy transitions while scrolling
- * - Provide intrinsic size hints for masonry cards
- * --------------------------------------------- */
-
-type ThumbCardProps = {
-  img: ImageItem;
-  onClick: (event: React.MouseEvent, img: ImageItem) => void;
-  showCheckbox: boolean;
-  selected: boolean;
-  layout: Layout;
-  observe: (el: Element | null, key: string) => void;
-  unobserve: (el: Element | null) => void;
-  thumbSize: number;
-  sizeClass?: string;
-  isScrolling?: boolean;
-};
-
-// Keep a global set of keys that have completed loading to avoid re-fade
-const loadedOnceSet = new Set<string>();
-
-const ThumbCardComponent: React.FC<ThumbCardProps> = ({
-  img,
-  onClick,
-  showCheckbox,
-  selected,
-  layout,
-  observe,
-  unobserve,
-  sizeClass,
-  thumbSize,
-  isScrolling = false,
-}) => {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [loaded, setLoaded] = useState(false);
-  const isMasonry = layout === 'masonry';
-
-  const key = useMemo(
-    () =>
-      convertToThumbKey(img.hash, {
-        width: thumbSize,
-        height: layout == 'masonry' ? 0 : thumbSize,
-        dpr: 1,
-        mode: ResizeMode.Original,
-      }),
-    [img.hash, thumbSize, layout],
-  );
-
-  // If previously loaded, start in loaded state to skip fade-in
   useEffect(() => {
-    if (loadedOnceSet.has(key)) {
-      setLoaded(true);
+    if (!gridData || !activeImage) return;
+    const exists = gridData.images.some(img => img.hash === activeImage.hash);
+    if (!exists) {
+      setActiveImage(null);
     }
-  }, [key]);
-
-  const { entry } = useThumbStore(useShallow(state => ({ entry: state.byKey[key] })));
-  const [stableSrc, setStableSrc] = useState<string | undefined>(undefined);
+  }, [gridData, activeImage?.hash]);
 
   useEffect(() => {
-    if (entry?.status === 'ready' && entry.url) {
-      setStableSrc(convertFileSrc(entry.url));
+    if (!gridData) {
+      setActiveImage(null);
     }
-  }, [entry]);
+  }, [gridData]);
 
-  useEffect(() => {
-    const el = containerRef.current;
-    // Observe by hash to match visibility map keys
-    observe(el, img.hash);
-    return () => unobserve(el);
-  }, [img.hash, observe, unobserve]);
+  const handleImageClick = (image: ImageItem) => {
+    setActiveImage(image);
+    onImageOpen?.(image);
+  };
 
-  const handleImageLoad = useCallback(() => {
-    loadedOnceSet.add(key);
-    setLoaded(true);
-  }, [key]);
-
-  const handleCardClick = useCallback(
-    (event: React.MouseEvent) => {
-      onClick(event, img);
-    },
-    [onClick, img],
-  );
-
-  const selectionClasses = selected
-    ? 'border-accent ring-2 ring-accent/60 ring-offset-1 ring-offset-surface-raised'
-    : 'border-border';
-
-  // While scrolling or already loaded, avoid fade transition to reduce flicker
-  const baseImgClass = isMasonry ? 'w-full h-auto object-cover' : 'w-full h-full object-cover';
-  const imgClass =
-    isScrolling || loaded
-      ? baseImgClass
-      : `${baseImgClass} opacity-0 transition-opacity duration-300`;
-
-  const cardStyle = useMemo<React.CSSProperties>(() => {
-    if (!isMasonry) return {};
-    return {
-      containIntrinsicSize: `${thumbSize}px ${thumbSize}px`,
-    };
-  }, [isMasonry, thumbSize]);
-
+  const handleClearPreview = () => {
+    setActiveImage(null);
+    onClearPreview?.();
+  };
   return (
-    <div
-      ref={containerRef}
-      className={`group relative w-full ${
-        isMasonry ? '' : 'h-full'
-      } overflow-hidden rounded-lg border ${selectionClasses} bg-surface shadow-sm transition-all duration-200 hover:border-accent hover:shadow-lg hover:-translate-y-1 cursor-pointer ${sizeClass ?? ''}`}
-      onClick={handleCardClick}
-      role="button"
-      tabIndex={0}
-      aria-selected={selected}
-      data-selected={selected ? 'true' : 'false'}
-      style={cardStyle}
-    >
-      {showCheckbox && (
-        <div className="absolute left-2 top-2 z-10">
-          <input
-            type="checkbox"
-            className="w-4 h-4 rounded text-accent bg-surface-muted border-border focus:ring-accent"
-            readOnly
-            checked={selected}
-          />
-        </div>
+    <Split position="horizontal" className="w-full h-full">
+      {({ Panel: SplitPanel }) => (
+        <>
+          <SplitPanel key="grid" minSize={320}>
+            <GridContent
+              {...props}
+              onImageOpen={handleImageClick}
+              onClearPreview={handleClearPreview}
+            />
+          </SplitPanel>
+          {activeImage && (
+            <SplitPanel key="sidebar" minSize={280} initialSize={360}>
+              <FileDetailSidebar image={activeImage} onClose={() => setActiveImage(null)} />
+            </SplitPanel>
+          )}
+        </>
       )}
-      <div className={`relative w-full ${isMasonry ? '' : 'h-full'}`}>
-        {!stableSrc && (
-          <div
-            className={`w-full ${isMasonry ? '' : 'h-full'} bg-surface-muted animate-pulse`}
-            style={isMasonry ? { height: thumbSize } : undefined}
-          />
-        )}
-        {stableSrc && (
-          <img
-            src={stableSrc}
-            alt={img.name}
-            className={imgClass}
-            onLoad={handleImageLoad}
-            loading="lazy"
-            decoding="async"
-          />
-        )}
-      </div>
-      {layout === 'grid' && (
-        <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-[color-mix(in_srgb,var(--ds-overlay)_85%,transparent)] via-[color-mix(in_srgb,var(--ds-overlay)_35%,transparent)] to-transparent">
-          <p className="text-text-inverse text-xs font-medium truncate" title={img.name}>
-            {img.name}
-          </p>
-        </div>
-      )}
-      {layout === 'masonry' && (
-        <div className="p-2 border-t border-border">
-          <p className="text-text text-xs font-medium truncate" title={img.name}>
-            {img.name}
-          </p>
-          <p className="text-xs text-text-soft opacity-80">{Math.round(img.size / 1024)} KB</p>
-        </div>
-      )}
-    </div>
+    </Split>
   );
 };
-
-const ThumbCard = React.memo(ThumbCardComponent);
 
 export default GridView;

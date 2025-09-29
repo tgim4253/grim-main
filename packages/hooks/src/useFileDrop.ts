@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
-import { ipc } from '../../../lib/ipc';
+import { ipc } from '../../../apps/desktop/src/lib/ipc';
 
-interface UsePanelDropParams {
+interface UseFileDropParams {
   dropEnabled: boolean;
   rootNodeId: string | null;
   moaId: string | null;
@@ -14,7 +14,7 @@ interface ExtractedDropData {
   baseUrls: string[];
 }
 
-interface PanelDropFilePayload {
+interface FileDropFilePayload {
   name: string;
   mimeType?: string | null;
   dataBase64: string;
@@ -237,7 +237,8 @@ const getDropCandidates = (dt: DataTransfer | null): ExtractedDropData => {
   return { urls, baseUrls };
 };
 
-const fileToPanelDropPayload = async (file: File): Promise<PanelDropFilePayload> => {
+/** Convert a File to the serialized payload used for import */
+const fileToFileDropPayload = async (file: File): Promise<FileDropFilePayload> => {
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -269,7 +270,7 @@ const fileToPanelDropPayload = async (file: File): Promise<PanelDropFilePayload>
 
 export const downloadUrlToFilePayload = async (
   url: string,
-): Promise<PanelDropFilePayload | null> => {
+): Promise<FileDropFilePayload | null> => {
   const candidates = await expandCandidateUrls(url);
 
   for (const candidate of candidates) {
@@ -310,7 +311,7 @@ export const downloadUrlToFilePayload = async (
         lastModified: Date.now(),
       });
 
-      return await fileToPanelDropPayload(file);
+      return await fileToFileDropPayload(file);
     } catch (err) {
       console.error('plugin-http fetch failed:', err);
       return null;
@@ -319,12 +320,12 @@ export const downloadUrlToFilePayload = async (
   return null;
 };
 
-export const usePanelDrop = ({
+export const useFileDrop = ({
   dropEnabled,
   rootNodeId,
   moaId,
   refreshPanelData,
-}: UsePanelDropParams) => {
+}: UseFileDropParams) => {
   const [isDropActive, setIsDropActive] = useState(false);
 
   const shouldHandleDrag = useCallback(
@@ -349,11 +350,11 @@ export const usePanelDrop = ({
       setIsDropActive(false);
 
       const files = Array.from(event.dataTransfer?.files ?? []);
-      let filePayloads: PanelDropFilePayload[] = [];
+      let filePayloads: FileDropFilePayload[] = [];
 
       if (files.length) {
         try {
-          filePayloads = await Promise.all(files.map(fileToPanelDropPayload));
+          filePayloads = await Promise.all(files.map(fileToFileDropPayload));
         } catch (error) {
           console.error('Failed to read dropped files', error);
           return;
@@ -365,7 +366,7 @@ export const usePanelDrop = ({
         return;
       }
 
-      const remotePayloads: PanelDropFilePayload[] = [];
+      const remotePayloads: FileDropFilePayload[] = [];
       const remainingUrls: string[] = [];
 
       for (const url of urls) {
@@ -433,4 +434,4 @@ export const usePanelDrop = ({
   };
 };
 
-export type UsePanelDropReturn = ReturnType<typeof usePanelDrop>;
+export type UseFileDropReturn = ReturnType<typeof useFileDrop>;
