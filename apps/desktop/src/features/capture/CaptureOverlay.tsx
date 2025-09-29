@@ -1,19 +1,13 @@
 import { CaptureContext, CaptureMonitor, CaptureRect } from '@tgim/types/capture';
 import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ipc } from '../../lib/ipc';
 import Button from '@tgim/ui/Button';
 import { toast } from 'react-toastify';
+import { usePointerSelection, type PointerSelectionRect } from '@tgim/hooks';
 
 const MIN_SELECTION_SIZE = 12;
-
-type SelectionRect = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
 
 type PointerPoint = {
   x: number;
@@ -56,13 +50,10 @@ const CaptureOverlay: React.FC = () => {
   const [monitorInfo, setMonitorInfo] = useState<CaptureMonitor | null>(null);
   const [phase, setPhase] = useState<Phase>('loading');
   const [mode, setMode] = useState<CaptureMode>('freeform');
-  const [selection, setSelection] = useState<SelectionRect | null>(null);
   const [busy, setBusy] = useState(false);
   const [baseUrl, setBaseUrl] = useState<string | null>(null);
   const [windowOffset, setWindowOffset] = useState<PointerPoint>({ x: 0, y: 0 });
 
-  const startRef = useRef<PointerPoint | null>(null);
-  const isPointerDownRef = useRef(false);
   const confirmedRef = useRef(false);
 
   const windowRef = useRef(getCurrentWindow());
@@ -183,139 +174,99 @@ const CaptureOverlay: React.FC = () => {
     };
   }, [phase]);
 
-  const createSquareRect = useCallback(
-    (start: PointerPoint, current: PointerPoint): SelectionRect => {
-      const deltaX = current.x - start.x;
-      const deltaY = current.y - start.y;
-      const size = Math.max(Math.abs(deltaX), Math.abs(deltaY));
-      const dirX = deltaX < 0 ? -1 : 1;
-      const dirY = deltaY < 0 ? -1 : 1;
-      const endX = start.x + size * dirX;
-      const endY = start.y + size * dirY;
-      const x = Math.min(start.x, endX);
-      const y = Math.min(start.y, endY);
-      return {
-        x,
-        y,
-        width: Math.abs(endX - start.x),
-        height: Math.abs(endY - start.y),
-      };
-    },
-    [],
-  );
-
-  const handlePointerDown = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>) => {
-      if (phase !== 'selecting' || busy) return;
-      event.preventDefault();
+  const {
+    selection,
+    completedSelection,
+    resetSelection,
+    clearCompletedSelection,
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp,
+    handlePointerCancel,
+  } = usePointerSelection<HTMLDivElement>({
+    mode,
+    minSize: MIN_SELECTION_SIZE,
+    disabled: phase !== 'selecting' || busy,
+    onSelectionStart: () => {
       document.body.style.backgroundColor = ACTIVE_OVERLAY_COLOR;
-      const point = { x: event.clientX, y: event.clientY };
-      startRef.current = point;
-      isPointerDownRef.current = true;
-      setSelection({ x: point.x, y: point.y, width: 0, height: 0 });
     },
-    [busy, phase],
-  );
-
-  const handlePointerMove = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>) => {
-      if (!isPointerDownRef.current || !startRef.current || phase !== 'selecting') return;
-      event.preventDefault();
-      const current = { x: event.clientX, y: event.clientY };
-      let rect: SelectionRect;
-      if (mode === 'square') {
-        rect = createSquareRect(startRef.current, current);
-      } else {
-        rect = {
-          x: Math.min(startRef.current.x, current.x),
-          y: Math.min(startRef.current.y, current.y),
-          width: Math.abs(current.x - startRef.current.x),
-          height: Math.abs(current.y - startRef.current.y),
-        };
-      }
-      setSelection(rect);
+    onSelectionCancel: () => {
+      document.body.style.backgroundColor = IDLE_OVERLAY_COLOR;
     },
-    [createSquareRect, mode, phase],
-  );
+    onSelectionInvalid: () => {
+      document.body.style.backgroundColor = IDLE_OVERLAY_COLOR;
+    },
+  });
 
-  const handlePointerUp = useCallback(
-    async (event: React.PointerEvent<HTMLDivElement>) => {
-      if (!isPointerDownRef.current || phase !== 'selecting') return;
-      event.preventDefault();
-      document.body.style.backgroundColor = ACTIVE_OVERLAY_COLOR;
+  useEffect(() => {
+    if (!completedSelection || phase !== 'selecting') return;
 
-      isPointerDownRef.current = false;
-      if (!selection || !monitorInfo) {
-        setSelection(null);
+    const rect: PointerSelectionRect = completedSelection;
+
+    const run = async () => {
+      if (!monitorInfo) {
+        clearCompletedSelection();
+        resetSelection();
         return;
       }
-      if (selection.width < MIN_SELECTION_SIZE || selection.height < MIN_SELECTION_SIZE) {
-        setSelection(null);
-        return;
-      }
-      await (async () => {
-        setBusy(true);
-        setPhase('loading');
-        const body = document.body;
-        const previousOpacity = body.style.opacity;
+
+      setBusy(true);
+      setPhase('loading');
+      const body = document.body;
+      const previousOpacity = body.style.opacity;
+
+      try {
+        body.style.opacity = '0';
+        let offsetX = windowOffset.x;
+        let offsetY = windowOffset.y;
         try {
-          body.style.opacity = '0';
-          let offsetX = windowOffset.x;
-          let offsetY = windowOffset.y;
-          try {
-            const windowPosition = await windowRef.current.innerPosition();
-            offsetX = windowPosition.x - monitorInfo.x;
-            offsetY = windowPosition.y - monitorInfo.y;
-            setWindowOffset({ x: offsetX, y: offsetY });
-          } catch (error) {
-            console.error('[Capture] Failed to refresh window offset', error);
-          }
-
-          const fallbackScale = window.devicePixelRatio ?? 1;
-          const scale = monitorInfo.scaleFactor > 0 ? monitorInfo.scaleFactor : fallbackScale;
-          const offsetLogicalX = offsetX / scale;
-          const offsetLogicalY = offsetY / scale;
-          const logical: CaptureRect = {
-            x: Math.round(selection.x + offsetLogicalX),
-            y: Math.round(selection.y + offsetLogicalY),
-            width: Math.round(selection.width),
-            height: Math.round(selection.height),
-          };
-          const normalized = normaliseRect(logical, monitorInfo);
-          const response = await ipc.capture.renderPreview({
-            rect: normalized,
-            monitor: monitorInfo,
-          });
-          setBaseUrl(response.baseUrl);
-          setSelection(null);
-          setPhase('preview');
+          const windowPosition = await windowRef.current.innerPosition();
+          offsetX = windowPosition.x - monitorInfo.x;
+          offsetY = windowPosition.y - monitorInfo.y;
+          setWindowOffset({ x: offsetX, y: offsetY });
         } catch (error) {
-          console.error('[Capture] Failed to render capture preview', error);
-          toast.error('Failed to capture selection. Please try again.');
-          setSelection(null);
-          setPhase('selecting');
-        } finally {
-          body.style.opacity = previousOpacity;
-          setBusy(false);
+          console.error('[Capture] Failed to refresh window offset', error);
         }
-      })();
-    },
-    [monitorInfo, phase, selection, windowOffset],
-  );
+
+        const fallbackScale = window.devicePixelRatio ?? 1;
+        const scale = monitorInfo.scaleFactor > 0 ? monitorInfo.scaleFactor : fallbackScale;
+        const offsetLogicalX = offsetX / scale;
+        const offsetLogicalY = offsetY / scale;
+        const logical: CaptureRect = {
+          x: Math.round(rect.x + offsetLogicalX),
+          y: Math.round(rect.y + offsetLogicalY),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+        };
+        const normalized = normaliseRect(logical, monitorInfo);
+        const response = await ipc.capture.renderPreview({
+          rect: normalized,
+          monitor: monitorInfo,
+        });
+        setBaseUrl(response.baseUrl);
+        resetSelection();
+        setPhase('preview');
+      } catch (error) {
+        console.error('[Capture] Failed to render capture preview', error);
+        toast.error('Failed to capture selection. Please try again.');
+        resetSelection();
+        setPhase('selecting');
+      } finally {
+        body.style.opacity = previousOpacity;
+        setBusy(false);
+        clearCompletedSelection();
+      }
+    };
+
+    void run();
+  }, [clearCompletedSelection, completedSelection, monitorInfo, phase, resetSelection, windowOffset]);
 
   const handleRetake = useCallback(() => {
-    setSelection(null);
+    resetSelection();
     setBaseUrl(null);
     setPhase('selecting');
     document.body.style.backgroundColor = IDLE_OVERLAY_COLOR;
-  }, []);
-
-  const handlePointerCancel = useCallback(() => {
-    if (!isPointerDownRef.current) return;
-    isPointerDownRef.current = false;
-    setSelection(null);
-    document.body.style.backgroundColor = IDLE_OVERLAY_COLOR;
-  }, []);
+  }, [resetSelection]);
 
   const handleCancel = useCallback(async () => {
     confirmedRef.current = true;
