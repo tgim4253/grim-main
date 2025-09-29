@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { FileType } from '@tgim/types/file';
-import { NodeFile } from '@tgim/types/graph';
+import { NodeCrop, NodeFile } from '@tgim/types/graph';
 import { ipc } from '../../../../lib/ipc';
 import { FileText } from 'lucide-react';
 import { cn } from '@tgim/utils/index';
@@ -10,13 +10,100 @@ import Button from '@tgim/ui/Button';
 import FileDetailSidebar from './FileDetailSidebar';
 import { ImageItem } from '@tgim/types/grid';
 
+type NormalizedCropRect = {
+  startX: number;
+  startY: number;
+  width: number;
+  height: number;
+};
+
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+
+const toNormalizedCropRect = (crop?: NodeCrop | null): NormalizedCropRect | null => {
+  if (!crop) return null;
+
+  const normalizedFromPayload = (crop as unknown as { normalizedRect?: NormalizedCropRect }).normalizedRect;
+  if (normalizedFromPayload) {
+    const { startX, startY, width, height } = normalizedFromPayload;
+    if ([startX, startY, width, height].every(isFiniteNumber)) {
+      const startXClamped = clamp01(startX);
+      const startYClamped = clamp01(startY);
+      const endXClamped = clamp01(startX + width);
+      const endYClamped = clamp01(startY + height);
+      const normalizedWidth = endXClamped - startXClamped;
+      const normalizedHeight = endYClamped - startYClamped;
+      if (normalizedWidth > 0 && normalizedHeight > 0) {
+        return {
+          startX: startXClamped,
+          startY: startYClamped,
+          width: normalizedWidth,
+          height: normalizedHeight,
+        };
+      }
+    }
+  }
+
+  const values = [crop.startX, crop.startY, crop.width, crop.height];
+  if (!values.every(isFiniteNumber)) {
+    return null;
+  }
+
+  let startX = crop.startX;
+  let startY = crop.startY;
+  let width = crop.width;
+  let height = crop.height;
+
+  if (!crop.isRelative) {
+    const referenceWidth = crop.referenceWidth ?? null;
+    const referenceHeight = crop.referenceHeight ?? null;
+    if (
+      isFiniteNumber(referenceWidth) &&
+      referenceWidth > 0 &&
+      isFiniteNumber(referenceHeight) &&
+      referenceHeight > 0
+    ) {
+      startX = startX / referenceWidth;
+      startY = startY / referenceHeight;
+      width = width / referenceWidth;
+      height = height / referenceHeight;
+    } else {
+      const alreadyNormalized = values.every(value => value >= 0 && value <= 1);
+      if (!alreadyNormalized) {
+        return null;
+      }
+    }
+  }
+
+  const startXClamped = clamp01(startX);
+  const startYClamped = clamp01(startY);
+  const endXClamped = clamp01(startX + width);
+  const endYClamped = clamp01(startY + height);
+  const normalizedWidth = endXClamped - startXClamped;
+  const normalizedHeight = endYClamped - startYClamped;
+
+  if (normalizedWidth <= 0 || normalizedHeight <= 0) {
+    return null;
+  }
+
+  return {
+    startX: startXClamped,
+    startY: startYClamped,
+    width: normalizedWidth,
+    height: normalizedHeight,
+  };
+};
+
 interface FileViewerProps {
   file: NodeFile;
   moaId: string | null;
   className?: string;
+  crop?: NodeCrop | null;
 }
 
-const FileViewer: React.FC<FileViewerProps> = ({ file, moaId, className }) => {
+const FileViewer: React.FC<FileViewerProps> = ({ file, moaId, className, crop }) => {
   const [viewerSidebarVisible, setViewerSidebarVisible] = useState(false);
 
   const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -24,6 +111,12 @@ const FileViewer: React.FC<FileViewerProps> = ({ file, moaId, className }) => {
     file.kind === FileType.Image ? 'loading' : 'idle',
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const imageWrapperRef = useRef<HTMLDivElement | null>(null);
+  const imageElementRef = useRef<HTMLImageElement | null>(null);
+  const [imageMetrics, setImageMetrics] = useState<
+    { width: number; height: number; offsetX: number; offsetY: number } | null
+  >(null);
+  const normalizedCropRect = useMemo(() => toNormalizedCropRect(crop), [crop]);
 
   useEffect(() => {
     if (file.kind !== FileType.Image) {
@@ -62,6 +155,71 @@ const FileViewer: React.FC<FileViewerProps> = ({ file, moaId, className }) => {
       isCancelled = true;
     };
   }, [file.kind, file.xxh364, moaId]);
+
+  useEffect(() => {
+    if (status !== 'ready') {
+      setImageMetrics(null);
+    }
+  }, [status]);
+
+  useEffect(() => {
+    if (!normalizedCropRect) {
+      setImageMetrics(null);
+      return;
+    }
+
+    const updateMetrics = () => {
+      const wrapper = imageWrapperRef.current;
+      const img = imageElementRef.current;
+      if (!wrapper || !img) return;
+      const naturalWidth = img.naturalWidth;
+      const naturalHeight = img.naturalHeight;
+      if (!(naturalWidth > 0 && naturalHeight > 0)) return;
+
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const wrapperWidth = wrapperRect.width;
+      const wrapperHeight = wrapperRect.height;
+      if (!(wrapperWidth > 0 && wrapperHeight > 0)) return;
+
+      const imageAspect = naturalWidth / naturalHeight;
+      const wrapperAspect = wrapperWidth / wrapperHeight;
+      let displayWidth = wrapperWidth;
+      let displayHeight = wrapperHeight;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if (imageAspect > wrapperAspect) {
+        displayWidth = wrapperWidth;
+        displayHeight = wrapperWidth / Math.max(imageAspect, 1e-6);
+        offsetY = (wrapperHeight - displayHeight) / 2;
+      } else {
+        displayHeight = wrapperHeight;
+        displayWidth = wrapperHeight * imageAspect;
+        offsetX = (wrapperWidth - displayWidth) / 2;
+      }
+
+      setImageMetrics({ width: displayWidth, height: displayHeight, offsetX, offsetY });
+    };
+
+    const resizeObserver = new ResizeObserver(() => updateMetrics());
+    if (imageWrapperRef.current) {
+      resizeObserver.observe(imageWrapperRef.current);
+    }
+
+    const img = imageElementRef.current;
+    if (img) {
+      img.addEventListener('load', updateMetrics);
+    }
+
+    updateMetrics();
+
+    return () => {
+      resizeObserver.disconnect();
+      if (img) {
+        img.removeEventListener('load', updateMetrics);
+      }
+    };
+  }, [imageSrc, normalizedCropRect]);
 
   const fileDescription = useMemo(() => {
     switch (file.kind) {
@@ -142,13 +300,34 @@ const FileViewer: React.FC<FileViewerProps> = ({ file, moaId, className }) => {
                 {/* Content area (scrolling) */}
                 <div className="flex-1 min-h-0">
                   {file?.kind === FileType.Image ? (
-                    <div className="flex h-full items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-muted">
+                    <div
+                      ref={imageWrapperRef}
+                      className="relative flex h-full items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-muted"
+                    >
                       {status === 'ready' && imageSrc ? (
-                        <img
-                          src={imageSrc}
-                          alt={file?.fileName ?? 'image'}
-                          className="h-full w-full max-h-full max-w-full object-contain"
-                        />
+                        <>
+                          <img
+                            ref={imageElementRef}
+                            src={imageSrc}
+                            alt={file?.fileName ?? 'image'}
+                            className="h-full w-full max-h-full max-w-full object-contain"
+                          />
+                          {normalizedCropRect && imageMetrics ? (
+                            <div
+                              className="pointer-events-none absolute rounded-md border-2 border-primary/80 bg-primary/15 shadow-[0_0_0_1px_rgba(15,23,42,0.15)]"
+                              style={{
+                                left:
+                                  imageMetrics.offsetX +
+                                  normalizedCropRect.startX * imageMetrics.width,
+                                top:
+                                  imageMetrics.offsetY +
+                                  normalizedCropRect.startY * imageMetrics.height,
+                                width: normalizedCropRect.width * imageMetrics.width,
+                                height: normalizedCropRect.height * imageMetrics.height,
+                              }}
+                            />
+                          ) : null}
+                        </>
                       ) : status === 'loading' ? (
                         <p className="text-sm text-muted-foreground">이미지를 불러오는 중...</p>
                       ) : (
