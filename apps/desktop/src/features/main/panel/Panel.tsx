@@ -74,15 +74,65 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       nodesMap[node.id] = node;
     });
     const connectionsMap: Record<string, Connection[]> = {};
+    const incomingConnectionsMap: Record<string, Connection[]> = {};
     graphData.connections.forEach(connection => {
       if (!connectionsMap[connection.srcNodeId]) {
         connectionsMap[connection.srcNodeId] = [];
       }
       connectionsMap[connection.srcNodeId].push(connection);
+
+      if (!incomingConnectionsMap[connection.dstNodeId]) {
+        incomingConnectionsMap[connection.dstNodeId] = [];
+      }
+      incomingConnectionsMap[connection.dstNodeId].push(connection);
     });
 
     const nodes: GraphNode[] = [];
     const links: GraphConnection[] = [];
+
+    const clamp01 = (value: number) => {
+      if (!Number.isFinite(value)) return 0;
+      return Math.min(1, Math.max(0, value));
+    };
+
+    const toNormalizedCropRect = (crop: NodeCrop) => {
+      let startX = crop.startX;
+      let startY = crop.startY;
+      let width = crop.width;
+      let height = crop.height;
+
+      if (!crop.isRelative) {
+        const referenceWidth = crop.referenceWidth ?? null;
+        const referenceHeight = crop.referenceHeight ?? null;
+
+        if (!referenceWidth || !referenceHeight || referenceWidth <= 0 || referenceHeight <= 0) {
+          return null;
+        }
+
+        startX = startX / referenceWidth;
+        startY = startY / referenceHeight;
+        width = width / referenceWidth;
+        height = height / referenceHeight;
+      }
+
+      const startXClamped = clamp01(startX);
+      const startYClamped = clamp01(startY);
+      const endXClamped = clamp01(startX + width);
+      const endYClamped = clamp01(startY + height);
+      const normalizedWidth = endXClamped - startXClamped;
+      const normalizedHeight = endYClamped - startYClamped;
+
+      if (normalizedWidth <= 0 || normalizedHeight <= 0) {
+        return null;
+      }
+
+      return {
+        startX: startXClamped,
+        startY: startYClamped,
+        width: normalizedWidth,
+        height: normalizedHeight,
+      };
+    };
 
     const getGraphNodeData = (node: Node, graphNodeId?: string): GraphNode => {
       const defaultSize = 14;
@@ -109,6 +159,28 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         };
       } else if (node.kind === NodeKind.Crop && node.data['Crop']) {
         const crop = node.data['Crop'] as NodeCrop;
+        const outgoingConnections = connectionsMap[node.id] ?? [];
+        const incomingConnections = incomingConnectionsMap[node.id] ?? [];
+
+        const originConnection =
+          outgoingConnections.find(connection => connection.kind === RelationType.CroppedOrigin) ??
+          incomingConnections.find(connection => connection.kind === RelationType.Cropped);
+
+        let originHash: string | undefined;
+        if (originConnection) {
+          const originNodeId =
+            originConnection.kind === RelationType.CroppedOrigin
+              ? originConnection.dstNodeId
+              : originConnection.srcNodeId;
+          const originNode = nodesMap[originNodeId];
+          const originFile = originNode?.data?.['File'];
+          if (originFile?.xxh364) {
+            originHash = originFile.xxh364;
+          }
+        }
+
+        const normalizedCropRect = toNormalizedCropRect(crop);
+
         return {
           id: graphNodeId,
           nodeId: node.id,
@@ -116,6 +188,8 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
           size: nodeSize,
           type: 'crop',
           crop,
+          originHash: originHash ?? crop.originHash,
+          cropRect: normalizedCropRect ?? undefined,
         };
       } else if (node.kind == NodeKind.Folder && node.data['Folder']) {
         let data = node.data['Folder'];

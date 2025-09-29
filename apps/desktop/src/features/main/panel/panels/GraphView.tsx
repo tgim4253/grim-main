@@ -9,7 +9,7 @@ import useThumbStore from '@tgim/stores/thumbStore';
 import { useMoa } from '@tgim/hooks/useMoa';
 import { ResizeMode } from '@tgim/types/file';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { useThumbnails } from '../../../../hooks';
+import { ThumbnailRequest, useThumbnails } from '../../../../hooks';
 import { useTheme } from '../../../../theme/ThemeProvider';
 
 interface Props {
@@ -88,7 +88,16 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
   };
   const [prunedTree, setPrunedTree] = useState(getPrunedTree());
   const imageNodes = useMemo(
-    () => prunedTree.nodes.filter(node => node.type === 'image' && node.hash),
+    () =>
+      prunedTree.nodes.filter(node => {
+        if (node.type === 'image') {
+          return typeof node.hash === 'string' && node.hash.length > 0;
+        }
+        if (node.type === 'crop') {
+          return typeof node.originHash === 'string' && node.originHash.length > 0;
+        }
+        return false;
+      }),
     [prunedTree.nodes],
   );
   const imageNodesRef = useRef<GraphNode[]>([]);
@@ -99,37 +108,40 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
   useEffect(() => {
     if (imageNodes.length === 0) return;
 
-    const requests = imageNodes
-      .filter(
-        (node): node is GraphNode & { hash: string } =>
-          typeof node.hash === 'string' && node.hash.length > 0,
-      )
-      .map(node => {
-        const request = {
-          hash: node.hash,
-          width: GRAPH_THUMB_SIZE,
-          height: GRAPH_THUMB_SIZE,
-          dpr: 1 as const,
-          mode: ResizeMode.Original,
-        };
-        const key = getThumbnailKey(request);
-        if (node.thumbKey !== key) {
-          node.thumbKey = key;
-          node.url = undefined;
-        }
+    const requests = imageNodes.reduce<ThumbnailRequest[]>((acc, node) => {
+      const hash =
+        node.type === 'crop'
+          ? (typeof node.originHash === 'string' ? node.originHash : undefined)
+          : (typeof node.hash === 'string' ? node.hash : undefined);
+      if (!hash) return acc;
 
-        const url = getThumbnailUrl(request).url;
-        if (url !== undefined) {
-          node.url = convertFileSrc(url);
-          node.key = getThumbnailKey(request);
-        }
-        return { ...request, key };
-      });
+      const request: ThumbnailRequest = {
+        hash,
+        width: GRAPH_THUMB_SIZE,
+        height: GRAPH_THUMB_SIZE,
+        dpr: 1 as const,
+        mode: ResizeMode.Original,
+      };
+      const key = getThumbnailKey(request);
+      if (node.thumbKey !== key) {
+        node.thumbKey = key;
+        node.url = undefined;
+      }
+
+      const { url } = getThumbnailUrl(request);
+      if (url !== undefined) {
+        node.url = convertFileSrc(url);
+        node.key = key;
+      }
+
+      acc.push({ ...request, key });
+      return acc;
+    }, []);
 
     if (requests.length === 0) return;
 
     void ensureThumbnails(requests);
-  }, [ensureThumbnails, getThumbnailKey, imageNodes]);
+  }, [ensureThumbnails, getThumbnailKey, getThumbnailUrl, imageNodes]);
 
   useEffect(() => {
     const unsubscribe = useThumbStore.subscribe(
@@ -239,6 +251,7 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
               label: node.label,
               url: node.url,
               thumbKey: node.thumbKey,
+              cropRect: node.cropRect,
             },
             globalScale,
           );
