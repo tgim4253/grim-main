@@ -108,7 +108,6 @@ pub async fn create_image_crop(
         tx.as_mut(),
         NewImageCrop {
             node_id: &crop_node_id,
-            origin_file_id: &origin_file.file_id,
             origin_hash: &origin_file.xxh3_64,
             start_x: rect.start_x,
             start_y: rect.start_y,

@@ -19,7 +19,6 @@ PRAGMA foreign_keys=ON;
 
 CREATE TABLE IF NOT EXISTS node_crop (
   node_id                 TEXT PRIMARY KEY NOT NULL REFERENCES node(id) ON DELETE CASCADE,
-  origin_file_content_id  TEXT NOT NULL REFERENCES file_content(id) ON DELETE CASCADE,
   origin_hash             TEXT NOT NULL,
   start_x                 REAL NOT NULL,
   start_y                 REAL NOT NULL,
@@ -31,7 +30,5 @@ CREATE TABLE IF NOT EXISTS node_crop (
   created_at              TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at              TEXT NOT NULL DEFAULT (datetime('now'))
 );
-
-CREATE INDEX IF NOT EXISTS idx_node_crop_origin ON node_crop(origin_file_content_id);
 
 PRAGMA user_version = 2;

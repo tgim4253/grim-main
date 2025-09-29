@@ -9,7 +9,6 @@ pub struct CropRepository;
 /// Parameters required to persist a new crop row.
 pub struct NewImageCrop<'a> {
     pub node_id: &'a str,
-    pub origin_file_id: &'a str,
     pub origin_hash: &'a str,
     pub start_x: f64,
     pub start_y: f64,
@@ -34,7 +33,6 @@ impl CropRepository {
             r#"
             INSERT INTO node_crop (
                 node_id,
-                origin_file_content_id,
                 origin_hash,
                 start_x,
                 start_y,
@@ -46,10 +44,9 @@ impl CropRepository {
                 created_at,
                 updated_at
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)
             "#,
             params.node_id,
-            params.origin_file_id,
             params.origin_hash,
             params.start_x,
             params.start_y,
@@ -76,7 +73,6 @@ impl CropRepository {
     {
         struct ImageCropRow {
             node_id: String,
-            origin_file_content_id: String,
             origin_hash: String,
             start_x: f64,
             start_y: f64,
@@ -94,7 +90,6 @@ impl CropRepository {
             r#"
             SELECT
                 node_id               AS "node_id!",
-                origin_file_content_id AS "origin_file_content_id!",
                 origin_hash           AS "origin_hash!",
                 start_x               AS "start_x!",
                 start_y               AS "start_y!",
@@ -115,7 +110,6 @@ impl CropRepository {
 
         Ok(row.map(|row| ImageCrop {
             node_id: row.node_id,
-            origin_file_id: row.origin_file_content_id,
             origin_hash: row.origin_hash,
             start_x: row.start_x,
             start_y: row.start_y,

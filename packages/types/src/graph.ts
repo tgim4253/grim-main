@@ -96,7 +96,6 @@ export interface NodeFile {
 
 export interface NodeCrop {
   nodeId: string;
-  originFileId: string;
   originHash: string;
   startX: number;
   startY: number;

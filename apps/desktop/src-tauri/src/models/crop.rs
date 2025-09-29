@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct ImageCrop {
     pub node_id: String,
-    pub origin_file_id: String,
     pub origin_hash: String,
     pub start_x: f64,
     pub start_y: f64,
