@@ -142,6 +142,13 @@ export const getGraphPalette = () => graphPalette;
 // Types for rendering
 // =========================
 
+type NormalizedCropRect = {
+  startX: number;
+  startY: number;
+  width: number;
+  height: number;
+};
+
 type NodeProp = {
   [key: string]: any; // extensible payload
   x: number;
@@ -152,6 +159,7 @@ type NodeProp = {
   size: number; // logical diameter
   label: string;
   icon?: 'circle' | 'tag' | 'folder' | 'image';
+  cropRect?: NormalizedCropRect;
 };
 
 export type NodeRenderer = (
@@ -175,6 +183,8 @@ const withCtx = (ctx: CanvasRenderingContext2D, draw: () => void) => {
 
 /** Keep stroke width roughly constant regardless of zoom */
 const constPx = (v: number, globalScale: number) => Math.max(1, v / Math.max(0.001, globalScale));
+
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
 /** Rounded-rect path helper */
 function roundRect(
@@ -735,62 +745,131 @@ const imageRenderer: NodeRenderer = (ctx, node, globalScale) => {
   ctx.drawImage(backplate, node.x - side / 2, node.y - side / 2, side, side);
 
   const src = resolveImageSrc(node);
-  let tile: HTMLCanvasElement | undefined;
-  if (src) tile = getMaskedImageTile(src, contentSize, contentSize, clipRadius, scaleB);
+  const cropRect = node.cropRect as NormalizedCropRect | undefined;
+  const hasCropRect =
+    cropRect &&
+    Number.isFinite(cropRect.startX) &&
+    Number.isFinite(cropRect.startY) &&
+    Number.isFinite(cropRect.width) &&
+    Number.isFinite(cropRect.height);
 
-  withCtx(ctx, () => {
-    ctx.imageSmoothingEnabled = true;
-    // @ts-ignore
-    ctx.imageSmoothingQuality = 'high';
+  let cropImage: HTMLImageElement | undefined;
+  let cropSource:
+    | { sx: number; sy: number; sw: number; sh: number }
+    | undefined;
 
-    if (tile) {
-      ctx.drawImage(
-        tile,
-        node.x - contentSize / 2,
-        node.y - contentSize / 2,
-        contentSize,
-        contentSize,
-      );
-    } else {
-      const phKey = `imgph|${side}|${radius}|${padding}|${clipRadius}|${scaleB}`;
-      const placeholder = getOrCreateSprite(
-        phKey,
-        side,
-        side,
-        g => {
-          roundRect(g, padding, padding, contentSize, contentSize, clipRadius);
-          g.strokeStyle = palette.placeholderStroke;
-          g.lineWidth = Math.max(1, 1.5 / Math.max(0.001, scaleB));
-          g.stroke();
+  if (src && hasCropRect) {
+    const rect = cropRect as NormalizedCropRect;
+    const candidate = getOrCreateImage(src);
+    if (candidate.complete && candidate.naturalWidth > 0 && candidate.naturalHeight > 0) {
+      const iw = candidate.naturalWidth;
+      const ih = candidate.naturalHeight;
+      const startXNorm = clamp01(rect.startX);
+      const startYNorm = clamp01(rect.startY);
+      const endXNorm = clamp01(rect.startX + rect.width);
+      const endYNorm = clamp01(rect.startY + rect.height);
+      const widthNorm = Math.max(0, endXNorm - startXNorm);
+      const heightNorm = Math.max(0, endYNorm - startYNorm);
 
-          g.beginPath();
-          g.arc(
-            padding + contentSize * 0.28,
-            padding + contentSize * 0.32,
-            contentSize * 0.12,
-            0,
-            Math.PI * 2,
-          );
-          g.fillStyle = palette.placeholderAccent;
-          g.fill();
+      const sxPx = startXNorm * iw;
+      const syPx = startYNorm * ih;
+      const exPx = Math.min(iw, sxPx + widthNorm * iw);
+      const eyPx = Math.min(ih, syPx + heightNorm * ih);
+      const sw = Math.max(1, exPx - sxPx);
+      const sh = Math.max(1, eyPx - syPx);
 
-          g.beginPath();
-          const baseY = padding + contentSize * 0.78;
-          g.moveTo(padding + contentSize * 0.08, baseY);
-          g.lineTo(padding + contentSize * 0.35, padding + contentSize * 0.48);
-          g.lineTo(padding + contentSize * 0.55, baseY);
-          g.lineTo(padding + contentSize * 0.48, baseY);
-          g.lineTo(padding + contentSize * 0.72, padding + contentSize * 0.58);
-          g.lineTo(padding + contentSize * 0.92, baseY);
-          g.closePath();
-          g.fillStyle = palette.placeholderFill;
-          g.fill();
-        },
-        scaleB,
-      );
-      ctx.drawImage(placeholder, node.x - side / 2, node.y - side / 2, side, side);
+      if (sw > 0 && sh > 0) {
+        cropImage = candidate;
+        cropSource = { sx: sxPx, sy: syPx, sw, sh };
+      }
     }
-  });
+  }
+
+  let tile: HTMLCanvasElement | undefined;
+  if (src && (!cropImage || !cropSource)) {
+    tile = getMaskedImageTile(src, contentSize, contentSize, clipRadius, scaleB);
+  }
+
+  const drawX = node.x - contentSize / 2;
+  const drawY = node.y - contentSize / 2;
+
+  const drawWithMask = (render: () => void) => {
+    withCtx(ctx, () => {
+      ctx.imageSmoothingEnabled = true;
+      // @ts-ignore
+      ctx.imageSmoothingQuality = 'high';
+      roundRect(ctx, drawX, drawY, contentSize, contentSize, clipRadius);
+      ctx.clip();
+      render();
+    });
+  };
+
+  if (cropImage && cropSource && cropSource.sw > 0 && cropSource.sh > 0) {
+    const { sx, sy, sw, sh } = cropSource;
+    const sourceImage = cropImage;
+    const cropAspect = sw / sh;
+    if (cropAspect > 0 && isFinite(cropAspect)) {
+      let drawWidth = contentSize;
+      let drawHeight = drawWidth / cropAspect;
+      if (drawHeight > contentSize) {
+        drawHeight = contentSize;
+        drawWidth = drawHeight * cropAspect;
+      }
+      const dx = drawX + (contentSize - drawWidth) / 2;
+      const dy = drawY + (contentSize - drawHeight) / 2;
+
+      drawWithMask(() => {
+        ctx.drawImage(sourceImage, sx, sy, sw, sh, dx, dy, drawWidth, drawHeight);
+      });
+      return;
+    }
+  }
+
+  if (tile) {
+    const tileCanvas = tile;
+    drawWithMask(() => {
+      ctx.drawImage(tileCanvas, drawX, drawY, contentSize, contentSize);
+    });
+    return;
+  }
+
+  const phKey = `imgph|${side}|${radius}|${padding}|${clipRadius}|${scaleB}`;
+  const placeholder = getOrCreateSprite(
+    phKey,
+    side,
+    side,
+    g => {
+      roundRect(g, padding, padding, contentSize, contentSize, clipRadius);
+      g.strokeStyle = palette.placeholderStroke;
+      g.lineWidth = Math.max(1, 1.5 / Math.max(0.001, scaleB));
+      g.stroke();
+
+      g.beginPath();
+      g.arc(
+        padding + contentSize * 0.28,
+        padding + contentSize * 0.32,
+        contentSize * 0.12,
+        0,
+        Math.PI * 2,
+      );
+      g.fillStyle = palette.placeholderAccent;
+      g.fill();
+
+      g.beginPath();
+      const baseY = padding + contentSize * 0.78;
+      g.moveTo(padding + contentSize * 0.08, baseY);
+      g.lineTo(padding + contentSize * 0.35, padding + contentSize * 0.48);
+      g.lineTo(padding + contentSize * 0.55, baseY);
+      g.lineTo(padding + contentSize * 0.48, baseY);
+      g.lineTo(padding + contentSize * 0.72, padding + contentSize * 0.58);
+      g.lineTo(padding + contentSize * 0.92, baseY);
+      g.closePath();
+      g.fillStyle = palette.placeholderFill;
+      g.fill();
+    },
+    scaleB,
+  );
+  ctx.drawImage(placeholder, node.x - side / 2, node.y - side / 2, side, side);
 
   // drawLabelCached(ctx, node, globalScale); // enable if you want labels under images
 };
@@ -807,6 +886,7 @@ export default (key: GraphNodeType): NodeRenderer => {
     tag: tagRenderer as NodeRenderer,
     folder: folderRenderer as NodeRenderer,
     image: imageRenderer as NodeRenderer,
+    crop: imageRenderer as NodeRenderer,
     document: documentRenderer as NodeRenderer,
   };
   return (map as NodeRendererType)[key];

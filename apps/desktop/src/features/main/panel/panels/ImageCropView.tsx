@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import {
-  PointerSelectionMode,
-  PointerSelectionRect,
-  usePointerSelection,
-} from '@tgim/hooks';
+import { PointerSelectionMode, PointerSelectionRect, usePointerSelection } from '@tgim/hooks';
 import { NodeCrop, NodeFile } from '@tgim/types/graph';
 import { FileDetail } from '@tgim/types/file';
 import { ipc } from '../../../../lib/ipc';
@@ -89,11 +85,7 @@ const computeSelectionData = (
 const approx = (value: number, expected: number, tolerance = FULL_IMAGE_TOLERANCE) =>
   Math.abs(value - expected) <= tolerance;
 
-const resolveCropRect = (
-  crop: NodeCrop,
-  sourceWidth: number,
-  sourceHeight: number,
-) => {
+const resolveCropRect = (crop: NodeCrop, sourceWidth: number, sourceHeight: number) => {
   if (sourceWidth <= 0 || sourceHeight <= 0) return null;
 
   const referenceWidth = crop.referenceWidth ?? sourceWidth;
@@ -133,9 +125,7 @@ const ImageCropView: React.FC<ImageCropViewProps> = ({ file, moaId, crops, onRef
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [mode, setMode] = useState<PointerSelectionMode>('freeform');
   const [imageSrc, setImageSrc] = useState<string | null>(null);
-  const [imageStatus, setImageStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>(
-    'loading',
-  );
+  const [imageStatus, setImageStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('loading');
   const [detail, setDetail] = useState<FileDetail | null>(null);
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
   const [activeCrop, setActiveCrop] = useState<CropEntry | null>(null);
@@ -203,7 +193,10 @@ const ImageCropView: React.FC<ImageCropViewProps> = ({ file, moaId, crops, onRef
 
   const handleImageLoad = useCallback(() => {
     if (!imageRef.current) return;
-    setNaturalSize({ width: imageRef.current.naturalWidth, height: imageRef.current.naturalHeight });
+    setNaturalSize({
+      width: imageRef.current.naturalWidth,
+      height: imageRef.current.naturalHeight,
+    });
     setImageStatus('ready');
   }, []);
 
@@ -254,12 +247,25 @@ const ImageCropView: React.FC<ImageCropViewProps> = ({ file, moaId, crops, onRef
   );
 
   const displaySelection = useMemo(() => {
-    if (!selection || !imageRef.current) return null;
+    if (!selection || !imageRef.current || !interactionSurfaceRef.current) return null;
     if (sourceWidth == null || sourceHeight == null) return null;
-    const bounds = imageRef.current.getBoundingClientRect();
-    const data = computeSelectionData(selection, bounds, sourceWidth, sourceHeight);
-    return data?.display ?? null;
-  }, [selection, sourceHeight, sourceWidth]);
+
+    const imageRect = imageRef.current.getBoundingClientRect();
+    const surfaceRect = interactionSurfaceRef.current.getBoundingClientRect();
+
+    const data = computeSelectionData(selection, imageRect, sourceWidth, sourceHeight);
+    if (!data) return null;
+
+    const offsetLeft = imageRect.left - surfaceRect.left;
+    const offsetTop = imageRect.top - surfaceRect.top;
+
+    return {
+      x: data.display.x + offsetLeft,
+      y: data.display.y + offsetTop,
+      width: data.display.width,
+      height: data.display.height,
+    };
+  }, [selection, sourceWidth, sourceHeight]);
 
   useEffect(() => {
     if (!completedSelection || !imageRef.current) return;
@@ -409,7 +415,9 @@ const ImageCropView: React.FC<ImageCropViewProps> = ({ file, moaId, crops, onRef
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex flex-col">
                     <h2 className="text-lg font-semibold">{file.fileName}</h2>
-                    <p className="text-sm text-muted-foreground">드래그하여 새로운 크롭을 생성하세요.</p>
+                    <p className="text-sm text-muted-foreground">
+                      드래그하여 새로운 크롭을 생성하세요.
+                    </p>
                   </div>
                   <Button
                     type="button"
@@ -526,7 +534,8 @@ const ImageCropView: React.FC<ImageCropViewProps> = ({ file, moaId, crops, onRef
                   </div>
                 </div>
                 <div className="rounded-lg border border-border bg-background p-3 text-sm text-muted-foreground">
-                  이미지 위를 드래그하여 영역을 선택하면 새로운 크롭이 생성됩니다. 전체 이미지를 선택하는 것은 허용되지 않습니다.
+                  이미지 위를 드래그하여 영역을 선택하면 새로운 크롭이 생성됩니다. 전체 이미지를
+                  선택하는 것은 허용되지 않습니다.
                 </div>
               </div>
             </SplitPanel>
@@ -541,7 +550,9 @@ const ImageCropView: React.FC<ImageCropViewProps> = ({ file, moaId, crops, onRef
             {(() => {
               const rect = resolveCropRect(activeCrop.crop, sourceWidth, sourceHeight);
               if (!rect) {
-                return <p className="text-sm text-muted-foreground">크롭 정보를 불러올 수 없습니다.</p>;
+                return (
+                  <p className="text-sm text-muted-foreground">크롭 정보를 불러올 수 없습니다.</p>
+                );
               }
               const scale = Math.min(600 / Math.max(rect.width, rect.height), 1);
               const displayWidth = Math.max(rect.width * scale, 1);

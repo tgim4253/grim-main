@@ -1,5 +1,11 @@
 import usePanelsStore from '@tgim/stores/panelStore';
-import { Connection, GraphConnection, GraphData, GraphNode } from '@tgim/types/graph';
+import {
+  Connection,
+  GraphConnection,
+  GraphData,
+  GraphNode,
+  NodeCrop,
+} from '@tgim/types/graph';
 import { NodeRenderer, clearNodeSpriteCaches, getGraphPalette } from '@tgim/ui/index';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d';
@@ -9,7 +15,7 @@ import useThumbStore from '@tgim/stores/thumbStore';
 import { useMoa } from '@tgim/hooks/useMoa';
 import { ResizeMode } from '@tgim/types/file';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { useThumbnails } from '../../../../hooks';
+import { ThumbnailRequest, useThumbnails } from '../../../../hooks';
 import { useTheme } from '../../../../theme/ThemeProvider';
 
 interface Props {
@@ -19,6 +25,95 @@ interface Props {
 }
 
 const GRAPH_THUMB_SIZE = 64;
+
+type NormalizedCropRect = {
+  startX: number;
+  startY: number;
+  width: number;
+  height: number;
+};
+
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+
+const toNormalizedCropRect = (
+  crop: NodeCrop | undefined,
+  fallback?: NormalizedCropRect,
+): NormalizedCropRect | undefined => {
+  if (!crop) return fallback;
+
+  const normalizedFromPayload = (crop as unknown as { normalizedRect?: NormalizedCropRect }).normalizedRect;
+  if (normalizedFromPayload) {
+    const { startX, startY, width, height } = normalizedFromPayload;
+    if ([startX, startY, width, height].every(isFiniteNumber)) {
+      const startXClamped = clamp01(startX);
+      const startYClamped = clamp01(startY);
+      const endXClamped = clamp01(startX + width);
+      const endYClamped = clamp01(startY + height);
+      const normalizedWidth = endXClamped - startXClamped;
+      const normalizedHeight = endYClamped - startYClamped;
+      if (normalizedWidth > 0 && normalizedHeight > 0) {
+        return {
+          startX: startXClamped,
+          startY: startYClamped,
+          width: normalizedWidth,
+          height: normalizedHeight,
+        };
+      }
+    }
+  }
+
+  const values = [crop.startX, crop.startY, crop.width, crop.height];
+  if (!values.every(isFiniteNumber)) {
+    return fallback;
+  }
+
+  let startX = crop.startX;
+  let startY = crop.startY;
+  let width = crop.width;
+  let height = crop.height;
+
+  if (!crop.isRelative) {
+    const referenceWidth = crop.referenceWidth ?? null;
+    const referenceHeight = crop.referenceHeight ?? null;
+    if (
+      isFiniteNumber(referenceWidth) &&
+      referenceWidth > 0 &&
+      isFiniteNumber(referenceHeight) &&
+      referenceHeight > 0
+    ) {
+      startX = startX / referenceWidth;
+      startY = startY / referenceHeight;
+      width = width / referenceWidth;
+      height = height / referenceHeight;
+    } else {
+      const alreadyNormalized = values.every(value => value >= 0 && value <= 1);
+      if (!alreadyNormalized) {
+        return fallback;
+      }
+    }
+  }
+
+  const startXClamped = clamp01(startX);
+  const startYClamped = clamp01(startY);
+  const endXClamped = clamp01(startX + width);
+  const endYClamped = clamp01(startY + height);
+  const normalizedWidth = endXClamped - startXClamped;
+  const normalizedHeight = endYClamped - startYClamped;
+
+  if (normalizedWidth <= 0 || normalizedHeight <= 0) {
+    return fallback;
+  }
+
+  return {
+    startX: startXClamped,
+    startY: startYClamped,
+    width: normalizedWidth,
+    height: normalizedHeight,
+  };
+};
 
 const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -88,7 +183,16 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
   };
   const [prunedTree, setPrunedTree] = useState(getPrunedTree());
   const imageNodes = useMemo(
-    () => prunedTree.nodes.filter(node => node.type === 'image' && node.hash),
+    () =>
+      prunedTree.nodes.filter(node => {
+        if (node.type === 'image') {
+          return typeof node.hash === 'string' && node.hash.length > 0;
+        }
+        if (node.type === 'crop') {
+          return typeof node.originHash === 'string' && node.originHash.length > 0;
+        }
+        return false;
+      }),
     [prunedTree.nodes],
   );
   const imageNodesRef = useRef<GraphNode[]>([]);
@@ -99,37 +203,40 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
   useEffect(() => {
     if (imageNodes.length === 0) return;
 
-    const requests = imageNodes
-      .filter(
-        (node): node is GraphNode & { hash: string } =>
-          typeof node.hash === 'string' && node.hash.length > 0,
-      )
-      .map(node => {
-        const request = {
-          hash: node.hash,
-          width: GRAPH_THUMB_SIZE,
-          height: GRAPH_THUMB_SIZE,
-          dpr: 1 as const,
-          mode: ResizeMode.Original,
-        };
-        const key = getThumbnailKey(request);
-        if (node.thumbKey !== key) {
-          node.thumbKey = key;
-          node.url = undefined;
-        }
+    const requests = imageNodes.reduce<ThumbnailRequest[]>((acc, node) => {
+      const hash =
+        node.type === 'crop'
+          ? (typeof node.originHash === 'string' ? node.originHash : undefined)
+          : (typeof node.hash === 'string' ? node.hash : undefined);
+      if (!hash) return acc;
 
-        const url = getThumbnailUrl(request).url;
-        if (url !== undefined) {
-          node.url = convertFileSrc(url);
-          node.key = getThumbnailKey(request);
-        }
-        return { ...request, key };
-      });
+      const request: ThumbnailRequest = {
+        hash,
+        width: GRAPH_THUMB_SIZE,
+        height: GRAPH_THUMB_SIZE,
+        dpr: 1 as const,
+        mode: ResizeMode.Original,
+      };
+      const key = getThumbnailKey(request);
+      if (node.thumbKey !== key) {
+        node.thumbKey = key;
+        node.url = undefined;
+      }
+
+      const { url } = getThumbnailUrl(request);
+      if (url !== undefined) {
+        node.url = convertFileSrc(url);
+        node.key = key;
+      }
+
+      acc.push({ ...request, key });
+      return acc;
+    }, []);
 
     if (requests.length === 0) return;
 
     void ensureThumbnails(requests);
-  }, [ensureThumbnails, getThumbnailKey, imageNodes]);
+  }, [ensureThumbnails, getThumbnailKey, getThumbnailUrl, imageNodes]);
 
   useEffect(() => {
     const unsubscribe = useThumbStore.subscribe(
@@ -230,6 +337,13 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
         linkWidth={1.5}
         linkCurvature={0}
         nodeCanvasObject={(node, ctx, globalScale) => {
+          const normalizedCrop = toNormalizedCropRect(
+            node.type === 'crop' ? (node.crop as NodeCrop | undefined) : undefined,
+            node.cropRect as NormalizedCropRect | undefined,
+          );
+          if (normalizedCrop) {
+            node.cropRect = normalizedCrop;
+          }
           NodeRenderer(node.type)?.(
             ctx,
             {
@@ -239,6 +353,7 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
               label: node.label,
               url: node.url,
               thumbKey: node.thumbKey,
+              cropRect: normalizedCrop,
             },
             globalScale,
           );
