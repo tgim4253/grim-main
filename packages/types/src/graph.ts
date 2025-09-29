@@ -134,4 +134,5 @@ export interface CreateImageCropPayload {
   referenceWidth?: number | null;
   referenceHeight?: number | null;
   isRelative?: boolean;
+  normalizedRect?: CropRectangle;
 }
