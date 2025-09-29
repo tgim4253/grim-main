@@ -13,7 +13,9 @@ pub struct Connection {
 }
 
 /// Relationship type assigned to an edge.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default,
+)]
 #[sqlx(type_name = "TEXT")]
 #[sqlx(rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
@@ -22,6 +24,7 @@ pub enum RelationType {
     BelongToFolder,
     ParentFolder,
     ChildFolder,
+    #[default]
     RelativeImage,
     CroquisResLink,
     CroquisRefLink,

@@ -9,7 +9,7 @@ import {
   NodeKind,
   RelationType,
   FileType,
-} from '@tgim/types/graph';
+} from '@tgim/types/index';
 import { GraphAdjacencyEntry, GraphContext } from '@tgim/types/graph-panel';
 import { createNewId } from '@tgim/utils/identifier';
 import { GridData, ImageItem } from '@tgim/types/grid';
@@ -61,8 +61,18 @@ export function buildGraphData(graphData: GraphResponse): {
       kindRuleIds.add(connection.kindRuleId);
     }
 
-    registerAdjacency(connection.srcNodeId, connection.dstNodeId, connection.kind, connection.kindRuleId);
-    registerAdjacency(connection.dstNodeId, connection.srcNodeId, connection.kind, connection.kindRuleId);
+    registerAdjacency(
+      connection.srcNodeId,
+      connection.dstNodeId,
+      connection.kind,
+      connection.kindRuleId,
+    );
+    registerAdjacency(
+      connection.dstNodeId,
+      connection.srcNodeId,
+      connection.kind,
+      connection.kindRuleId,
+    );
   });
 
   graphData.nodes.forEach(node => {
