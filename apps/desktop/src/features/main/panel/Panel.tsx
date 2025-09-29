@@ -405,9 +405,24 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   }, [graphData, rootNodeId]);
 
   const rootFile = useMemo<NodeFile | null>(() => {
-    if (rootNode?.kind !== NodeKind.File) return null;
-    return rootNode.data?.['File'] ?? null;
-  }, [rootNode]);
+    if (!rootNode) return null;
+    if (rootNode.kind === NodeKind.File) {
+      return rootNode.data?.['File'] ?? null;
+    }
+    if (rootNode.kind === NodeKind.Crop) {
+      const crop = rootNode.data?.['Crop'];
+      if (!crop) return null;
+      const originHash = crop.originHash;
+      if (!originHash) return null;
+      const originNode = Object.values(rawNodesById).find(candidate => {
+        if (candidate.kind !== NodeKind.File) return false;
+        const file = candidate.data?.['File'];
+        return file?.xxh364 === originHash;
+      });
+      return originNode?.data?.['File'] ?? null;
+    }
+    return null;
+  }, [rawNodesById, rootNode]);
 
   const cropEntries = useMemo(() => {
     if (!graphData) return [] as { nodeId: string; crop: NodeCrop }[];
@@ -433,9 +448,6 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       return ['viewer', 'graph'];
     }
     if (rootNode?.kind === NodeKind.Crop) {
-      if (rootFile?.kind === FileType.Image) {
-        return ['viewer', 'crop', 'graph'];
-      }
       return ['viewer', 'graph'];
     }
     return ['graph'];
@@ -470,26 +482,6 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     previousCropRootIdRef.current = rootNode.id;
     setViewType('viewer');
   }, [availableViews, rootNode]);
-
-  const rootFile = useMemo<NodeFile | null>(() => {
-    if (!rootNode) return null;
-    if (rootNode.kind === NodeKind.File) {
-      return rootNode.data?.['File'] ?? null;
-    }
-    if (rootNode.kind === NodeKind.Crop) {
-      const crop = rootNode.data?.['Crop'];
-      if (!crop) return null;
-      const originHash = crop.originHash;
-      if (!originHash) return null;
-      const originNode = Object.values(rawNodesById).find(candidate => {
-        if (candidate.kind !== NodeKind.File) return false;
-        const file = candidate.data?.['File'];
-        return file?.xxh364 === originHash;
-      });
-      return originNode?.data?.['File'] ?? null;
-    }
-    return null;
-  }, [rawNodesById, rootNode]);
 
   const activeCrop = useMemo<NodeCrop | null>(() => {
     if (rootNode?.kind !== NodeKind.Crop) return null;
@@ -541,7 +533,12 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const showGraph = viewType === 'graph' && graphData && rootNodeId && rootGraphNodeId;
   const showGrid = viewType === 'grid' && !!gridData && availableViews.includes('grid');
   const showViewer = viewType === 'viewer' && !!rootFile;
-  const showCrop = viewType === 'crop' && !!rootFile && rootFile.kind === FileType.Image && !!moaId;
+  const showCrop =
+    viewType === 'crop' &&
+    !!rootFile &&
+    rootNode?.kind !== NodeKind.Crop &&
+    rootFile.kind === FileType.Image &&
+    !!moaId;
 
   const handleStartCapture = useCallback(async () => {
     if (!moaId || !captureAnchor) return;
