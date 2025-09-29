@@ -1,7 +1,7 @@
 /* ------------------------------------ Core graph (virtual) ---------------------------------------- */
 CREATE TABLE IF NOT EXISTS node (
   id         TEXT PRIMARY KEY NOT NULL,                               -- uuid  
-  kind       TEXT NOT NULL CHECK (kind IN ('folder','file','tag','annotation','memo')),
+  kind       TEXT NOT NULL CHECK (kind IN ('folder','file','tag','annotation','memo','crop')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
