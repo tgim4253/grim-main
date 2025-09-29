@@ -1,6 +1,6 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
-import { GraphResponse } from '@tgim/types/graph';
+import { CreateImageCropPayload, GraphResponse } from '@tgim/types/graph';
 import {
   CreateFolderPayload,
   FileTypeExtensionGroup,
@@ -77,6 +77,13 @@ const moaIpc = {
 const graphIpc = {
   createFolder: async (moaId: string, data: CreateFolderPayload) => {
     await invoke('create_folder', { moaId, data });
+  },
+  createImageCrop: async (
+    moaId: string,
+    payload: CreateImageCropPayload,
+  ): Promise<GraphResponse> => {
+    const response = await invoke('create_image_crop', { moaId, payload });
+    return convertKeysToCamel(response) as GraphResponse;
   },
   getGraphOne: async (moaId: string, nodeId: string): Promise<GraphResponse> => {
     const response = await invoke('get_graph_one', { moaId, nodeId });

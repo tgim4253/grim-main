@@ -2,6 +2,7 @@
 
 pub mod capture;
 pub mod connection;
+pub mod crop;
 pub mod croquis;
 pub mod file;
 pub mod graph;

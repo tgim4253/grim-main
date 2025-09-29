@@ -30,6 +30,8 @@ fn infer_relation_kind(kind: &str) -> RelationType {
         "relativeimage" => RelationType::RelativeImage,
         "croquisreslink" => RelationType::CroquisResLink,
         "croquisreflink" => RelationType::CroquisRefLink,
+        "cropped" => RelationType::Cropped,
+        "croppedorigin" => RelationType::CroppedOrigin,
         _ => RelationType::BelongToFolder,
     }
 }

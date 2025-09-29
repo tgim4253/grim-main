@@ -5,6 +5,7 @@ use sqlx::{FromRow, Type};
 
 use crate::models::{
     connection::Connection,
+    crop::ImageCrop,
     file::{FileContent, NodeFolder},
 };
 
@@ -30,6 +31,7 @@ pub enum NodeKind {
     Tag,
     Annotation,
     Memo,
+    Crop,
     #[default]
     Unknown,
 }
@@ -41,6 +43,7 @@ impl FromStr for NodeKind {
         match s {
             "folder" => Ok(NodeKind::Folder),
             "file" => Ok(NodeKind::File),
+            "crop" => Ok(NodeKind::Crop),
             _ => Ok(NodeKind::Unknown),
         }
     }
@@ -61,6 +64,7 @@ pub struct Node {
 pub enum NodeData {
     Folder(NodeFolder),
     File(FileContent),
+    Crop(ImageCrop),
 }
 
 /// Wrapper bundling nodes and their connections.
