@@ -6,7 +6,7 @@ import useThumbStore, { convertToThumbKey } from '@tgim/stores/thumbStore';
 import { ResizeMode } from '@tgim/types/file';
 import { useShallow } from 'zustand/shallow';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { useThumbnails } from '../../../../hooks';
+import { useThumbnails } from '@tgim/hooks/useThumbnails';
 import { FixedSizeGrid as WindowGrid, GridChildComponentProps } from 'react-window';
 import { Button } from '@tgim/ui';
 import { CroquisPreferences } from '@tgim/types/croquis';

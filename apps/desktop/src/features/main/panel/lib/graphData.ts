@@ -10,7 +10,7 @@ import {
   RelationType,
   FileType,
 } from '@tgim/types/graph';
-import { GraphAdjacencyEntry, GraphContext } from '../types';
+import { GraphAdjacencyEntry, GraphContext } from '@tgim/types/graph-panel';
 import { createNewId } from '@tgim/utils/identifier';
 import { GridData, ImageItem } from '@tgim/types/grid';
 

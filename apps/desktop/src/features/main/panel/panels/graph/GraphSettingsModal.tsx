@@ -3,7 +3,7 @@ import { GraphClause, GraphOption, GraphPreferences } from '@tgim/types/graph-se
 import { RelationType } from '@tgim/types/graph';
 import { Button, Modal, Switch } from '@tgim/ui';
 import { Input as TextInput } from '@tgim/ui/Input';
-import { GraphContext } from '../../types';
+import { GraphContext } from '@tgim/types/graph-panel';
 import { createPreset } from '../../lib/graphPreferences';
 
 interface Props {

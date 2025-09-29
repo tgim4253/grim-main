@@ -1,4 +1,4 @@
-import { GraphNodeType, RelationType } from '@tgim/types/graph';
+import { GraphNodeType, RelationType } from './graph';
 
 export type GraphAdjacencyEntry = {
   nodeId: string;

@@ -3,6 +3,7 @@ export * from './panel';
 export * from './graph';
 export * from './graph-settings';
 export * from './panel-settings';
+export * from './graph-panel';
 export * from './grid';
 export * from './file';
 export * from './croquis';

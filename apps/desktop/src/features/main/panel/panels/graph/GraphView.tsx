@@ -5,14 +5,14 @@ import { GraphOption, GraphPreferences } from '@tgim/types/graph-settings';
 import { Button, clearNodeSpriteCaches, getGraphPalette, NodeRenderer } from '@tgim/ui';
 import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d';
 import * as d3 from 'd3-force';
-import { useThumbnails } from '../../../../../hooks';
+import { useThumbnails } from '@tgim/hooks/useThumbnails';
 import { useTheme } from '../../../../../theme/ThemeProvider';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
-import { GraphContext } from '../../types';
+import { GraphContext } from '@tgim/types/graph-panel';
 import GraphSettingsModal from './GraphSettingsModal';
-import { useGraphFiltering } from './hooks/useGraphFiltering';
-import { useGraphThumbnails } from './hooks/useGraphThumbnails';
+import { useGraphFiltering } from '@tgim/hooks/graph/useGraphFiltering';
+import { useGraphThumbnails } from '@tgim/hooks/graph/useGraphThumbnails';
 
 interface Props {
   graphData: GraphData;

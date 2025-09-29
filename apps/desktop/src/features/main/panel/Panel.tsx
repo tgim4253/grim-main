@@ -4,7 +4,7 @@ import { shallow, useShallow } from 'zustand/shallow';
 import ReactDOM from 'react-dom';
 import { ipc } from '../../../lib/ipc';
 import { useMoa } from '@tgim/hooks/useMoa';
-import { dirname } from '@tauri-apps/api/path';
+import { dirname, join } from '@tauri-apps/api/path';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import GraphView from './panels/graph/GraphView';
 import {
@@ -20,7 +20,6 @@ import { GraphOption, GraphPreferences } from '@tgim/types/graph-settings';
 import { PanelPreferences, PanelView } from '@tgim/types/panel-settings';
 import GridView from './panels/GridView';
 import { GridData, ImageItem } from '@tgim/types/grid';
-import { FileType, ThumbResSpec } from '@tgim/types/file';
 import { Button } from '@tgim/ui';
 import cn from '@tgim/utils/cn';
 import { Split } from '@tgim/ui/Splitter';
@@ -34,7 +33,7 @@ import {
   createDefaultPanelPreferences,
   normalisePanelPreferences,
 } from './lib/panelPreferences';
-import { GraphContext } from './types';
+import { GraphContext } from '@tgim/types/graph-panel';
 import { buildGraphData, buildGridData } from './lib/graphData';
 
 const DEFAULT_CAPTURE_LINK = 'relativeimage';
@@ -58,6 +57,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [graphRefreshKey, setGraphRefreshKey] = useState(0);
   const [gridRefreshKey, setGridRefreshKey] = useState(0);
   const [graphContext, setGraphContext] = useState<GraphContext | null>(null);
+  const [defaultDownloadPath, setDefaultDownloadPath] = useState<string | null>(null);
   const [panelPreferences, setPanelPreferences] = useState<PanelPreferences>(() =>
     createDefaultPanelPreferences(),
   );
@@ -107,6 +107,43 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     };
 
     void loadPreferences();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [moaId]);
+
+  useEffect(() => {
+    if (!moaId) {
+      setDefaultDownloadPath(null);
+      return;
+    }
+
+    let isCancelled = false;
+
+    const resolveDefaultDownloadPath = async () => {
+      try {
+        const moas = await ipc.moa.loadMoas();
+        if (isCancelled) return;
+
+        const target = moas.find(moa => moa.moaId === moaId);
+        if (!target) {
+          setDefaultDownloadPath(null);
+          return;
+        }
+
+        const downloadPath = await join(target.path, target.name, 'download');
+        if (isCancelled) return;
+        setDefaultDownloadPath(downloadPath);
+      } catch (error) {
+        console.error('[Panel] Failed to resolve default download path', error);
+        if (!isCancelled) {
+          setDefaultDownloadPath(null);
+        }
+      }
+    };
+
+    void resolveDefaultDownloadPath();
 
     return () => {
       isCancelled = true;

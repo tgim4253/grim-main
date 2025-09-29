@@ -22,7 +22,14 @@ type UrlResolver = (params: {
 
 interface Params {
   nodes: GraphNode[];
-  ensureThumbnails: (requests: Array<{ hash: string; width: number; height: number; dpr: 1; mode: ResizeMode; key: string }>) => Promise<void> | void;
+  ensureThumbnails: (requests: Array<{
+    hash: string;
+    width: number;
+    height: number;
+    dpr: 1;
+    mode: ResizeMode;
+    key: string;
+  }>) => Promise<void> | void;
   getThumbnailKey: RequestGenerator;
   getThumbnailUrl: UrlResolver;
   refresh: () => void;

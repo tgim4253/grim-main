@@ -6,7 +6,7 @@ import {
   GraphNode,
 } from '@tgim/types/graph';
 import { GraphOption } from '@tgim/types/graph-settings';
-import { GraphContext } from '../../../types';
+import { GraphContext } from '@tgim/types/graph-panel';
 
 interface Params {
   graphData: GraphData;
@@ -171,16 +171,20 @@ export function useGraphFiltering({
           if (graphOption.connectionKinds.exclude.includes(connection.kind)) {
             hidden = true;
           }
+
+          if (graphOption.nodeKinds.exclude.length > 0) {
+            const targetNode = graphContext.nodeTypes[node.nodeId];
+            if (targetNode && graphOption.nodeKinds.exclude.includes(targetNode)) {
+              hidden = true;
+            }
+          }
         }
 
+        const nodeType = graphContext.nodeTypes[node.nodeId];
         if (
           graphOption.nodeKinds.include.length > 0 &&
-          !graphOption.nodeKinds.include.includes(node.type)
+          (!nodeType || !graphOption.nodeKinds.include.includes(nodeType))
         ) {
-          hidden = true;
-        }
-
-        if (graphOption.nodeKinds.exclude.includes(node.type)) {
           hidden = true;
         }
 
@@ -196,11 +200,24 @@ export function useGraphFiltering({
   }, [
     evaluateClauses,
     getPrunedTree,
+    graphContext.nodeTypes,
     graphData.nodes,
-    graphOption,
+    graphOption.connectionKinds.exclude,
+    graphOption.connectionKinds.include,
+    graphOption.hideLevelTwoNodes,
+    graphOption.maxDepth,
+    graphOption.nodeKinds.exclude,
+    graphOption.nodeKinds.include,
+    graphOption.perKindLevels,
+    graphOption.visibleLevels,
     incomingByTarget,
     rootGraphNodeId,
   ]);
 
-  return { prunedTree, setPrunedTree, getPrunedTree, incomingByTarget };
+  return {
+    prunedTree,
+    setPrunedTree,
+    getPrunedTree,
+    incomingByTarget,
+  };
 }

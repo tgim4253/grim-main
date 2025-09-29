@@ -8,7 +8,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import useThumbStore, { convertToThumbKey } from '@tgim/stores/thumbStore';
 import { useShallow } from 'zustand/shallow';
-import { useThumbnails } from '../../../../hooks';
+import { useThumbnails } from '@tgim/hooks/useThumbnails';
 import { ResizeMode } from '@tgim/types/file';
 import { cn } from '@tgim/utils/index';
 import { FolderOpen, Loader2, PencilLine, Plus, RefreshCw, Trash2, X } from 'lucide-react';
