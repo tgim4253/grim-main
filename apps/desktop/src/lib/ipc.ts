@@ -1,6 +1,7 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { GraphResponse } from '@tgim/types/graph';
+import { PanelPreferences } from '@tgim/types/panel-settings';
 import {
   CreateFolderPayload,
   FileTypeExtensionGroup,
@@ -81,6 +82,16 @@ const graphIpc = {
   getGraphOne: async (moaId: string, nodeId: string): Promise<GraphResponse> => {
     const response = await invoke('get_graph_one', { moaId, nodeId });
     return convertKeysToCamel(response) as GraphResponse;
+  },
+};
+
+const panelIpc = {
+  loadPreferences: async (moaId: string): Promise<PanelPreferences> => {
+    const response = await invoke('load_panel_preferences', { moaId });
+    return convertKeysToCamel(response) as PanelPreferences;
+  },
+  savePreferences: async (moaId: string, preferences: PanelPreferences): Promise<void> => {
+    await invoke('save_panel_preferences', { moaId, preferences });
   },
 };
 
@@ -199,6 +210,7 @@ export const ipc = {
   windowController: windowControllerIpc,
   moa: moaIpc,
   graph: graphIpc,
+  panel: panelIpc,
   file: fileIpc,
   croquis: croquisIpc,
   capture: captureIpc,

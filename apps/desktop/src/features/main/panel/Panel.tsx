@@ -4,15 +4,11 @@ import { shallow, useShallow } from 'zustand/shallow';
 import ReactDOM from 'react-dom';
 import { ipc } from '../../../lib/ipc';
 import { useMoa } from '@tgim/hooks/useMoa';
-import { dirname, join } from '@tauri-apps/api/path';
+import { dirname } from '@tauri-apps/api/path';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
-import GraphView from './panels/GraphView';
+import GraphView from './panels/graph/GraphView';
 import {
-  Connection,
-  GraphConnection,
   GraphData,
-  GraphNode,
-  GraphNodeType,
   GraphResponse,
   Node,
   NodeFile,
@@ -20,7 +16,8 @@ import {
   NodeKind,
   RelationType,
 } from '@tgim/types/graph';
-import { createNewId } from '@tgim/utils/identifier';
+import { GraphOption, GraphPreferences } from '@tgim/types/graph-settings';
+import { PanelPreferences, PanelView } from '@tgim/types/panel-settings';
 import GridView from './panels/GridView';
 import { GridData, ImageItem } from '@tgim/types/grid';
 import { FileType, ThumbResSpec } from '@tgim/types/file';
@@ -32,6 +29,13 @@ import { Camera, Eye, GitBranch, LayoutGrid } from 'lucide-react';
 import FileViewer from './panels/FileViewer';
 import { usePanelDrop } from './usePanelDrop';
 import { toast } from 'react-toastify';
+import { normaliseGraphPreferences, normaliseGraphOption } from './lib/graphPreferences';
+import {
+  createDefaultPanelPreferences,
+  normalisePanelPreferences,
+} from './lib/panelPreferences';
+import { GraphContext } from './types';
+import { buildGraphData, buildGridData } from './lib/graphData';
 
 const DEFAULT_CAPTURE_LINK = 'relativeimage';
 const FOLDER_CAPTURE_FORWARD_LINK = RelationType.ContainsFile;
@@ -42,10 +46,9 @@ interface PanelProps {
   hidden?: boolean;
 }
 
-type ViewType = 'graph' | 'grid' | 'viewer';
+type ViewType = PanelView;
 
 const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
-  const [viewType, setViewType] = useState<ViewType>('graph');
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [gridData, setGridData] = useState<GridData | null>(null);
   const [rootNodeId, setRootNodeId] = useState<string | null>(null);
@@ -54,6 +57,21 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [rootNode, setRootNode] = useState<Node | null>(null);
   const [graphRefreshKey, setGraphRefreshKey] = useState(0);
   const [gridRefreshKey, setGridRefreshKey] = useState(0);
+  const [graphContext, setGraphContext] = useState<GraphContext | null>(null);
+  const [panelPreferences, setPanelPreferences] = useState<PanelPreferences>(() =>
+    createDefaultPanelPreferences(),
+  );
+  const [panelSettingsLoaded, setPanelSettingsLoaded] = useState(false);
+  const graphPreferences = useMemo(
+    () => panelPreferences.graph,
+    [panelPreferences.graph],
+  );
+  const activeGraphOption = useMemo(() => {
+    const active =
+      graphPreferences.presets.find(preset => preset.id === graphPreferences.activePresetId) ??
+      graphPreferences.presets[0];
+    return normaliseGraphOption(active?.option);
+  }, [graphPreferences]);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const { panel, containerId, isActive } = usePanelsStore(
     useShallow(state => ({
@@ -62,170 +80,72 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       isActive: state.activePanelId === panelId,
     })),
   );
+  const panelNodeId = panel?.nodeId;
   const { moaId } = useMoa(location);
   const [container, setContainer] = useState<HTMLElement | null>(null);
-  const transformDataToGraphData = useCallback((graphData: GraphResponse): GraphData => {
-    setRootNodeId(graphData.rootNodeId);
-    setRootNode(graphData.nodes.find(node => node.id === graphData.rootNodeId) ?? null);
-
-    const nodesMap: Record<string, Node> = {};
-    graphData.nodes.forEach(node => {
-      nodesMap[node.id] = node;
-    });
-    const connectionsMap: Record<string, Connection[]> = {};
-    graphData.connections.forEach(connection => {
-      if (!connectionsMap[connection.srcNodeId]) {
-        connectionsMap[connection.srcNodeId] = [];
-      }
-      connectionsMap[connection.srcNodeId].push(connection);
-    });
-
-    const nodes: GraphNode[] = [];
-    const links: GraphConnection[] = [];
-
-    const getGraphNodeData = (node: Node, graphNodeId?: string): GraphNode => {
-      const defaultSize = 14;
-      const nodeSize = node.id == graphData.rootNodeId ? defaultSize * 1.6 : defaultSize;
-      if (!graphNodeId) graphNodeId = createNewId();
-
-      if (node.kind == NodeKind.File && node.data['File']) {
-        let data = node.data['File'];
-
-        let type: GraphNodeType = 'default';
-
-        if (data.kind == FileType.Image) {
-          type = 'image';
-        } else if (data.kind == FileType.Document) {
-          type = 'document';
-        }
-        return {
-          id: graphNodeId,
-          nodeId: node.id,
-          label: data.fileName ?? 'file',
-          size: nodeSize,
-          type: type,
-          hash: data.xxh364,
-        };
-      } else if (node.kind == NodeKind.Folder && node.data['Folder']) {
-        let data = node.data['Folder'];
-
-        return {
-          id: graphNodeId,
-          nodeId: node.id,
-          label: data.folderName ?? 'folder',
-          size: nodeSize,
-          type: 'folder',
-        };
-      }
-
-      return {
-        id: graphNodeId,
-        nodeId: node.id,
-        label: node.kind,
-        size: nodeSize,
-        type: 'default',
-      };
-    };
-
-    ((startNodeId: string, maxDepth?: number): string => {
-      // Stack holds work items to expand, along with the parent relation
-      const stack: Array<{
-        origId: string; // original node id to materialize
-        parentNewId?: string; // newly created id of parent (if any)
-        via?: Connection; // connection from parent -> this node
-        depth: number;
-        prevLevel?: number;
-      }> = [{ origId: startNodeId, depth: 0 }];
-
-      // We will create a brand-new node for EVERY stack item, even if origId repeats.
-      // This mirrors the original recursive function (children are not shared).
-      let rootNewId: string | undefined;
-
-      while (stack.length > 0) {
-        const { origId, parentNewId, via, prevLevel, depth } = stack.pop()!;
-
-        if (maxDepth && depth > maxDepth) continue;
-
-        // 1) Create a fresh node id and materialize the node
-        const newId = createNewId();
-        const node = nodesMap[origId];
-        const newNode = getGraphNodeData(node, newId);
-        newNode.depth = depth;
-        if (node.id == graphData.rootNodeId) {
-          newNode.fx = 0;
-          newNode.fy = 0;
-        }
-        // Capture root id (the very first item expanded has no parent)
-        if (!parentNewId && rootNewId === undefined) {
-          rootNewId = newId;
-        }
-
-        // 2) If we came from a parent, create the link now
-        if (parentNewId && via) {
-          links.push({
-            source: parentNewId,
-            target: newId,
-            label: via.kind,
-            data: via,
-          });
-        }
-        // 3) Enqueue children; they will each create brand-new nodes
-        const connections: Connection[] = connectionsMap[origId] ?? [];
-        newNode.isLeaf = connections.length == 0;
-        nodes.push(newNode);
-
-        for (const connection of connections) {
-          if (prevLevel !== 3)
-            stack.push({
-              origId: connection.dstNodeId,
-              parentNewId: newId,
-              via: connection,
-              prevLevel: connection.level,
-              depth: depth + 1,
-            });
-        }
-      }
-
-      // rootNewId must exist because startNodeId produced at least one node
-      return rootNewId!;
-    })(graphData.rootNodeId, 99);
-
-    return {
-      nodes,
-      links,
-    };
-  }, []);
-  const [defaultDownloadPath, setDefaultDownloadPath] = useState<string | null>(null);
-
   useEffect(() => {
-    (async () => {
-      const moas = await ipc.moa.loadMoas();
-      const target = moas.find(moa => moa.moaId === moaId);
-      if (!target) return;
-      const defaultPath = await join(target.path, target.name, 'download');
-      setDefaultDownloadPath(defaultPath);
-    })();
-  }, [moaId]);
-  const transformDataToGridData = useCallback(async (data: GraphResponse): Promise<GridData> => {
-    const items = data.nodes.filter(node => node.id !== data.rootNodeId);
-    const imageItems: ImageItem[] = [];
-    items.forEach(item => {
-      if (item.kind == NodeKind.File && item.data['File']) {
-        let data = item.data['File'];
-        if (data.kind != FileType.Image) return;
-        imageItems.push({
-          id: createNewId(),
-          nodeId: item.id,
-          name: data.fileName,
-          type: data.kind,
-          size: data.size,
-          hash: data.xxh364,
-        });
-      }
-    });
+    if (!moaId) return;
 
-    return { images: imageItems };
-  }, []);
+    let isCancelled = false;
+
+    const loadPreferences = async () => {
+      setPanelSettingsLoaded(false);
+      try {
+        const response = await ipc.panel.loadPreferences(moaId);
+        if (isCancelled) return;
+        const preferences = normalisePanelPreferences(response);
+        setPanelPreferences(preferences);
+      } catch (error) {
+        console.error('[Panel] Failed to load panel preferences', error);
+        if (isCancelled) return;
+        setPanelPreferences(createDefaultPanelPreferences());
+      } finally {
+        if (!isCancelled) {
+          setPanelSettingsLoaded(true);
+        }
+      }
+    };
+
+    void loadPreferences();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [moaId]);
+
+  const updatePanelPreferences = useCallback(
+    (updater: (prev: PanelPreferences) => PanelPreferences) => {
+      setPanelPreferences(prev => {
+        const base = normalisePanelPreferences(prev);
+        const next = normalisePanelPreferences(updater(base));
+        return next;
+      });
+    },
+    [],
+  );
+
+  const viewType = useMemo<ViewType>(
+    () => panelPreferences.activeView ?? 'graph',
+    [panelPreferences.activeView],
+  );
+
+  const setActiveView = useCallback(
+    (view: ViewType) => {
+      updatePanelPreferences(prev => ({ ...prev, activeView: view }));
+    },
+    [updatePanelPreferences],
+  );
+
+  const applyGraphResponse = useCallback((data: GraphResponse) => {
+    setRootNodeId(data.rootNodeId);
+    setRootNode(data.nodes.find(node => node.id === data.rootNodeId) ?? null);
+
+    const { graph, context } = buildGraphData(data);
+    setGraphData(graph);
+    setGraphContext(context);
+    setGridData(buildGridData(data));
+    updatePanelPreferences(prev => ({ ...prev, rootNodeId: data.rootNodeId }));
+  }, [updatePanelPreferences]);
   useEffect(() => {
     if (containerId) {
       const el = document.getElementById(containerId);
@@ -233,19 +153,53 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       if (el) setContainer(el);
     }
   }, [containerId]);
-  const refreshPanelData = useCallback(async () => {
+  const handleGraphPreferencesUpdate = useCallback(
+    (updater: (prev: GraphPreferences) => GraphPreferences) => {
+      updatePanelPreferences(prev => ({
+        ...prev,
+        graph: normaliseGraphPreferences(updater(prev.graph)),
+      }));
+    },
+    [updatePanelPreferences],
+  );
+  const handleGraphOptionChange = useCallback(
+    (updater: (prev: GraphOption) => GraphOption) => {
+      updatePanelPreferences(prev => {
+        const base = normaliseGraphPreferences(prev.graph);
+        const index = base.presets.findIndex(preset => preset.id === base.activePresetId);
+        if (index === -1) {
+          return prev;
+        }
+
+        const nextOption = normaliseGraphOption(updater(base.presets[index].option));
+        const nextPresets = [...base.presets];
+        nextPresets[index] = { ...nextPresets[index], option: nextOption };
+        return { ...prev, graph: { ...base, presets: nextPresets } };
+      });
+    },
+    [updatePanelPreferences],
+  );
+  const handleSavePanelPreferences = useCallback(async () => {
     if (!moaId) return;
     try {
-      const data = await ipc.graph.getGraphOne(moaId, panel.nodeId.toString());
-      setRootNode(data.nodes.find(node => node.id === data.rootNodeId) ?? null);
-      setGraphData(transformDataToGraphData(data));
-      setGridData(await transformDataToGridData(data));
+      await ipc.panel.savePreferences(moaId, panelPreferences);
+      toast.success('그래프 설정을 저장했어요.');
+    } catch (error) {
+      console.error('[Panel] Failed to save panel preferences', error);
+      toast.error('그래프 설정을 저장하지 못했습니다.');
+    }
+  }, [moaId, panelPreferences]);
+  const refreshPanelData = useCallback(async () => {
+    if (!moaId || !panelNodeId) return;
+    try {
+      const data = await ipc.graph.getGraphOne(moaId, panelNodeId.toString());
+      applyGraphResponse(data);
       setGraphRefreshKey(prev => prev + 1);
       setGridRefreshKey(prev => prev + 1);
     } catch (e) {
       console.error('Failed to load panel data', e);
     }
-  }, [moaId, panel.nodeId, transformDataToGraphData, transformDataToGridData]);
+  }, [applyGraphResponse, moaId, panelNodeId]);
 
   useEffect(() => {
     void refreshPanelData();
@@ -276,20 +230,17 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   }, [moaId, refreshPanelData]);
 
   useEffect(() => {
-    if (!moaId || !panel?.nodeId) return;
+    if (!moaId || !panelNodeId) return;
 
     let isCancelled = false;
 
     const load = async () => {
       try {
-        const data = await ipc.graph.getGraphOne(moaId, panel.nodeId.toString());
-        const nextGraphData = transformDataToGraphData(data);
-        const nextGridData = await transformDataToGridData(data);
+        const data = await ipc.graph.getGraphOne(moaId, panelNodeId.toString());
 
         if (isCancelled) return;
 
-        setGraphData(nextGraphData);
-        setGridData(nextGridData);
+        applyGraphResponse(data);
         setGraphRefreshKey(prev => prev + 1);
         setGridRefreshKey(prev => prev + 1);
       } catch (e) {
@@ -302,7 +253,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     return () => {
       isCancelled = true;
     };
-  }, [moaId, panel?.nodeId, transformDataToGraphData, transformDataToGridData]);
+  }, [applyGraphResponse, moaId, panelNodeId]);
 
   const rootGraphNodeId = useMemo(() => {
     if (!graphData) return null;
@@ -353,9 +304,9 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   }, [rootNode]);
   useEffect(() => {
     if (!availableViews.includes(viewType)) {
-      setViewType(defaultView);
+      setActiveView(defaultView);
     }
-  }, [availableViews, defaultView, viewType]);
+  }, [availableViews, defaultView, setActiveView, viewType]);
 
   const rootFile = useMemo<NodeFile | null>(() => {
     if (rootNode?.kind !== NodeKind.File) return null;
@@ -419,7 +370,8 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       refreshPanelData,
     });
 
-  const showGraph = viewType === 'graph' && graphData && rootNodeId && rootGraphNodeId;
+  const showGraph =
+    viewType === 'graph' && graphData && rootNodeId && rootGraphNodeId && graphContext;
   const showGrid = viewType === 'grid' && !!gridData && availableViews.includes('grid');
   const showViewer = viewType === 'viewer' && !!rootFile;
 
@@ -530,7 +482,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
                     aria-pressed={isActive}
                     aria-label={labels[type]}
                     title={labels[type]}
-                    onClick={() => setViewType(type)}
+                    onClick={() => setActiveView(type)}
                     className="h-8 w-8"
                   >
                     <Icon className="h-4 w-4" />
@@ -548,6 +500,13 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
             rootNodeId={rootNodeId}
             rootGraphNodeId={rootGraphNodeId}
             graphData={graphData}
+            graphContext={graphContext}
+            graphPreferences={graphPreferences}
+            graphOption={activeGraphOption}
+            onGraphOptionChange={handleGraphOptionChange}
+            onPreferencesChange={handleGraphPreferencesUpdate}
+            onSavePreferences={handleSavePanelPreferences}
+            settingsLoaded={panelSettingsLoaded}
           />
         ) : showGrid && gridData ? (
           <Split position="horizontal" className="w-full h-full">

@@ -41,6 +41,8 @@ fn main() {
             commands::file::create_folder,
             commands::moa::bootstrap_status,
             commands::graph::get_graph_one,
+            commands::graph::load_panel_preferences,
+            commands::graph::save_panel_preferences,
             commands::file::get_thumbnails,
             commands::file::get_file_path,
             commands::file::expand_preferred_urls,
