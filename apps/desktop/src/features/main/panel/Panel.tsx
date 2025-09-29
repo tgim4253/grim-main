@@ -404,6 +404,11 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     return id;
   }, [graphData, rootNodeId]);
 
+  const rootFile = useMemo<NodeFile | null>(() => {
+    if (rootNode?.kind !== NodeKind.File) return null;
+    return rootNode.data?.['File'] ?? null;
+  }, [rootNode]);
+
   const cropEntries = useMemo(() => {
     if (!graphData) return [] as { nodeId: string; crop: NodeCrop }[];
     const unique = new Map<string, NodeCrop>();
@@ -536,8 +541,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const showGraph = viewType === 'graph' && graphData && rootNodeId && rootGraphNodeId;
   const showGrid = viewType === 'grid' && !!gridData && availableViews.includes('grid');
   const showViewer = viewType === 'viewer' && !!rootFile;
-  const showCrop =
-    viewType === 'crop' && !!rootFile && rootFile.kind === FileType.Image && !!moaId;
+  const showCrop = viewType === 'crop' && !!rootFile && rootFile.kind === FileType.Image && !!moaId;
 
   const handleStartCapture = useCallback(async () => {
     if (!moaId || !captureAnchor) return;
