@@ -25,6 +25,16 @@ interface Props {
 }
 
 const GRAPH_THUMB_SIZE = 64;
+const CROP_THUMB_SCALE = 4;
+
+const clampDevicePixelRatio = () => {
+  if (typeof window === 'undefined') return 1;
+  const ratio = window.devicePixelRatio ?? 1;
+  if (!Number.isFinite(ratio) || ratio <= 0) {
+    return 1;
+  }
+  return Math.min(3, Math.max(1, Math.round(ratio)));
+};
 
 type NormalizedCropRect = {
   startX: number;
@@ -122,6 +132,40 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
   const [linkStroke, setLinkStroke] = useState(() => getGraphPalette().link);
 
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [devicePixelRatio, setDevicePixelRatio] = useState(() => clampDevicePixelRatio());
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const updateRatio = () => {
+      setDevicePixelRatio(clampDevicePixelRatio());
+    };
+
+    updateRatio();
+    window.addEventListener('resize', updateRatio);
+
+    const ratios = [1, 1.5, 2, 2.5, 3];
+    const mediaQueries = ratios
+      .map(value => (typeof window.matchMedia === 'function' ? window.matchMedia(`(resolution: ${value}dppx)`) : null))
+      .filter((query): query is MediaQueryList => query !== null);
+
+    const detachListeners = mediaQueries.map(query => {
+      if (typeof query.addEventListener === 'function') {
+        query.addEventListener('change', updateRatio);
+        return () => query.removeEventListener('change', updateRatio);
+      }
+      if (typeof query.addListener === 'function') {
+        query.addListener(updateRatio);
+        return () => query.removeListener(updateRatio);
+      }
+      return () => {};
+    });
+
+    return () => {
+      window.removeEventListener('resize', updateRatio);
+      detachListeners.forEach(detach => detach());
+    };
+  }, []);
   useEffect(() => {
     const updateDimensions = () => {
       if (containerRef.current) {
@@ -203,6 +247,9 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
   useEffect(() => {
     if (imageNodes.length === 0) return;
 
+    const baseThumbSize = Math.max(1, Math.round(GRAPH_THUMB_SIZE * devicePixelRatio));
+    const cropThumbSize = Math.max(baseThumbSize, Math.round(GRAPH_THUMB_SIZE * CROP_THUMB_SCALE * devicePixelRatio));
+
     const requests = imageNodes.reduce<ThumbnailRequest[]>((acc, node) => {
       const hash =
         node.type === 'crop'
@@ -210,10 +257,12 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
           : (typeof node.hash === 'string' ? node.hash : undefined);
       if (!hash) return acc;
 
+      const targetSize = node.type === 'crop' ? cropThumbSize : baseThumbSize;
+
       const request: ThumbnailRequest = {
         hash,
-        width: GRAPH_THUMB_SIZE,
-        height: GRAPH_THUMB_SIZE,
+        width: targetSize,
+        height: targetSize,
         dpr: 1 as const,
         mode: ResizeMode.Original,
       };
@@ -236,7 +285,7 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
     if (requests.length === 0) return;
 
     void ensureThumbnails(requests);
-  }, [ensureThumbnails, getThumbnailKey, getThumbnailUrl, imageNodes]);
+  }, [devicePixelRatio, ensureThumbnails, getThumbnailKey, getThumbnailUrl, imageNodes]);
 
   useEffect(() => {
     const unsubscribe = useThumbStore.subscribe(
