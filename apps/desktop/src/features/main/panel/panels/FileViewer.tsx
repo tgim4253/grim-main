@@ -1,15 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { FileType } from '@tgim/types/file';
-import {
-  Connection,
-  GraphResponse,
-  Node,
-  NodeCrop,
-  NodeFile,
-  NodeMemo,
-  RelationType,
-} from '@tgim/types/graph';
+import { NodeCrop, NodeFile } from '@tgim/types/graph';
 import { ipc } from '../../../../lib/ipc';
 import { FileText } from 'lucide-react';
 import { cn } from '@tgim/utils/index';
@@ -109,30 +101,9 @@ interface FileViewerProps {
   moaId: string | null;
   className?: string;
   crop?: NodeCrop | null;
-  nodesById?: Record<string, Node>;
-  connections?: Connection[];
-  onGraphUpdate?: (graph: GraphResponse) => void;
 }
 
-type MemoAttachmentType = 'file' | 'crop';
-
-type MemoEntry = {
-  memo: NodeMemo;
-  attachmentNodeId: string;
-  attachmentType: MemoAttachmentType;
-  crop?: NodeCrop | null;
-  marker?: number;
-};
-
-const FileViewer: React.FC<FileViewerProps> = ({
-  file,
-  moaId,
-  className,
-  crop,
-  nodesById,
-  connections,
-  onGraphUpdate,
-}) => {
+const FileViewer: React.FC<FileViewerProps> = ({ file, moaId, className, crop }) => {
   const [viewerSidebarVisible, setViewerSidebarVisible] = useState(false);
 
   const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -142,18 +113,10 @@ const FileViewer: React.FC<FileViewerProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const imageWrapperRef = useRef<HTMLDivElement | null>(null);
   const imageElementRef = useRef<HTMLImageElement | null>(null);
-  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const [imageMetrics, setImageMetrics] = useState<
     { width: number; height: number; offsetX: number; offsetY: number } | null
   >(null);
   const normalizedCropRect = useMemo(() => toNormalizedCropRect(crop), [crop]);
-  const [memoItems, setMemoItems] = useState<MemoEntry[]>([]);
-  const [selectedMemoId, setSelectedMemoId] = useState<string | null>(null);
-  const [draftText, setDraftText] = useState('');
-  const [isSavingMemo, setIsSavingMemo] = useState(false);
-  const [isCreatingMemo, setIsCreatingMemo] = useState(false);
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [selectionRect, setSelectionRect] = useState<NormalizedCropRect | null>(null);
 
   useEffect(() => {
     if (file.kind !== FileType.Image) {
@@ -200,7 +163,8 @@ const FileViewer: React.FC<FileViewerProps> = ({
   }, [status]);
 
   useEffect(() => {
-    if (status !== 'ready') {
+    if (!normalizedCropRect) {
+      setImageMetrics(null);
       return;
     }
 
@@ -238,17 +202,13 @@ const FileViewer: React.FC<FileViewerProps> = ({
     };
 
     const resizeObserver = new ResizeObserver(() => updateMetrics());
-    const wrapper = imageWrapperRef.current;
-    if (wrapper) {
-      resizeObserver.observe(wrapper);
+    if (imageWrapperRef.current) {
+      resizeObserver.observe(imageWrapperRef.current);
     }
 
     const img = imageElementRef.current;
     if (img) {
       img.addEventListener('load', updateMetrics);
-      if (img.complete) {
-        updateMetrics();
-      }
     }
 
     updateMetrics();
@@ -259,7 +219,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
         img.removeEventListener('load', updateMetrics);
       }
     };
-  }, [imageSrc, status]);
+  }, [imageSrc, normalizedCropRect]);
 
   const fileDescription = useMemo(() => {
     switch (file.kind) {
@@ -294,249 +254,6 @@ const FileViewer: React.FC<FileViewerProps> = ({
       return null;
     }
   }, [file]);
-  useEffect(() => {
-    if (!nodesById || !connections) {
-      setMemoItems([]);
-      return;
-    }
-
-    const directMemoEntries: MemoEntry[] = [];
-
-    connections
-      .filter(connection => connection.srcNodeId === file.nodeId && connection.kind === RelationType.Memo)
-      .forEach(connection => {
-        const memoNode = nodesById[connection.dstNodeId];
-        const memoData = memoNode?.data?.['Memo'];
-        if (memoData) {
-          directMemoEntries.push({
-            memo: memoData,
-            attachmentNodeId: file.nodeId,
-            attachmentType: 'file',
-          });
-        }
-      });
-
-    const cropMemoEntries: MemoEntry[] = [];
-    let marker = 1;
-
-    connections
-      .filter(connection => connection.srcNodeId === file.nodeId && connection.kind === RelationType.Cropped)
-      .forEach(connection => {
-        const cropNodeId = connection.dstNodeId;
-        const cropNode = nodesById[cropNodeId];
-        const cropData = cropNode?.data?.['Crop'] as NodeCrop | undefined;
-        if (!cropData) {
-          return;
-        }
-
-        const relatedMemos = connections.filter(
-          candidate => candidate.srcNodeId === cropNodeId && candidate.kind === RelationType.Memo,
-        );
-
-        if (relatedMemos.length === 0) {
-          return;
-        }
-
-        relatedMemos.forEach(memoConnection => {
-          const memoNode = nodesById[memoConnection.dstNodeId];
-          const memoData = memoNode?.data?.['Memo'];
-          if (memoData) {
-            cropMemoEntries.push({
-              memo: memoData,
-              attachmentNodeId: cropNodeId,
-              attachmentType: 'crop',
-              crop: cropData,
-              marker,
-            });
-          }
-        });
-
-        marker += 1;
-      });
-
-    const merged = [...directMemoEntries, ...cropMemoEntries];
-    setMemoItems(merged);
-  }, [connections, file.nodeId, nodesById]);
-
-  useEffect(() => {
-    if (memoItems.length === 0) {
-      setSelectedMemoId(null);
-      setDraftText('');
-      return;
-    }
-
-    setSelectedMemoId(prev => {
-      if (prev && memoItems.some(entry => entry.memo.nodeId === prev)) {
-        return prev;
-      }
-      return memoItems[0]?.memo.nodeId ?? null;
-    });
-  }, [memoItems]);
-
-  useEffect(() => {
-    if (!selectedMemoId) {
-      setDraftText('');
-      return;
-    }
-
-    const entry = memoItems.find(item => item.memo.nodeId === selectedMemoId);
-    setDraftText(entry?.memo.text ?? '');
-  }, [memoItems, selectedMemoId]);
-
-  const handleSaveMemo = useCallback(async () => {
-    if (!moaId || !selectedMemoId) return;
-    setIsSavingMemo(true);
-    try {
-      const updated = await ipc.memo.updateMemoText(moaId, {
-        nodeId: selectedMemoId,
-        text: draftText,
-      });
-
-      setMemoItems(prev =>
-        prev.map(entry =>
-          entry.memo.nodeId === updated.nodeId
-            ? { ...entry, memo: { ...entry.memo, text: updated.text, updatedAt: updated.updatedAt } }
-            : entry,
-        ),
-      );
-    } catch (error) {
-      console.error('[FileViewer] Failed to update memo text', error);
-    } finally {
-      setIsSavingMemo(false);
-    }
-  }, [draftText, moaId, selectedMemoId]);
-
-  const handleCreateMemo = useCallback(async () => {
-    if (!moaId) return;
-    setIsCreatingMemo(true);
-    try {
-      const result = await ipc.memo.createMemo(moaId, {
-        targetNodeId: file.nodeId,
-        text: '',
-      });
-      onGraphUpdate?.(result.graph);
-      setSelectedMemoId(result.memo.nodeId);
-    } catch (error) {
-      console.error('[FileViewer] Failed to create memo', error);
-    } finally {
-      setIsCreatingMemo(false);
-    }
-  }, [file.nodeId, moaId, onGraphUpdate]);
-
-  const finalizeSelection = useCallback(
-    async (rect: NormalizedCropRect) => {
-      if (!moaId || !file.xxh364) return;
-      setIsCreatingMemo(true);
-      try {
-        const result = await ipc.memo.createMemo(moaId, {
-          targetNodeId: file.nodeId,
-          text: '',
-          crop: {
-            rect: {
-              startX: rect.startX,
-              startY: rect.startY,
-              width: rect.width,
-              height: rect.height,
-            },
-            isRelative: true,
-            referenceHeight: null,
-            referenceWidth: null,
-          },
-          originHash: file.xxh364,
-        });
-        onGraphUpdate?.(result.graph);
-        setSelectedMemoId(result.memo.nodeId);
-      } catch (error) {
-        console.error('[FileViewer] Failed to create memo with crop', error);
-      } finally {
-        setIsCreatingMemo(false);
-      }
-    },
-    [file.nodeId, file.xxh364, moaId, onGraphUpdate],
-  );
-
-  const handlePointerDown = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      if (!selectionMode || status !== 'ready' || !imageWrapperRef.current || !imageMetrics) {
-        return;
-      }
-      if (event.button !== 0) {
-        return;
-      }
-      event.preventDefault();
-
-      const bounds = imageWrapperRef.current.getBoundingClientRect();
-      const relativeX = clamp01((event.clientX - bounds.left - imageMetrics.offsetX) / imageMetrics.width);
-      const relativeY = clamp01((event.clientY - bounds.top - imageMetrics.offsetY) / imageMetrics.height);
-
-      dragStartRef.current = { x: relativeX, y: relativeY };
-      setSelectionRect({ startX: relativeX, startY: relativeY, width: 0, height: 0 });
-    },
-    [imageMetrics, selectionMode, status],
-  );
-
-  const handlePointerMove = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      if (!selectionMode || !dragStartRef.current || !imageWrapperRef.current || !imageMetrics) {
-        return;
-      }
-      event.preventDefault();
-
-      const bounds = imageWrapperRef.current.getBoundingClientRect();
-      const currentX = clamp01((event.clientX - bounds.left - imageMetrics.offsetX) / imageMetrics.width);
-      const currentY = clamp01((event.clientY - bounds.top - imageMetrics.offsetY) / imageMetrics.height);
-
-      const start = dragStartRef.current;
-      const startX = Math.min(start.x, currentX);
-      const startY = Math.min(start.y, currentY);
-      const width = Math.abs(currentX - start.x);
-      const height = Math.abs(currentY - start.y);
-
-      setSelectionRect({ startX, startY, width, height });
-    },
-    [imageMetrics, selectionMode],
-  );
-
-  const clearSelectionRect = useCallback(() => {
-    dragStartRef.current = null;
-    setSelectionRect(null);
-  }, []);
-
-  const handlePointerUp = useCallback(async () => {
-    if (!selectionMode || !dragStartRef.current || !selectionRect) {
-      clearSelectionRect();
-      setSelectionMode(false);
-      return;
-    }
-
-    dragStartRef.current = null;
-
-    if (selectionRect.width < 0.01 || selectionRect.height < 0.01) {
-      clearSelectionRect();
-      setSelectionMode(false);
-      return;
-    }
-
-    const rect = selectionRect;
-    clearSelectionRect();
-    setSelectionMode(false);
-    await finalizeSelection(rect);
-  }, [clearSelectionRect, finalizeSelection, selectionMode, selectionRect]);
-
-  const handlePointerLeave = useCallback(() => {
-    if (!selectionMode || !dragStartRef.current) {
-      return;
-    }
-    clearSelectionRect();
-  }, [clearSelectionRect, selectionMode]);
-
-  const selectedMemo = useMemo(
-    () => memoItems.find(entry => entry.memo.nodeId === selectedMemoId) ?? null,
-    [memoItems, selectedMemoId],
-  );
-
-  const isImageFile = file.kind === FileType.Image;
-
   return (
     <div
       className={cn(
@@ -582,14 +299,10 @@ const FileViewer: React.FC<FileViewerProps> = ({
 
                 {/* Content area (scrolling) */}
                 <div className="flex-1 min-h-0">
-                  {isImageFile ? (
+                  {file?.kind === FileType.Image ? (
                     <div
                       ref={imageWrapperRef}
                       className="relative flex h-full items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-muted"
-                      onMouseDown={handlePointerDown}
-                      onMouseMove={handlePointerMove}
-                      onMouseUp={handlePointerUp}
-                      onMouseLeave={handlePointerLeave}
                     >
                       {status === 'ready' && imageSrc ? (
                         <>
@@ -614,45 +327,6 @@ const FileViewer: React.FC<FileViewerProps> = ({
                               }}
                             />
                           ) : null}
-                          {selectionMode ? (
-                            <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-background/70 px-3 py-1 text-xs font-medium text-foreground shadow">
-                              드래그하여 메모 영역을 선택하세요.
-                            </div>
-                          ) : null}
-                          {selectionRect && imageMetrics ? (
-                            <div
-                              className="pointer-events-none absolute rounded-md border-2 border-accent/80 bg-accent/20"
-                              style={{
-                                left:
-                                  imageMetrics.offsetX + selectionRect.startX * imageMetrics.width,
-                                top:
-                                  imageMetrics.offsetY + selectionRect.startY * imageMetrics.height,
-                                width: selectionRect.width * imageMetrics.width,
-                                height: selectionRect.height * imageMetrics.height,
-                              }}
-                            />
-                          ) : null}
-                          {memoItems
-                            .filter(item => item.attachmentType === 'crop' && item.marker && imageMetrics && item.crop)
-                            .map(item => {
-                              const rect = toNormalizedCropRect(item.crop);
-                              if (!rect) return null;
-                              return (
-                                <div
-                                  key={item.memo.nodeId}
-                                  className="pointer-events-none absolute flex items-center justify-center rounded-md border border-primary bg-primary/40 text-xs font-bold text-primary-foreground"
-                                  style={{
-                                    left:
-                                      imageMetrics.offsetX + rect.startX * imageMetrics.width,
-                                    top: imageMetrics.offsetY + rect.startY * imageMetrics.height,
-                                    width: rect.width * imageMetrics.width,
-                                    height: rect.height * imageMetrics.height,
-                                  }}
-                                >
-                                  {item.marker}
-                                </div>
-                              );
-                            })}
                         </>
                       ) : status === 'loading' ? (
                         <p className="text-sm text-muted-foreground">이미지를 불러오는 중...</p>
@@ -676,115 +350,6 @@ const FileViewer: React.FC<FileViewerProps> = ({
                     </div>
                   )}
                 </div>
-                {isImageFile ? (
-                  <div className="mt-4 flex h-[260px] min-h-[220px] flex-col overflow-hidden rounded-lg border border-border bg-surface-muted/40">
-                    <div className="flex items-center justify-between border-b border-border px-4 py-2">
-                      <h3 className="text-sm font-medium">메모</h3>
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={selectionMode ? 'primary' : 'secondary'}
-                          disabled={isCreatingMemo || status !== 'ready'}
-                          onClick={() => {
-                            if (selectionMode) {
-                              setSelectionMode(false);
-                              setSelectionRect(null);
-                              dragStartRef.current = null;
-                              return;
-                            }
-                            setSelectionMode(true);
-                            setSelectionRect(null);
-                            dragStartRef.current = null;
-                          }}
-                        >
-                          {selectionMode ? '선택 취소' : '영역 선택'}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={isCreatingMemo}
-                          onClick={handleCreateMemo}
-                        >
-                          원본에 메모 추가
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="flex flex-1 min-h-0 divide-x divide-border">
-                      <div className="w-48 flex-shrink-0 overflow-y-auto">
-                        {memoItems.length === 0 ? (
-                          <p className="px-3 py-4 text-sm text-muted-foreground">등록된 메모가 없습니다.</p>
-                        ) : (
-                          <ul className="divide-y divide-border/60">
-                            {memoItems.map(entry => {
-                              const isSelected = entry.memo.nodeId === selectedMemoId;
-                              return (
-                                <li key={entry.memo.nodeId}>
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedMemoId(entry.memo.nodeId)}
-                                    className={cn(
-                                      'flex w-full flex-col items-start gap-1 px-3 py-2 text-left text-sm transition-colors',
-                                      isSelected
-                                        ? 'bg-primary/10 text-foreground'
-                                        : 'hover:bg-muted text-muted-foreground',
-                                    )}
-                                  >
-                                    <span className="font-medium text-xs uppercase text-muted-foreground">
-                                      {entry.attachmentType === 'file'
-                                        ? '원본'
-                                        : `크롭 #${entry.marker ?? ''}`}
-                                    </span>
-                                    <span className="line-clamp-2 text-sm">
-                                      {entry.memo.text.trim() ? entry.memo.text : '새 메모'}
-                                    </span>
-                                  </button>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        )}
-                      </div>
-                      <div className="flex flex-1 flex-col">
-                        <div className="flex items-center justify-between px-4 py-2 text-sm text-muted-foreground">
-                          {selectedMemo ? (
-                            <span>
-                              {selectedMemo.attachmentType === 'file'
-                                ? '원본 이미지 메모'
-                                : `크롭 #${selectedMemo.marker ?? ''} 메모`}
-                            </span>
-                          ) : (
-                            <span>메모를 선택하세요.</span>
-                          )}
-                          <span className="text-xs">
-                            {selectedMemo ? `최근 수정: ${selectedMemo.memo.updatedAt}` : ''}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-h-0 px-4 pb-4">
-                          <textarea
-                            value={draftText}
-                            onChange={event => setDraftText(event.target.value)}
-                            className="h-full w-full resize-none rounded-md border border-border bg-background p-3 text-sm shadow-inner focus:border-primary focus:outline-none"
-                            placeholder={selectedMemo ? '메모 내용을 입력하세요.' : '메모를 선택하면 내용을 편집할 수 있습니다.'}
-                            disabled={!selectedMemo || isSavingMemo}
-                          />
-                        </div>
-                        <div className="flex justify-end gap-2 border-t border-border px-4 py-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="primary"
-                            disabled={!selectedMemo || isSavingMemo}
-                            onClick={handleSaveMemo}
-                          >
-                            {isSavingMemo ? '저장 중...' : '메모 저장'}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
               </div>
             </SplitPanel>
 
