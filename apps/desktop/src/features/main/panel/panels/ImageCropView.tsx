@@ -371,7 +371,7 @@ const ImageCropView: React.FC<ImageCropViewProps> = ({ file, moaId, crops, onRef
       const displayHeight = Math.max(rect.height * scale, 1);
       const backgroundSize = `${sourceWidth * scale}px ${sourceHeight * scale}px`;
       const backgroundPosition = `${-rect.startX * scale}px ${-rect.startY * scale}px`;
-
+      console.log(imageSrc);
       return (
         <button
           key={entry.nodeId}
@@ -386,7 +386,7 @@ const ImageCropView: React.FC<ImageCropViewProps> = ({ file, moaId, crops, onRef
             <div
               className="h-full w-full"
               style={{
-                backgroundImage: `url(${imageSrc})`,
+                backgroundImage: `url("${imageSrc}")`,
                 backgroundRepeat: 'no-repeat',
                 backgroundSize,
                 backgroundPosition,
@@ -569,7 +569,7 @@ const ImageCropView: React.FC<ImageCropViewProps> = ({ file, moaId, crops, onRef
                     <div
                       className="h-full w-full"
                       style={{
-                        backgroundImage: `url(${imageSrc})`,
+                        backgroundImage: `url("${imageSrc}")`,
                         backgroundRepeat: 'no-repeat',
                         backgroundSize,
                         backgroundPosition,

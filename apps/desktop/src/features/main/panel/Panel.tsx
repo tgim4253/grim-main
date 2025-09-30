@@ -403,14 +403,14 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   }, [moaId, panel?.nodeId, transformDataToGraphData, transformDataToGridData]);
 
   const rootGraphNodeId = useMemo(() => {
-    if (!graphData) return null;
-    let id = null;
-    graphData.nodes.forEach(node => {
-      if (node.nodeId == rootNodeId) {
-        id = node.id;
-      }
-    });
-    return id;
+    if (!graphData || !rootNodeId) return null;
+
+    const rootNode = graphData.nodes.find(node => node.nodeId === rootNodeId && node.depth === 0);
+    if (rootNode) {
+      return rootNode.id;
+    }
+
+    return graphData.nodes.find(node => node.nodeId === rootNodeId)?.id ?? null;
   }, [graphData, rootNodeId]);
 
   const rootFile = useMemo<NodeFile | null>(() => {
