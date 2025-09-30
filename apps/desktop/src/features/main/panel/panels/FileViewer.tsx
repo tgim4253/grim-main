@@ -4,11 +4,12 @@ import { FileType } from '@tgim/types/file';
 import { Connection, GraphResponse, Node, NodeCrop, NodeFile } from '@tgim/types/graph';
 import { ipc } from '../../../../lib/ipc';
 import { FileText } from 'lucide-react';
-import { cn, toNormalizedCropRect } from '@tgim/utils/index';
+import { cn } from '@tgim/utils/index';
 import { Split } from '@tgim/ui/Splitter';
 import Button from '@tgim/ui/Button';
 import FileDetailSidebar from './FileDetailSidebar';
 import { ImageItem } from '@tgim/types/grid';
+import { useNormalizedCropRect } from '@tgim/hooks/useCropRect';
 
 interface FileViewerProps {
   file: NodeFile;
@@ -33,7 +34,7 @@ const FileViewer: React.FC<FileViewerProps> = ({ file, moaId, className, crop })
     offsetX: number;
     offsetY: number;
   } | null>(null);
-  const normalizedCropRect = useMemo(() => toNormalizedCropRect(crop), [crop]);
+  const normalizedCropRect = useNormalizedCropRect(crop);
 
   useEffect(() => {
     if (file.kind !== FileType.Image) {

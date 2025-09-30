@@ -1,5 +1,6 @@
 import usePanelsStore from '@tgim/stores/panelStore';
 import { Connection, GraphConnection, GraphData, GraphNode, NodeCrop } from '@tgim/types/graph';
+import { NormalizedCropRect } from '@tgim/types/crop';
 import { NodeRenderer, clearNodeSpriteCaches, getGraphPalette } from '@tgim/ui/index';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d';
@@ -11,6 +12,7 @@ import { ResizeMode } from '@tgim/types/file';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { ThumbnailRequest, useThumbnails } from '../../../../hooks';
 import { useTheme } from '../../../../theme/ThemeProvider';
+import { toNormalizedCropRect } from '@tgim/utils/crop';
 
 interface Props {
   graphData: GraphData;
@@ -28,96 +30,6 @@ const clampDevicePixelRatio = () => {
     return 1;
   }
   return Math.min(3, Math.max(1, Math.round(ratio)));
-};
-
-type NormalizedCropRect = {
-  startX: number;
-  startY: number;
-  width: number;
-  height: number;
-};
-
-const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
-
-const isFiniteNumber = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value);
-
-const toNormalizedCropRect = (
-  crop: NodeCrop | undefined,
-  fallback?: NormalizedCropRect,
-): NormalizedCropRect | undefined => {
-  if (!crop) return fallback;
-
-  const normalizedFromPayload = (crop as unknown as { normalizedRect?: NormalizedCropRect })
-    .normalizedRect;
-  if (normalizedFromPayload) {
-    const { startX, startY, width, height } = normalizedFromPayload;
-    if ([startX, startY, width, height].every(isFiniteNumber)) {
-      const startXClamped = clamp01(startX);
-      const startYClamped = clamp01(startY);
-      const endXClamped = clamp01(startX + width);
-      const endYClamped = clamp01(startY + height);
-      const normalizedWidth = endXClamped - startXClamped;
-      const normalizedHeight = endYClamped - startYClamped;
-      if (normalizedWidth > 0 && normalizedHeight > 0) {
-        return {
-          startX: startXClamped,
-          startY: startYClamped,
-          width: normalizedWidth,
-          height: normalizedHeight,
-        };
-      }
-    }
-  }
-
-  const values = [crop.startX, crop.startY, crop.width, crop.height];
-  if (!values.every(isFiniteNumber)) {
-    return fallback;
-  }
-
-  let startX = crop.startX;
-  let startY = crop.startY;
-  let width = crop.width;
-  let height = crop.height;
-
-  if (!crop.isRelative) {
-    const referenceWidth = crop.referenceWidth ?? null;
-    const referenceHeight = crop.referenceHeight ?? null;
-    if (
-      isFiniteNumber(referenceWidth) &&
-      referenceWidth > 0 &&
-      isFiniteNumber(referenceHeight) &&
-      referenceHeight > 0
-    ) {
-      startX = startX / referenceWidth;
-      startY = startY / referenceHeight;
-      width = width / referenceWidth;
-      height = height / referenceHeight;
-    } else {
-      const alreadyNormalized = values.every(value => value >= 0 && value <= 1);
-      if (!alreadyNormalized) {
-        return fallback;
-      }
-    }
-  }
-
-  const startXClamped = clamp01(startX);
-  const startYClamped = clamp01(startY);
-  const endXClamped = clamp01(startX + width);
-  const endYClamped = clamp01(startY + height);
-  const normalizedWidth = endXClamped - startXClamped;
-  const normalizedHeight = endYClamped - startYClamped;
-
-  if (normalizedWidth <= 0 || normalizedHeight <= 0) {
-    return fallback;
-  }
-
-  return {
-    startX: startXClamped,
-    startY: startYClamped,
-    width: normalizedWidth,
-    height: normalizedHeight,
-  };
 };
 
 const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) => {
@@ -388,10 +300,10 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
         linkWidth={1.5}
         linkCurvature={0}
         nodeCanvasObject={(node, ctx, globalScale) => {
-          const normalizedCrop = toNormalizedCropRect(
-            node.type === 'crop' ? (node.crop as NodeCrop | undefined) : undefined,
-            node.cropRect as NormalizedCropRect | undefined,
-          );
+          const computedCrop =
+            node.type === 'crop' ? toNormalizedCropRect(node.crop as NodeCrop | null) : null;
+          const fallbackCrop = node.cropRect as NormalizedCropRect | undefined;
+          const normalizedCrop = computedCrop ?? fallbackCrop ?? null;
           if (normalizedCrop) {
             node.cropRect = normalizedCrop;
           }
@@ -404,7 +316,7 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
               label: node.label,
               url: node.url,
               thumbKey: node.thumbKey,
-              cropRect: normalizedCrop,
+              cropRect: normalizedCrop ?? undefined,
             },
             globalScale,
           );
