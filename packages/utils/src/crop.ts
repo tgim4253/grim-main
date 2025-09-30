@@ -1,11 +1,4 @@
-import {
-  Connection,
-  GraphResponse,
-  Node,
-  NodeCrop,
-  NodeFile,
-  NormalizedCropRect,
-} from '@tgim/types/index';
+import { AbsoluteCropRect, NodeCrop, NormalizedCropRect } from '@tgim/types/index';
 import { clamp01, isFiniteNumber } from './number';
 
 export const toNormalizedCropRect = (crop?: NodeCrop | null): NormalizedCropRect | null => {
@@ -81,5 +74,89 @@ export const toNormalizedCropRect = (crop?: NodeCrop | null): NormalizedCropRect
     startY: startYClamped,
     width: normalizedWidth,
     height: normalizedHeight,
+  };
+};
+
+export const toAbsoluteCropRect = (
+  crop: NodeCrop | null | undefined,
+  sourceWidth: number | null | undefined,
+  sourceHeight: number | null | undefined,
+): AbsoluteCropRect | null => {
+  if (!crop) return null;
+  if (!isFiniteNumber(sourceWidth) || !isFiniteNumber(sourceHeight)) {
+    return null;
+  }
+
+  const normalized = toNormalizedCropRect(crop);
+  if (!normalized) {
+    return null;
+  }
+
+  const width = sourceWidth as number;
+  const height = sourceHeight as number;
+  if (!(width > 0 && height > 0)) {
+    return null;
+  }
+
+  return {
+    startX: normalized.startX * width,
+    startY: normalized.startY * height,
+    width: normalized.width * width,
+    height: normalized.height * height,
+  };
+};
+
+export type CropPreviewStyle = {
+  displayWidth: number;
+  displayHeight: number;
+  backgroundSize: string;
+  backgroundPosition: string;
+  scale: number;
+};
+
+type CropPreviewOptions = {
+  maxEdge?: number;
+};
+
+export const getCropPreviewStyle = (
+  rect: AbsoluteCropRect | null | undefined,
+  sourceWidth: number | null | undefined,
+  sourceHeight: number | null | undefined,
+  options?: CropPreviewOptions,
+): CropPreviewStyle | null => {
+  if (!rect) return null;
+  if (!isFiniteNumber(sourceWidth) || !isFiniteNumber(sourceHeight)) {
+    return null;
+  }
+
+  const width = sourceWidth as number;
+  const height = sourceHeight as number;
+  if (!(width > 0 && height > 0)) {
+    return null;
+  }
+
+  if (!(rect.width > 0 && rect.height > 0)) {
+    return null;
+  }
+
+  const cropMaxEdge = Math.max(rect.width, rect.height);
+  if (!(cropMaxEdge > 0)) {
+    return null;
+  }
+
+  const maxEdge = options?.maxEdge ?? cropMaxEdge;
+  const previewEdge = Math.max(1, maxEdge);
+  const scale = Math.min(previewEdge / cropMaxEdge, 1);
+  const displayWidth = Math.max(rect.width * scale, 1);
+  const displayHeight = Math.max(rect.height * scale, 1);
+  const backgroundSize = `${width * scale}px ${height * scale}px`;
+  const backgroundPosition = `${-rect.startX * scale}px ${-rect.startY * scale}px`;
+
+  return {
+    displayWidth,
+    displayHeight,
+    backgroundSize,
+    backgroundPosition,
+    scale,
   };
 };

@@ -34,6 +34,7 @@ import FileViewer from './panels/FileViewer';
 import { useFileDrop } from '../../../../../../packages/hooks/src/useFileDrop';
 import { toast } from 'react-toastify';
 import ImageCropView from './panels/ImageCropView';
+import { toNormalizedCropRect } from '@tgim/utils/crop';
 
 const DEFAULT_CAPTURE_LINK = 'relativeimage';
 const FOLDER_CAPTURE_FORWARD_LINK = RelationType.ContainsFile;
@@ -93,50 +94,6 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
 
     const nodes: GraphNode[] = [];
     const links: GraphConnection[] = [];
-
-    const clamp01 = (value: number) => {
-      if (!Number.isFinite(value)) return 0;
-      return Math.min(1, Math.max(0, value));
-    };
-
-    const toNormalizedCropRect = (crop: NodeCrop) => {
-      let startX = crop.startX;
-      let startY = crop.startY;
-      let width = crop.width;
-      let height = crop.height;
-
-      if (!crop.isRelative) {
-        const referenceWidth = crop.referenceWidth ?? null;
-        const referenceHeight = crop.referenceHeight ?? null;
-
-        if (!referenceWidth || !referenceHeight || referenceWidth <= 0 || referenceHeight <= 0) {
-          return null;
-        }
-
-        startX = startX / referenceWidth;
-        startY = startY / referenceHeight;
-        width = width / referenceWidth;
-        height = height / referenceHeight;
-      }
-
-      const startXClamped = clamp01(startX);
-      const startYClamped = clamp01(startY);
-      const endXClamped = clamp01(startX + width);
-      const endYClamped = clamp01(startY + height);
-      const normalizedWidth = endXClamped - startXClamped;
-      const normalizedHeight = endYClamped - startYClamped;
-
-      if (normalizedWidth <= 0 || normalizedHeight <= 0) {
-        return null;
-      }
-
-      return {
-        startX: startXClamped,
-        startY: startYClamped,
-        width: normalizedWidth,
-        height: normalizedHeight,
-      };
-    };
 
     const getGraphNodeData = (node: Node, graphNodeId?: string): GraphNode => {
       const defaultSize = 14;

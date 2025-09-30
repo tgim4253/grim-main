@@ -9,6 +9,8 @@ import Button from '@tgim/ui/Button';
 import Modal from '@tgim/ui/Modal';
 import { cn } from '@tgim/utils/index';
 import { toast } from 'react-toastify';
+import { toAbsoluteCropRect } from '@tgim/utils/crop';
+import { CropPreview } from '@tgim/ui';
 
 interface CropEntry {
   nodeId: string;
@@ -84,39 +86,6 @@ const computeSelectionData = (
 
 const approx = (value: number, expected: number, tolerance = FULL_IMAGE_TOLERANCE) =>
   Math.abs(value - expected) <= tolerance;
-
-const resolveCropRect = (crop: NodeCrop, sourceWidth: number, sourceHeight: number) => {
-  if (sourceWidth <= 0 || sourceHeight <= 0) return null;
-
-  const referenceWidth = crop.referenceWidth ?? sourceWidth;
-  const referenceHeight = crop.referenceHeight ?? sourceHeight;
-
-  if (referenceWidth <= 0 || referenceHeight <= 0) {
-    return null;
-  }
-
-  let startX = crop.startX;
-  let startY = crop.startY;
-  let width = crop.width;
-  let height = crop.height;
-
-  if (crop.isRelative) {
-    startX *= referenceWidth;
-    startY *= referenceHeight;
-    width *= referenceWidth;
-    height *= referenceHeight;
-  }
-
-  const scaleX = sourceWidth / referenceWidth;
-  const scaleY = sourceHeight / referenceHeight;
-
-  return {
-    startX: startX * scaleX,
-    startY: startY * scaleY,
-    width: width * scaleX,
-    height: height * scaleY,
-  };
-};
 
 const formatDimensions = (width: number, height: number) =>
   `${Math.round(width)} × ${Math.round(height)}`;
@@ -362,16 +331,9 @@ const ImageCropView: React.FC<ImageCropViewProps> = ({ file, moaId, crops, onRef
   const renderCropPreview = useCallback(
     (entry: CropEntry) => {
       if (!imageSrc || sourceWidth == null || sourceHeight == null) return null;
-      const rect = resolveCropRect(entry.crop, sourceWidth, sourceHeight);
+      const rect = toAbsoluteCropRect(entry.crop, sourceWidth, sourceHeight);
       if (!rect) return null;
 
-      const maxEdge = Math.max(rect.width, rect.height);
-      const scale = maxEdge > 0 ? Math.min(PREVIEW_MAX_EDGE / maxEdge, 1) : 1;
-      const displayWidth = Math.max(rect.width * scale, 1);
-      const displayHeight = Math.max(rect.height * scale, 1);
-      const backgroundSize = `${sourceWidth * scale}px ${sourceHeight * scale}px`;
-      const backgroundPosition = `${-rect.startX * scale}px ${-rect.startY * scale}px`;
-      console.log(imageSrc);
       return (
         <button
           key={entry.nodeId}
@@ -379,20 +341,14 @@ const ImageCropView: React.FC<ImageCropViewProps> = ({ file, moaId, crops, onRef
           onClick={() => setActiveCrop(entry)}
           className="flex flex-col gap-2 rounded-lg border border-border bg-surface-muted p-2 text-left shadow-sm transition hover:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
-          <div
-            className="flex items-center justify-center overflow-hidden rounded-md bg-background"
-            style={{ width: displayWidth, height: displayHeight }}
-          >
-            <div
-              className="h-full w-full"
-              style={{
-                backgroundImage: `url("${imageSrc}")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundSize,
-                backgroundPosition,
-              }}
-            />
-          </div>
+          <CropPreview
+            imageSrc={imageSrc}
+            rect={rect}
+            sourceWidth={sourceWidth}
+            sourceHeight={sourceHeight}
+            maxEdge={PREVIEW_MAX_EDGE}
+            className="flex items-center justify-center"
+          />
           <div className="flex flex-col text-xs text-muted-foreground">
             <span>크기: {formatDimensions(rect.width, rect.height)}</span>
             <span>
@@ -548,34 +504,23 @@ const ImageCropView: React.FC<ImageCropViewProps> = ({ file, moaId, crops, onRef
           <div className="flex flex-col gap-4">
             <h3 className="text-lg font-semibold">크롭 상세 보기</h3>
             {(() => {
-              const rect = resolveCropRect(activeCrop.crop, sourceWidth, sourceHeight);
+              const rect = toAbsoluteCropRect(activeCrop.crop, sourceWidth, sourceHeight);
               if (!rect) {
                 return (
                   <p className="text-sm text-muted-foreground">크롭 정보를 불러올 수 없습니다.</p>
                 );
               }
-              const scale = Math.min(600 / Math.max(rect.width, rect.height), 1);
-              const displayWidth = Math.max(rect.width * scale, 1);
-              const displayHeight = Math.max(rect.height * scale, 1);
-              const backgroundSize = `${sourceWidth * scale}px ${sourceHeight * scale}px`;
-              const backgroundPosition = `${-rect.startX * scale}px ${-rect.startY * scale}px`;
 
               return (
                 <div className="flex flex-col gap-3">
-                  <div
-                    className="self-start overflow-hidden rounded-xl border border-border bg-background shadow"
-                    style={{ width: displayWidth, height: displayHeight }}
-                  >
-                    <div
-                      className="h-full w-full"
-                      style={{
-                        backgroundImage: `url("${imageSrc}")`,
-                        backgroundRepeat: 'no-repeat',
-                        backgroundSize,
-                        backgroundPosition,
-                      }}
-                    />
-                  </div>
+                  <CropPreview
+                    imageSrc={imageSrc}
+                    rect={rect}
+                    sourceWidth={sourceWidth}
+                    sourceHeight={sourceHeight}
+                    maxEdge={600}
+                    className="self-start rounded-xl border border-border bg-background shadow"
+                  />
                   <div className="text-sm text-muted-foreground">
                     <p>크기: {formatDimensions(rect.width, rect.height)}</p>
                     <p>
