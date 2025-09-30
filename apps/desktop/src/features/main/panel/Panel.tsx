@@ -29,7 +29,7 @@ import { Button } from '@tgim/ui';
 import cn from '@tgim/utils/cn';
 import { Split } from '@tgim/ui/Splitter';
 import FileDetailSidebar from './panels/FileDetailSidebar';
-import { Camera, Crop, Eye, GitBranch, LayoutGrid } from 'lucide-react';
+import { Camera, Crop, Eye, GitBranch, LayoutGrid, NotebookPen } from 'lucide-react';
 import FileViewer from './panels/FileViewer';
 import { useFileDrop } from '../../../../../../packages/hooks/src/useFileDrop';
 import { toast } from 'react-toastify';
@@ -44,7 +44,7 @@ interface PanelProps {
   hidden?: boolean;
 }
 
-type ViewType = 'graph' | 'grid' | 'viewer' | 'crop';
+type ViewType = 'graph' | 'grid' | 'viewer' | 'crop' | 'memo';
 
 const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [viewType, setViewType] = useState<ViewType>('graph');
@@ -452,7 +452,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     }
     if (rootNode?.kind === NodeKind.File) {
       if (rootFile?.kind === FileType.Image) {
-        return ['viewer', 'crop', 'graph'];
+        return ['viewer', 'crop', 'graph', 'memo'];
       }
       return ['viewer', 'graph'];
     }
@@ -539,15 +539,17 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       refreshPanelData,
     });
 
+  const isRootFileImage = useMemo(() => {
+    return (
+      !!rootFile && rootNode?.kind !== NodeKind.Crop && rootFile.kind === FileType.Image && !!moaId
+    );
+  }, [rootFile, rootNode]);
+
   const showGraph = viewType === 'graph' && graphData && rootNodeId && rootGraphNodeId;
   const showGrid = viewType === 'grid' && !!gridData && availableViews.includes('grid');
   const showViewer = viewType === 'viewer' && !!rootFile;
-  const showCrop =
-    viewType === 'crop' &&
-    !!rootFile &&
-    rootNode?.kind !== NodeKind.Crop &&
-    rootFile.kind === FileType.Image &&
-    !!moaId;
+  const showMemo = viewType === 'memo' && isRootFileImage;
+  const showCrop = viewType === 'crop' && isRootFileImage;
 
   const handleStartCapture = useCallback(async () => {
     if (!moaId || !captureAnchor) return;
@@ -594,6 +596,8 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         return Eye;
       case 'crop':
         return Crop;
+      case 'memo':
+        return NotebookPen;
       case 'graph':
       default:
         return GitBranch;
@@ -648,6 +652,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
                   grid: '그리드 보기',
                   viewer: '뷰어 보기',
                   crop: '크롭 도구',
+                  memo: '메모 도구',
                 };
 
                 return (
@@ -686,14 +691,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
             onClearPreview={() => {}}
           />
         ) : showViewer && rootFile ? (
-          <FileViewer
-            file={rootFile}
-            moaId={moaId}
-            crop={activeCrop ?? undefined}
-            nodesById={rawNodesById}
-            connections={rawConnections}
-            onGraphUpdate={handleGraphUpdate}
-          />
+          <FileViewer file={rootFile} moaId={moaId} crop={activeCrop ?? undefined} />
         ) : showCrop && rootFile && moaId ? (
           <ImageCropView
             file={rootFile}

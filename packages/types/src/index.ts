@@ -5,3 +5,4 @@ export * from './grid';
 export * from './file';
 export * from './croquis';
 export * from './capture';
+export * from './crop';
