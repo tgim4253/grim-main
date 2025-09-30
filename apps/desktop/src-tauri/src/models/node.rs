@@ -52,7 +52,7 @@ impl FromStr for NodeKind {
 }
 
 /// Node record returned to the renderer.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Node {
     pub id: String,
     pub kind: NodeKind,
@@ -62,7 +62,7 @@ pub struct Node {
 }
 
 /// Associated data for a node depending on its kind.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum NodeData {
     Folder(NodeFolder),
     File(FileContent),

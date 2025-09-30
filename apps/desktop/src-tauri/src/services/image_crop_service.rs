@@ -75,10 +75,12 @@ pub(crate) async fn create_image_crop_in_tx(
 ) -> Result<String> {
     validate_crop(rect, is_relative, reference_width, reference_height)?;
 
-    let node_data =
-        NodeRepository::fetch_file_node_data(tx, origin_node_id.to_string())
-            .await
-            .map_err(|err| anyhow!("Failed to load origin node: {err}"))?;
+    let node_data = NodeRepository::fetch_file_node_data(
+        tx.as_mut(),
+        origin_node_id.to_string(),
+    )
+    .await
+    .map_err(|err| anyhow!("Failed to load origin node: {err}"))?;
 
     let NodeData::File(origin_file) = node_data else {
         bail!("The origin node is not a file");
@@ -95,10 +97,10 @@ pub(crate) async fn create_image_crop_in_tx(
     }
 
     let crop_node_id =
-        NodeRepository::insert_node(tx, NodeKind::Crop, now).await?;
+        NodeRepository::insert_node(tx.as_mut(), NodeKind::Crop, now).await?;
 
     CropRepository::insert_crop(
-        tx,
+        tx.as_mut(),
         NewImageCrop {
             node_id: &crop_node_id,
             origin_hash: &origin_file.xxh3_64,
@@ -118,7 +120,7 @@ pub(crate) async fn create_image_crop_in_tx(
     let now_owned = now.to_string();
 
     ConnectionRepository::insert_connection(
-        tx,
+        tx.as_mut(),
         origin_id.clone(),
         crop_node_id.clone(),
         RelationType::Cropped,
@@ -127,7 +129,7 @@ pub(crate) async fn create_image_crop_in_tx(
     .await?;
 
     ConnectionRepository::insert_connection(
-        tx,
+        tx.as_mut(),
         crop_node_id.clone(),
         origin_id,
         RelationType::CroppedOrigin,
@@ -156,7 +158,7 @@ pub async fn create_image_crop(
     let now = get_now_date();
 
     create_image_crop_in_tx(
-        tx.as_mut(),
+        &mut tx,
         &origin_node_id,
         Some(origin_hash.as_str()),
         &rect,

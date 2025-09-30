@@ -73,7 +73,7 @@ impl Default for FolderMountState {
 }
 
 /// Folder node metadata fetched from the database.
-#[derive(Debug, FromRow, Serialize, Deserialize)]
+#[derive(Debug, FromRow, Serialize, Deserialize, Clone)]
 pub struct NodeFolder {
     pub folder_id: String,
     pub node_id: String,
@@ -85,7 +85,7 @@ pub struct NodeFolder {
 }
 
 /// File content metadata persisted in the database.
-#[derive(Debug, FromRow, Serialize, Deserialize)]
+#[derive(Debug, FromRow, Serialize, Deserialize, Clone)]
 pub struct FileContent {
     pub file_id: String,
     pub node_id: String,

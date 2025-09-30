@@ -33,7 +33,7 @@ pub async fn create_memo(
 
     if let Some(crop_payload) = crop.as_ref() {
         let crop_node_id = create_image_crop_in_tx(
-            tx.as_mut(),
+            &mut tx,
             &target_node_id,
             origin_hash.as_deref(),
             &crop_payload.rect,
@@ -46,12 +46,13 @@ pub async fn create_memo(
 
         attachment_node_id = crop_node_id;
     } else {
+        let target_node_id_cap = target_node_id.clone();
         // Ensure the target node exists and is a file or crop.
         let kind = sqlx::query_scalar!(
             r#"
             SELECT kind FROM node WHERE id = ?1
             "#,
-            &target_node_id
+            target_node_id_cap
         )
         .fetch_optional(tx.as_mut())
         .await?
@@ -125,11 +126,12 @@ pub async fn update_memo_text(
 
     let UpdateMemoPayload { node_id, text } = payload;
 
+    let node_id_cap = node_id.clone();
     let kind = sqlx::query_scalar!(
         r#"
         SELECT kind FROM node WHERE id = ?1
         "#,
-        &node_id
+        node_id_cap
     )
     .fetch_optional(tx.as_mut())
     .await?
