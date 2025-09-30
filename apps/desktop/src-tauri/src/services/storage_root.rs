@@ -1,5 +1,3 @@
-//! Cross-platform helpers for storage root discovery and classification.
-
 use crate::db::repository::sroot_repository::SrootRepository;
 use crate::models::file::{StorageKind, StorageRootInfo};
 use crate::services::file_service::ensure_real_folder;
@@ -252,7 +250,7 @@ mod platform_impl {
     }
 
     /// Try to resolve the mount point for `p` using WinAPI; fall back to drive prefix.
-    pub fn find_mount_point(p: &Path) -> Option<PathBuf> {
+    pub fn find_mount_point(p: &PathBuf) -> Option<PathBuf> {
         let w_path = os_to_utf16_nul(p.as_os_str());
         let mut out = vec![0u16; 32_768];
         let ok = unsafe {
@@ -462,8 +460,8 @@ mod platform_impl {
 
     /// Classify storage kind using Windows-specific heuristics.
     pub fn classify_kind(
-        norm: &Path,
-        mount_path: &Path,
+        norm: &PathBuf,
+        mount_path: &PathBuf,
         device: Option<&str>,
         fstype: Option<&str>,
     ) -> StorageKind {

@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                node_id           AS \"node_id!\",\n                text              AS \"text!\",\n                created_at        AS \"created_at!\",\n                updated_at        AS \"updated_at!\"\n            FROM node_memo\n            WHERE node_id IN (SELECT value FROM json_each(?1))\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "node_id!",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "text!",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at!",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at!",
+        "ordinal": 3,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "9bd7898c2d87f77c550bc8c8d15a2d48af3f161e6eb5f8a73c52ac72bded5b28"
+}

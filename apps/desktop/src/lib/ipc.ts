@@ -1,6 +1,13 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
-import { CreateImageCropPayload, GraphResponse } from '@tgim/types/graph';
+import {
+  CreateImageCropPayload,
+  CreateMemoPayload,
+  CreateMemoResult,
+  GraphResponse,
+  NodeMemo,
+  UpdateMemoPayload,
+} from '@tgim/types/graph';
 import {
   CreateFolderPayload,
   FileTypeExtensionGroup,
@@ -88,6 +95,17 @@ const graphIpc = {
   getGraphOne: async (moaId: string, nodeId: string): Promise<GraphResponse> => {
     const response = await invoke('get_graph_one', { moaId, nodeId });
     return convertKeysToCamel(response) as GraphResponse;
+  },
+};
+
+const memoIpc = {
+  createMemo: async (moaId: string, payload: CreateMemoPayload): Promise<CreateMemoResult> => {
+    const response = await invoke('create_memo', { moaId, payload });
+    return convertKeysToCamel(response) as CreateMemoResult;
+  },
+  updateMemoText: async (moaId: string, payload: UpdateMemoPayload): Promise<NodeMemo> => {
+    const response = await invoke('update_memo_text', { moaId, payload });
+    return convertKeysToCamel(response) as NodeMemo;
   },
 };
 
@@ -206,6 +224,7 @@ export const ipc = {
   windowController: windowControllerIpc,
   moa: moaIpc,
   graph: graphIpc,
+  memo: memoIpc,
   file: fileIpc,
   croquis: croquisIpc,
   capture: captureIpc,

@@ -7,6 +7,7 @@ use crate::models::{
     connection::Connection,
     crop::ImageCrop,
     file::{FileContent, NodeFolder},
+    memo::NodeMemo,
 };
 
 /// Kind of node stored in the workspace graph.
@@ -43,6 +44,7 @@ impl FromStr for NodeKind {
         match s {
             "folder" => Ok(NodeKind::Folder),
             "file" => Ok(NodeKind::File),
+            "memo" => Ok(NodeKind::Memo),
             "crop" => Ok(NodeKind::Crop),
             _ => Ok(NodeKind::Unknown),
         }
@@ -50,7 +52,7 @@ impl FromStr for NodeKind {
 }
 
 /// Node record returned to the renderer.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Node {
     pub id: String,
     pub kind: NodeKind,
@@ -60,11 +62,12 @@ pub struct Node {
 }
 
 /// Associated data for a node depending on its kind.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum NodeData {
     Folder(NodeFolder),
     File(FileContent),
     Crop(ImageCrop),
+    Memo(NodeMemo),
 }
 
 /// Wrapper bundling nodes and their connections.

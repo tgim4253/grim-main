@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{prelude::Type, FromRow};
 
 /// Directed edge connecting two nodes in the graph.
-#[derive(Debug, FromRow, Serialize)]
+#[derive(Debug, FromRow, Serialize, Deserialize, Clone)]
 pub struct Connection {
     pub id: String,
     pub src_node_id: String,
@@ -27,6 +27,8 @@ pub enum RelationType {
     CroquisRefLink,
     Cropped,
     CroppedOrigin,
+    Memo,
+    MemoTarget,
 }
 
 impl RelationType {
@@ -41,6 +43,8 @@ impl RelationType {
             RelationType::CroquisRefLink => "croquisreflink",
             RelationType::Cropped => "cropped",
             RelationType::CroppedOrigin => "croppedorigin",
+            RelationType::Memo => "memo",
+            RelationType::MemoTarget => "memotarget",
         }
     }
 }

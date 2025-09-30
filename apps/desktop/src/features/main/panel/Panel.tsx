@@ -56,6 +56,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [graphRefreshKey, setGraphRefreshKey] = useState(0);
   const [gridRefreshKey, setGridRefreshKey] = useState(0);
   const [rawNodesById, setRawNodesById] = useState<Record<string, Node>>({});
+  const [rawConnections, setRawConnections] = useState<Connection[]>([]);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const { panel, containerId, isActive } = usePanelsStore(
     useShallow(state => ({
@@ -75,6 +76,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       nodesMap[node.id] = node;
     });
     setRawNodesById(nodesMap);
+    setRawConnections(graphData.connections);
     const connectionsMap: Record<string, Connection[]> = {};
     const incomingConnectionsMap: Record<string, Connection[]> = {};
     graphData.connections.forEach(connection => {
@@ -284,6 +286,14 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       links,
     };
   }, []);
+
+  const handleGraphUpdate = useCallback(
+    (graph: GraphResponse) => {
+      const nextGraphData = transformDataToGraphData(graph);
+      setGraphData(nextGraphData);
+    },
+    [transformDataToGraphData],
+  );
   const [defaultDownloadPath, setDefaultDownloadPath] = useState<string | null>(null);
 
   useEffect(() => {
@@ -326,15 +336,14 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     if (!moaId) return;
     try {
       const data = await ipc.graph.getGraphOne(moaId, panel.nodeId.toString());
-      setRootNode(data.nodes.find(node => node.id === data.rootNodeId) ?? null);
-      setGraphData(transformDataToGraphData(data));
+      handleGraphUpdate(data);
       setGridData(await transformDataToGridData(data));
       setGraphRefreshKey(prev => prev + 1);
       setGridRefreshKey(prev => prev + 1);
     } catch (e) {
       console.error('Failed to load panel data', e);
     }
-  }, [moaId, panel.nodeId, transformDataToGraphData, transformDataToGridData]);
+  }, [handleGraphUpdate, moaId, panel.nodeId, transformDataToGridData]);
 
   useEffect(() => {
     void refreshPanelData();
@@ -394,14 +403,14 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   }, [moaId, panel?.nodeId, transformDataToGraphData, transformDataToGridData]);
 
   const rootGraphNodeId = useMemo(() => {
-    if (!graphData) return null;
-    let id = null;
-    graphData.nodes.forEach(node => {
-      if (node.nodeId == rootNodeId) {
-        id = node.id;
-      }
-    });
-    return id;
+    if (!graphData || !rootNodeId) return null;
+
+    const rootNode = graphData.nodes.find(node => node.nodeId === rootNodeId && node.depth === 0);
+    if (rootNode) {
+      return rootNode.id;
+    }
+
+    return graphData.nodes.find(node => node.nodeId === rootNodeId)?.id ?? null;
   }, [graphData, rootNodeId]);
 
   const rootFile = useMemo<NodeFile | null>(() => {
@@ -677,7 +686,14 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
             onClearPreview={() => {}}
           />
         ) : showViewer && rootFile ? (
-          <FileViewer file={rootFile} moaId={moaId} crop={activeCrop ?? undefined} />
+          <FileViewer
+            file={rootFile}
+            moaId={moaId}
+            crop={activeCrop ?? undefined}
+            nodesById={rawNodesById}
+            connections={rawConnections}
+            onGraphUpdate={handleGraphUpdate}
+          />
         ) : showCrop && rootFile && moaId ? (
           <ImageCropView
             file={rootFile}
