@@ -61,6 +61,7 @@ export interface Node {
     ['File']?: NodeFile;
     ['Folder']?: NodeFolder;
     ['Crop']?: NodeCrop;
+    ['Memo']?: NodeMemo;
   };
   createdAt: string;
   updatedAt: string;
@@ -108,6 +109,13 @@ export interface NodeCrop {
   updatedAt: string;
 }
 
+export interface NodeMemo {
+  nodeId: string;
+  text: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export enum RelationType {
   ContainsFile = 'containsfile',
   BelongToFolder = 'belongtofolder',
@@ -118,6 +126,8 @@ export enum RelationType {
   CroquisRefLink = 'croquisreflink',
   Cropped = 'cropped',
   CroppedOrigin = 'croppedorigin',
+  Memo = 'memo',
+  MemoTarget = 'memotarget',
 }
 
 export interface CropRectangle {
@@ -135,4 +145,28 @@ export interface CreateImageCropPayload {
   referenceHeight?: number | null;
   isRelative?: boolean;
   normalizedRect?: CropRectangle;
+}
+
+export interface CreateMemoCropPayload {
+  rect: CropRectangle;
+  referenceWidth?: number | null;
+  referenceHeight?: number | null;
+  isRelative?: boolean;
+}
+
+export interface CreateMemoPayload {
+  targetNodeId: string;
+  text?: string;
+  crop?: CreateMemoCropPayload | null;
+  originHash?: string | null;
+}
+
+export interface UpdateMemoPayload {
+  nodeId: string;
+  text?: string;
+}
+
+export interface CreateMemoResult {
+  memo: NodeMemo;
+  graph: GraphResponse;
 }

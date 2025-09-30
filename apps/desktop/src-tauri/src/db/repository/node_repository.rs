@@ -1,6 +1,7 @@
 use super::{
     crop_repository::CropRepository,
     file_repository::{FileRepository, MountWithFolder},
+    memo_repository::MemoRepository,
 };
 use anyhow::{anyhow, Result};
 use sqlx::{Executor, Sqlite};
@@ -301,8 +302,26 @@ impl NodeRepository {
         .await?;
         let mut out = Vec::with_capacity(nodes.len());
 
+        let mut memo_ids: Vec<String> = Vec::new();
+        let mut kinds: Vec<NodeKind> = Vec::with_capacity(nodes.len());
+
         for node in nodes.iter() {
             let kind = NodeKind::from_str(&node.kind)?; // propagate parse error if any
+            if kind == NodeKind::Memo {
+                memo_ids.push(node.id.clone());
+            }
+            kinds.push(kind);
+        }
+
+        let mut memo_by_id =
+            MemoRepository::fetch_memos_by_node_ids(&mut *executor, &memo_ids)
+                .await?
+                .into_iter()
+                .map(|memo| (memo.node_id.clone(), memo))
+                .collect::<HashMap<_, _>>();
+
+        for (idx, node) in nodes.iter().enumerate() {
+            let kind = kinds[idx];
             let data = match kind {
                 NodeKind::Folder => Some(
                     Self::fetch_folder_node_data(
@@ -319,6 +338,9 @@ impl NodeRepository {
                     Self::fetch_crop_node_data(&mut *executor, node.id.clone())
                         .await?,
                 ),
+                NodeKind::Memo => {
+                    memo_by_id.remove(&node.id).map(NodeData::Memo)
+                }
                 _ => None,
             };
             out.push(Node {

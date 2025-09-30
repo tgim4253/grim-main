@@ -7,6 +7,7 @@ use crate::models::{
     connection::Connection,
     crop::ImageCrop,
     file::{FileContent, NodeFolder},
+    memo::NodeMemo,
 };
 
 /// Kind of node stored in the workspace graph.
@@ -43,6 +44,7 @@ impl FromStr for NodeKind {
         match s {
             "folder" => Ok(NodeKind::Folder),
             "file" => Ok(NodeKind::File),
+            "memo" => Ok(NodeKind::Memo),
             "crop" => Ok(NodeKind::Crop),
             _ => Ok(NodeKind::Unknown),
         }
@@ -65,6 +67,7 @@ pub enum NodeData {
     Folder(NodeFolder),
     File(FileContent),
     Crop(ImageCrop),
+    Memo(NodeMemo),
 }
 
 /// Wrapper bundling nodes and their connections.

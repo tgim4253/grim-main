@@ -27,6 +27,8 @@ pub enum RelationType {
     CroquisRefLink,
     Cropped,
     CroppedOrigin,
+    Memo,
+    MemoTarget,
 }
 
 impl RelationType {
@@ -41,6 +43,8 @@ impl RelationType {
             RelationType::CroquisRefLink => "croquisreflink",
             RelationType::Cropped => "cropped",
             RelationType::CroppedOrigin => "croppedorigin",
+            RelationType::Memo => "memo",
+            RelationType::MemoTarget => "memotarget",
         }
     }
 }

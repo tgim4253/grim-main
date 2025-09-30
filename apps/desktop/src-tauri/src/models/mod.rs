@@ -6,5 +6,6 @@ pub mod crop;
 pub mod croquis;
 pub mod file;
 pub mod graph;
+pub mod memo;
 pub mod node;
 pub mod tag;
