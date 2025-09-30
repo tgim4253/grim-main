@@ -89,6 +89,11 @@ pub async fn create_memo(
     )
     .await?;
 
+    // Reuse the memo repository helper so memo hydration stays consistent with
+    // other node-loading paths (for example the graph loader in
+    // `NodeRepository::fetch_nodes_by_ids`). Even when we only need the single
+    // row we rely on the shared helper to ensure the same joins and mapping
+    // logic are applied everywhere.
     let memo = MemoRepository::fetch_memos_by_node_ids(
         tx.as_mut(),
         &[memo_node_id.clone()],
@@ -137,6 +142,8 @@ pub async fn update_memo_text(
     MemoRepository::update_memo_text(tx.as_mut(), &node_id, &text, &now)
         .await?;
 
+    // See note above about using the shared memo fetch helper so the row is
+    // hydrated identically to bulk node loads.
     let memo = MemoRepository::fetch_memos_by_node_ids(
         tx.as_mut(),
         &[node_id.clone()],
