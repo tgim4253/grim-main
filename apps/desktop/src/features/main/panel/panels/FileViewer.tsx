@@ -200,8 +200,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
   }, [status]);
 
   useEffect(() => {
-    if (!normalizedCropRect) {
-      setImageMetrics(null);
+    if (status !== 'ready') {
       return;
     }
 
@@ -239,13 +238,17 @@ const FileViewer: React.FC<FileViewerProps> = ({
     };
 
     const resizeObserver = new ResizeObserver(() => updateMetrics());
-    if (imageWrapperRef.current) {
-      resizeObserver.observe(imageWrapperRef.current);
+    const wrapper = imageWrapperRef.current;
+    if (wrapper) {
+      resizeObserver.observe(wrapper);
     }
 
     const img = imageElementRef.current;
     if (img) {
       img.addEventListener('load', updateMetrics);
+      if (img.complete) {
+        updateMetrics();
+      }
     }
 
     updateMetrics();
@@ -256,7 +259,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
         img.removeEventListener('load', updateMetrics);
       }
     };
-  }, [imageSrc, normalizedCropRect]);
+  }, [imageSrc, status]);
 
   const fileDescription = useMemo(() => {
     switch (file.kind) {
