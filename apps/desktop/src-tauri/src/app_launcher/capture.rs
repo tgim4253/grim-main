@@ -64,7 +64,7 @@ pub fn launch_capture_overlay(
 
     #[cfg(not(target_os = "macos"))]
     {
-        builder = builder.decorations(false);
+        builder = builder.decorations(false).transparent(true);
     }
 
     let window = builder.build().map_err(|err| err.to_string())?;
