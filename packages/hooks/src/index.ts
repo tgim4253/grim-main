@@ -4,3 +4,4 @@ export * from './usePointerSelection';
 export * from './useFileDrop';
 export * from './useElementSize';
 export * from './useDebouncedEffect';
+export * from './useCropRect';

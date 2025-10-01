@@ -29,11 +29,13 @@ import { Button } from '@tgim/ui';
 import cn from '@tgim/utils/cn';
 import { Split } from '@tgim/ui/Splitter';
 import FileDetailSidebar from './panels/FileDetailSidebar';
-import { Camera, Crop, Eye, GitBranch, LayoutGrid } from 'lucide-react';
+import { Camera, Crop, Eye, GitBranch, LayoutGrid, NotebookPen } from 'lucide-react';
 import FileViewer from './panels/FileViewer';
 import { useFileDrop } from '../../../../../../packages/hooks/src/useFileDrop';
 import { toast } from 'react-toastify';
 import ImageCropView from './panels/ImageCropView';
+import ImageMemoView, { MemoEntry as MemoViewEntry } from './panels/ImageMemoView';
+import { toNormalizedCropRect } from '@tgim/utils/crop';
 
 const DEFAULT_CAPTURE_LINK = 'relativeimage';
 const FOLDER_CAPTURE_FORWARD_LINK = RelationType.ContainsFile;
@@ -44,7 +46,7 @@ interface PanelProps {
   hidden?: boolean;
 }
 
-type ViewType = 'graph' | 'grid' | 'viewer' | 'crop';
+type ViewType = 'graph' | 'grid' | 'viewer' | 'crop' | 'memo';
 
 const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [viewType, setViewType] = useState<ViewType>('graph');
@@ -93,50 +95,6 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
 
     const nodes: GraphNode[] = [];
     const links: GraphConnection[] = [];
-
-    const clamp01 = (value: number) => {
-      if (!Number.isFinite(value)) return 0;
-      return Math.min(1, Math.max(0, value));
-    };
-
-    const toNormalizedCropRect = (crop: NodeCrop) => {
-      let startX = crop.startX;
-      let startY = crop.startY;
-      let width = crop.width;
-      let height = crop.height;
-
-      if (!crop.isRelative) {
-        const referenceWidth = crop.referenceWidth ?? null;
-        const referenceHeight = crop.referenceHeight ?? null;
-
-        if (!referenceWidth || !referenceHeight || referenceWidth <= 0 || referenceHeight <= 0) {
-          return null;
-        }
-
-        startX = startX / referenceWidth;
-        startY = startY / referenceHeight;
-        width = width / referenceWidth;
-        height = height / referenceHeight;
-      }
-
-      const startXClamped = clamp01(startX);
-      const startYClamped = clamp01(startY);
-      const endXClamped = clamp01(startX + width);
-      const endYClamped = clamp01(startY + height);
-      const normalizedWidth = endXClamped - startXClamped;
-      const normalizedHeight = endYClamped - startYClamped;
-
-      if (normalizedWidth <= 0 || normalizedHeight <= 0) {
-        return null;
-      }
-
-      return {
-        startX: startXClamped,
-        startY: startYClamped,
-        width: normalizedWidth,
-        height: normalizedHeight,
-      };
-    };
 
     const getGraphNodeData = (node: Node, graphNodeId?: string): GraphNode => {
       const defaultSize = 14;
@@ -446,13 +404,59 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     return entries.filter(entry => entry.crop.originHash === rootFile.xxh364);
   }, [graphData, rootFile?.xxh364]);
 
+  const memoEntries = useMemo<MemoViewEntry[]>(() => {
+    if (!rootFile?.xxh364 || !rootNode || rootNode.kind !== NodeKind.File) {
+      return [];
+    }
+
+    const entries: MemoViewEntry[] = [];
+    const rootHash = rootFile.xxh364;
+    const rootNodeId = rootNode.id;
+
+    Object.values(rawNodesById).forEach(node => {
+      if (node.kind !== NodeKind.Memo) return;
+      const memo = node.data?.['Memo'];
+      if (!memo) return;
+
+      const attachmentConnection = rawConnections.find(
+        connection => connection.kind === RelationType.Memo && connection.dstNodeId === node.id,
+      );
+
+      if (!attachmentConnection) return;
+
+      const attachmentNode = rawNodesById[attachmentConnection.srcNodeId];
+      if (!attachmentNode) return;
+
+      if (attachmentNode.kind === NodeKind.File) {
+        if (attachmentNode.id !== rootNodeId) return;
+        entries.push({
+          memo,
+          attachmentNodeId: attachmentNode.id,
+          attachmentType: 'file',
+        });
+      } else if (attachmentNode.kind === NodeKind.Crop) {
+        const crop = attachmentNode.data?.['Crop'];
+        if (!crop) return;
+        if (crop.originHash !== rootHash) return;
+        entries.push({
+          memo,
+          attachmentNodeId: attachmentNode.id,
+          attachmentType: 'crop',
+          crop,
+        });
+      }
+    });
+
+    return entries;
+  }, [rawConnections, rawNodesById, rootFile?.xxh364, rootNode]);
+
   const availableViews = useMemo<ViewType[]>(() => {
     if (rootNode?.kind === NodeKind.Folder) {
       return ['grid', 'graph'];
     }
     if (rootNode?.kind === NodeKind.File) {
       if (rootFile?.kind === FileType.Image) {
-        return ['viewer', 'crop', 'graph'];
+        return ['viewer', 'crop', 'graph', 'memo'];
       }
       return ['viewer', 'graph'];
     }
@@ -539,15 +543,17 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       refreshPanelData,
     });
 
+  const isRootFileImage = useMemo(() => {
+    return (
+      !!rootFile && rootNode?.kind !== NodeKind.Crop && rootFile.kind === FileType.Image && !!moaId
+    );
+  }, [rootFile, rootNode]);
+
   const showGraph = viewType === 'graph' && graphData && rootNodeId && rootGraphNodeId;
   const showGrid = viewType === 'grid' && !!gridData && availableViews.includes('grid');
   const showViewer = viewType === 'viewer' && !!rootFile;
-  const showCrop =
-    viewType === 'crop' &&
-    !!rootFile &&
-    rootNode?.kind !== NodeKind.Crop &&
-    rootFile.kind === FileType.Image &&
-    !!moaId;
+  const showMemo = viewType === 'memo' && isRootFileImage;
+  const showCrop = viewType === 'crop' && isRootFileImage;
 
   const handleStartCapture = useCallback(async () => {
     if (!moaId || !captureAnchor) return;
@@ -594,6 +600,8 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         return Eye;
       case 'crop':
         return Crop;
+      case 'memo':
+        return NotebookPen;
       case 'graph':
       default:
         return GitBranch;
@@ -648,6 +656,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
                   grid: '그리드 보기',
                   viewer: '뷰어 보기',
                   crop: '크롭 도구',
+                  memo: '메모 도구',
                 };
 
                 return (
@@ -686,19 +695,19 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
             onClearPreview={() => {}}
           />
         ) : showViewer && rootFile ? (
-          <FileViewer
-            file={rootFile}
-            moaId={moaId}
-            crop={activeCrop ?? undefined}
-            nodesById={rawNodesById}
-            connections={rawConnections}
-            onGraphUpdate={handleGraphUpdate}
-          />
+          <FileViewer file={rootFile} moaId={moaId} crop={activeCrop ?? undefined} />
         ) : showCrop && rootFile && moaId ? (
           <ImageCropView
             file={rootFile}
             moaId={moaId!}
             crops={cropEntries}
+            onRefresh={refreshPanelData}
+          />
+        ) : showMemo && rootFile && moaId ? (
+          <ImageMemoView
+            file={rootFile}
+            moaId={moaId!}
+            memoEntries={memoEntries}
             onRefresh={refreshPanelData}
           />
         ) : null}
