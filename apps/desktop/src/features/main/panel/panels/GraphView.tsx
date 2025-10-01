@@ -173,10 +173,13 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
 
       const targetSize = node.type === 'crop' ? cropThumbSize : baseThumbSize;
 
+      // Request thumbnails using only the width so the service preserves the
+      // original aspect ratio. Square thumbnails shift the crop coordinates
+      // and make the preview appear offset in the graph.
       const request: ThumbnailRequest = {
         hash,
         width: targetSize,
-        height: targetSize,
+        height: 0,
         dpr: 1 as const,
         mode: ResizeMode.Original,
       };
