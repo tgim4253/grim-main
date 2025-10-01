@@ -109,6 +109,8 @@ pub async fn seed_initial_data(pool: &Pool<Sqlite>) -> Result<()> {
         (RelationType::CroquisRefLink, 1, 0, "croquis -> origin"),
         (RelationType::Cropped, 1, 0, "origin -> crop"),
         (RelationType::CroppedOrigin, 1, 0, "crop -> origin"),
+        (RelationType::Memo, 1, 0, "image/crop -> memo"),
+        (RelationType::MemoTarget, 1, 0, "memo -> image/crop"),
     ];
 
     for (kind, default_level, editable, description) in seed_data {

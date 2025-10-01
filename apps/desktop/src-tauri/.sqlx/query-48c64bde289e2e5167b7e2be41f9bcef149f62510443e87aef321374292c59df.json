@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE node_memo\n            SET text = ?2,\n                updated_at = ?3\n            WHERE node_id = ?1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "48c64bde289e2e5167b7e2be41f9bcef149f62510443e87aef321374292c59df"
+}

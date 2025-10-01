@@ -232,6 +232,13 @@ CREATE TABLE IF NOT EXISTS node_crop (
   created_at              TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at              TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS node_memo (
+  node_id     TEXT PRIMARY KEY NOT NULL REFERENCES node(id) ON DELETE CASCADE,
+  text        TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
 /* ------------------------------------ PRAGMA user_version ----------------------------------------- */
 -- TODO: Replace `1` with actual TARGET_DB_VERSION value.
 PRAGMA user_version = 1;

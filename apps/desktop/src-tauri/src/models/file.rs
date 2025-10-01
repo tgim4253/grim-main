@@ -2,14 +2,16 @@ use anyhow::{anyhow, Context, Result};
 use core::fmt;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Type};
+#[cfg(target_os = "macos")]
+use std::os::unix::fs::MetadataExt;
 use std::{
     convert::From,
     fs::{self, Metadata},
-    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     str::FromStr,
     time::UNIX_EPOCH,
 };
+
 use tauri::{path::BaseDirectory, AppHandle, Manager};
 
 use crate::{
@@ -73,7 +75,7 @@ impl Default for FolderMountState {
 }
 
 /// Folder node metadata fetched from the database.
-#[derive(Debug, FromRow, Serialize, Deserialize)]
+#[derive(Debug, FromRow, Serialize, Deserialize, Clone)]
 pub struct NodeFolder {
     pub folder_id: String,
     pub node_id: String,
@@ -85,7 +87,7 @@ pub struct NodeFolder {
 }
 
 /// File content metadata persisted in the database.
-#[derive(Debug, FromRow, Serialize, Deserialize)]
+#[derive(Debug, FromRow, Serialize, Deserialize, Clone)]
 pub struct FileContent {
     pub file_id: String,
     pub node_id: String,

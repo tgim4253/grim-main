@@ -1,4 +1,5 @@
 use anyhow::{anyhow, bail, Result};
+use sqlx::{Sqlite, Transaction};
 
 use crate::{
     db::repository::{
@@ -41,7 +42,7 @@ fn is_full_image(
     }
 }
 
-fn validate_crop(
+pub(crate) fn validate_crop(
     rect: &CropRectangle,
     is_relative: bool,
     ref_w: Option<i64>,
@@ -62,6 +63,83 @@ fn validate_crop(
     Ok(())
 }
 
+pub(crate) async fn create_image_crop_in_tx(
+    tx: &mut Transaction<'_, Sqlite>,
+    origin_node_id: &str,
+    expected_origin_hash: Option<&str>,
+    rect: &CropRectangle,
+    reference_width: Option<i64>,
+    reference_height: Option<i64>,
+    is_relative: bool,
+    now: &str,
+) -> Result<String> {
+    validate_crop(rect, is_relative, reference_width, reference_height)?;
+
+    let node_data = NodeRepository::fetch_file_node_data(
+        tx.as_mut(),
+        origin_node_id.to_string(),
+    )
+    .await
+    .map_err(|err| anyhow!("Failed to load origin node: {err}"))?;
+
+    let NodeData::File(origin_file) = node_data else {
+        bail!("The origin node is not a file");
+    };
+
+    if origin_file.kind != FileType::Image {
+        bail!("Only image files can be cropped");
+    }
+
+    if let Some(expected_hash) = expected_origin_hash {
+        if !origin_file.xxh3_64.eq_ignore_ascii_case(expected_hash) {
+            bail!("Origin hash does not match the stored image hash");
+        }
+    }
+
+    let crop_node_id =
+        NodeRepository::insert_node(tx.as_mut(), NodeKind::Crop, now).await?;
+
+    CropRepository::insert_crop(
+        tx.as_mut(),
+        NewImageCrop {
+            node_id: &crop_node_id,
+            origin_hash: &origin_file.xxh3_64,
+            start_x: rect.start_x,
+            start_y: rect.start_y,
+            width: rect.width,
+            height: rect.height,
+            reference_width,
+            reference_height,
+            is_relative,
+            now,
+        },
+    )
+    .await?;
+
+    let origin_id = origin_node_id.to_string();
+    let now_owned = now.to_string();
+
+    ConnectionRepository::insert_connection(
+        tx.as_mut(),
+        origin_id.clone(),
+        crop_node_id.clone(),
+        RelationType::Cropped,
+        now_owned.clone(),
+    )
+    .await?;
+
+    ConnectionRepository::insert_connection(
+        tx.as_mut(),
+        crop_node_id.clone(),
+        origin_id,
+        RelationType::CroppedOrigin,
+        now_owned,
+    )
+    .await?;
+
+    Ok(crop_node_id)
+}
+
 /// Persist a crop node and return the updated neighbourhood graph.
 pub async fn create_image_crop(
     moa_id: &str,
@@ -76,66 +154,18 @@ pub async fn create_image_crop(
         is_relative,
     } = payload;
 
-    validate_crop(&rect, is_relative, reference_width, reference_height)?;
-
     let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
-
-    let node_data = NodeRepository::fetch_file_node_data(
-        tx.as_mut(),
-        origin_node_id.clone(),
-    )
-    .await
-    .map_err(|err| anyhow!("Failed to load origin node: {err}"))?;
-
-    let NodeData::File(origin_file) = node_data else {
-        bail!("The origin node is not a file");
-    };
-
-    if origin_file.kind != FileType::Image {
-        bail!("Only image files can be cropped");
-    }
-
-    if !origin_file.xxh3_64.eq_ignore_ascii_case(origin_hash.as_str()) {
-        bail!("Origin hash does not match the stored image hash");
-    }
-
     let now = get_now_date();
 
-    let crop_node_id =
-        NodeRepository::insert_node(tx.as_mut(), NodeKind::Crop, &now).await?;
-
-    CropRepository::insert_crop(
-        tx.as_mut(),
-        NewImageCrop {
-            node_id: &crop_node_id,
-            origin_hash: &origin_file.xxh3_64,
-            start_x: rect.start_x,
-            start_y: rect.start_y,
-            width: rect.width,
-            height: rect.height,
-            reference_width,
-            reference_height,
-            is_relative,
-            now: &now,
-        },
-    )
-    .await?;
-
-    ConnectionRepository::insert_connection(
-        tx.as_mut(),
-        origin_node_id.clone(),
-        crop_node_id.clone(),
-        RelationType::Cropped,
-        now.clone(),
-    )
-    .await?;
-
-    ConnectionRepository::insert_connection(
-        tx.as_mut(),
-        crop_node_id.clone(),
-        origin_node_id.clone(),
-        RelationType::CroppedOrigin,
-        now.clone(),
+    create_image_crop_in_tx(
+        &mut tx,
+        &origin_node_id,
+        Some(origin_hash.as_str()),
+        &rect,
+        reference_width,
+        reference_height,
+        is_relative,
+        &now,
     )
     .await?;
 
