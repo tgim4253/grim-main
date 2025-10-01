@@ -465,12 +465,16 @@ const ImageMemoView: React.FC<ImageMemoViewProps> = ({ file, moaId, memoEntries,
           text: draftText,
         };
         if (activeMemoState.crop) {
+          const {
+            absolute,
+            referenceWidth,
+            referenceHeight,
+          } = activeMemoState.crop;
           payload.crop = {
-            rect: activeMemoState.crop.absolute,
-            referenceWidth: activeMemoState.crop.referenceWidth,
-            referenceHeight: activeMemoState.crop.referenceHeight,
+            rect: absolute,
+            referenceWidth,
+            referenceHeight,
             isRelative: false,
-            normalizedRect: activeMemoState.crop.normalized,
           };
           payload.originHash = file.xxh364;
         }
