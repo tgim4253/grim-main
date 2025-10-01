@@ -34,6 +34,7 @@ import FileViewer from './panels/FileViewer';
 import { useFileDrop } from '../../../../../../packages/hooks/src/useFileDrop';
 import { toast } from 'react-toastify';
 import ImageCropView from './panels/ImageCropView';
+import ImageMemoView, { MemoEntry as MemoViewEntry } from './panels/ImageMemoView';
 import { toNormalizedCropRect } from '@tgim/utils/crop';
 
 const DEFAULT_CAPTURE_LINK = 'relativeimage';
@@ -403,6 +404,52 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     return entries.filter(entry => entry.crop.originHash === rootFile.xxh364);
   }, [graphData, rootFile?.xxh364]);
 
+  const memoEntries = useMemo<MemoViewEntry[]>(() => {
+    if (!rootFile?.xxh364 || !rootNode || rootNode.kind !== NodeKind.File) {
+      return [];
+    }
+
+    const entries: MemoViewEntry[] = [];
+    const rootHash = rootFile.xxh364;
+    const rootNodeId = rootNode.id;
+
+    Object.values(rawNodesById).forEach(node => {
+      if (node.kind !== NodeKind.Memo) return;
+      const memo = node.data?.['Memo'];
+      if (!memo) return;
+
+      const attachmentConnection = rawConnections.find(
+        connection => connection.kind === RelationType.Memo && connection.dstNodeId === node.id,
+      );
+
+      if (!attachmentConnection) return;
+
+      const attachmentNode = rawNodesById[attachmentConnection.srcNodeId];
+      if (!attachmentNode) return;
+
+      if (attachmentNode.kind === NodeKind.File) {
+        if (attachmentNode.id !== rootNodeId) return;
+        entries.push({
+          memo,
+          attachmentNodeId: attachmentNode.id,
+          attachmentType: 'file',
+        });
+      } else if (attachmentNode.kind === NodeKind.Crop) {
+        const crop = attachmentNode.data?.['Crop'];
+        if (!crop) return;
+        if (crop.originHash !== rootHash) return;
+        entries.push({
+          memo,
+          attachmentNodeId: attachmentNode.id,
+          attachmentType: 'crop',
+          crop,
+        });
+      }
+    });
+
+    return entries;
+  }, [rawConnections, rawNodesById, rootFile?.xxh364, rootNode]);
+
   const availableViews = useMemo<ViewType[]>(() => {
     if (rootNode?.kind === NodeKind.Folder) {
       return ['grid', 'graph'];
@@ -654,6 +701,13 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
             file={rootFile}
             moaId={moaId!}
             crops={cropEntries}
+            onRefresh={refreshPanelData}
+          />
+        ) : showMemo && rootFile && moaId ? (
+          <ImageMemoView
+            file={rootFile}
+            moaId={moaId!}
+            memoEntries={memoEntries}
             onRefresh={refreshPanelData}
           />
         ) : null}
