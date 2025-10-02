@@ -60,7 +60,7 @@ const partitionExtensions = (
       if (!selections[fileType]) {
         selections[fileType] = new Set<string>();
       }
-      selections[fileType]!.add(normalized);
+      selections[fileType].add(normalized);
     } else {
       remainder.push(normalized);
     }
@@ -281,7 +281,9 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({
                     <button
                       type="button"
                       className="text-xs text-modal-text-secondary underline"
-                      onClick={() => toggleGroupExpansion(setExpanded, group.fileType)}
+                      onClick={() => {
+                        toggleGroupExpansion(setExpanded, group.fileType);
+                      }}
                     >
                       {isExpanded ? '접기' : '세부 선택'}
                     </button>
@@ -323,7 +325,9 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({
           <input
             className="w-full rounded-md border border-modal-input-bg bg-modal-input-bg px-3 py-2 text-sm text-modal-text focus:border-primary focus:outline-none"
             value={customValue}
-            onChange={event => setCustomValue(event.target.value)}
+            onChange={event => {
+              setCustomValue(event.target.value);
+            }}
             placeholder="psd, clip"
           />
           <p className="text-xs text-modal-text-secondary">
@@ -410,7 +414,9 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({
                 id="folder-path"
                 className="w-full rounded-md border border-modal-input-bg bg-modal-input-bg px-3 py-2 text-sm text-modal-text focus:border-primary focus:outline-none"
                 value={path}
-                onChange={event => setPath(event.target.value)}
+                onChange={event => {
+                  setPath(event.target.value);
+                }}
                 placeholder="/Users/username/Pictures"
               />
               <p className="text-xs text-modal-text-secondary">
@@ -547,7 +553,9 @@ const OptionToggle = ({
       type="checkbox"
       className="mt-1 h-4 w-4"
       checked={checked}
-      onChange={event => onChange(event.target.checked)}
+      onChange={event => {
+        onChange(event.target.checked);
+      }}
     />
   </label>
 );

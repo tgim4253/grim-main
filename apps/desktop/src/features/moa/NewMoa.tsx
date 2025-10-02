@@ -54,7 +54,9 @@ const NewMoa: React.FC = () => {
         <Input.Input
           placeholder="보관함 이름을 입력해주세요."
           className="input-default"
-          onChange={e => setName(e.target.value)}
+          onChange={e => {
+            setName(e.target.value);
+          }}
         />
         <div className="flex justify-end">
           <Button variant="primary" onClick={handleCreate}>

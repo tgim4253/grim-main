@@ -184,16 +184,24 @@ const ImageMemoView: React.FC<ImageMemoViewProps> = ({ file, moaId, memoEntries,
   }, []);
 
   useEffect(() => {
-    const handleResize = () => updateImageBounds();
+    const handleResize = () => {
+      updateImageBounds();
+    };
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
   }, [updateImageBounds]);
 
   useEffect(() => {
     if (!interactionSurfaceRef.current) return;
-    const observer = new ResizeObserver(() => updateImageBounds());
+    const observer = new ResizeObserver(() => {
+      updateImageBounds();
+    });
     observer.observe(interactionSurfaceRef.current);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+    };
   }, [updateImageBounds]);
 
   useEffect(() => {
@@ -496,7 +504,9 @@ const ImageMemoView: React.FC<ImageMemoViewProps> = ({ file, moaId, memoEntries,
         <button
           key={item.memo.nodeId}
           type="button"
-          onClick={() => handleOpenMemo(item)}
+          onClick={() => {
+            handleOpenMemo(item);
+          }}
           className={cn(
             'flex flex-col gap-1 rounded-lg border border-border bg-surface-muted p-3 text-left shadow-sm transition hover:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent',
             selectedMemoId === item.memo.nodeId && 'border-accent',
@@ -551,7 +561,9 @@ const ImageMemoView: React.FC<ImageMemoViewProps> = ({ file, moaId, memoEntries,
                     type="button"
                     variant="toggle"
                     active={selectionMode}
-                    onClick={() => setSelectionMode(prev => !prev)}
+                    onClick={() => {
+                      setSelectionMode(prev => !prev);
+                    }}
                     disabled={selectionToggleDisabled}
                   >
                     영역 선택
@@ -614,7 +626,9 @@ const ImageMemoView: React.FC<ImageMemoViewProps> = ({ file, moaId, memoEntries,
                         selectedMemoId === item.memo.nodeId && 'border-accent bg-accent/15',
                       )}
                       style={style}
-                      onClick={() => handleOpenMemo(item)}
+                      onClick={() => {
+                        handleOpenMemo(item);
+                      }}
                     >
                       <span className="absolute -top-2 -left-2 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-accent-foreground shadow">
                         {item.marker}
@@ -644,7 +658,9 @@ const ImageMemoView: React.FC<ImageMemoViewProps> = ({ file, moaId, memoEntries,
               {previewOptions.length > 1 ? (
                 <Switch
                   current={modalPreview}
-                  onChanged={value => setModalPreview(value as 'original' | 'crop')}
+                  onChanged={value => {
+                    setModalPreview(value);
+                  }}
                   options={previewOptions}
                 />
               ) : null}
@@ -695,7 +711,9 @@ const ImageMemoView: React.FC<ImageMemoViewProps> = ({ file, moaId, memoEntries,
               <textarea
                 id="memo-text"
                 value={draftText}
-                onChange={event => setDraftText(event.target.value)}
+                onChange={event => {
+                  setDraftText(event.target.value);
+                }}
                 placeholder="메모를 입력하세요"
                 className="h-32 w-full resize-none rounded-lg border border-border bg-background p-3 text-sm text-foreground shadow-inner focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               />

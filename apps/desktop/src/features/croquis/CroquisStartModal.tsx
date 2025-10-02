@@ -51,9 +51,9 @@ const formatTimer = (seconds: number): string => {
   const secs = total % 60;
   const parts: string[] = [];
 
-  if (hours) parts.push(`${hours}h`);
-  if (minutes) parts.push(`${minutes}m`);
-  if (secs || parts.length === 0) parts.push(`${secs}s`);
+  if (hours) parts.push(`${String(hours)}h`);
+  if (minutes) parts.push(`${String(minutes)}m`);
+  if (secs || parts.length === 0) parts.push(`${String(secs)}s`);
 
   return parts.join(' ');
 };
@@ -139,15 +139,15 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
       preferencesState.presets[0],
     [preferencesState],
   );
-  const activeOption = useMemo(() => normaliseCroquisOption(activePreset?.option), [activePreset]);
-  const [rememberSettings, setRememberSettings] = useState<boolean>(Boolean(remember));
+  const activeOption = useMemo(() => normaliseCroquisOption(activePreset.option), [activePreset]);
+  const [rememberSettings, setRememberSettings] = useState<boolean>(remember);
   const [submitting, setSubmitting] = useState(false);
   const [timerInput, setTimerInput] = useState(() => formatTimer(activeOption.timer.maxTime));
   const [editingTimer, setEditingTimer] = useState(false);
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
   const [presetNameDraft, setPresetNameDraft] = useState('');
   const [editingPresetInitialName, setEditingPresetInitialName] = useState('');
-  const hasUserInteractedRef = useRef(false);
+  const hasUserInteractedRef = { current: false };
   const editingPresetInputRef = useRef<HTMLInputElement | null>(null);
 
   const markInteracted = useCallback(() => {
@@ -170,11 +170,10 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
       return;
     }
     const trimmed = presetNameDraft.trim();
-    let didChange = false;
     setPreferencesState(prev => {
       const index = prev.presets.findIndex(preset => preset.id === editingPresetId);
       if (index === -1) return prev;
-      const fallbackName = `Preset ${index + 1}`;
+      const fallbackName = `Preset ${String(index + 1)}`;
       const current = prev.presets[index];
       const nextName = trimmed || fallbackName;
       if (current.name === nextName) {
@@ -185,20 +184,21 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
         ...current,
         name: nextName,
       };
-      didChange = true;
       return {
         ...prev,
         presets: nextPresets,
       };
     });
-    if (didChange) {
-      markInteracted();
-    }
+
     setEditingPresetId(null);
     setPresetNameDraft('');
     setEditingPresetInitialName('');
     editingPresetInputRef.current = null;
   }, [editingPresetId, markInteracted, presetNameDraft, setPreferencesState]);
+
+  useEffect(() => {
+    markInteracted();
+  }, [preferencesState]);
 
   const cancelPresetNameEdit = useCallback(() => {
     if (editingPresetId) {
@@ -290,7 +290,7 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
     if (!open) return;
     hasUserInteractedRef.current = false;
     setPreferencesState(normaliseCroquisPreferences(preferences));
-    setRememberSettings(Boolean(remember));
+    setRememberSettings(remember);
     setEditingTimer(false);
     setEditingPresetId(null);
     setPresetNameDraft('');
@@ -306,12 +306,12 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
   useEffect(() => {
     if (!open || !moaId) return;
 
-    let cancelled = false;
+    const cancelledRef = { current: false };
 
     void (async () => {
       try {
         const persisted = await ipc.croquis.loadPreferences(moaId);
-        if (cancelled || !persisted) return;
+        if (cancelledRef.current || !persisted) return;
         if (hasUserInteractedRef.current) return;
         setPreferencesState(normaliseCroquisPreferences(persisted));
         setEditingPresetId(null);
@@ -324,7 +324,7 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
     })();
 
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
     };
   }, [open, moaId]);
 
@@ -332,7 +332,7 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
     if (!open || !moaId) return;
     if (activeOption.savePath) return;
 
-    let cancelled = false;
+    const cancelledRef = { current: false };
 
     void (async () => {
       try {
@@ -340,7 +340,7 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
         const target = moas.find(moa => moa.moaId === moaId);
         if (!target) return;
         const defaultPath = await join(target.path, target.name, 'croquis');
-        if (cancelled) return;
+        if (cancelledRef.current) return;
         setPreferencesState(prev => {
           const activeId = prev.activePresetId;
           const nextPresets = prev.presets.map(preset => {
@@ -365,7 +365,7 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
     })();
 
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
     };
   }, [open, moaId, activeOption.savePath]);
 
@@ -415,22 +415,25 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
     }
     markInteracted();
     setEditingTimer(false);
-    let createdPreset: CroquisPreset | null = null;
-    setPreferencesState(prev => {
-      const index = prev.presets.length;
-      const nextPreset = createPreset(`Preset ${index + 1}`, activeOption, index);
-      createdPreset = nextPreset;
-      return {
-        presets: [...prev.presets, nextPreset],
-        activePresetId: nextPreset.id,
-      };
-    });
-    if (createdPreset) {
-      setPresetNameDraft((createdPreset as CroquisPreset).name);
-      setEditingPresetInitialName((createdPreset as CroquisPreset).name);
-      setEditingPresetId((createdPreset as CroquisPreset).id);
-    }
-  }, [activeOption, commitPresetName, editingPresetId, markInteracted]);
+
+    const index = preferencesState.presets.length;
+    const newPreset = createPreset(`Preset ${String(index + 1)}`, activeOption, index);
+
+    setPreferencesState(prev => ({
+      presets: [...prev.presets, newPreset],
+      activePresetId: newPreset.id,
+    }));
+
+    setPresetNameDraft(newPreset.name);
+    setEditingPresetInitialName(newPreset.name);
+    setEditingPresetId(newPreset.id);
+  }, [
+    preferencesState.presets.length,
+    activeOption,
+    commitPresetName,
+    editingPresetId,
+    markInteracted,
+  ]);
 
   const handleWindowPresetClick = useCallback(
     (preset: WindowPreset) => {
@@ -484,7 +487,7 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
 
   const commitTimerInput = useCallback(() => {
     const parsed = parseTimerInput(timerInput);
-    const safeValue = clampSeconds(parsed ?? activeOption.timer.maxTime ?? 0);
+    const safeValue = clampSeconds(parsed ?? activeOption.timer.maxTime);
     setEditingTimer(false);
     updateActiveOption(prev => ({
       ...prev,
@@ -552,8 +555,8 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
   }, [onClose]);
 
   const selectedCount = imageHashes.length;
-  const windowWidth = activeOption.window?.width ?? '';
-  const windowHeight = activeOption.window?.height ?? '';
+  const windowWidth = activeOption.window.width ?? '';
+  const windowHeight = activeOption.window.height ?? '';
   const skipMode: 'manual' | 'auto' = activeOption.auto.isSkip ? 'auto' : 'manual';
   const rememberMode = rememberSettings ? 'remember' : 'session';
 
@@ -578,7 +581,7 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
       const payloadPresets = preferencesState.presets.map((preset, index) => {
         const rawName = editingPresetId === preset.id ? presetNameDraft : preset.name;
         const trimmedName = rawName.trim();
-        const safeName = trimmedName || `Preset ${index + 1}`;
+        const safeName = trimmedName || `Preset ${String(index + 1)}`;
         if (safeName !== preset.name) {
           updatedNames.set(preset.id, safeName);
         }
@@ -652,7 +655,7 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
     submitting,
   ]);
 
-  if (!open || !activePreset) {
+  if (!open) {
     return null;
   }
 
@@ -684,7 +687,7 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
                           isActive ? ' border-primary/60 ring-2 ring-primary/20' : ''
                         }`}
                         value={presetNameDraft}
-                        placeholder={`Preset ${index + 1}`}
+                        placeholder={`Preset ${String(index + 1)}`}
                         onChange={handlePresetNameInputChange}
                         onBlur={commitPresetName}
                         onKeyDown={handlePresetNameInputKeyDown}
@@ -696,7 +699,9 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
                         variant="toggle"
                         active={isActive}
                         className="flex-1 justify-start"
-                        onClick={() => handlePresetSelect(preset.id)}
+                        onClick={() => {
+                          handlePresetSelect(preset.id);
+                        }}
                       >
                         <div className="flex w-full items-center justify-between">
                           <div className="flex-1 text-center">{preset.name}</div>
@@ -704,8 +709,12 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
                             type="button"
                             variant="icon"
                             active={isEditing}
-                            onMouseDown={event => event.preventDefault()}
-                            onClick={() => handlePresetRenameClick(preset)}
+                            onMouseDown={event => {
+                              event.preventDefault();
+                            }}
+                            onClick={() => {
+                              handlePresetRenameClick(preset);
+                            }}
                             aria-label={`Rename preset ${preset.name}`}
                             title="Rename preset"
                           >
@@ -759,7 +768,9 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
                       type="button"
                       variant="toggle"
                       active={isActive}
-                      onClick={() => handleWindowPresetClick(preset)}
+                      onClick={() => {
+                        handleWindowPresetClick(preset);
+                      }}
                     >
                       {preset.label}
                     </Button>
@@ -809,7 +820,9 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
                     type="button"
                     variant="toggle"
                     active={activeTimerSeconds === preset.seconds}
-                    onClick={() => handleTimerPresetClick(preset.seconds)}
+                    onClick={() => {
+                      handleTimerPresetClick(preset.seconds);
+                    }}
                   >
                     {preset.label}
                   </Button>
@@ -837,7 +850,9 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
               </header>
               <Switch
                 current={skipMode}
-                onChanged={value => handleSkipModeChange((value as 'manual' | 'auto') ?? 'manual')}
+                onChanged={value => {
+                  handleSkipModeChange(value);
+                }}
                 options={[
                   { name: 'Manual', value: 'manual' },
                   { name: 'Auto skip', value: 'auto' },
@@ -857,7 +872,9 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
                     type="button"
                     variant="toggle"
                     active={activeOption.isCapture}
-                    onClick={() => handleToggleOption('isCapture')}
+                    onClick={() => {
+                      handleToggleOption('isCapture');
+                    }}
                   >
                     Capture reference
                   </Button>
@@ -866,7 +883,9 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
                   type="button"
                   variant="toggle"
                   active={activeOption.isGray}
-                  onClick={() => handleToggleOption('isGray')}
+                  onClick={() => {
+                    handleToggleOption('isGray');
+                  }}
                 >
                   Grayscale
                 </Button>
@@ -874,7 +893,9 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
                   type="button"
                   variant="toggle"
                   active={activeOption.isShuffle}
-                  onClick={() => handleToggleOption('isShuffle')}
+                  onClick={() => {
+                    handleToggleOption('isShuffle');
+                  }}
                 >
                   Shuffle order
                 </Button>
@@ -887,11 +908,13 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
               </header>
               <label
                 className="flex cursor-pointer flex-col gap-1 text-sm"
-                onClick={async () => {
-                  const result = await pickerOpen({ directory: true });
-                  if (!result) return;
-                  handleSavePathChange(result);
-                }}
+                onClick={() =>
+                  void (async () => {
+                    const result = await pickerOpen({ directory: true });
+                    if (!result) return;
+                    handleSavePathChange(result);
+                  })
+                }
               >
                 <span className="text-xs font-semibold uppercase tracking-wide text-text-soft">
                   Save path
@@ -928,7 +951,7 @@ const CroquisStartModal: React.FC<CroquisStartModalProps> = ({
             <Button
               type="button"
               variant="primary"
-              onClick={handleConfirm}
+              onClick={() => void handleConfirm()}
               disabled={submitting || !selectedCount}
             >
               {submitting ? 'Starting…' : 'Start Croquis'}

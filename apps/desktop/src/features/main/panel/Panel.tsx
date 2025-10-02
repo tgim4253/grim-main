@@ -102,7 +102,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       if (!graphNodeId) graphNodeId = createNewId();
 
       if (node.kind == NodeKind.File && node.data['File']) {
-        let data = node.data['File'];
+        const data = node.data['File'];
 
         let type: GraphNodeType = 'default';
 
@@ -120,7 +120,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
           hash: data.xxh364,
         };
       } else if (node.kind === NodeKind.Crop && node.data['Crop']) {
-        const crop = node.data['Crop'] as NodeCrop;
+        const crop = node.data['Crop'];
         const outgoingConnections = connectionsMap[node.id] ?? [];
         const incomingConnections = incomingConnectionsMap[node.id] ?? [];
 
@@ -156,7 +156,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
           cropRect: normalizedCropRect ?? undefined,
         };
       } else if (node.kind == NodeKind.Folder && node.data['Folder']) {
-        let data = node.data['Folder'];
+        const data = node.data['Folder'];
 
         return {
           id: graphNodeId,
@@ -268,7 +268,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     const imageItems: ImageItem[] = [];
     items.forEach(item => {
       if (item.kind == NodeKind.File && item.data['File']) {
-        let data = item.data['File'];
+        const data = item.data['File'];
         if (data.kind != FileType.Image) return;
         imageItems.push({
           id: createNewId(),
@@ -310,9 +310,12 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   useEffect(() => {
     if (!moaId) return;
 
-    let unlistenPromise: Promise<UnlistenFn> | null = listen(`capture://completed/${moaId}`, () => {
-      void refreshPanelData();
-    });
+    let unlistenPromise: Promise<UnlistenFn> | null = listen(
+      `capture://completed/${String(moaId)}`,
+      () => {
+        void refreshPanelData();
+      },
+    );
 
     unlistenPromise.catch(error => {
       console.error('[Panel] Failed to register capture listener', error);
@@ -668,7 +671,9 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
                     aria-pressed={isActive}
                     aria-label={labels[type]}
                     title={labels[type]}
-                    onClick={() => setViewType(type)}
+                    onClick={() => {
+                      setViewType(type);
+                    }}
                     className="h-8 w-8"
                   >
                     <Icon className="h-4 w-4" />
@@ -699,14 +704,14 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         ) : showCrop && rootFile && moaId ? (
           <ImageCropView
             file={rootFile}
-            moaId={moaId!}
+            moaId={moaId}
             crops={cropEntries}
             onRefresh={refreshPanelData}
           />
         ) : showMemo && rootFile && moaId ? (
           <ImageMemoView
             file={rootFile}
-            moaId={moaId!}
+            moaId={moaId}
             memoEntries={memoEntries}
             onRefresh={refreshPanelData}
           />

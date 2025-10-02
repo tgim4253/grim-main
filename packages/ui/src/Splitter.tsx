@@ -1,16 +1,4 @@
-// Fully revised Split with container-resize redistribution and nested min-size propagation
-// Comments: English only (per user preference)
-
-import React, {
-  Children,
-  forwardRef,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-
+import React, { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@tgim/utils/index';
 
 // ---- Types ---------------------------------------------------------------
@@ -53,14 +41,16 @@ export interface SplitterProps {
   className?: string;
 }
 
-const isSplitPanelEl = (el: React.ReactElement<any>) =>
-  (el.type as any) === SplitPanel || (el.type as any)?.displayName === 'SplitPanel';
+const isSplitPanelEl = (el: React.ReactElement) =>
+  el.type === SplitPanel ||
+  (typeof el.type === 'function' &&
+    (el.type as { displayName?: string }).displayName === 'SplitPanel');
 
 const collectPanelsAtFirstDepth = (
   nodes: React.ReactNode,
 ): React.ReactElement<SplitPanelProps>[] => {
   // Crawl the tree until the first SplitPanel layer so layout math stays predictable.
-  let level = React.Children.toArray(nodes).filter(React.isValidElement) as React.ReactElement[];
+  let level = React.Children.toArray(nodes).filter(React.isValidElement);
   const result: React.ReactElement<SplitPanelProps>[] = [];
   while (level.length > 0) {
     const nextLevel: React.ReactElement[] = [];
@@ -71,11 +61,9 @@ const collectPanelsAtFirstDepth = (
         }
         continue;
       }
-      const children = (el.props as any)?.children;
+      const children = (el.props as { children?: React.ReactNode } | undefined)?.children;
       if (!children) continue;
-      const arr = React.Children.toArray(children).filter(
-        React.isValidElement,
-      ) as React.ReactElement[];
+      const arr = React.Children.toArray(children).filter(React.isValidElement);
       nextLevel.push(...arr);
     }
     level = nextLevel;
@@ -118,7 +106,7 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
       (node: HTMLDivElement | null) => {
         containerRef.current = node;
         if (typeof ref === 'function') ref(node);
-        else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
+        else if (ref) ref.current = node;
       },
       [ref],
     );
@@ -131,7 +119,8 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
           if (prev.length === panels.length && prev[idx] === px) return prev;
 
           // Otherwise create/resize the array and write the new value.
-          const next = prev.length === panels.length ? [...prev] : Array(panels.length).fill(0);
+          const next =
+            prev.length === panels.length ? [...prev] : Array<number>(panels.length).fill(0);
           next[idx] = px;
           return next;
         });
@@ -167,7 +156,7 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
         };
 
         const [sum, cnt] = initialSizes.reduce<[number, number]>(
-          ([s, c], v) => (v != null ? [s + (v as number), c + 1] : [s, c]),
+          ([s, c], v) => (v != null ? [s + v, c + 1] : [s, c]),
           [0, 0],
         );
 
@@ -180,7 +169,7 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
         const sizePerPanel = rest > 0 ? (100 - sum) / rest : 0;
 
         return initialSizes.map((v, i) => {
-          const raw = v != null ? (v as number) : sizePerPanel;
+          const raw = v != null ? v : sizePerPanel;
           return clamp(raw, list[i]);
         });
       },
@@ -222,8 +211,8 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
         const leftLimits = getLimits(leftPanel, leftIdx);
         const rightLimits = getLimits(rightPanel, rightIdx);
 
-        let newLeft = newSizes[leftIdx] + deltaPercent;
-        let newRight = newSizes[rightIdx] - deltaPercent;
+        const newLeft = newSizes[leftIdx] + deltaPercent;
+        const newRight = newSizes[rightIdx] - deltaPercent;
 
         // handle hiding thresholds (left)
         if (leftLimits.hidden && newLeft < leftLimits.hiddenSize) {
@@ -272,7 +261,7 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
     // ---- Container resize → water-filling redistribution ------------------
     const rebalanceToFit = useCallback((pxSizes: number[], minPx: number[], maxPx: number[]) => {
       // initial clamp
-      let s = pxSizes.map((v, i) => {
+      const s = pxSizes.map((v, i) => {
         const clamped = Math.min(Math.max(v, minPx[i]), isFinite(maxPx[i]) ? maxPx[i] : v);
         return clamped;
       });
@@ -325,7 +314,7 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
 
       const ro = new ResizeObserver(entries => {
         const cr = entries[0]?.contentRect;
-        if (!cr) return;
+
         const newSize = position === 'horizontal' ? cr.width : cr.height;
         if (!newSize) return;
 
@@ -352,9 +341,10 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
       });
 
       ro.observe(el);
-      return () => ro.disconnect();
+      return () => {
+        ro.disconnect();
+      };
       // exclude sizes from deps to avoid feedback loop, intrinsicMins changes should trigger recalculation
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [position, panels.length, rebalanceToFit, intrinsicMins.join(',')]);
 
     // ---- If I'm a nested Split, compute and report my intrinsic min --------
@@ -402,25 +392,30 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
         {panels.map((child, index) => {
           const isHidden = hiddens[index];
 
-          const hiddenIndex = hiddens.findIndex(el => el === true);
+          const hiddenIndex = hiddens.findIndex(el => el);
           const sizePct = hiddenIndex !== -1 && hiddenIndex !== index ? 100 : (sizes[index] ?? 0);
 
           const sizeStyle = isHidden
             ? { display: 'none' }
             : position === 'horizontal'
               ? {
-                  width: `${sizePct}%`,
-                  minWidth: `${child.props.minSize ?? 0}px`,
+                  width: `${String(sizePct)}%`,
+                  minWidth: `${String(child.props.minSize ?? 0)}px`,
                   flex: '0 0 auto',
                 }
-              : { height: `${sizePct}%`, minHeight: `${child.props.minSize ?? 0}px` };
+              : {
+                  height: `${String(sizePct)}%`,
+                  minHeight: `${String(child.props.minSize ?? 0)}px`,
+                };
 
           const parentAxis: 'width' | 'height' = position === 'horizontal' ? 'width' : 'height';
 
           return React.cloneElement(child, {
-            key: child.key ?? `panel-${index}`, // 🔑 keep original key
+            key: child.key ?? `panel-${String(index)}`, // 🔑 keep original key
             style: { ...child.props.style, ...sizeStyle },
-            __onIntrinsicMinChange: (px: number) => updateIntrinsicMin(index, px),
+            __onIntrinsicMinChange: (px: number) => {
+              updateIntrinsicMin(index, px);
+            },
             __parentAxis: parentAxis,
           } as Partial<SplitPanelProps>);
         })}
@@ -433,7 +428,7 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
               : el.clientHeight
             : 0;
 
-          const visibleSizesPct = sizes.map((s, i) => (hiddens[i] ? 0 : (s ?? 0)));
+          const visibleSizesPct = sizes.map((s, i) => (hiddens[i] ? 0 : s));
           const cumPct: number[] = [];
           let acc = 0;
           for (let i = 0; i < panels.length; i++) {
@@ -447,7 +442,7 @@ export const Split = forwardRef<HTMLDivElement, SplitProps>(
             const boundaryPx = (cumPct[i] / 100) * (containerSize || 0);
             return (
               <Splitter
-                key={`splitter-${i}`}
+                key={`splitter-${String(i)}`}
                 size={splitterSize}
                 index={i}
                 position={position}
@@ -507,13 +502,25 @@ export const SplitPanel = (props: SplitPanelProps & { className?: string }) => {
     ...domProps // e.g. id, role, aria-*, data-*, tabIndex, onClick, etc.
   } = props;
 
+  console.log(
+    size,
+    initialSize,
+    minSize,
+    maxSize,
+    hidden,
+    canHidden,
+    hiddenSize,
+    onSizeChange,
+    onHidden,
+  );
+
   // Forward internal props to non-DOM React element children (e.g., nested Split)
   const forwardedChildren = React.useMemo(() => {
     return React.Children.map(children, child => {
       if (!React.isValidElement(child)) return child;
       const isDom = typeof child.type === 'string';
       if (isDom) return child;
-      return React.cloneElement(child as any, {
+      return React.cloneElement(child as React.ReactElement<Partial<SplitPanelProps>>, {
         __onIntrinsicMinChange,
         __parentAxis,
       });
@@ -580,8 +587,8 @@ const Splitter = forwardRef<HTMLDivElement, SplitterOverlayProps>(
           [isH ? 'left' : 'top']: Math.max(0, boundaryPx - size / 2), // center on line
           ...(crossStyles as React.CSSProperties),
           cursor: isH ? 'col-resize' : 'row-resize',
-          width: isH ? `${size}px` : '100%',
-          height: !isH ? `${size}px` : '100%',
+          width: isH ? `${String(size)}px` : '100%',
+          height: !isH ? `${String(size)}px` : '100%',
           zIndex: 10,
           backgroundColor: isDragging ? 'var(--color-primary)' : '',
         }}

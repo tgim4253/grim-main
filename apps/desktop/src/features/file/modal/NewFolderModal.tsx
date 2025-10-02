@@ -52,7 +52,9 @@ const buildNodeIndex = (root: FolderPreview['root'] | null) => {
   const walk = (node: FolderPreview['root'], parent: string | null) => {
     const key = node.relativePath ?? '';
     map.set(key, { node, parent });
-    node.children.forEach(child => walk(child, key));
+    node.children.forEach(child => {
+      walk(child, key);
+    });
   };
 
   walk(root, null);
@@ -128,7 +130,9 @@ const buildEffectiveSelections = (
 
     effective.set(key, { include: isIncluded, types: allowedTypes });
 
-    node.children.forEach(child => walk(child, allowedTypes, isIncluded));
+    node.children.forEach(child => {
+      walk(child, allowedTypes, isIncluded);
+    });
   };
 
   walk(preview.root, rootTypes, rootIncluded);
@@ -388,7 +392,9 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
               className="bg-modal-input-bg hover:bg-modal-input-hover shadow-lg"
               placeholder="폴더 이름"
               value={name}
-              onChange={event => setName(event.target.value)}
+              onChange={event => {
+                setName(event.target.value);
+              }}
             />
             <div className="flex items-center gap-3">
               <Input
@@ -435,7 +441,9 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
                     <input
                       type="checkbox"
                       checked={rootState?.include ?? true}
-                      onChange={event => handleRootIncludeToggle(event.target.checked)}
+                      onChange={event => {
+                        handleRootIncludeToggle(event.target.checked);
+                      }}
                     />
                     전체 폴더 포함
                   </label>
@@ -466,7 +474,9 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
                           type="checkbox"
                           checked={isChecked}
                           disabled={!rootState?.include}
-                          onChange={() => handleRootFileTypeToggle(type)}
+                          onChange={() => {
+                            handleRootFileTypeToggle(type);
+                          }}
                         />
                         <span className="flex-1">
                           {FILE_TYPE_LABELS[type]} · {selected.count.toLocaleString()}개 /{' '}
@@ -514,9 +524,9 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
                               type="checkbox"
                               checked={state.include}
                               disabled={!ancestorIncluded}
-                              onChange={event =>
-                                handleFolderIncludeToggle(key, event.target.checked)
-                              }
+                              onChange={event => {
+                                handleFolderIncludeToggle(key, event.target.checked);
+                              }}
                             />
                             <span className="font-medium" style={{ paddingLeft: depth * 12 }}>
                               {node.name}
@@ -526,7 +536,9 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
                             <Button
                               variant="default"
                               className="px-2 py-1 text-xs text-modal-text-secondary"
-                              onClick={() => handleResetFolderTypes(key)}
+                              onClick={() => {
+                                handleResetFolderTypes(key);
+                              }}
                             >
                               초기화
                             </Button>
@@ -548,7 +560,9 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
                                     type="checkbox"
                                     checked={isAllowed}
                                     disabled={disabled}
-                                    onChange={() => handleFolderFileTypeToggle(key, type)}
+                                    onChange={() => {
+                                      handleFolderFileTypeToggle(key, type);
+                                    }}
                                   />
                                   <span className="flex-1">
                                     {FILE_TYPE_LABELS[type]} · {stat.count.toLocaleString()}개
@@ -582,7 +596,13 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
           </Button>
           {step === 'selection' ? (
             <>
-              <Button variant="default" onClick={() => setStep('details')} disabled={submitting}>
+              <Button
+                variant="default"
+                onClick={() => {
+                  setStep('details');
+                }}
+                disabled={submitting}
+              >
                 이전
               </Button>
               <Button variant="primary" onClick={handleSubmit} disabled={submitting}>

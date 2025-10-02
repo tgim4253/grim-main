@@ -133,7 +133,7 @@ export const VirtualGridLayout: React.FC<Props> = ({
       data: GridCellData;
     }) => {
       const idx = rowIndex * data.cols + columnIndex;
-      return data.images[idx]?.hash ?? `row${rowIndex}-col${columnIndex}`;
+      return data.images[idx]?.hash ?? `row${String(rowIndex)}-col${String(columnIndex)}`;
     },
     [],
   );

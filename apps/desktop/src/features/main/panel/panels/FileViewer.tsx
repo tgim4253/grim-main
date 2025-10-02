@@ -119,7 +119,9 @@ const FileViewer: React.FC<FileViewerProps> = ({ file, moaId, className, crop })
       setImageMetrics({ width: displayWidth, height: displayHeight, offsetX, offsetY });
     };
 
-    const resizeObserver = new ResizeObserver(() => updateMetrics());
+    const resizeObserver = new ResizeObserver(() => {
+      updateMetrics();
+    });
     if (imageWrapperRef.current) {
       resizeObserver.observe(imageWrapperRef.current);
     }
@@ -194,7 +196,9 @@ const FileViewer: React.FC<FileViewerProps> = ({ file, moaId, className, crop })
                     variant="icon"
                     aria-label={viewerSidebarVisible ? '사이드바 닫기' : '사이드바 열기'}
                     title={viewerSidebarVisible ? '사이드바 닫기' : '사이드바 열기'}
-                    onClick={() => setViewerSidebarVisible(prev => !prev)}
+                    onClick={() => {
+                      setViewerSidebarVisible(prev => !prev);
+                    }}
                     className="absolute right-0 top-0 h-8 w-8"
                     aria-controls="viewer-sidebar"
                     aria-expanded={viewerSidebarVisible}
@@ -284,7 +288,12 @@ const FileViewer: React.FC<FileViewerProps> = ({ file, moaId, className, crop })
               >
                 {/* Add id for aria-controls */}
                 <div id="viewer-sidebar" className="h-full min-h-0">
-                  <FileDetailSidebar image={image} onClose={() => setViewerSidebarVisible(false)} />
+                  <FileDetailSidebar
+                    image={image}
+                    onClose={() => {
+                      setViewerSidebarVisible(false);
+                    }}
+                  />
                 </div>
               </SplitPanel>
             ) : null}

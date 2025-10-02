@@ -129,7 +129,7 @@ function useVisibilityMap(rootRef: React.RefObject<HTMLElement>, overscanPx = 60
       },
       {
         root: rootRef.current ?? null,
-        rootMargin: `${overscanPx}px 0px`,
+        rootMargin: `${String(overscanPx)}px 0px`,
         threshold: 0,
       },
     );
@@ -138,7 +138,9 @@ function useVisibilityMap(rootRef: React.RefObject<HTMLElement>, overscanPx = 60
   const ensureObserver = useCallback(() => {
     if (ioRef.current) return ioRef.current;
     const observer = createObserver();
-    observedElementsRef.current.forEach(element => observer.observe(element));
+    observedElementsRef.current.forEach(element => {
+      observer.observe(element);
+    });
     ioRef.current = observer;
     return observer;
   }, [createObserver]);
@@ -170,7 +172,9 @@ function useVisibilityMap(rootRef: React.RefObject<HTMLElement>, overscanPx = 60
     if (!ioRef.current) return;
     const prevObserver = ioRef.current;
     const nextObserver = createObserver();
-    observedElementsRef.current.forEach(element => nextObserver.observe(element));
+    observedElementsRef.current.forEach(element => {
+      nextObserver.observe(element);
+    });
     ioRef.current = nextObserver;
     prevObserver.disconnect();
   }, [createObserver]);
@@ -395,7 +399,14 @@ export const GridContent: React.FC<Props> = ({ gridData, onImageOpen, onClearPre
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-1 rounded-full border border-border bg-surface-muted p-1 shadow-inner">
             {SIZES.map(s => (
-              <Button key={s} variant="toggle" active={size === s} onClick={() => setSize(s)}>
+              <Button
+                key={s}
+                variant="toggle"
+                active={size === s}
+                onClick={() => {
+                  setSize(s);
+                }}
+              >
                 {s.charAt(0).toUpperCase() + s.slice(1)}
               </Button>
             ))}
@@ -406,7 +417,9 @@ export const GridContent: React.FC<Props> = ({ gridData, onImageOpen, onClearPre
                 key={l}
                 variant="icon"
                 active={layout === l}
-                onClick={() => setLayout(l)}
+                onClick={() => {
+                  setLayout(l);
+                }}
                 aria-label={l === 'grid' ? 'Grid layout' : 'Masonry layout'}
                 className="size-9"
               >
@@ -418,7 +431,9 @@ export const GridContent: React.FC<Props> = ({ gridData, onImageOpen, onClearPre
         <div className="flex items-center gap-2">
           <Button
             variant="secondary"
-            onClick={() => setStorageModalOpen(true)}
+            onClick={() => {
+              setStorageModalOpen(true);
+            }}
             className="min-w-[7rem] px-4 py-2 text-sm font-medium"
           >
             썸네일 관리
@@ -430,7 +445,7 @@ export const GridContent: React.FC<Props> = ({ gridData, onImageOpen, onClearPre
             className="min-w-[7rem] px-4 py-2 text-sm font-medium"
           >
             {selectMode && selectedCount
-              ? `Done (${selectedCount})`
+              ? `Done (${String(selectedCount)})`
               : selectMode
                 ? 'Done'
                 : 'Select'}
@@ -534,7 +549,12 @@ const GridView: React.FC<Props> = props => {
           </SplitPanel>
           {activeImage && (
             <SplitPanel key="sidebar" minSize={280} initialSize={360}>
-              <FileDetailSidebar image={activeImage} onClose={() => setActiveImage(null)} />
+              <FileDetailSidebar
+                image={activeImage}
+                onClose={() => {
+                  setActiveImage(null);
+                }}
+              />
             </SplitPanel>
           )}
         </>

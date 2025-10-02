@@ -93,7 +93,9 @@ const Main: React.FC = () => {
       setReady(true);
     }, 100);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [progress.stage]);
 
   useEffect(() => {
@@ -129,7 +131,9 @@ const Main: React.FC = () => {
 
     return () => {
       cancelled = true;
-      timers.forEach(id => window.clearTimeout(id));
+      timers.forEach(id => {
+        window.clearTimeout(id);
+      });
       setProcessing(false);
     };
   }, [processing, progressQueue]);
@@ -225,7 +229,7 @@ const Main: React.FC = () => {
     void load();
 
     const initListener = async () => {
-      unlisten = await listen<AppProgressEvent>(`bootstrap://progress/${moaId}`, event => {
+      unlisten = await listen<AppProgressEvent>(`bootstrap://progress/${String(moaId)}`, event => {
         setProgressQueue(prev => [...prev, event.payload]);
       });
     };
@@ -277,8 +281,12 @@ const Main: React.FC = () => {
                     hiddenSize={leftSidebar.hiddenSize ?? leftSidebar.minSize}
                     minSize={leftSidebar.minSize}
                     initialSize={leftSidebar.size}
-                    onHidden={hidden => setSidebarHidden('left', hidden)}
-                    onSizeChange={size => setSidebarSize('left', size)}
+                    onHidden={hidden => {
+                      setSidebarHidden('left', hidden);
+                    }}
+                    onSizeChange={size => {
+                      setSidebarSize('left', size);
+                    }}
                   >
                     <SidebarPanel sidebarPosition="left" />
                   </Panel>

@@ -53,7 +53,7 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
 
   //   const ratios = [1, 1.5, 2, 2.5, 3];
   //   const mediaQueries = ratios
-  //     .map(value => (typeof window.matchMedia === 'function' ? window.matchMedia(`(resolution: ${value}dppx)`) : null))
+  //     .map(value => (typeof window.matchMedia === 'function' ? window.matchMedia(`(resolution: ${String(value)}dppx)`) : null))
   //     .filter((query): query is MediaQueryList => query !== null);
 
   //   const detachListeners = mediaQueries.map(query => {
@@ -269,7 +269,7 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
 
   const { openNode } = usePanelsStore(useShallow(s => ({ openNode: s.addPanelWithoutContainer })));
   useEffect(() => {
-    let refreshFrame: number | null = null;
+    const refreshFrame: number | null = null;
     const frame = requestAnimationFrame(() => {
       clearNodeSpriteCaches();
       setLinkStroke(getGraphPalette().link);

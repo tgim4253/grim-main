@@ -26,7 +26,7 @@ interface SidebarState {
   setSize: (position: SidebarPosition, size: number) => void;
 }
 
-const useSidebarStore = create<SidebarState>((set, get) => ({
+const useSidebarStore = create<SidebarState>((set, _get) => ({
   sidebars: {
     left: {
       activeTab: 'explorer',
@@ -48,7 +48,7 @@ const useSidebarStore = create<SidebarState>((set, get) => ({
       hiddenSize: 100,
     },
   },
-  setActiveTab: (position, tab) =>
+  setActiveTab: (position, tab) => {
     set(state => ({
       sidebars: {
         ...state.sidebars,
@@ -57,7 +57,8 @@ const useSidebarStore = create<SidebarState>((set, get) => ({
           activeTab: tab,
         },
       },
-    })),
+    }));
+  },
   setHidden: (position, hidden) => {
     set(state => ({
       sidebars: {
@@ -81,7 +82,7 @@ const useSidebarStore = create<SidebarState>((set, get) => ({
     }));
   },
 
-  toggleTab: (position, tab) =>
+  toggleTab: (position, tab) => {
     set(state => {
       const current = state.sidebars[position].activeTab;
       return {
@@ -93,7 +94,8 @@ const useSidebarStore = create<SidebarState>((set, get) => ({
           },
         },
       };
-    }),
+    });
+  },
 }));
 
 export default useSidebarStore;

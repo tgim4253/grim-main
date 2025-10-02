@@ -4,3 +4,4 @@ export * from './identifier';
 export * from './object';
 export * from './number';
 export * from './crop';
+export * from './react-children';

@@ -68,7 +68,9 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
     const el = containerRef.current;
     // Observe by hash to match visibility map keys
     observe(el, img.hash);
-    return () => unobserve(el);
+    return () => {
+      unobserve(el);
+    };
   }, [img.hash, observe, unobserve]);
 
   const handleImageLoad = useCallback(() => {
@@ -92,12 +94,12 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
   const imgClass =
     isScrolling || loaded
       ? baseImgClass
-      : `${baseImgClass} opacity-0 transition-opacity duration-300`;
+      : `${String(baseImgClass)} opacity-0 transition-opacity duration-300`;
 
   const cardStyle = useMemo<React.CSSProperties>(() => {
     if (!isMasonry) return {};
     return {
-      containIntrinsicSize: `${thumbSize}px ${thumbSize}px`,
+      containIntrinsicSize: `${String(thumbSize)}px ${String(thumbSize)}px`,
     };
   }, [isMasonry, thumbSize]);
 
@@ -106,7 +108,7 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
       ref={containerRef}
       className={`group relative w-full ${
         isMasonry ? '' : 'h-full'
-      } overflow-hidden rounded-lg border ${selectionClasses} bg-surface shadow-sm transition-all duration-200 hover:border-accent hover:shadow-lg hover:-translate-y-1 cursor-pointer ${sizeClass ?? ''}`}
+      } overflow-hidden rounded-lg border ${String(selectionClasses)} bg-surface shadow-sm transition-all duration-200 hover:border-accent hover:shadow-lg hover:-translate-y-1 cursor-pointer ${sizeClass ?? ''}`}
       onClick={handleCardClick}
       role="button"
       tabIndex={0}

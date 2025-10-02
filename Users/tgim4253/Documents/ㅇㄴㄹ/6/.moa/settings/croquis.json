@@ -1,0 +1,25 @@
+{
+  "presets": [
+    {
+      "id": "e1f3d7a5-343b-49ca-80b2-1d16c7a93ce6",
+      "name": "Preset 1",
+      "option": {
+        "window": {
+          "width": null,
+          "height": null
+        },
+        "auto": {
+          "isSkip": false
+        },
+        "timer": {
+          "maxTime": 60
+        },
+        "isCapture": false,
+        "savePath": "/Users/tgim4253/Documents/GitHub/grim-main/Users/tgim4253/Documents/ㅇㄴㄹ/6/croquis",
+        "isGray": false,
+        "isShuffle": false
+      }
+    }
+  ],
+  "activePresetId": "e1f3d7a5-343b-49ca-80b2-1d16c7a93ce6"
+}

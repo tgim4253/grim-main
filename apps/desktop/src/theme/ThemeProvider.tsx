@@ -98,12 +98,16 @@ export const ThemeProvider = ({ children }: PropsWithChildren) => {
 
     if (typeof media.addEventListener === 'function') {
       media.addEventListener('change', handleChange);
-      return () => media.removeEventListener('change', handleChange);
+      return () => {
+        media.removeEventListener('change', handleChange);
+      };
     }
 
     if (typeof media.addListener === 'function') {
       media.addListener(handleChange);
-      return () => media.removeListener(handleChange);
+      return () => {
+        media.removeListener(handleChange);
+      };
     }
 
     return;

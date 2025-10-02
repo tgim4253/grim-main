@@ -338,7 +338,9 @@ const ImageCropView: React.FC<ImageCropViewProps> = ({ file, moaId, crops, onRef
         <button
           key={entry.nodeId}
           type="button"
-          onClick={() => setActiveCrop(entry)}
+          onClick={() => {
+            setActiveCrop(entry);
+          }}
           className="flex flex-col gap-2 rounded-lg border border-border bg-surface-muted p-2 text-left shadow-sm transition hover:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           <CropPreview
@@ -379,7 +381,9 @@ const ImageCropView: React.FC<ImageCropViewProps> = ({ file, moaId, crops, onRef
                     type="button"
                     variant="icon"
                     className="h-8 w-8"
-                    onClick={() => setSidebarVisible(prev => !prev)}
+                    onClick={() => {
+                      setSidebarVisible(prev => !prev);
+                    }}
                     aria-label={sidebarVisible ? '옵션 숨기기' : '옵션 보기'}
                     aria-controls="image-crop-options"
                     aria-expanded={sidebarVisible}
@@ -475,7 +479,9 @@ const ImageCropView: React.FC<ImageCropViewProps> = ({ file, moaId, crops, onRef
                       type="button"
                       variant="toggle"
                       active={mode === 'freeform'}
-                      onClick={() => setMode('freeform')}
+                      onClick={() => {
+                        setMode('freeform');
+                      }}
                     >
                       자유 형태
                     </Button>
@@ -483,7 +489,9 @@ const ImageCropView: React.FC<ImageCropViewProps> = ({ file, moaId, crops, onRef
                       type="button"
                       variant="toggle"
                       active={mode === 'square'}
-                      onClick={() => setMode('square')}
+                      onClick={() => {
+                        setMode('square');
+                      }}
                     >
                       정사각형
                     </Button>
@@ -500,7 +508,12 @@ const ImageCropView: React.FC<ImageCropViewProps> = ({ file, moaId, crops, onRef
       </Split>
 
       {activeCrop && imageSrc && sourceWidth != null && sourceHeight != null ? (
-        <Modal onClose={() => setActiveCrop(null)} className="max-h-[90vh] max-w-[90vw]">
+        <Modal
+          onClose={() => {
+            setActiveCrop(null);
+          }}
+          className="max-h-[90vh] max-w-[90vw]"
+        >
           <div className="flex flex-col gap-4">
             <h3 className="text-lg font-semibold">크롭 상세 보기</h3>
             {(() => {

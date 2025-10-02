@@ -38,7 +38,7 @@ export const MasonryLayout: React.FC<Props> = ({
   const columnStyle = useMemo<React.CSSProperties>(
     () => ({
       columnCount: Math.max(columnCount, 1),
-      columnGap: `${MASONRY_COLUMN_GAP}px`,
+      columnGap: `${String(MASONRY_COLUMN_GAP)}px`,
       columnFill: 'balance',
     }),
     [columnCount],

@@ -31,7 +31,7 @@ export const normaliseCroquisOption = (option?: CroquisOption | null): CroquisOp
 
   const maxTimeRaw = next.timer?.maxTime;
   const maxTimeValue = Number.isFinite(maxTimeRaw)
-    ? Math.max(0, Math.round(maxTimeRaw as number))
+    ? Math.max(0, Math.round(maxTimeRaw))
     : fallback.timer.maxTime;
 
   return {

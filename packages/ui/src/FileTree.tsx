@@ -1,7 +1,7 @@
 import React from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { createContainerId, createFolderId, Droppable } from '@tgim/dnd/index';
-import { NodeKind, type FileTreeData } from '@tgim/types/index';
+import { CSSVariables, NodeKind, type FileTreeData } from '@tgim/types/index';
 import {
   AlertCircle,
   AlertTriangle,
@@ -70,7 +70,7 @@ export const TreeNode: React.FC<{
 
   const highlight = hovered || isOver;
 
-  const indentStyle = { ['--depth' as any]: depth } as React.CSSProperties;
+  const indentStyle: CSSVariables = { ['--depth']: depth };
 
   const status = node.status ?? 'normal';
   const hasSync = node.mounts?.some(mount => mount.syncEnabled) ?? false;

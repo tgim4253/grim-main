@@ -4,7 +4,7 @@ import { Switch } from '@tgim/ui/index';
 type Language = 'ko' | 'en' | 'jp';
 
 type Props = {
-  current: Language;
+  current: Language | undefined;
   onChanged?: (lng: Language) => void;
 };
 

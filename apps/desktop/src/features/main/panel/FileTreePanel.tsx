@@ -103,7 +103,7 @@ export const FileTree = () => {
   const refreshTree = useCallback(async () => {
     if (!moaId) return;
     try {
-      const graph = (await ipc.graph.getGraphOne(moaId, 'root')) as GraphResponse;
+      const graph = await ipc.graph.getGraphOne(moaId, 'root');
       const next = convertToTreeData(graph);
       setTreeData(next);
       if (optionNode) {
@@ -155,8 +155,8 @@ export const FileTree = () => {
     onDragStartSelect,
   } = useMultiSelect(visibleOrder);
 
-  const skipSelectedSync = useRef(false);
-  const manualSelection = useRef(false);
+  const skipSelectedSync = { current: false };
+  const manualSelection = { current: false };
   const pendingScrollId = useRef<string | null>(null);
 
   const updateSelectedNode = useCallback(
@@ -175,7 +175,9 @@ export const FileTree = () => {
 
   // Hover-to-open folder while dragging
   const { hoverId, onDragOverHoverOpen, resetHoverOpen } = useHoverOpen(
-    id => setExpanded(prev => new Set(prev).add(id)),
+    id => {
+      setExpanded(prev => new Set(prev).add(id));
+    },
     { delay: 700, isValidTarget: () => true },
   );
 
@@ -273,7 +275,7 @@ export const FileTree = () => {
         ? window.CSS.escape(targetId)
         : targetId.replace(/["\\]/g, '\\$&');
 
-    const element = document.querySelector<HTMLElement>(`[data-node-id="${escapeId}"]`);
+    const element = document.querySelector<HTMLElement>(`[data-node-id="${String(escapeId)}"]`);
     if (!element) return;
 
     pendingScrollId.current = null;
@@ -303,7 +305,7 @@ export const FileTree = () => {
     const setup = async () => {
       try {
         unlisten = await listen<FolderImportProgressEvent>(
-          `folder-import://progress/${moaId}`,
+          `folder-import://progress/${String(moaId)}`,
           event => {
             const context = importContextRef.current;
             if (!context) {
@@ -354,9 +356,12 @@ export const FileTree = () => {
 
     const setup = async () => {
       try {
-        unlisten = await listen<FolderStatusChangeEvent>(`folder-status://changed/${moaId}`, () => {
-          void refreshTree();
-        });
+        unlisten = await listen<FolderStatusChangeEvent>(
+          `folder-status://changed/${String(moaId)}`,
+          () => {
+            void refreshTree();
+          },
+        );
       } catch (error) {
         console.error('Failed to listen for folder status updates', error);
       }
@@ -491,7 +496,12 @@ export const FileTree = () => {
       ) : null}
 
       {activeModal === 'new-folder' && (
-        <Modal onClose={() => setActiveModal(null)} className="bg-modal-bg">
+        <Modal
+          onClose={() => {
+            setActiveModal(null);
+          }}
+          className="bg-modal-bg"
+        >
           <NewFolderModal
             onClose={() => {
               setActiveModal(null);
@@ -557,7 +567,9 @@ export const FileTree = () => {
       ) : null}
       {isSyncing ? (
         <Modal
-          onClose={() => setIsSyncing(false)}
+          onClose={() => {
+            setIsSyncing(false);
+          }}
           dismissible={false}
           className="bg-modal-bg max-w-xs text-center text-modal-text"
         >

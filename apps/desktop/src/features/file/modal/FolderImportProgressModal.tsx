@@ -23,9 +23,9 @@ const formatDuration = (milliseconds: number) => {
   const seconds = totalSeconds % 60;
 
   const parts: string[] = [];
-  if (hours > 0) parts.push(`${hours}시간`);
-  if (minutes > 0) parts.push(`${minutes}분`);
-  if (seconds > 0 || parts.length === 0) parts.push(`${seconds}초`);
+  if (hours > 0) parts.push(`${String(hours)}시간`);
+  if (minutes > 0) parts.push(`${String(minutes)}분`);
+  if (seconds > 0 || parts.length === 0) parts.push(`${String(seconds)}초`);
 
   return parts.join(' ');
 };
@@ -77,17 +77,17 @@ const FolderImportProgressModal: React.FC<Props> = ({
       case 'completed':
         return {
           title: '업서트 완료',
-          description: `"${safeName}" 폴더 업서트가 완료되었습니다.`,
+          description: `"${String(safeName)}" 폴더 업서트가 완료되었습니다.`,
         };
       case 'failed':
         return {
           title: '업서트 실패',
-          description: `"${safeName}" 폴더 업서트 중 오류가 발생했습니다.`,
+          description: `"${String(safeName)}" 폴더 업서트 중 오류가 발생했습니다.`,
         };
       default:
         return {
           title: '업서트 진행 중',
-          description: `"${safeName}" 폴더를 업서트하는 중입니다.`,
+          description: `"${String(safeName)}" 폴더를 업서트하는 중입니다.`,
         };
     }
   }, [progress.state, safeName]);
@@ -106,8 +106,8 @@ const FolderImportProgressModal: React.FC<Props> = ({
         <div>
           <div className="h-3 w-full overflow-hidden rounded-full bg-surface-muted">
             <div
-              className={`h-full rounded-full transition-all ${barColor}`}
-              style={{ width: `${percent}%` }}
+              className={`h-full rounded-full transition-all ${String(barColor)}`}
+              style={{ width: `${String(percent)}%` }}
             ></div>
           </div>
           <div className="mt-2 flex items-center justify-between text-sm font-medium">
