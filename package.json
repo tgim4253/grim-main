@@ -46,5 +46,6 @@
   },
   "dependencies": {
     "typescript-eslint": "^8.37.0"
-  }
+  },
+  "license": "GPL-3.0-or-later"
 }
