@@ -14,7 +14,7 @@
   "dependencies": {
     "fs-extra": "^11.3.0",
     "path": "^0.12.7",
-    "xlsx": "^0.18.5"
+    "exceljs": "^4.4.0"
   },
   "devDependencies": {}
 }
