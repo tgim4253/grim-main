@@ -9,7 +9,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "GPL-3.0-or-later",
   "packageManager": "pnpm@10.13.1",
   "dependencies": {
     "fs-extra": "^11.3.0",
