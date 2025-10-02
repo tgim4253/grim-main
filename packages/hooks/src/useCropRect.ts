@@ -21,11 +21,10 @@ export const useAbsoluteCropRect = (
   sourceWidth?: number | null,
   sourceHeight?: number | null,
 ): AbsoluteCropRect | null =>
-  useMemo(() => toAbsoluteCropRect(crop, sourceWidth ?? null, sourceHeight ?? null), [
-    crop,
-    sourceWidth,
-    sourceHeight,
-  ]);
+  useMemo(
+    () => toAbsoluteCropRect(crop, sourceWidth ?? null, sourceHeight ?? null),
+    [crop, sourceWidth, sourceHeight],
+  );
 
 type CropPreviewSource = NodeCrop | AbsoluteCropRect | null | undefined;
 

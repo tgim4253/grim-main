@@ -10,9 +10,9 @@
     "tauri": "pnpm --filter @grim/desktop tauri",
     "lint": "eslint . --ext .ts,.tsx --fix",
     "lint:check": "eslint . --ext .ts,.tsx",
-    "format": "prettier --check .",
+    "format": "prettier --check . && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check",
     "translate": "pnpm --filter @grim/scripts translate",
-    "format:write": "prettier --write ."
+    "format:write": "prettier --write . && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.7.1",

@@ -754,9 +754,7 @@ const imageRenderer: NodeRenderer = (ctx, node, globalScale) => {
     Number.isFinite(cropRect.height);
 
   let cropImage: HTMLImageElement | undefined;
-  let cropSource:
-    | { sx: number; sy: number; sw: number; sh: number }
-    | undefined;
+  let cropSource: { sx: number; sy: number; sw: number; sh: number } | undefined;
 
   if (src && hasCropRect) {
     const rect = cropRect as NormalizedCropRect;

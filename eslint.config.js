@@ -51,7 +51,7 @@ export default [
       '*.d.ts',
       '.config/**',
       'scripts/dev.ts',
-      'apps/desktop/src-tauri/target/**',
+      'apps/desktop/src-tauri/**',
     ],
   },
   // 📁 apps/desktop/renderer

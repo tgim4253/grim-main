@@ -1,7 +1,7 @@
 {
   "name": "@tgim/hooks",
   "version": "1.0.0",
-  "description": "\uacf5\ud1b5 React custom hooks \ubaa8\uc74c",
+  "description": "공통 React custom hooks 모음",
   "keywords": [
     "react",
     "hooks",

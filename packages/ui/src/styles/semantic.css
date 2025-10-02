@@ -93,10 +93,22 @@
     var(--ds-surface-active)
   );
   --ds-graph-node-folder-edge: color-mix(in srgb, var(--ds-accent) 96%, transparent);
-  --ds-graph-node-document-paper: color-mix(in srgb, var(--ds-surface-base) 88%, var(--ds-accent) 12%);
+  --ds-graph-node-document-paper: color-mix(
+    in srgb,
+    var(--ds-surface-base) 88%,
+    var(--ds-accent) 12%
+  );
   --ds-graph-node-document-edge: color-mix(in srgb, var(--ds-accent) 60%, transparent);
-  --ds-graph-node-document-shadow: color-mix(in srgb, var(--ds-accent) 30%, var(--ds-surface-hover));
-  --ds-graph-node-document-line: color-mix(in srgb, var(--ds-text-inverse) 60%, var(--ds-accent) 40%);
+  --ds-graph-node-document-shadow: color-mix(
+    in srgb,
+    var(--ds-accent) 30%,
+    var(--ds-surface-hover)
+  );
+  --ds-graph-node-document-line: color-mix(
+    in srgb,
+    var(--ds-text-inverse) 60%,
+    var(--ds-accent) 40%
+  );
   --ds-graph-node-image-bg: color-mix(in srgb, var(--ds-accent) 60%, var(--ds-surface-active));
   --ds-graph-node-image-border: color-mix(in srgb, var(--ds-accent) 96%, transparent);
   --ds-graph-node-placeholder-stroke: color-mix(in srgb, var(--ds-text-inverse) 96%, transparent);
@@ -289,10 +301,22 @@
     var(--ds-surface-active)
   );
   --ds-graph-node-folder-edge: color-mix(in srgb, var(--ds-accent) 98%, transparent);
-  --ds-graph-node-document-paper: color-mix(in srgb, var(--ds-surface-base) 84%, var(--ds-accent) 16%);
+  --ds-graph-node-document-paper: color-mix(
+    in srgb,
+    var(--ds-surface-base) 84%,
+    var(--ds-accent) 16%
+  );
   --ds-graph-node-document-edge: color-mix(in srgb, var(--ds-accent) 66%, transparent);
-  --ds-graph-node-document-shadow: color-mix(in srgb, var(--ds-accent) 32%, var(--ds-surface-hover));
-  --ds-graph-node-document-line: color-mix(in srgb, var(--ds-text-primary) 55%, var(--ds-accent) 45%);
+  --ds-graph-node-document-shadow: color-mix(
+    in srgb,
+    var(--ds-accent) 32%,
+    var(--ds-surface-hover)
+  );
+  --ds-graph-node-document-line: color-mix(
+    in srgb,
+    var(--ds-text-primary) 55%,
+    var(--ds-accent) 45%
+  );
   --ds-graph-node-image-bg: color-mix(in srgb, var(--ds-accent) 64%, var(--ds-surface-active));
   --ds-graph-node-image-border: color-mix(in srgb, var(--ds-accent) 98%, transparent);
   --ds-graph-node-placeholder-stroke: color-mix(in srgb, var(--ds-text-primary) 92%, transparent);

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Folder, Search, Settings } from 'lucide-react';
 
-type TabKey = 'explorer' | 'search' | 'settings' | (string & {})
+type TabKey = 'explorer' | 'search' | 'settings' | (string & {});
 
 interface TabItem {
   name: TabKey;

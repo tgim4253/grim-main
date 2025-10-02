@@ -1,5 +1,5 @@
-import { NodeKind } from "./graph";
-import { FolderHealthState, FolderMountState } from "./file";
+import { NodeKind } from './graph';
+import { FolderHealthState, FolderMountState } from './file';
 
 export interface FileTreeData {
   id: string;

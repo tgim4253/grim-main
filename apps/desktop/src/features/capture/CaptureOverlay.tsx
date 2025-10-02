@@ -259,7 +259,14 @@ const CaptureOverlay: React.FC = () => {
     };
 
     void run();
-  }, [clearCompletedSelection, completedSelection, monitorInfo, phase, resetSelection, windowOffset]);
+  }, [
+    clearCompletedSelection,
+    completedSelection,
+    monitorInfo,
+    phase,
+    resetSelection,
+    windowOffset,
+  ]);
 
   const handleRetake = useCallback(() => {
     resetSelection();

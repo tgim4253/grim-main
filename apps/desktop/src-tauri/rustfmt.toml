@@ -1,23 +1,23 @@
-# --- 기본 스타일 ---
-edition = "2021"        # Rust Edition
-max_width = 80          # 한 줄 최대 길이
-hard_tabs = false       # 스페이스 사용
-tab_spaces = 4          # 들여쓰기 폭
+# --- Basic style ---
+edition = "2021"  # Rust edition
+max_width = 80    # Maximum line length
+hard_tabs = false # Use spaces instead of tabs
+tab_spaces = 4    # Number of spaces per indentation
 
-# --- 코드 레이아웃 ---
-newline_style = "Unix"  # LF 사용 (Unix 스타일)
-use_small_heuristics = "Max" # 줄바꿈 기준 완화
+# --- Code layout ---
+newline_style = "Unix"       # Use LF (Unix style line endings)
+use_small_heuristics = "Max" # Relax line-breaking heuristics
 
-# --- 함수, 매개변수, 블록 ---
-fn_params_layout = "Tall"   # 매개변수 길면 줄바꿈
-brace_style = "AlwaysNextLine" # 중괄호는 다음 줄에
-control_brace_style = "AlwaysNextLine" # if/else도 동일
+# --- Functions, parameters, blocks ---
+fn_params_layout = "Tall" # Break function parameters onto new lines if too long
+# brace_style = "AlwaysNextLine"          # NIGHTLY ONLY
+# control_brace_style = "AlwaysNextLine"  # NIGHTLY ONLY
 
-# --- 모듈/임포트 ---
-reorder_imports = true   # use 문 자동 정렬
-group_imports = "StdExternalCrate" # 표준, 외부, 로컬 순서
+# --- Modules / imports ---
+reorder_imports = true # Automatically reorder use statements
+# group_imports = "StdExternalCrate"      # NIGHTLY ONLY
 
-# --- 기타 ---
-format_macro_bodies = true # 매크로 본문도 포맷팅
-wrap_comments = true       # 주석 줄바꿈
-normalize_comments = true  # 주석 스타일 통일
+# --- Other ---
+# format_macro_bodies = true              # NIGHTLY ONLY
+# wrap_comments = true                    # NIGHTLY ONLY
+# normalize_comments = true               # NIGHTLY ONLY

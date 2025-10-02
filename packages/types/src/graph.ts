@@ -28,14 +28,7 @@ export interface GraphNode {
   fy?: number;
 }
 
-export type GraphNodeType =
-  | 'folder'
-  | 'tag'
-  | 'image'
-  | 'document'
-  | 'crop'
-  | 'default'
-  | string;
+export type GraphNodeType = 'folder' | 'tag' | 'image' | 'document' | 'crop' | 'default' | string;
 
 export interface GraphConnection {
   source: string;

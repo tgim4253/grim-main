@@ -354,12 +354,9 @@ export const FileTree = () => {
 
     const setup = async () => {
       try {
-        unlisten = await listen<FolderStatusChangeEvent>(
-          `folder-status://changed/${moaId}`,
-          () => {
-            void refreshTree();
-          },
-        );
+        unlisten = await listen<FolderStatusChangeEvent>(`folder-status://changed/${moaId}`, () => {
+          void refreshTree();
+        });
       } catch (error) {
         console.error('Failed to listen for folder status updates', error);
       }

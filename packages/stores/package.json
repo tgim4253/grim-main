@@ -1,7 +1,7 @@
 {
   "name": "@eolgae/stores",
   "version": "1.0.0",
-  "description": "\uacf5\ud1b5 custom stores \ubaa8\uc74c",
+  "description": "공통 custom stores 모음",
   "keywords": [
     "stores",
     "custom",

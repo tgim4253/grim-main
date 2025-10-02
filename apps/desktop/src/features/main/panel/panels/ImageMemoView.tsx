@@ -465,11 +465,7 @@ const ImageMemoView: React.FC<ImageMemoViewProps> = ({ file, moaId, memoEntries,
           text: draftText,
         };
         if (activeMemoState.crop) {
-          const {
-            absolute,
-            referenceWidth,
-            referenceHeight,
-          } = activeMemoState.crop;
+          const { absolute, referenceWidth, referenceHeight } = activeMemoState.crop;
           payload.crop = {
             rect: absolute,
             referenceWidth,

@@ -10,7 +10,11 @@ type UseMultiSelectOptions = {
 };
 
 export function useMultiSelect(visibleIds: string[], options: UseMultiSelectOptions = {}) {
-  const { mergeShiftToggle = false, pruneOnVisibilityChange = false, keepSelectedOnClick = false } = options;
+  const {
+    mergeShiftToggle = false,
+    pruneOnVisibilityChange = false,
+    keepSelectedOnClick = false,
+  } = options;
 
   // Selected IDs as a Set
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -105,7 +109,7 @@ export function useMultiSelect(visibleIds: string[], options: UseMultiSelectOpti
       } else if (isToggle) {
         toggle(id);
       } else {
-        if(!keepSelectedOnClick){ 
+        if (!keepSelectedOnClick) {
           // remove all selected item
           selectOnly(id);
         } else {
