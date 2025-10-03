@@ -140,7 +140,7 @@ pub async fn seed_initial_data(pool: &Pool<Sqlite>) -> Result<()> {
             r#"INSERT OR IGNORE INTO node (id, kind, created_at, updated_at)
                VALUES (?1, 'folder', ?2, ?2);"#,
         )
-        .bind(&root_id)
+        .bind(root_id)
         .bind(get_now_date())
         .execute(&mut *tx)
         .await?;
@@ -149,8 +149,8 @@ pub async fn seed_initial_data(pool: &Pool<Sqlite>) -> Result<()> {
             r#"INSERT OR IGNORE INTO node_folder (id, node_id, display_name, created_at, updated_at)
                VALUES (?1, ?2, 'root', ?3, ?3);"#,
         )
-        .bind(&root_id)
-        .bind(&root_id)
+        .bind(root_id)
+        .bind(root_id)
         .bind(get_now_date())
         .execute(&mut *tx)
         .await?;

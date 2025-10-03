@@ -847,9 +847,7 @@ impl From<ThumbPath> for PathBuf {
 
 /// Validate ASCII-hex strings (0-9a-fA-F) quickly.
 fn is_ascii_hex(s: &str) -> bool {
-    !s.is_empty()
-        && s.bytes()
-            .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F'))
+    !s.is_empty() && s.bytes().all(|b| (b as char).is_ascii_hexdigit())
 }
 
 /// Batch thumbnail request submitted from the frontend.

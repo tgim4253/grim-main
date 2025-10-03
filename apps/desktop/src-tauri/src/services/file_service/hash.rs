@@ -78,7 +78,7 @@ pub async fn fetch_hash_by_file_info(
     file_name_norm: &str,
     mtime: i64,
 ) -> Result<Option<String>> {
-    let mut tx = DB_MANAGER.create_new_tx(&moa_id).await?;
+    let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
 
     let file_path_id = FileRepository::fetch_file_path_by_info(
         tx.as_mut(),
