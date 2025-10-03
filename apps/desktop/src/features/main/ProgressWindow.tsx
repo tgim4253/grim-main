@@ -11,7 +11,7 @@ const ProgressWindow: React.FC<Props> = ({ progress }) => {
             className={`h-3 rounded-full ${
               progress.stage === 'Error' ? 'bg-[var(--color-status-danger)]' : 'bg-accent'
             }`}
-            style={{ width: `${progress.percent}%` }}
+            style={{ width: `${String(progress.percent)}%` }}
           ></div>
         </div>
         <div className="mb-2 text-sm font-medium text-text text-center">

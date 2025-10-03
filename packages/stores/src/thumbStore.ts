@@ -21,8 +21,8 @@ type ThumbKey = string;
 type Hash = string;
 
 interface ThumbState {
-  byKey: Record<ThumbKey, ThumbEntry | undefined>;
-  byHash: Record<Hash, ThumbKey[] | undefined>; // hash -> set of key
+  byKey: Partial<Record<ThumbKey, ThumbEntry>>;
+  byHash: Partial<Record<Hash, ThumbKey[]>>; // hash -> set of key
   lru: ThumbKey[]; // least resently used cache. (oldest first, least end)
 
   upsert: (thumbKey: ThumbKey, patch: Partial<ThumbEntry>) => void;

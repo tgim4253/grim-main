@@ -1,6 +1,6 @@
 import { usePanelsStore } from '@tgim/stores/index';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { shallow, useShallow } from 'zustand/shallow';
+import { useShallow } from 'zustand/shallow';
 import ReactDOM from 'react-dom';
 import { ipc } from '../../../lib/ipc';
 import { useMoa } from '@tgim/hooks/useMoa';
@@ -17,18 +17,15 @@ import {
   Node,
   NodeCrop,
   NodeFile,
-  NodeFolder,
   NodeKind,
   RelationType,
 } from '@tgim/types/graph';
 import { createNewId } from '@tgim/utils/identifier';
 import GridView from './panels/grid/GridView';
 import { GridData, ImageItem } from '@tgim/types/grid';
-import { FileType, ThumbResSpec } from '@tgim/types/file';
+import { FileType } from '@tgim/types/file';
 import { Button } from '@tgim/ui';
 import cn from '@tgim/utils/cn';
-import { Split } from '@tgim/ui/Splitter';
-import FileDetailSidebar from './panels/FileDetailSidebar';
 import { Camera, Crop, Eye, GitBranch, LayoutGrid, NotebookPen } from 'lucide-react';
 import FileViewer from './panels/FileViewer';
 import { useFileDrop } from '../../../../../../packages/hooks/src/useFileDrop';
@@ -57,7 +54,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [rootNode, setRootNode] = useState<Node | null>(null);
   const [graphRefreshKey, setGraphRefreshKey] = useState(0);
   const [gridRefreshKey, setGridRefreshKey] = useState(0);
-  const [rawNodesById, setRawNodesById] = useState<Record<string, Node>>({});
+  const [rawNodesById, setRawNodesById] = useState<Partial<Record<string, Node>>>({});
   const [rawConnections, setRawConnections] = useState<Connection[]>([]);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const { panel, containerId, isActive } = usePanelsStore(
@@ -73,24 +70,24 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     setRootNodeId(graphData.rootNodeId);
     setRootNode(graphData.nodes.find(node => node.id === graphData.rootNodeId) ?? null);
 
-    const nodesMap: Record<string, Node> = {};
+    const nodesMap: Partial<Record<string, Node>> = {};
     graphData.nodes.forEach(node => {
       nodesMap[node.id] = node;
     });
     setRawNodesById(nodesMap);
     setRawConnections(graphData.connections);
-    const connectionsMap: Record<string, Connection[]> = {};
-    const incomingConnectionsMap: Record<string, Connection[]> = {};
+    const connectionsMap: Partial<Record<string, Connection[]>> = {};
+    const incomingConnectionsMap: Partial<Record<string, Connection[]>> = {};
     graphData.connections.forEach(connection => {
       if (!connectionsMap[connection.srcNodeId]) {
         connectionsMap[connection.srcNodeId] = [];
       }
-      connectionsMap[connection.srcNodeId].push(connection);
+      connectionsMap[connection.srcNodeId]?.push(connection);
 
       if (!incomingConnectionsMap[connection.dstNodeId]) {
         incomingConnectionsMap[connection.dstNodeId] = [];
       }
-      incomingConnectionsMap[connection.dstNodeId].push(connection);
+      incomingConnectionsMap[connection.dstNodeId]?.push(connection);
     });
 
     const nodes: GraphNode[] = [];
@@ -114,7 +111,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         return {
           id: graphNodeId,
           nodeId: node.id,
-          label: data.fileName ?? 'file',
+          label: data.fileName,
           size: nodeSize,
           type: type,
           hash: data.xxh364,
@@ -136,7 +133,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
               ? originConnection.dstNodeId
               : originConnection.srcNodeId;
           const originNode = originNodeId ? nodesMap[originNodeId] : undefined;
-          const originFile = originNode?.data?.['File'];
+          const originFile = originNode?.data.File;
           if (originFile?.xxh364) {
             originHash = originFile.xxh364;
           }
@@ -176,7 +173,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       };
     };
 
-    ((startNodeId: string, maxDepth?: number): string => {
+    ((startNodeId: string, maxDepth?: number): string | null => {
       // Stack holds work items to expand, along with the parent relation
       const stack: Array<{
         origId: string; // original node id to materialize
@@ -188,16 +185,20 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
 
       // We will create a brand-new node for EVERY stack item, even if origId repeats.
       // This mirrors the original recursive function (children are not shared).
-      let rootNewId: string | undefined;
+      let rootNewId: string | null = null;
 
       while (stack.length > 0) {
-        const { origId, parentNewId, via, prevLevel, depth } = stack.pop()!;
+        const popped = stack.pop();
+        if (!popped) continue;
+        const { origId, parentNewId, via, prevLevel, depth } = popped;
 
         if (maxDepth && depth > maxDepth) continue;
 
         // 1) Create a fresh node id and materialize the node
         const newId = createNewId();
         const node = nodesMap[origId];
+        if (!node) continue;
+
         const newNode = getGraphNodeData(node, newId);
         newNode.depth = depth;
         if (node.id == graphData.rootNodeId) {
@@ -205,7 +206,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
           newNode.fy = 0;
         }
         // Capture root id (the very first item expanded has no parent)
-        if (!parentNewId && rootNewId === undefined) {
+        if (!parentNewId && rootNewId === null) {
           rootNewId = newId;
         }
 
@@ -236,7 +237,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       }
 
       // rootNewId must exist because startNodeId produced at least one node
-      return rootNewId!;
+      return rootNewId;
     })(graphData.rootNodeId, 99);
 
     return {
@@ -255,7 +256,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [defaultDownloadPath, setDefaultDownloadPath] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
+    void (async () => {
       const moas = await ipc.moa.loadMoas();
       const target = moas.find(moa => moa.moaId === moaId);
       if (!target) return;
@@ -263,7 +264,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       setDefaultDownloadPath(defaultPath);
     })();
   }, [moaId]);
-  const transformDataToGridData = useCallback(async (data: GraphResponse): Promise<GridData> => {
+  const transformDataToGridData = useCallback((data: GraphResponse): GridData => {
     const items = data.nodes.filter(node => node.id !== data.rootNodeId);
     const imageItems: ImageItem[] = [];
     items.forEach(item => {
@@ -292,16 +293,17 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   }, [containerId]);
   const refreshPanelData = useCallback(async () => {
     if (!moaId) return;
+    if (!panel) return;
     try {
       const data = await ipc.graph.getGraphOne(moaId, panel.nodeId.toString());
       handleGraphUpdate(data);
-      setGridData(await transformDataToGridData(data));
+      setGridData(transformDataToGridData(data));
       setGraphRefreshKey(prev => prev + 1);
       setGridRefreshKey(prev => prev + 1);
     } catch (e) {
       console.error('Failed to load panel data', e);
     }
-  }, [handleGraphUpdate, moaId, panel.nodeId, transformDataToGridData]);
+  }, [handleGraphUpdate, moaId, panel?.nodeId, transformDataToGridData]);
 
   useEffect(() => {
     void refreshPanelData();
@@ -310,14 +312,11 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   useEffect(() => {
     if (!moaId) return;
 
-    let unlistenPromise: Promise<UnlistenFn> | null = listen(
-      `capture://completed/${String(moaId)}`,
-      () => {
-        void refreshPanelData();
-      },
-    );
+    let unlistenPromise: Promise<UnlistenFn> | null = listen(`capture://completed/${moaId}`, () => {
+      void refreshPanelData();
+    });
 
-    unlistenPromise.catch(error => {
+    unlistenPromise.catch((error: unknown) => {
       console.error('[Panel] Failed to register capture listener', error);
     });
 
@@ -327,7 +326,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         .then(unlisten => {
           unlisten();
         })
-        .catch(error => {
+        .catch((error: unknown) => {
           console.error('[Panel] Failed to remove capture listener', error);
         });
       unlistenPromise = null;
@@ -343,7 +342,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       try {
         const data = await ipc.graph.getGraphOne(moaId, panel.nodeId.toString());
         const nextGraphData = transformDataToGraphData(data);
-        const nextGridData = await transformDataToGridData(data);
+        const nextGridData = transformDataToGridData(data);
 
         if (isCancelled) return;
 
@@ -377,19 +376,20 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const rootFile = useMemo<NodeFile | null>(() => {
     if (!rootNode) return null;
     if (rootNode.kind === NodeKind.File) {
-      return rootNode.data?.['File'] ?? null;
+      return rootNode.data.File ?? null;
     }
     if (rootNode.kind === NodeKind.Crop) {
-      const crop = rootNode.data?.['Crop'];
+      const crop = rootNode.data.Crop;
       if (!crop) return null;
       const originHash = crop.originHash;
       if (!originHash) return null;
       const originNode = Object.values(rawNodesById).find(candidate => {
+        if (!candidate) return false;
         if (candidate.kind !== NodeKind.File) return false;
-        const file = candidate.data?.['File'];
+        const file = candidate.data.File;
         return file?.xxh364 === originHash;
       });
-      return originNode?.data?.['File'] ?? null;
+      return originNode?.data.File ?? null;
     }
     return null;
   }, [rawNodesById, rootNode]);
@@ -417,8 +417,9 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     const rootNodeId = rootNode.id;
 
     Object.values(rawNodesById).forEach(node => {
+      if (!node) return;
       if (node.kind !== NodeKind.Memo) return;
-      const memo = node.data?.['Memo'];
+      const memo = node.data.Memo;
       if (!memo) return;
 
       const attachmentConnection = rawConnections.find(
@@ -438,7 +439,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
           attachmentType: 'file',
         });
       } else if (attachmentNode.kind === NodeKind.Crop) {
-        const crop = attachmentNode.data?.['Crop'];
+        const crop = attachmentNode.data.Crop;
         if (!crop) return;
         if (crop.originHash !== rootHash) return;
         entries.push({
@@ -501,7 +502,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
 
   const activeCrop = useMemo<NodeCrop | null>(() => {
     if (rootNode?.kind !== NodeKind.Crop) return null;
-    return rootNode.data?.['Crop'] ?? null;
+    return rootNode.data.Crop ?? null;
   }, [rootNode]);
 
   const captureAnchor = useMemo(() => {
@@ -574,7 +575,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
           linkTypeForward: DEFAULT_CAPTURE_LINK,
           linkTypeReverse: DEFAULT_CAPTURE_LINK,
         });
-      } else if (captureAnchor.type === 'folder') {
+      } else {
         if (!captureAnchor.path) {
           toast.error('폴더 경로를 확인할 수 없습니다.');
           return;
@@ -619,7 +620,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     <div
       ref={panelRef}
       onDragOver={handleDragOver}
-      onDrop={handleDrop}
+      onDrop={(ev: React.DragEvent<HTMLDivElement>) => void handleDrop(ev)}
       onDragEnter={handleDragEnter}
       onDragStart={ev => {
         ev.preventDefault();
@@ -643,7 +644,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
             variant="icon"
             aria-label="캡처 시작"
             title="캡처 시작"
-            onClick={handleStartCapture}
+            onClick={() => void handleStartCapture()}
             disabled={captureDisabled}
             className="h-8 w-8"
           >
@@ -654,7 +655,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
               {availableViews.map(type => {
                 const Icon = getViewIcon(type);
                 const isActive = viewType === type;
-                const labels: Record<ViewType, string> = {
+                const labels: Partial<Record<ViewType, string>> = {
                   graph: '그래프 보기',
                   grid: '그리드 보기',
                   viewer: '뷰어 보기',
@@ -688,18 +689,19 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
         {showGraph ? (
           <GraphView
             key={graphRefreshKey}
-            rootNodeId={rootNodeId}
             rootGraphNodeId={rootGraphNodeId}
             graphData={graphData}
           />
-        ) : showGrid && gridData ? (
+        ) : showGrid ? (
           <GridView
             key={gridRefreshKey}
             gridData={gridData}
-            onImageOpen={image => {}}
+            onImageOpen={image => {
+              console.log(image);
+            }}
             onClearPreview={() => {}}
           />
-        ) : showViewer && rootFile ? (
+        ) : showViewer ? (
           <FileViewer file={rootFile} moaId={moaId} crop={activeCrop ?? undefined} />
         ) : showCrop && rootFile && moaId ? (
           <ImageCropView

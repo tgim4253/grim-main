@@ -7,7 +7,7 @@ export function convertKeysToCamel(obj: unknown): unknown {
     return obj.map(item => convertKeysToCamel(item));
   } else if (obj !== null && typeof obj === 'object') {
     return Object.fromEntries(
-      Object.entries(obj as Record<string, unknown>).map(([key, value]) => [
+      Object.entries(obj as Partial<Record<string, unknown>>).map(([key, value]) => [
         snakeToCamel(key),
         convertKeysToCamel(value),
       ]),
@@ -15,7 +15,7 @@ export function convertKeysToCamel(obj: unknown): unknown {
   }
   return obj;
 }
-export function omitKey<T extends Record<string, unknown>>(obj: T, key: string): T {
+export function omitKey<T extends Partial<Record<string, unknown>>>(obj: T, key: string): T {
   const { [key]: _, ...rest } = obj;
   return rest as T;
 }

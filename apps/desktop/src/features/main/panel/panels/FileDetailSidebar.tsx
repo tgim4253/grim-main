@@ -27,7 +27,7 @@ type ActionState = {
 
 const PREVIEW_WIDTH = 360;
 
-const statusLabel: Record<FilePathStatus, { label: string; tone: string }> = {
+const statusLabel: Partial<Record<FilePathStatus, { label: string; tone: string }>> = {
   ok: { label: '정상', tone: 'text-emerald-500 dark:text-emerald-400' },
   warning: { label: '경고', tone: 'text-amber-500 dark:text-amber-400' },
   error: { label: '오류', tone: 'text-rose-500 dark:text-rose-400' },
@@ -80,7 +80,7 @@ const FileDetailSidebar: React.FC<Props> = ({ image, onClose }) => {
   }, [thumbEntry]);
 
   useEffect(() => {
-    let cancelled = false;
+    const cancelledRef = { current: false };
     if (!image || !moaId) {
       setDetail(null);
       setError(null);
@@ -102,25 +102,25 @@ const FileDetailSidebar: React.FC<Props> = ({ image, onClose }) => {
       /* ignore preview errors */
     });
 
-    (async () => {
+    void (async () => {
       try {
         const result = await ipc.file.getFileDetail(moaId, image.hash);
-        if (!cancelled) {
+        if (!cancelledRef.current) {
           setDetail(result);
         }
       } catch (err) {
-        if (!cancelled) {
+        if (!cancelledRef.current) {
           setError(err instanceof Error ? err.message : '파일 정보를 불러오지 못했습니다');
         }
       } finally {
-        if (!cancelled) {
+        if (!cancelledRef.current) {
           setLoading(false);
         }
       }
     })();
 
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
     };
   }, [image, moaId, ensureThumbnails]);
 
@@ -206,7 +206,12 @@ const FileDetailSidebar: React.FC<Props> = ({ image, onClose }) => {
           {detail?.file.mime && <span className="text-xs text-text-soft">{detail.file.mime}</span>}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="icon" onClick={handleRefresh} disabled={loading} title="새로고침">
+          <Button
+            variant="icon"
+            onClick={() => void handleRefresh()}
+            disabled={loading}
+            title="새로고침"
+          >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -252,8 +257,8 @@ const FileDetailSidebar: React.FC<Props> = ({ image, onClose }) => {
             <div>
               <dt className="text-xs text-text-soft">원본 크기</dt>
               <dd className="font-medium text-text">
-                {detail?.file.width && detail?.file.height
-                  ? `${detail.file.width} × ${detail.file.height}`
+                {detail?.file.width && detail.file.height
+                  ? `${String(detail.file.width)} × ${String(detail.file.height)}`
                   : '정보 없음'}
               </dd>
             </div>
@@ -286,14 +291,14 @@ const FileDetailSidebar: React.FC<Props> = ({ image, onClose }) => {
             <Button
               size="sm"
               variant="secondary"
-              onClick={handleAddPath}
+              onClick={() => void handleAddPath()}
               disabled={actionState.busy}
               className="flex items-center gap-1"
             >
               <Plus className="h-4 w-4" /> 경로 추가
             </Button>
           </div>
-          {detail?.paths?.length ? (
+          {detail?.paths.length ? (
             <div className="space-y-3">
               {detail.paths.map(pathInfo => {
                 const status = statusLabel[pathInfo.status];
@@ -309,7 +314,9 @@ const FileDetailSidebar: React.FC<Props> = ({ image, onClose }) => {
                           {pathInfo.path ?? '저장된 경로 정보 없음'}
                         </p>
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-soft">
-                          <span className={cn('font-semibold', status.tone)}>{status.label}</span>
+                          <span className={cn('font-semibold', status?.tone)}>
+                            {status?.label ?? ''}
+                          </span>
                           {pathInfo.warning && <span>{pathInfo.warning}</span>}
                           {pathInfo.error && (
                             <span className="text-rose-500 dark:text-rose-300">
@@ -331,7 +338,7 @@ const FileDetailSidebar: React.FC<Props> = ({ image, onClose }) => {
                         <Button
                           variant="icon"
                           title="파일 위치 열기"
-                          onClick={() => handleReveal(pathInfo)}
+                          onClick={() => void handleReveal(pathInfo)}
                           disabled={!pathInfo.path || busy}
                         >
                           <FolderOpen className="h-4 w-4" />
@@ -339,7 +346,7 @@ const FileDetailSidebar: React.FC<Props> = ({ image, onClose }) => {
                         <Button
                           variant="icon"
                           title="경로 수정"
-                          onClick={() => handleReplacePath(pathInfo)}
+                          onClick={() => void handleReplacePath(pathInfo)}
                           disabled={busy}
                         >
                           {busy ? (
@@ -351,7 +358,7 @@ const FileDetailSidebar: React.FC<Props> = ({ image, onClose }) => {
                         <Button
                           variant="icon"
                           title="경로 제거"
-                          onClick={() => handleRemovePath(pathInfo)}
+                          onClick={() => void handleRemovePath(pathInfo)}
                           disabled={busy}
                         >
                           <Trash2 className="h-4 w-4" />

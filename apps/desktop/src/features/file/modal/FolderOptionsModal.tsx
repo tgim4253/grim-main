@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Modal } from '@tgim/ui/index';
 import {
   FileType,
@@ -9,8 +9,9 @@ import {
 import { FileTreeData } from '@tgim/types/index';
 import { ipc } from '../../../lib/ipc';
 import { FILE_TYPE_LABELS } from '../constants';
+import { omitKey } from '@tgim/utils/object';
 
-type ExtensionSelection = Record<FileType, Set<string>>;
+type ExtensionSelection = Partial<Record<FileType, Set<string>>>;
 
 const normalizeExtension = (value: string) => value.trim().replace(/^\./, '').toLowerCase();
 
@@ -57,10 +58,7 @@ const partitionExtensions = (
     if (!normalized) return;
     const fileType = lookup.get(normalized);
     if (fileType) {
-      if (!selections[fileType]) {
-        selections[fileType] = new Set<string>();
-      }
-      selections[fileType].add(normalized);
+      selections[fileType]?.add(normalized);
     } else {
       remainder.push(normalized);
     }
@@ -97,12 +95,6 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({
   const [suppressWarnings, setSuppressWarnings] = useState<boolean>(
     mount?.suppressWarnings ?? false,
   );
-  const [includeExtensionsInput, setIncludeExtensionsInput] = useState<string>(
-    (mount?.includeExtensions ?? []).join(', '),
-  );
-  const [excludeExtensionsInput, setExcludeExtensionsInput] = useState<string>(
-    (mount?.excludeExtensions ?? []).join(', '),
-  );
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -131,7 +123,7 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({
       }
     };
 
-    load();
+    void load();
 
     return () => {
       mounted = false;
@@ -187,7 +179,7 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({
       const next = { ...prev } as ExtensionSelection;
       const normalized = new Set(Array.from(values).map(normalizeExtension));
       if (normalized.size === 0) {
-        delete next[fileType];
+        omitKey(next, fileType);
       } else {
         next[fileType] = normalized;
       }
@@ -236,7 +228,7 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({
             .filter(group => group.fileType !== FileType.Unknown)
             .map(group => {
               const selectedSet = selection[group.fileType];
-              const selectedCount = selectedSet ? selectedSet.size : 0;
+              const selectedCount = selectedSet?.size ?? 0;
               const totalCount = group.extensions.length;
               const isExpanded = expanded.has(group.fileType);
               const isChecked = selectedCount > 0;
@@ -292,14 +284,14 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({
                     <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
                       {group.extensions.map(ext => {
                         const normalized = normalizeExtension(ext);
-                        const isExtensionChecked = selectedSet?.has(normalized) ?? false;
+                        const isExtensionChecked = selectedSet?.has(normalized);
                         return (
                           <label key={ext} className="flex items-center gap-2">
                             <input
                               type="checkbox"
                               checked={isExtensionChecked}
                               onChange={event => {
-                                const next = new Set(selectedSet ?? []);
+                                const next = new Set(selectedSet);
                                 if (event.target.checked) {
                                   next.add(normalized);
                                 } else {
@@ -358,7 +350,7 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({
     };
     try {
       await ipc.file.updateFolderOptions(moaId, node.id, payload);
-      await onUpdated();
+      onUpdated();
       onClose();
     } catch (err) {
       console.error(err);
@@ -378,7 +370,7 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({
     setError(null);
     try {
       await ipc.file.syncFolder(moaId, node.id);
-      await onUpdated();
+      onUpdated();
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : '동기화에 실패했습니다.');
@@ -512,7 +504,11 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({
 
         <footer className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={handleSync} disabled={!mount || isSyncing}>
+            <Button
+              variant="secondary"
+              onClick={() => void handleSync()}
+              disabled={!mount || isSyncing}
+            >
               {isSyncing ? '동기화 중...' : '지금 동기화'}
             </Button>
           </div>
@@ -520,7 +516,11 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({
             <Button variant="secondary" onClick={onClose} disabled={isSaving}>
               취소
             </Button>
-            <Button variant="primary" onClick={handleSave} disabled={!mount || isSaving}>
+            <Button
+              variant="primary"
+              onClick={() => void handleSave()}
+              disabled={!mount || isSaving}
+            >
               {isSaving ? '저장 중...' : '저장'}
             </Button>
           </div>

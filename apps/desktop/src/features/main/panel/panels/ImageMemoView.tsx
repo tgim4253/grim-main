@@ -533,7 +533,7 @@ const ImageMemoView: React.FC<ImageMemoViewProps> = ({ file, moaId, memoEntries,
 
   const modalTitle = activeMemoState
     ? activeMemoState.mode === 'existing'
-      ? `메모 #${activeMemoState.entry.marker}`
+      ? `메모 #${String(activeMemoState.entry.marker)}`
       : '새 메모'
     : '메모';
 
@@ -730,7 +730,7 @@ const ImageMemoView: React.FC<ImageMemoViewProps> = ({ file, moaId, memoEntries,
               <Button
                 type="button"
                 variant="primary"
-                onClick={handleSave}
+                onClick={() => void handleSave()}
                 disabled={!canSave || isSaving}
               >
                 {activeMemoState.mode === 'existing' ? '저장' : '생성'}

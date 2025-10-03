@@ -95,14 +95,15 @@ function calculateMasonryMetrics(containerWidth: number, size: Size) {
   return { columnCount, cardWidth };
 }
 
-// Debounce Hook (unchanged)
-
 // Visibility Hook (unchanged)
-function useVisibilityMap(rootRef: React.RefObject<HTMLElement>, overscanPx = 600) {
+function useVisibilityMap<T extends HTMLElement>(
+  rootRef: React.RefObject<T | null>,
+  overscanPx = 600,
+) {
   const ioRef = useRef<IntersectionObserver | null>(null);
   const observedElementsRef = useRef(new Map<string, Element>());
-  const [visible, setVisible] = useState<Record<string, boolean>>({});
-  const pending = useRef<Record<string, boolean>>({});
+  const [visible, setVisible] = useState<Partial<Record<string, boolean>>>({});
+  const pending = useRef<Partial<Record<string, boolean>>>({});
   const rafId = useRef<number | null>(null);
 
   const flush = useCallback(() => {
@@ -128,7 +129,7 @@ function useVisibilityMap(rootRef: React.RefObject<HTMLElement>, overscanPx = 60
         }
       },
       {
-        root: rootRef.current ?? null,
+        root: rootRef.current,
         rootMargin: `${String(overscanPx)}px 0px`,
         threshold: 0,
       },
@@ -195,7 +196,7 @@ export const GridContent: React.FC<Props> = ({ gridData, onImageOpen, onClearPre
   const [layout, setLayout] = useState<Layout>('grid');
   const [size, setSize] = useState<Size>('medium');
   const [selectMode, setSelectMode] = useState(false);
-  const [images, setImages] = useState(gridData.images);
+  const [images, _setImages] = useState(gridData.images);
 
   const visibleOrder = useMemo(() => images.map(img => img.hash), [images]);
 
@@ -211,7 +212,7 @@ export const GridContent: React.FC<Props> = ({ gridData, onImageOpen, onClearPre
 
   // Map for quick lookup by hash
   const hashToImgMap = useMemo(() => {
-    const map: Record<string, ImageItem> = {};
+    const map: Partial<Record<string, ImageItem>> = {};
     images.forEach(img => (map[img.hash] = img));
     return map;
   }, [images]);
@@ -262,9 +263,8 @@ export const GridContent: React.FC<Props> = ({ gridData, onImageOpen, onClearPre
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const noop = React.useCallback((..._args: any[]) => {}, []);
+  const noop = React.useCallback((..._args: unknown[]) => {}, []);
 
-  //@ts-ignore
   const viewportSize = useElementSize(scrollRef);
   const overscanPx = useMemo(
     () =>
@@ -273,7 +273,6 @@ export const GridContent: React.FC<Props> = ({ gridData, onImageOpen, onClearPre
         : 800,
     [viewportSize.height],
   );
-  // @ts-expect-error.
   const { visible, observe, unobserve } = useVisibilityMap(scrollRef, overscanPx);
 
   const masonryMetrics = useMemo(() => {
@@ -336,7 +335,7 @@ export const GridContent: React.FC<Props> = ({ gridData, onImageOpen, onClearPre
       return;
     }
 
-    stableFetchThumbnails.current(initialItems);
+    void stableFetchThumbnails.current(initialItems);
   }, [images, moaId]);
 
   /* -------------------------------------------------
@@ -347,13 +346,13 @@ export const GridContent: React.FC<Props> = ({ gridData, onImageOpen, onClearPre
     return Object.keys(visible)
       .filter(k => visible[k])
       .map(hash => hashToImgMap[hash])
-      .filter(Boolean);
+      .filter(e => e !== undefined);
   }, [visible, hashToImgMap]);
 
   useDebouncedEffect(
     () => {
       if (layout === 'masonry' && visibleItems.length > 0) {
-        stableFetchThumbnails.current(visibleItems);
+        void stableFetchThumbnails.current(visibleItems);
       }
     },
     [visibleItems, layout],
@@ -362,7 +361,7 @@ export const GridContent: React.FC<Props> = ({ gridData, onImageOpen, onClearPre
 
   // Handler for grid layout to request thumbs by index ranges
   const handleNeedThumbs = useCallback((items: ImageItem[]) => {
-    if (items.length) stableFetchThumbnails.current(items);
+    if (items.length) void stableFetchThumbnails.current(items);
   }, []);
 
   const handleToggleSelectMode = useCallback(() => {
@@ -514,18 +513,12 @@ const GridView: React.FC<Props> = props => {
   const [activeImage, setActiveImage] = useState<ImageItem | null>(null);
 
   useEffect(() => {
-    if (!gridData || !activeImage) return;
+    if (!activeImage) return;
     const exists = gridData.images.some(img => img.hash === activeImage.hash);
     if (!exists) {
       setActiveImage(null);
     }
   }, [gridData, activeImage?.hash]);
-
-  useEffect(() => {
-    if (!gridData) {
-      setActiveImage(null);
-    }
-  }, [gridData]);
 
   const handleImageClick = (image: ImageItem) => {
     setActiveImage(image);

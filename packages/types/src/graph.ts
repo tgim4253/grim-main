@@ -31,8 +31,8 @@ export interface GraphNode {
 export type GraphNodeType = 'folder' | 'tag' | 'image' | 'document' | 'crop' | 'default';
 
 export interface GraphConnection {
-  source: string;
-  target: string;
+  source: string | GraphNode;
+  target: string | GraphNode;
   label: string;
 
   data: Connection;

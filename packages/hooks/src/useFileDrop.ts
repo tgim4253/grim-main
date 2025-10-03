@@ -20,7 +20,7 @@ interface FileDropFilePayload {
   dataBase64: string;
 }
 
-const MIME_EXTENSION_MAP: Record<string, string> = {
+const MIME_EXTENSION_MAP: Partial<Record<string, string>> = {
   'image/jpeg': 'jpg',
   jpeg: 'jpg',
   jpg: 'jpg',
@@ -73,20 +73,20 @@ const ensureExtension = (name: string, extension?: string | null): string => {
   return `${name}.${normalized}`;
 };
 
-const extensionFromMime = (mime?: string | null): string | null => {
+const extensionFromMime = (mime?: string | null): string | undefined => {
   if (!mime) {
-    return null;
+    return undefined;
   }
   const normalized = mime.split(';')[0]?.trim().toLowerCase();
   if (!normalized) {
-    return null;
+    return undefined;
   }
   if (normalized in MIME_EXTENSION_MAP) {
     return MIME_EXTENSION_MAP[normalized];
   }
   const [, subtype] = normalized.split('/');
   if (!subtype) {
-    return null;
+    return undefined;
   }
   const cleaned = subtype.split('+')[0];
   return MIME_EXTENSION_MAP[cleaned] ?? cleaned;

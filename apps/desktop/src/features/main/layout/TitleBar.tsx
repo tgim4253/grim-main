@@ -12,7 +12,7 @@ const TitleBar: React.FC = () => {
       <div className="flex h-8" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <Button
           variant="titlebar"
-          onClick={() => ipc.windowController.minimize()}
+          onClick={() => void ipc.windowController.minimize()}
           aria-label="Minimize window"
           className="flex items-center justify-center text-icon-main hover:text-icon-hover-main"
         >
@@ -20,7 +20,7 @@ const TitleBar: React.FC = () => {
         </Button>
         <Button
           variant="titlebar"
-          onClick={() => ipc.windowController.maximize()}
+          onClick={() => void ipc.windowController.maximize()}
           aria-label="Maximize window"
           className="flex items-center justify-center text-icon-main hover:text-icon-hover-main"
         >
@@ -28,7 +28,7 @@ const TitleBar: React.FC = () => {
         </Button>
         <Button
           variant="titlebar"
-          onClick={() => ipc.windowController.close()}
+          onClick={() => void ipc.windowController.close()}
           aria-label="Close window"
           className="flex items-center justify-center text-icon-main hover:text-icon-hover-main"
         >

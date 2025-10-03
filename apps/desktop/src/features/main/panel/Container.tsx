@@ -23,7 +23,7 @@ const PanelContainer: React.FC<Props> = ({ containerId }) => {
       }
 
       const panel = panelEntities[panelId];
-      if (!panel || panel.nodeId == null) {
+      if (!panel) {
         setSelectedNode(null);
         return;
       }

@@ -320,8 +320,8 @@ const CaptureOverlay: React.FC = () => {
       <div
         className="absolute border-2 border-accent bg-accent/10"
         style={{
-          left: `(${String(selection.x)})px`,
-          top: `(${String(selection.y)})px`,
+          left: `${String(selection.x)}px`,
+          top: `${String(selection.y)}px`,
           width: `${String(selection.width)}px`,
           height: `${String(selection.height)}px`,
         }}

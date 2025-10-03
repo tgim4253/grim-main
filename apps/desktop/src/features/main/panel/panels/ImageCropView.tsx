@@ -88,7 +88,7 @@ const approx = (value: number, expected: number, tolerance = FULL_IMAGE_TOLERANC
   Math.abs(value - expected) <= tolerance;
 
 const formatDimensions = (width: number, height: number) =>
-  `${Math.round(width)} × ${Math.round(height)}`;
+  `${String(Math.round(width))} × ${String(Math.round(height))}`;
 
 const ImageCropView: React.FC<ImageCropViewProps> = ({ file, moaId, crops, onRefresh }) => {
   const [sidebarVisible, setSidebarVisible] = useState(false);
@@ -462,7 +462,9 @@ const ImageCropView: React.FC<ImageCropViewProps> = ({ file, moaId, crops, onRef
               key="crop-options"
               canHidden
               hidden={!sidebarVisible}
-              onHidden={hidden => hidden && setSidebarVisible(false)}
+              onHidden={hidden => {
+                if (hidden) setSidebarVisible(false);
+              }}
               hiddenSize={200}
               minSize={240}
               initialSize={280}

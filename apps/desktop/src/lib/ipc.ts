@@ -19,7 +19,6 @@ import {
   ThumbnailUsage,
 } from '@tgim/types/file';
 import {
-  CroquisOption,
   CroquisPreferences,
   CroquisSession,
   CroquisStartPayload,

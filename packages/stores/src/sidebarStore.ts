@@ -19,7 +19,7 @@ interface SidebarPanelState {
 
 type SidebarPosition = 'left' | 'right';
 interface SidebarState {
-  sidebars: Record<SidebarPosition, SidebarPanelState>;
+  sidebars: Partial<Record<SidebarPosition, SidebarPanelState>>;
   setActiveTab: (position: SidebarPosition, tab: TabKey) => void;
   toggleTab: (position: SidebarPosition, tab: TabKey) => void;
   setHidden: (position: SidebarPosition, hidden: boolean) => void;
@@ -84,7 +84,7 @@ const useSidebarStore = create<SidebarState>((set, _get) => ({
 
   toggleTab: (position, tab) => {
     set(state => {
-      const current = state.sidebars[position].activeTab;
+      const current = state.sidebars[position]?.activeTab;
       return {
         sidebars: {
           ...state.sidebars,

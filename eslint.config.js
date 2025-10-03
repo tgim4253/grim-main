@@ -61,6 +61,7 @@ export default [
       '**/postcss.config.cjs',
       'scripts/translator.mjs',
       '*.d.ts',
+      '**/*.js',
       '.config/**',
       'scripts/dev.ts',
       'apps/desktop/src-tauri/**',

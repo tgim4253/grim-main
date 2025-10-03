@@ -19,8 +19,6 @@ import usePanelsStore from '@tgim/stores/panelStore';
 import { listen } from '@tauri-apps/api/event';
 import FolderImportProgressModal from '../../file/modal/FolderImportProgressModal';
 import FolderOptionsModal from '../../file/modal/FolderOptionsModal';
-import { GraphResponse } from '@tgim/types/graph';
-
 /* local utils for rendering */
 
 // Find node by id (UI helper)
@@ -271,11 +269,11 @@ export const FileTree = () => {
     if (!targetId || targetId !== selectedNodeId) return;
 
     const escapeId =
-      typeof window !== 'undefined' && window.CSS?.escape
+      typeof window !== 'undefined'
         ? window.CSS.escape(targetId)
         : targetId.replace(/["\\]/g, '\\$&');
 
-    const element = document.querySelector<HTMLElement>(`[data-node-id="${String(escapeId)}"]`);
+    const element = document.querySelector<HTMLElement>(`[data-node-id="${escapeId}"]`);
     if (!element) return;
 
     pendingScrollId.current = null;
@@ -305,7 +303,7 @@ export const FileTree = () => {
     const setup = async () => {
       try {
         unlisten = await listen<FolderImportProgressEvent>(
-          `folder-import://progress/${String(moaId)}`,
+          `folder-import://progress/${moaId}`,
           event => {
             const context = importContextRef.current;
             if (!context) {
@@ -356,12 +354,9 @@ export const FileTree = () => {
 
     const setup = async () => {
       try {
-        unlisten = await listen<FolderStatusChangeEvent>(
-          `folder-status://changed/${String(moaId)}`,
-          () => {
-            void refreshTree();
-          },
-        );
+        unlisten = await listen<FolderStatusChangeEvent>(`folder-status://changed/${moaId}`, () => {
+          void refreshTree();
+        });
       } catch (error) {
         console.error('Failed to listen for folder status updates', error);
       }
@@ -426,7 +421,11 @@ export const FileTree = () => {
           onToggle={id => {
             setExpanded(prev => {
               const n = new Set(prev);
-              n.has(id) ? n.delete(id) : n.add(id);
+              if (n.has(id)) {
+                n.delete(id);
+              } else {
+                n.add(id);
+              }
               return n;
             });
           }}
@@ -479,7 +478,7 @@ export const FileTree = () => {
             >
               새 폴더 만들기
             </Button>
-            <Button variant="default" onClick={handleManualSync} disabled={isSyncing}>
+            <Button variant="default" onClick={() => void handleManualSync} disabled={isSyncing}>
               폴더/파일 업서트
             </Button>
             <Button
@@ -513,8 +512,8 @@ export const FileTree = () => {
               if (hasPath) {
                 const context: ImportContext = {
                   folderName: d.name,
-                  totalBytes: d.expectedBytes ?? 0,
-                  totalFiles: d.expectedFiles ?? 0,
+                  totalBytes: d.expectedBytes,
+                  totalFiles: d.expectedFiles,
                   startedAt: Date.now(),
                 };
                 importContextRef.current = context;
@@ -523,9 +522,9 @@ export const FileTree = () => {
                   folderId: '',
                   state: 'running',
                   processedBytes: 0,
-                  totalBytes: d.expectedBytes ?? 0,
+                  totalBytes: d.expectedBytes,
                   processedFiles: 0,
-                  totalFiles: d.expectedFiles ?? 0,
+                  totalFiles: d.expectedFiles,
                   elapsedMs: 0,
                 });
                 setImportModalOpen(true);
@@ -562,7 +561,7 @@ export const FileTree = () => {
             setActiveModal(null);
             setOptionNode(undefined);
           }}
-          onUpdated={refreshTree}
+          onUpdated={() => void refreshTree()}
         />
       ) : null}
       {isSyncing ? (

@@ -229,7 +229,7 @@ const Main: React.FC = () => {
     void load();
 
     const initListener = async () => {
-      unlisten = await listen<AppProgressEvent>(`bootstrap://progress/${String(moaId)}`, event => {
+      unlisten = await listen<AppProgressEvent>(`bootstrap://progress/${moaId}`, event => {
         setProgressQueue(prev => [...prev, event.payload]);
       });
     };
@@ -242,17 +242,17 @@ const Main: React.FC = () => {
   }, [convertToTreeData, moaId, setTreeData]);
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
+    const mountedRef = { current: true };
+    (() => {
       try {
-        const os = await platform();
-        if (mounted) setIsMac(os === 'macos');
+        const os = platform();
+        if (mountedRef.current) setIsMac(os === 'macos');
       } catch {
-        if (mounted) setIsMac(false);
+        if (mountedRef.current) setIsMac(false);
       }
     })();
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
   }, []);
 
@@ -274,13 +274,13 @@ const Main: React.FC = () => {
           <Split position="horizontal" className="w-full h-screen">
             {({ Panel }) => (
               <>
-                {!leftSidebar.hidden ? (
+                {!leftSidebar?.hidden ? (
                   <Panel
                     key="left"
                     canHidden
-                    hiddenSize={leftSidebar.hiddenSize ?? leftSidebar.minSize}
-                    minSize={leftSidebar.minSize}
-                    initialSize={leftSidebar.size}
+                    hiddenSize={leftSidebar?.hiddenSize ?? leftSidebar?.minSize}
+                    minSize={leftSidebar?.minSize}
+                    initialSize={leftSidebar?.size}
                     onHidden={hidden => {
                       setSidebarHidden('left', hidden);
                     }}

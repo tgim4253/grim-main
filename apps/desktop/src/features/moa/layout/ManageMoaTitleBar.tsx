@@ -14,7 +14,7 @@ const ManageMoaTitleBar: React.FC = () => {
       <div className="flex" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <Button
           variant="titlebar"
-          onClick={() => ipc.windowController.minimize()}
+          onClick={() => void ipc.windowController.minimize()}
           aria-label="Minimize window"
           className="flex items-center justify-center text-icon-main hover:text-icon-hover-main"
         >
@@ -22,7 +22,7 @@ const ManageMoaTitleBar: React.FC = () => {
         </Button>
         <Button
           variant="titlebar"
-          onClick={() => ipc.windowController.close()}
+          onClick={() => void ipc.windowController.close()}
           aria-label="Close window"
           className="flex items-center justify-center text-icon-main hover:text-icon-hover-main"
         >

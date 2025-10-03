@@ -77,17 +77,17 @@ const FolderImportProgressModal: React.FC<Props> = ({
       case 'completed':
         return {
           title: '업서트 완료',
-          description: `"${String(safeName)}" 폴더 업서트가 완료되었습니다.`,
+          description: `"${safeName}" 폴더 업서트가 완료되었습니다.`,
         };
       case 'failed':
         return {
           title: '업서트 실패',
-          description: `"${String(safeName)}" 폴더 업서트 중 오류가 발생했습니다.`,
+          description: `"${safeName}" 폴더 업서트 중 오류가 발생했습니다.`,
         };
       default:
         return {
           title: '업서트 진행 중',
-          description: `"${String(safeName)}" 폴더를 업서트하는 중입니다.`,
+          description: `"${safeName}" 폴더를 업서트하는 중입니다.`,
         };
     }
   }, [progress.state, safeName]);
@@ -106,7 +106,7 @@ const FolderImportProgressModal: React.FC<Props> = ({
         <div>
           <div className="h-3 w-full overflow-hidden rounded-full bg-surface-muted">
             <div
-              className={`h-full rounded-full transition-all ${String(barColor)}`}
+              className={`h-full rounded-full transition-all ${barColor}`}
               style={{ width: `${String(percent)}%` }}
             ></div>
           </div>

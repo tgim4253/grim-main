@@ -10,7 +10,7 @@ export const FILE_TYPE_ORDER: FileType[] = [
   FileType.Unknown,
 ];
 
-export const FILE_TYPE_LABELS: Record<FileType, string> = {
+export const FILE_TYPE_LABELS: Partial<Partial<Record<FileType, string>>> = {
   [FileType.Image]: '이미지',
   [FileType.Video]: '비디오',
   [FileType.Document]: '문서',

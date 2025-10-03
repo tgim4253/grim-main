@@ -27,14 +27,14 @@ interface LayoutContainer {
 }
 interface PanelsState {
   rootLayout: LayoutContainer | null;
-  layout: Record<LayoutContainerId, LayoutContainer | undefined>;
+  layout: Partial<Record<LayoutContainerId, LayoutContainer>>;
   // containerId -> layoutContainerIds
-  containerOwnership: Record<ContainerId, LayoutContainerId | undefined>;
+  containerOwnership: Partial<Record<ContainerId, LayoutContainerId>>;
 
-  panelEntities: Record<PanelId, PanelItem | undefined>;
-  containers: Record<ContainerId, PanelContainer | undefined>;
+  panelEntities: Partial<Record<PanelId, PanelItem>>;
+  containers: Partial<Record<ContainerId, PanelContainer>>;
   // panelId -> containerId
-  panelOwnership: Record<PanelId, ContainerId | undefined>;
+  panelOwnership: Partial<Record<PanelId, ContainerId>>;
 
   activePanelId: PanelId | null;
 

@@ -1,8 +1,8 @@
 import usePanelsStore from '@tgim/stores/panelStore';
-import { Connection, GraphConnection, GraphData, GraphNode, NodeCrop } from '@tgim/types/graph';
+import { GraphConnection, GraphData, GraphNode, GraphNodeType, NodeCrop } from '@tgim/types/graph';
 import { NormalizedCropRect } from '@tgim/types/crop';
 import { NodeRenderer, clearNodeSpriteCaches, getGraphPalette } from '@tgim/ui/index';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d';
 import { useShallow } from 'zustand/shallow';
 import * as d3 from 'd3-force';
@@ -16,63 +16,27 @@ import { toNormalizedCropRect } from '@tgim/utils/crop';
 
 interface Props {
   graphData: GraphData;
-  rootNodeId: string;
   rootGraphNodeId: string;
 }
 
 const GRAPH_THUMB_SIZE = 64;
 const CROP_THUMB_SCALE = 4;
 
-const clampDevicePixelRatio = () => {
-  if (typeof window === 'undefined') return 1;
-  const ratio = window.devicePixelRatio ?? 1;
-  if (!Number.isFinite(ratio) || ratio <= 0) {
-    return 1;
-  }
-  return Math.min(3, Math.max(1, Math.round(ratio)));
-};
-
-const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) => {
+const GraphView: React.FC<Props> = ({ graphData, rootGraphNodeId }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<ForceGraphMethods | undefined>(undefined);
   const { theme } = useTheme();
   const [linkStroke, setLinkStroke] = useState(() => getGraphPalette().link);
 
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  // const [devicePixelRatio, setDevicePixelRatio] = useState(() => clampDevicePixelRatio());
 
-  // useEffect(() => {
-  //   if (typeof window === 'undefined') return;
+  const getSourceId = useCallback((source: string | { id: string }) => {
+    if (typeof source === 'object' && 'id' in source) {
+      return source.id;
+    }
+    return source;
+  }, []);
 
-  //   const updateRatio = () => {
-  //     setDevicePixelRatio(clampDevicePixelRatio());
-  //   };
-
-  //   updateRatio();
-  //   window.addEventListener('resize', updateRatio);
-
-  //   const ratios = [1, 1.5, 2, 2.5, 3];
-  //   const mediaQueries = ratios
-  //     .map(value => (typeof window.matchMedia === 'function' ? window.matchMedia(`(resolution: ${String(value)}dppx)`) : null))
-  //     .filter((query): query is MediaQueryList => query !== null);
-
-  //   const detachListeners = mediaQueries.map(query => {
-  //     if (typeof query.addEventListener === 'function') {
-  //       query.addEventListener('change', updateRatio);
-  //       return () => query.removeEventListener('change', updateRatio);
-  //     }
-  //     if (typeof query.addListener === 'function') {
-  //       query.addListener(updateRatio);
-  //       return () => query.removeListener(updateRatio);
-  //     }
-  //     return () => {};
-  //   });
-
-  //   return () => {
-  //     window.removeEventListener('resize', updateRatio);
-  //     detachListeners.forEach(detach => detach());
-  //   };
-  // }, []);
   useEffect(() => {
     const updateDimensions = () => {
       if (containerRef.current) {
@@ -97,15 +61,14 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
     };
   }, []);
   const nodesById = useMemo(() => {
-    if (!graphData) return {};
     const nodesById = Object.fromEntries(graphData.nodes.map(node => [node.id, node]));
     graphData.nodes.forEach(node => {
       node.isHidden = node.isLeaf;
       node.childLinks = [];
     });
     graphData.links.forEach(link => {
-      const source = typeof link.source === 'object' ? (link.source as any).id : link.source;
-      nodesById[source].childLinks.push(link);
+      const source = getSourceId(link.source);
+      (nodesById[source].childLinks as GraphConnection[]).push(link);
     });
     return nodesById;
   }, [graphData.nodes]);
@@ -114,21 +77,27 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
 
   const GAP = 90;
 
+  const getTarget = useCallback(
+    (target: string | GraphNode) => {
+      if (typeof target === 'object') {
+        return target;
+      }
+      return nodesById[target];
+    },
+    [nodesById],
+  );
+
   const getPrunedTree = () => {
     const visibleNodes = [];
     const visibleLinks = [];
     (function traverseTree(node = nodesById[rootGraphNodeId]) {
       visibleNodes.push(node);
-      const filteredLinks = node.childLinks.filter((link: any) => {
-        const target = typeof link.target === 'object' ? link.target : nodesById[link.target];
+      const filteredLinks = (node.childLinks as GraphConnection[]).filter(link => {
+        const target: GraphNode = getTarget(link.target);
         return !target.isHidden;
       });
       visibleLinks.push(...filteredLinks);
-      filteredLinks
-        .map((link: any) =>
-          typeof link.target === 'object' ? link.target : nodesById[link.target],
-        )
-        .forEach(traverseTree);
+      filteredLinks.map(link => getTarget(link.target)).forEach(traverseTree);
     })();
     return { nodes: visibleNodes, links: visibleLinks };
   };
@@ -208,16 +177,15 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
     const unsubscribe = useThumbStore.subscribe(
       state => state.byKey,
       byKey => {
-        let changed = false;
         imageNodesRef.current.forEach(node => {
-          const key = node.thumbKey;
+          const key = node.thumbKey as string | undefined;
           if (!key) return;
           const entry = byKey[key];
+
           const nextUrl =
             entry?.status === 'ready' && entry.url ? convertFileSrc(entry.url) : undefined;
           if (node.url !== nextUrl) {
             node.url = nextUrl;
-            changed = true;
           }
         });
       },
@@ -229,30 +197,40 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
   }, []);
 
   useEffect(() => {
-    if (fgRef && fgRef.current) {
+    if (fgRef.current) {
       const fg = fgRef.current;
       fg.d3Force(
         'radial',
         d3
           .forceRadial(
-            (d: any) => {
-              if (!isFinite(d.depth)) return 0;
-              return d.depth * GAP;
+            (d: unknown) => {
+              const node = d as GraphNode;
+              const depth = node.depth as number;
+              if (!isFinite(depth)) return 0;
+              return depth * GAP;
             },
             0,
             0,
           )
-          .strength((d: any) => {
-            if (!d.isLeaf) return 0.9;
+          .strength((d: unknown) => {
+            const node = d as GraphNode;
+            if (!node.isLeaf) return 0.9;
             else return 0;
           }),
       );
-      fg.d3Force('charge')?.strength(-50);
-      fg.d3Force('link')
-        ?.distance((l: any) =>
-          Math.abs((l.source.depth ?? 0) - (l.target.depth ?? 0)) <= 1 ? 40 : 110,
-        )
+      (fg.d3Force('charge') as d3.ForceManyBody<GraphNode> | undefined)?.strength(-50);
+
+      (fg.d3Force('link') as d3.ForceLink<GraphNode, GraphConnection> | undefined)
+        ?.distance(l => {
+          const link = l;
+          return Math.abs(
+            ((link.source as GraphNode).depth ?? 0) - ((link.target as GraphNode).depth ?? 0),
+          ) <= 1
+            ? 40
+            : 110;
+        })
         .strength(0.6);
+
       fg.d3Force('collide', d3.forceCollide(10));
     }
     setTimeout(() => {
@@ -269,16 +247,12 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
 
   const { openNode } = usePanelsStore(useShallow(s => ({ openNode: s.addPanelWithoutContainer })));
   useEffect(() => {
-    const refreshFrame: number | null = null;
     const frame = requestAnimationFrame(() => {
       clearNodeSpriteCaches();
       setLinkStroke(getGraphPalette().link);
     });
     return () => {
       cancelAnimationFrame(frame);
-      if (refreshFrame !== null) {
-        cancelAnimationFrame(refreshFrame);
-      }
     };
   }, [theme]);
 
@@ -310,13 +284,13 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
           if (normalizedCrop) {
             node.cropRect = normalizedCrop;
           }
-          NodeRenderer(node.type)?.(
+          NodeRenderer(node.type as GraphNodeType)(
             ctx,
             {
               x: node.x || 0,
               y: node.y || 0,
-              size: node.size,
-              label: node.label,
+              size: node.size as number,
+              label: node.label as string,
               url: node.url,
               thumbKey: node.thumbKey,
               cropRect: normalizedCrop ?? undefined,
@@ -327,11 +301,12 @@ const GraphView: React.FC<Props> = ({ graphData, rootNodeId, rootGraphNodeId }) 
         onNodeClick={node => {
           node.collapsed = false;
           setPrunedTree(getPrunedTree());
-          node.id &&
+          if (node.id) {
             openNode({
-              nodeId: node.nodeId,
-              name: node.id + '',
+              nodeId: node.nodeId as string,
+              name: String(node.id),
             });
+          }
         }}
       />
     </div>
