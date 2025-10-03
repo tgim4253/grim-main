@@ -76,6 +76,28 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
+          # Core dev tools & helpers (recommended by Tauri docs)
+          sudo apt-get install -y \
+            build-essential \        # C/C++ toolchain for building native deps
+            curl \                   # downloads in scripts
+            wget \                   # downloads in scripts
+            file \                   # file(1) utility
+            pkg-config               # pkg-config lookup
+
+          # WebKitGTK 4.1 stack (Ubuntu 24.04 / ubuntu-latest)
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \  # <- REQUIRED for Tauri/Wry on 24.04
+            libsoup-3.0-dev          # <- Ensures soup3-sys finds libsoup-3.0.pc
+
+          # Optional but recommended extras from Tauri docs
+          sudo apt-get install -y \
+            libxdo-dev \                      # for xdotool integration (global shortcut, etc.)
+            libssl-dev \                      # for native-tls/openssl bindings used by many crates
+            libayatana-appindicator3-dev \    # for system tray support
+            librsvg2-dev                      # for SVG/icon handling
+
+          # Your existing GTK/X11 deps (mostly redundant once webkit2gtk is installed,
+          # but keeping them is harmless and can appease other crates)
           sudo apt-get install -y \
             libgtk-3-dev \
             libglib2.0-dev \
@@ -88,8 +110,7 @@ jobs:
             libxcb1-dev \
             libxcb-render0-dev \
             libxcb-shape0-dev \
-            libxcb-xfixes0-dev \
-            pkg-config
+            libxcb-xfixes0-dev
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
