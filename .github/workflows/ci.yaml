@@ -1,15 +1,17 @@
 name: CI
 
-push:
-    branches:
-      - main
-      - develop
-      - release/**
-  pull_request:
-    branches:
-      - main
-      - develop
-      - release/**
+on: 
+    push:
+        branches:
+          - main
+          - develop
+          - release/**
+          
+    pull_request:
+        branches:
+          - main
+          - develop
+          - release/**
 
 jobs:
   frontend:
