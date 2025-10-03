@@ -93,7 +93,7 @@ const FolderImportProgressModal: React.FC<Props> = ({
   }, [progress.state, safeName]);
 
   const dismissible = progress.state === 'completed' || progress.state === 'failed';
-  const barColor = progress.state === 'failed' ? 'bg-[var(--color-status-danger)]' : 'bg-accent';
+  const barColor = progress.state === 'failed' ? 'bg-status-danger' : 'bg-accent';
 
   return (
     <Modal onClose={onClose} className="bg-modal-bg w-[28rem]" dismissible={dismissible}>

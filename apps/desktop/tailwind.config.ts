@@ -86,6 +86,11 @@ export default {
           hover: 'var(--color-brand-hover)',
           ring: 'var(--ds-accent-ring)',
         },
+        status: {
+          success: 'var(--color-status-success)',
+          warning: 'var(--color-status-warning)',
+          danger: 'var(--color-status-danger)',
+        },
         overlay: {
           DEFAULT: 'var(--ds-overlay)',
         },

@@ -493,12 +493,14 @@ const FolderOptionsModal: React.FC<FolderOptionsModalProps> = ({
                   <span>{formatDate(mount.lastSeenAt)}</span>
                 </div>
                 {mount.errorMsg ? (
-                  <p className="rounded bg-red-500/10 p-2 text-xs text-red-400">{mount.errorMsg}</p>
+                  <p className="rounded bg-status-danger/10 p-2 text-xs text-status-danger">
+                    {mount.errorMsg}
+                  </p>
                 ) : null}
               </div>
             </section>
 
-            {error ? <p className="text-sm text-red-400">{error}</p> : null}
+            {error ? <p className="text-sm text-status-danger">{error}</p> : null}
           </div>
         )}
 

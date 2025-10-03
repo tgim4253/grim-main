@@ -50,6 +50,8 @@
   --ds-brand: var(--ds-blue-500);
 
   /* Status tokens */
+  --ds-status-success: var(--ds-emerald-500);
+  --ds-status-warning: var(--ds-amber-500);
   --ds-status-danger: var(--ds-red-600);
 
   /* Stateful layers */
@@ -131,6 +133,8 @@
   --color-border: var(--ds-border-subtle);
   --color-border-hover: var(--ds-border-strong);
 
+  --color-status-success: var(--ds-status-success);
+  --color-status-warning: var(--ds-status-warning);
   --color-status-danger: var(--ds-status-danger);
 
   --color-brand: var(--ds-accent);
@@ -260,6 +264,8 @@
   --ds-accent-ring: color-mix(in srgb, var(--ds-indigo-500) 30%, transparent);
 
   /* Status tokens */
+  --ds-status-success: var(--ds-emerald-400);
+  --ds-status-warning: var(--ds-amber-400);
   --ds-status-danger: var(--ds-red-400);
 
   --ds-overlay: rgba(2, 6, 23, 0.7);

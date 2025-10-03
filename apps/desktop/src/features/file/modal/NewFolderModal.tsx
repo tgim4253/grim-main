@@ -418,7 +418,7 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
             {loadingPreview && (
               <p className="text-sm text-modal-text-secondary">폴더 구조를 불러오는 중입니다...</p>
             )}
-            {previewError && <p className="text-sm text-red-400">{previewError}</p>}
+            {previewError && <p className="text-sm text-status-danger">{previewError}</p>}
             {preview && !loadingPreview && !previewError && (
               <div className="rounded-md bg-modal-input-bg/60 p-3 text-sm">
                 <div>폴더: {preview.summary.totalFolders.toLocaleString()}개</div>

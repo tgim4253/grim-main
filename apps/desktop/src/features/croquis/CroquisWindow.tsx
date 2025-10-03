@@ -311,7 +311,7 @@ const CroquisWindow: React.FC = () => {
           <div className="w-full max-w-[720px]">
             <div className="h-1 w-full overflow-hidden rounded-full bg-surface-muted">
               <div
-                className={`h-full ${isCritical ? 'bg-red-500' : 'bg-accent'}`}
+                className={`h-full ${isCritical ? 'bg-status-danger' : 'bg-accent'}`}
                 style={{ width: `${String(Math.min(100, Math.max(0, progress * 100)))}%` }}
               />
             </div>
