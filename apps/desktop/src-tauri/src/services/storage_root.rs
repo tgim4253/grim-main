@@ -9,7 +9,7 @@ use sqlx::{Sqlite, Transaction};
 use std::path::PathBuf;
 
 /// Re-export platform-specific helpers behind a single interface.
-#[cfg(target_os = "macos")]
+#[cfg(not(target_os = "windows"))]
 mod platform_impl {
     use super::*;
     use std::path::Path;

@@ -2,7 +2,8 @@ use anyhow::{anyhow, Context, Result};
 use core::fmt;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Type};
-#[cfg(target_os = "macos")]
+
+#[cfg(not(target_os = "windows"))]
 use std::{
     convert::From,
     fs::{self, Metadata},
