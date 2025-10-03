@@ -6,7 +6,8 @@
 
 ## 권장 툴체인
 
-- **Node.js ≥ 18.x** · Vite 5 + pnpm 10 툴체인을 지원하기 위한 최소 런타임
+- **Node.js 20.x** · .nvmrc 또는 .node-version 파일에 명시된 Node.js 버전과 맞추세요.
+  의존성을 설치하기 전에 nvm use(혹은 asdf를 사용한다면 해당 명령어)를 실행하여 환경을 정렬해야 합니다.
 - **pnpm 10.13.1** · 루트 `packageManager` 필드에 고정된 워크스페이스 패키지 매니저
 - **Tauri CLI ^2.7.1 & Rust Toolchain** · 데스크톱 번들 빌드 및 Rust 명령 실행에 필요
 

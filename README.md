@@ -6,7 +6,7 @@
 
 ## Recommended Toolchain
 
-- **Node.js ≥ 18.x** · Minimum runtime required to support the Vite 5 + pnpm 10 toolchain.
+- **Node.js 20.x** · Matches the versions in `.nvmrc`/`.node-version`; run `nvm use` (or your asdf equivalent) to align before installing dependencies.
 - **pnpm 10.13.1** · Workspace package manager pinned via the root `packageManager` field.
 - **Tauri CLI ^2.7.1 & Rust Toolchain** · Required to build and run the desktop bundle and execute Rust commands.
 

@@ -133,8 +133,8 @@ fn capture_region_as_png(
             let info = screen.display_info;
             info.x == monitor.x
                 && info.y == monitor.y
-                && info.width == monitor.width as u32
-                && info.height == monitor.height as u32
+                && info.width == monitor.width
+                && info.height == monitor.height
         })
         .or_else(|| Screen::from_point(monitor.x, monitor.y).ok())
         .ok_or_else(|| anyhow!("Failed to resolve monitor for capture"))?;

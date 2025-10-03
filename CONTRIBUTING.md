@@ -4,13 +4,12 @@ Here’s your **Grim Project Contribution Guide** in English (with the updates a
 
 # Grim Project Contribution Guide
 
-[CI](./.github/ci.yaml)
+[CI](./.github/workflows/ci.yaml)
 
 ## Development Environment
 
-- **Node.js & pnpm**: Use Node.js 20+ and **pnpm 10.x** (workspace required).
-  Install dependencies with `pnpm install`.
-  If scoped packages are blocked in the registry (e.g., `GET https://registry.npmjs.org/@eslint%2Fjs: Forbidden - 403`), request access to the npm registry or set the correct authentication token before retrying.
+- **Node.js & pnpm**: Use Node.js 20.x (run `nvm use` or the asdf equivalent to match `.nvmrc`) and **pnpm 10.x** (workspace required).
+  - Install dependencies with `pnpm install`.
 
 - **Rust Toolchain**: Install Rustup, Cargo, and Tauri targets in advance to build the Rust backend for the desktop app.
 
@@ -42,6 +41,31 @@ Before submitting a PR, run the following:
 
 3. `pnpm format`
    - Verifies formatting for all code (including Rust).
+
+---
+
+## Branch Strategy
+
+- **Default target branch**: Open pull requests against the `develop` branch unless the work is tied to an open release branch or hotfix.
+- **Release branches**: When preparing a release, create a branch named `release/<version>` from `develop`. Only stabilization fixes, documentation updates, and release-specific chores should be merged into the release branch. Merge the release branch back into both `main` and `develop` after the release is cut to keep histories aligned.
+- **Hotfixes**: For urgent production fixes, branch off `main`, apply the fix, then merge into both `main` and `develop` once validated.
+
+---
+
+## Commit Message Guidelines
+
+We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification to keep history readable and automation-friendly.
+
+- **Structure**: `<type>[optional scope]: <short description>`
+- **Body**: Provide additional context and motivation. Wrap at ~72 characters.
+- **Footer**: Reference issues or breaking changes (e.g., `BREAKING CHANGE: ...`).
+
+### Examples
+
+- `feat(desktop): add draggable timeline markers`
+- `fix(stores): correct default workspace selection`
+- `chore(ci): update pnpm to 10.1.0`
+- `revert: feat(desktop): add draggable timeline markers`
 
 ---
 
