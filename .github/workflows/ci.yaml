@@ -1,17 +1,17 @@
 name: CI
 
-on: 
-    push:
-        branches:
-          - main
-          - develop
-          - release/**
-          
-    pull_request:
-        branches:
-          - main
-          - develop
-          - release/**
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - release/**
+
+  pull_request:
+    branches:
+      - main
+      - develop
+      - release/**
 
 jobs:
   frontend:
@@ -72,6 +72,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libglib2.0-dev pkg-config
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
