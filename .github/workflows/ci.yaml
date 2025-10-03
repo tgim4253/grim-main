@@ -70,28 +70,12 @@ jobs:
     runs-on: macos-14
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install system dependencies
+      - name: Install minimal system deps (macOS)
         run: |
           brew update
-          brew install \
-            gtk+3 \
-            glib \
-            pango \
-            cairo \
-            atk \
-            gdk-pixbuf \
-            xorgproto \
-            libx11 \
-            xquartz \
-            dbus \
-            webkitgtk \
-            openssl \
-            libayatana-appindicator \
-            librsvg \
-            sqlite \
-            libsoup
+          brew install pkg-config sqlite
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@1.88.0
