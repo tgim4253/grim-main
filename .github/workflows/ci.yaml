@@ -96,7 +96,8 @@ jobs:
             libssl-dev \
             libxdo-dev \
             libayatana-appindicator-dev \
-            librsvg2-dev
+            librsvg2-dev \
+            javascriptcoregtk-4.1
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
