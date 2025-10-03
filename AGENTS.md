@@ -17,7 +17,7 @@
 
 ## Required Quality Checks
 
-- Run `pnpm lint:check` to enforce the workspace ESLint configuration (`eslint.config.js`).
+- Run `pnpm lint` to enforce the workspace ESLint configuration (`eslint.config.js`).
 - Run `pnpm format:write` to apply the shared Prettier rules defined in `.prettierrc.json`.
 - Ensure the front-end compiles by executing `pnpm --filter @grim/desktop build`.
 - For the Rust backend, run `cargo fmt --all` and `cargo clippy --all-targets -- -D warnings` from `apps/desktop/src-tauri` before committing.
