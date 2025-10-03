@@ -24,12 +24,6 @@ pub struct MoaPaths {
     pub moa_dir: PathBuf,
     /// Location of the SQLite database file ("path/name/.moa/grim.db").
     pub db_path: PathBuf,
-    /// Cache directory used for transient state ("path/name/.moa/.cached").
-    pub cached_dir: PathBuf,
-    /// Thumbnail cache directory ("path/name/.moa/.cached/thumbs").
-    pub thumb_dir: PathBuf,
-    /// Path to the persisted configuration file ("path/name/.moa/config.json").
-    pub cfg_path: PathBuf,
 }
 
 /// Lazily computed map of derived Moa paths keyed by workspace identifier.
@@ -128,12 +122,5 @@ pub async fn ensure_layout(base: &Path) -> Result<MoaPaths> {
         .await
         .with_context(|| format!("Failed to create {}", thumb_dir.display()))?;
 
-    Ok(MoaPaths {
-        base_dir: base.to_path_buf(),
-        moa_dir,
-        db_path,
-        cfg_path,
-        thumb_dir,
-        cached_dir,
-    })
+    Ok(MoaPaths { base_dir: base.to_path_buf(), moa_dir, db_path })
 }

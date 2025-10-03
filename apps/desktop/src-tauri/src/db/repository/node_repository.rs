@@ -359,27 +359,6 @@ impl NodeRepository {
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
     {
-        struct FolderNodeRow {
-            node_id: String,
-            kind: String,
-            folder_id: String,
-            folder_name: String,
-            created_at: String,
-            updated_at: String,
-            mount_id: Option<String>,
-            real_folder_id: Option<String>,
-            recursive: Option<i64>,
-            sync_enabled: Option<i64>,
-            suppress_warnings: Option<i64>,
-            real_path: Option<String>,
-            error_flag: Option<String>,
-            error_msg: Option<String>,
-            last_seen_scan_id: Option<String>,
-            last_seen_at: Option<String>,
-            include_glob: Option<String>,
-            exclude_glob: Option<String>,
-        }
-
         let rows: Vec<FolderNodeAggregateRow> =
             sqlx::query_as::<_, FolderNodeAggregateRow>(
                 r#"
@@ -422,7 +401,7 @@ impl NodeRepository {
         for row in rows {
             let node_kind = NodeKind::from_str(&row.kind)?;
 
-            let entry = match nodes_by_id.entry(row.node_id.clone()) {
+            let _entry = match nodes_by_id.entry(row.node_id.clone()) {
                 Entry::Occupied(occupied) => occupied.into_mut(),
                 Entry::Vacant(vacant) => {
                     ordered_ids.push(row.node_id.clone());
@@ -456,7 +435,6 @@ impl NodeRepository {
 
                 let mount = MountWithFolder {
                     mount_id,
-                    virtual_node_id: row.node_id.clone(),
                     real_folder_id: row
                         .real_folder_id
                         .clone()

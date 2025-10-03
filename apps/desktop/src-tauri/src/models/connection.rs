@@ -53,17 +53,17 @@ impl RelationType {
 /// - `Forward`: traversal continues.
 /// - `Reverse`: traversal stops (edge ignored).
 /// - `Bidirectional`: traversal continues but the edge may be hidden later.
-pub enum EdgeType {
+pub enum _EdgeType {
     Forward = 1,       // Normal forward edge, expand during traversal
     Bidirectional = 2, // Expand during traversal, but can be hidden in UI
     Reverse = 3,       // Do not expand, stop traversal at this edge
 }
 
 /// Connection kind metadata loaded from the rule table.
-pub struct ConnectionKind {
+pub struct _ConnectionKind {
     pub kind_rule_id: String,
     pub kind: RelationType,
-    pub default_level: EdgeType,
+    pub default_level: _EdgeType,
     pub editable: bool,
     pub description: Option<String>,
 }

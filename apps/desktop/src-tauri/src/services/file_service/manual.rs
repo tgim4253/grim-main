@@ -1,16 +1,8 @@
-use std::{
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::path::{Path, PathBuf};
 
-use ::bytes::Bytes;
 use anyhow::{anyhow, Context, Result};
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
-use futures::{stream, StreamExt};
-use regex::bytes;
-use reqwest::{Client, ClientBuilder, Response};
 use serde::{Deserialize, Serialize};
-use sha2::digest::typenum::Len;
 use tokio::fs;
 use uuid::Uuid;
 
@@ -290,18 +282,6 @@ async fn register_path_with_virtual_folder(
     Ok(true)
 }
 
-fn derive_file_name_from_url(url: &str) -> Option<String> {
-    reqwest::Url::parse(url)
-        .ok()
-        .and_then(|parsed| {
-            parsed.path_segments().and_then(|mut segments| {
-                segments.next_back().map(|segment| segment.to_string())
-            })
-        })
-        .map(|name| sanitize_file_name(&name))
-        .filter(|name| !name.is_empty())
-}
-
 fn extract_extension_from_mime(mime: &str) -> Option<String> {
     mime.split('/')
         .nth(1)
@@ -347,7 +327,7 @@ async fn ensure_unique_path(path: PathBuf) -> Result<PathBuf> {
         return Ok(path);
     }
 
-    let mut base = path
+    let base = path
         .file_stem()
         .and_then(|stem| stem.to_str())
         .map(|stem| stem.to_string())

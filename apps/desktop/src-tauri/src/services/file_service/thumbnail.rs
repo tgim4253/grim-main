@@ -133,10 +133,11 @@ pub async fn ensure_base_thumbnail(
         bail!("bad base thumbnail path");
     }
 
+    let target_dims = (target_w, target_h);
+
     let encoded = task::spawn_blocking({
         let buffer = dst_image.into_vec();
-        let target_w = target_w;
-        let target_h = target_h;
+        let (target_w, target_h) = target_dims;
 
         move || -> Result<Vec<u8>> {
             let mut rgb = Vec::with_capacity(
@@ -413,7 +414,7 @@ async fn process_job(app: &AppHandle, job: ThumbnailJob) -> Result<()> {
 
             let scale_w = target_w as f32 / crop_w as f32;
             let scale_h = target_h as f32 / crop_h as f32;
-            let scale = scale_w.min(scale_h).min(1.0).max(0.0);
+            let scale = scale_w.min(scale_h).clamp(0.0, 1.0);
 
             let dst_w = ((crop_w as f32 * scale).round() as u32).max(1);
             let dst_h = ((crop_h as f32 * scale).round() as u32).max(1);
