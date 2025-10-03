@@ -88,7 +88,6 @@ jobs:
             dbus \
             webkitgtk \
             openssl \
-            xdotool \
             libayatana-appindicator \
             librsvg \
             sqlite \
