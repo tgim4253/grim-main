@@ -4,7 +4,7 @@ Here’s your **Grim Project Contribution Guide** in English (with the updates a
 
 # Grim Project Contribution Guide
 
-[![CI](https://github.com/tgim-dev/grim/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/tgim-dev/grim/actions/workflows/ci.yaml)
+[CI](./.github/ci.yaml)
 
 ## Development Environment
 
