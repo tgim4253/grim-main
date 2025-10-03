@@ -9,8 +9,8 @@ import ThumbnailStorageModal from '../../../file/modal/ThumbnailStorageModal';
 const SidebarTabs: React.FC<SidebarProps> = ({ sidebarPosition }) => {
   const { activeTab, tabs } = useSidebarStore(
     useShallow(state => ({
-      activeTab: state.sidebars[sidebarPosition].activeTab,
-      tabs: state.sidebars[sidebarPosition].tabs,
+      activeTab: state.sidebars[sidebarPosition]?.activeTab,
+      tabs: state.sidebars[sidebarPosition]?.tabs,
     })),
   );
   const setActiveTab = useCallback(
@@ -29,14 +29,14 @@ const SidebarTabs: React.FC<SidebarProps> = ({ sidebarPosition }) => {
   const toggleHiddenPanel = useCallback(() => {
     useSidebarStore
       .getState()
-      .setHidden(sidebarPosition, !useSidebarStore.getState().sidebars[sidebarPosition].hidden);
+      .setHidden(sidebarPosition, !useSidebarStore.getState().sidebars[sidebarPosition]?.hidden);
   }, [sidebarPosition]);
 
   const [tOpen, setTOpen] = useState(false);
 
   return (
     <div className="flex flex-col min-w-8 w-fit h-full overflow-hidden border-t border-r border-border-sidebar bg-sidebar text-text">
-      {tabs.map(tab => {
+      {tabs?.map(tab => {
         return (
           <Button
             variant="icon"
