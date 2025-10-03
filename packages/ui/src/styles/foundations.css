@@ -28,6 +28,14 @@
   --ds-indigo-500: #6366f1;
   --ds-indigo-600: #4f46e5;
 
+  /* Positive + warning palette */
+  --ds-emerald-400: #34d399;
+  --ds-emerald-500: #10b981;
+  --ds-emerald-600: #059669;
+  --ds-amber-400: #fbbf24;
+  --ds-amber-500: #f59e0b;
+  --ds-amber-600: #d97706;
+
   /* Supporting accents */
   --ds-red-400: #f87171;
   --ds-red-500: #ef4444;

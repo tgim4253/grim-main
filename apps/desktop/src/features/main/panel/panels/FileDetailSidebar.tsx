@@ -28,9 +28,9 @@ type ActionState = {
 const PREVIEW_WIDTH = 360;
 
 const statusLabel: Partial<Record<FilePathStatus, { label: string; tone: string }>> = {
-  ok: { label: '정상', tone: 'text-emerald-500 dark:text-emerald-400' },
-  warning: { label: '경고', tone: 'text-amber-500 dark:text-amber-400' },
-  error: { label: '오류', tone: 'text-rose-500 dark:text-rose-400' },
+  ok: { label: '정상', tone: 'text-status-success' },
+  warning: { label: '경고', tone: 'text-status-warning' },
+  error: { label: '오류', tone: 'text-status-danger' },
 };
 
 const extractPath = (value: string | string[] | null): string | null => {
@@ -227,7 +227,7 @@ const FileDetailSidebar: React.FC<Props> = ({ image, onClose }) => {
       </div>
       <div className="flex-1 overflow-auto px-4 py-3 space-y-6">
         {error && (
-          <div className="rounded-md border border-rose-400/60 bg-rose-100/70 px-3 py-2 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-200">
+          <div className="rounded-md border border-status-danger/60 bg-status-danger/10 px-3 py-2 text-sm text-status-danger">
             {error}
           </div>
         )}
@@ -319,17 +319,13 @@ const FileDetailSidebar: React.FC<Props> = ({ image, onClose }) => {
                           </span>
                           {pathInfo.warning && <span>{pathInfo.warning}</span>}
                           {pathInfo.error && (
-                            <span className="text-rose-500 dark:text-rose-300">
-                              {pathInfo.error}
-                            </span>
+                            <span className="text-status-danger">{pathInfo.error}</span>
                           )}
                           {!pathInfo.exists && !pathInfo.error && (
-                            <span className="text-rose-500 dark:text-rose-300">
-                              파일을 찾을 수 없습니다
-                            </span>
+                            <span className="text-status-danger">파일을 찾을 수 없습니다</span>
                           )}
                           {pathInfo.hashMatches === false && (
-                            <span className="text-rose-500 dark:text-rose-300">해시 불일치</span>
+                            <span className="text-status-danger">해시 불일치</span>
                           )}
                           {pathInfo.hashMatches && <span>해시 일치</span>}
                         </div>
