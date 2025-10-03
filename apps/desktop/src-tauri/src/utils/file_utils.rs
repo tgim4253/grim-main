@@ -81,3 +81,44 @@ pub fn file_mtime_epoch(meta: &fs::Metadata) -> Result<i64> {
         .map_err(std::io::Error::other)?;
     Ok(duration.as_secs() as i64)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{
+        fs,
+        path::Path,
+        time::{Duration, SystemTime},
+    };
+
+    use filetime::{set_file_mtime, FileTime};
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn guess_mime_handles_common_extensions() {
+        assert_eq!(guess_mime(Path::new("photo.jpg")), "image/jpeg");
+        assert_eq!(guess_mime(Path::new("video.mp4")), "video/mp4");
+        assert_eq!(
+            guess_mime(Path::new("unknown.xyz")),
+            "application/octet-stream"
+        );
+    }
+
+    #[test]
+    fn file_mtime_epoch_matches_set_timestamp() -> anyhow::Result<()> {
+        let temp_file = NamedTempFile::new()?;
+        let target_time =
+            SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+        set_file_mtime(
+            temp_file.path(),
+            FileTime::from_system_time(target_time),
+        )?;
+
+        let metadata = fs::metadata(temp_file.path())?;
+        let epoch = file_mtime_epoch(&metadata)?;
+
+        assert_eq!(epoch, 1_700_000_000);
+
+        Ok(())
+    }
+}
