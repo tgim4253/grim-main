@@ -1,0 +1,9 @@
+# Default code owner
+* @tgim4253
+
+# Core application areas
+/apps/desktop/ @tgim4253
+/apps/desktop/src-tauri/ @tgim4253
+/packages/ui/ @tgim4253
+/packages/stores/ @tgim4253
+/scripts/ @tgim4253
