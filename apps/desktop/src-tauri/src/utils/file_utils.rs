@@ -81,8 +81,3 @@ pub fn file_mtime_epoch(meta: &fs::Metadata) -> Result<i64> {
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
     Ok(duration.as_secs() as i64)
 }
-
-/// Lowercase a file name for normalized comparisons.
-pub fn normailze_file_name(name: &str) -> String {
-    name.to_lowercase()
-}

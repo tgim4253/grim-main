@@ -1,6 +1,5 @@
 use std::{
     io::Cursor,
-    io::ErrorKind,
     path::{Path, PathBuf},
 };
 
@@ -9,7 +8,7 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use image::{DynamicImage, ImageFormat, RgbaImage};
 use screenshots::Screen;
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 use tokio::fs;
 use tracing::{debug, warn};
 

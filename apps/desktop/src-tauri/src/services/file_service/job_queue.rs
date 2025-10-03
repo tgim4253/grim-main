@@ -23,9 +23,9 @@ pub struct BaseThumbnailJob {
 
 /// Key used to track pending and inflight jobs.
 #[derive(Debug, Clone, Eq)]
-struct ThumbnailJobKey {
-    xxhs: String,
-    thumb_key: String,
+pub struct ThumbnailJobKey {
+    pub xxhs: String,
+    pub thumb_key: String,
 }
 
 impl PartialEq for ThumbnailJobKey {
@@ -59,11 +59,11 @@ pub struct ThumbnailJob {
 }
 
 #[derive(Default)]
-struct ThumbnailQueue {
-    high: VecDeque<ThumbnailJob>,
-    low: VecDeque<ThumbnailJob>,
-    pending: HashSet<ThumbnailJobKey>,
-    inflight: HashSet<ThumbnailJobKey>,
+pub struct ThumbnailQueue {
+    pub high: VecDeque<ThumbnailJob>,
+    pub low: VecDeque<ThumbnailJob>,
+    pub pending: HashSet<ThumbnailJobKey>,
+    pub inflight: HashSet<ThumbnailJobKey>,
 }
 
 impl ThumbnailQueue {
@@ -91,10 +91,10 @@ impl ThumbnailQueue {
 }
 
 #[derive(Default)]
-struct BaseThumbnailQueue {
-    queue: VecDeque<BaseThumbnailJob>,
-    pending: HashMap<String, String>,
-    inflight: HashMap<String, String>,
+pub struct BaseThumbnailQueue {
+    pub queue: VecDeque<BaseThumbnailJob>,
+    pub pending: HashMap<String, String>,
+    pub inflight: HashMap<String, String>,
 }
 
 impl BaseThumbnailQueue {

@@ -28,7 +28,7 @@ pub async fn create_memo(
 
     let CreateMemoPayload { target_node_id, text, crop, origin_hash } = payload;
 
-    let mut root_node_id = target_node_id.clone();
+    let root_node_id = target_node_id.clone();
     let mut attachment_node_id = target_node_id.clone();
 
     if let Some(crop_payload) = crop.as_ref() {

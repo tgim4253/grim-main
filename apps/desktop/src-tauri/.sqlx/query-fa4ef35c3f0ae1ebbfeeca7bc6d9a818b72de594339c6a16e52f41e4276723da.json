@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT\n                fp.file_name,\n                fp.folder_id,\n                fp.file_name_norm,\n                fp.mtime,\n                fp.is_found,\n                fc.mime,\n                fc.size,\n                fc.xxh3_64,\n                fc.sha256,\n                fc.kind,\n                fc.display_name\n            FROM file_path fp\n            JOIN file_path_content_binding fpcb ON fp.id = fpcb.file_path_id\n            JOIN file_content fc ON fpcb.file_content_id = fc.id\n            WHERE fp.id = ?1 AND fpcb.is_active = 1\n            ",
+  "query": "\n            SELECT\n                fp.file_name,\n                fp.folder_id,\n                fp.file_name_norm,\n                fp.mtime,\n                fp.is_found,\n                fc.mime,\n                fc.size,\n                fc.xxh3_64,\n                fc.sha256,\n                fc.kind\n            FROM file_path fp\n            JOIN file_path_content_binding fpcb ON fp.id = fpcb.file_path_id\n            JOIN file_content fc ON fpcb.file_content_id = fc.id\n            WHERE fp.id = ?1 AND fpcb.is_active = 1\n            ",
   "describe": {
     "columns": [
       {
@@ -52,11 +52,6 @@
         "name": "kind",
         "ordinal": 9,
         "type_info": "Text"
-      },
-      {
-        "name": "display_name",
-        "ordinal": 10,
-        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -72,9 +67,8 @@
       false,
       false,
       true,
-      false,
       false
     ]
   },
-  "hash": "4c548b632156294a34ea972f2d3a83e2568f487fe4b31bcecc6694a99ba6482e"
+  "hash": "fa4ef35c3f0ae1ebbfeeca7bc6d9a818b72de594339c6a16e52f41e4276723da"
 }

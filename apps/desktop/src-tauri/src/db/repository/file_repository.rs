@@ -1,7 +1,7 @@
 use std::{collections::HashSet, path::PathBuf, str::FromStr};
 
 use anyhow::{anyhow, Result};
-use sqlx::{Executor, Row, Sqlite};
+use sqlx::{Executor, Sqlite};
 
 use crate::{
     config::file::{IntegrityCheckResult, MatchStates},
@@ -22,7 +22,6 @@ pub struct FileRepository;
 #[derive(Debug, Clone)]
 pub struct MountWithFolder {
     pub mount_id: String,
-    pub virtual_node_id: String,
     pub real_folder_id: String,
     pub recursive: bool,
     pub sync_enabled: bool,
@@ -40,24 +39,17 @@ pub struct MountWithFolder {
 pub struct MountInfo {
     pub virtual_node_id: String,
     pub real_folder_id: String,
-    pub recursive: bool,
     pub sync_enabled: bool,
     pub abs_path: Option<String>,
     pub stored_mtime: i64,
-    pub include_extensions: Vec<String>,
-    pub exclude_extensions: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct FilePathRecord {
     pub id: String,
-    pub folder_id: String,
-    pub folder_name: Option<String>,
     pub file_name: String,
     pub stored_mtime: Option<i64>,
-    pub is_found: bool,
     pub abs_path_cached: Option<String>,
-    pub match_state: MatchStates,
 }
 
 impl FileRepository {
@@ -113,9 +105,6 @@ impl FileRepository {
             sync_enabled: i64,
             abs_path: Option<String>,
             stored_mtime: i64,
-            recursive: i64,
-            include_glob: Option<String>,
-            exclude_glob: Option<String>,
         }
 
         let rows = sqlx::query_as_unchecked!(
@@ -125,9 +114,6 @@ impl FileRepository {
                 vfm.virtual_node_id   AS virtual_node_id,
                 vfm.real_folder_id    AS real_folder_id,
                 vfm.sync_enabled      AS sync_enabled,
-                vfm.include_glob      AS include_glob,
-                vfm.exclude_glob      AS exclude_glob,
-                vfm.recursive         AS recursive,
                 rf.abs_path_cached    AS abs_path,
                 rf.mtime              AS stored_mtime
             FROM virtual_folder_mount vfm
@@ -143,16 +129,9 @@ impl FileRepository {
             out.push(MountInfo {
                 virtual_node_id: row.virtual_node_id,
                 real_folder_id: row.real_folder_id,
-                recursive: row.recursive != 0,
                 sync_enabled: row.sync_enabled != 0,
                 abs_path: row.abs_path,
                 stored_mtime: row.stored_mtime,
-                include_extensions: Self::decode_extension_list(
-                    row.include_glob,
-                ),
-                exclude_extensions: Self::decode_extension_list(
-                    row.exclude_glob,
-                ),
             });
         }
 
@@ -166,11 +145,27 @@ impl FileRepository {
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
     {
-        let rows = sqlx::query(
+        #[derive(sqlx::FromRow)]
+        struct MountWithFolderRow {
+            mount_id: String,
+            real_folder_id: String,
+            recursive: i64,
+            sync_enabled: i64,
+            suppress_warnings: i64,
+            abs_path: Option<String>,
+            error_flag: Option<String>,
+            error_msg: Option<String>,
+            last_seen_scan_id: Option<String>,
+            last_seen_at: Option<String>,
+            include_glob: Option<String>,
+            exclude_glob: Option<String>,
+        }
+        // Rust에서 sqlx::query! 사용 예시
+        let rows = sqlx::query_as_unchecked!(
+            MountWithFolderRow,
             r#"
             SELECT
                 vfm.id                AS mount_id,
-                vfm.virtual_node_id   AS virtual_node_id,
                 vfm.real_folder_id    AS real_folder_id,
                 vfm.recursive         AS recursive,
                 vfm.sync_enabled      AS sync_enabled,
@@ -187,38 +182,37 @@ impl FileRepository {
             WHERE vfm.virtual_node_id = ? AND vfm.enabled = 1
             ORDER BY vfm.priority
             "#,
+            virtual_node_id
         )
-        .bind(virtual_node_id)
         .fetch_all(&mut *executor)
         .await?;
 
+        // 매핑 처리
         let mut out = Vec::with_capacity(rows.len());
         for row in rows {
-            let error_flag =
-                match row.get::<Option<String>, _>("error_flag").as_deref() {
-                    Some("notfound") => IntegrityCheckResult::NotFound,
-                    Some("mismatch") => IntegrityCheckResult::Mismatch,
-                    _ => IntegrityCheckResult::Success,
-                };
+            // error_flag 변환
+            let error_flag = match row.error_flag.as_deref() {
+                Some("notfound") => IntegrityCheckResult::NotFound,
+                Some("mismatch") => IntegrityCheckResult::Mismatch,
+                _ => IntegrityCheckResult::Success,
+            };
 
             out.push(MountWithFolder {
-                mount_id: row.get::<String, _>("mount_id"),
-                virtual_node_id: row.get::<String, _>("virtual_node_id"),
-                real_folder_id: row.get::<String, _>("real_folder_id"),
-                recursive: row.get::<i64, _>("recursive") != 0,
-                sync_enabled: row.get::<i64, _>("sync_enabled") != 0,
-                suppress_warnings: row.get::<i64, _>("suppress_warnings") != 0,
-                abs_path: row.get::<Option<String>, _>("abs_path"),
+                mount_id: row.mount_id,
+                real_folder_id: row.real_folder_id,
+                recursive: row.recursive != 0,
+                sync_enabled: row.sync_enabled != 0,
+                suppress_warnings: row.suppress_warnings != 0,
+                abs_path: row.abs_path,
                 error_flag,
-                error_msg: row.get::<Option<String>, _>("error_msg"),
-                last_seen_scan_id: row
-                    .get::<Option<String>, _>("last_seen_scan_id"),
-                last_seen_at: row.get::<Option<String>, _>("last_seen_at"),
+                error_msg: row.error_msg,
+                last_seen_scan_id: row.last_seen_scan_id,
+                last_seen_at: row.last_seen_at,
                 include_extensions: Self::decode_extension_list(
-                    row.get::<Option<String>, _>("include_glob"),
+                    row.include_glob,
                 ),
                 exclude_extensions: Self::decode_extension_list(
-                    row.get::<Option<String>, _>("exclude_glob"),
+                    row.exclude_glob,
                 ),
             });
         }
@@ -265,20 +259,6 @@ impl FileRepository {
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
     {
-        #[derive(sqlx::FromRow)]
-        struct Row {
-            mount_id: String,
-            real_folder_id: String,
-            recursive: i64,
-            sync_enabled: i64,
-            suppress_warnings: i64,
-            abs_path: Option<String>,
-            error_flag: Option<String>,
-            error_msg: Option<String>,
-            last_seen_scan_id: Option<String>,
-            last_seen_at: Option<String>,
-        }
-
         let mounts = Self::fetch_mount_rows(executor, virtual_node_id).await?;
 
         Ok(mounts.into_iter().next())
@@ -803,13 +783,9 @@ impl FileRepository {
         #[derive(sqlx::FromRow)]
         struct Row {
             file_path_id: String,
-            folder_id: String,
             file_name: String,
             mtime: Option<i64>,
-            is_found: i64,
             abs_path_cached: Option<String>,
-            folder_name: Option<String>,
-            match_states: MatchStates,
         }
 
         let rows = sqlx::query_as!(
@@ -817,13 +793,9 @@ impl FileRepository {
             r#"
             SELECT
                 fp.id                AS "file_path_id!",
-                fp.folder_id         AS "folder_id!",
                 fp.file_name         AS "file_name!",
                 fp.mtime             AS "mtime?",
-                fp.is_found          AS "is_found!",
-                rf.abs_path_cached   AS "abs_path_cached?",
-                rf.name              AS "folder_name?",
-                fpcb.match_states    AS "match_states!: MatchStates"
+                rf.abs_path_cached   AS "abs_path_cached?"
             FROM file_path_content_binding fpcb
             JOIN file_path fp ON fp.id = fpcb.file_path_id
             LEFT JOIN real_folder rf ON rf.id = fp.folder_id
@@ -839,13 +811,9 @@ impl FileRepository {
             .into_iter()
             .map(|row| FilePathRecord {
                 id: row.file_path_id,
-                folder_id: row.folder_id,
-                folder_name: row.folder_name,
                 file_name: row.file_name,
                 stored_mtime: row.mtime,
-                is_found: row.is_found != 0,
                 abs_path_cached: row.abs_path_cached,
-                match_state: row.match_states,
             })
             .collect())
     }
@@ -910,7 +878,6 @@ impl FileRepository {
             xxh3_64: String,
             sha256: Option<String>,
             kind: String,
-            display_name: String,
         }
 
         let Some(file_info_row) = sqlx::query_as_unchecked!(
@@ -926,8 +893,7 @@ impl FileRepository {
                 fc.size,
                 fc.xxh3_64,
                 fc.sha256,
-                fc.kind,
-                fc.display_name
+                fc.kind
             FROM file_path fp
             JOIN file_path_content_binding fpcb ON fp.id = fpcb.file_path_id
             JOIN file_content fc ON fpcb.file_content_id = fc.id

@@ -1,7 +1,7 @@
 use crate::{
     models::capture::{
         CaptureContext, CaptureMonitor, CaptureOverlayPayload, CapturePreview,
-        CapturePreviewPayload, CaptureRect,
+        CaptureRect,
     },
     services::capture_service,
 };

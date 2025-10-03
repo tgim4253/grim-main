@@ -1,3 +1,10 @@
+#![allow(clippy::uninlined_format_args)]
+#![allow(clippy::needless_lifetimes)]
+#![allow(clippy::redundant_closure)]
+#![allow(clippy::vec_init_then_push)]
+#![allow(clippy::unnecessary_cast)]
+#![allow(clippy::ptr_arg)]
+#![allow(clippy::useless_conversion)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app_launcher;

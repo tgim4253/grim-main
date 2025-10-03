@@ -1164,8 +1164,6 @@ pub async fn ensure_real_folder(
     let mut rel_path = PathBuf::from("");
     let mut abs_path = PathBuf::from(&mount_path);
 
-    let now = crate::utils::date::get_now_date();
-
     for component in components {
         abs_path.push(component);
         rel_path.push(component);
@@ -1174,7 +1172,6 @@ pub async fn ensure_real_folder(
         let mtime = file_mtime_epoch(&metadata)?;
 
         let data = RealFolderData {
-            id: String::new(),
             storage_root_id: Some(sroot_id.to_owned()),
             parent_id: current_parent_id.clone(),
             name: component.to_string(),
@@ -1182,12 +1179,6 @@ pub async fn ensure_real_folder(
             root_rel_path: Some(rel_path.to_string_lossy().into_owned()),
             abs_path_cached: Some(abs_path.to_string_lossy().into_owned()),
             mtime,
-            error_flag: crate::config::file::IntegrityCheckResult::Success,
-            error_msg: None,
-            last_seen_scan_id: None,
-            last_seen_at: None,
-            created_at: now.clone(),
-            updated_at: now.clone(),
         };
 
         let id = FileRepository::upsert_real_folder(tx.as_mut(), &data).await?;

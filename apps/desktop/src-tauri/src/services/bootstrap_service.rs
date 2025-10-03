@@ -235,17 +235,6 @@ async fn perform_initial_scan(
     app: &tauri::AppHandle,
     moa_id: &str,
 ) -> Result<()> {
-    #[derive(sqlx::FromRow)]
-    struct MountRow {
-        virtual_node_id: String,
-        real_folder_id: String,
-        sync_enabled: i64,
-        abs_path: Option<String>,
-        stored_mtime: i64,
-        include_blob: Option<String>,
-        exclude_blob: Option<String>,
-    }
-
     let scan_id = get_unique_id();
     let now = get_now_date();
 
@@ -703,7 +692,6 @@ async fn ensure_mounted_volume(moa_id: &str) -> Result<()> {
         // Check previous availability & primary mount to detect change
         #[derive(sqlx::FromRow)]
         struct PrevState {
-            is_available: bool,
             primary_mount: Option<String>,
         }
         let prev: PrevState = sqlx::query_as(

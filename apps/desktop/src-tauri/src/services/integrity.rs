@@ -78,7 +78,7 @@ pub async fn ensure_schema(pool: &Pool<Sqlite>) -> Result<()> {
 }
 
 /// Validate PRAGMA user_version and migrate if necessary.
-pub async fn check_version(pool: &Pool<Sqlite>) -> Result<()> {
+pub async fn _check_version(pool: &Pool<Sqlite>) -> Result<()> {
     // Read user_version
     let ver: i32 = sqlx::query("PRAGMA user_version;")
         .fetch_one(pool)
@@ -86,7 +86,7 @@ pub async fn check_version(pool: &Pool<Sqlite>) -> Result<()> {
         .get::<i32, _>(0);
 
     if ver != TARGET_DB_VERSION {
-        migrate(pool, ver, TARGET_DB_VERSION).await.with_context(|| {
+        _migrate(pool, ver, TARGET_DB_VERSION).await.with_context(|| {
             format!("Migration from {} to {} failed", ver, TARGET_DB_VERSION)
         })?;
     }
@@ -160,7 +160,7 @@ pub async fn seed_initial_data(pool: &Pool<Sqlite>) -> Result<()> {
 }
 
 /// Very basic migration stub using PRAGMA user_version.
-async fn migrate(pool: &Pool<Sqlite>, from: i32, to: i32) -> Result<()> {
+async fn _migrate(pool: &Pool<Sqlite>, from: i32, to: i32) -> Result<()> {
     if from < to {
         // TODO: apply stepwise DDL changes here; wrap in transaction
         let mut tx = pool.begin().await?;
