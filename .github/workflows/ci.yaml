@@ -102,7 +102,10 @@ jobs:
           javascriptcoregtk-4.1
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          working-directory: apps/desktop/src-tauri
+
       - name: Cache cargo
         uses: actions/cache@v4
         with:
