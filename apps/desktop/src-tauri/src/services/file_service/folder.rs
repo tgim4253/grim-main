@@ -890,13 +890,14 @@ async fn upsert_folder(
 
 /// Internal recursive implementation that accumulates metrics across the traversal.
 #[async_recursion]
+#[allow(clippy::too_many_arguments)]
 async fn upsert_folder_impl(
     tx: &mut Transaction<'_, Sqlite>,
     moa_id: &str,
     parent_real_folder_id: String,
     parent_virtual_folder_id: String,
     abs_dir: &Path,
-    config: FolderUpsertConfig<'_>,
+    config: FolderUpsertConfig<'async_recursion>,
     inherited_allowed_types: Option<HashSet<FileType>>,
     metrics: &mut UpsertFolderMetrics,
 ) -> Result<()> {

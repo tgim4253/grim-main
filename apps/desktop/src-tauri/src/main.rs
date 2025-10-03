@@ -82,7 +82,7 @@ fn main() {
             let app_handle = app.handle();
 
             let latest_moa = tauri::async_runtime::block_on(async {
-                moa_services::load_latest_moas(&app_handle).await
+                moa_services::load_latest_moas(app_handle).await
             })
             .unwrap_or_else(|err| {
                 error!("Failed to load recent MOA: {err}");
@@ -93,12 +93,12 @@ fn main() {
             match latest_moa {
                 Some(moa) => {
                     app_launcher::grim::launch_moa(
-                        &app_handle,
+                        app_handle,
                         moa.moa_id.clone(),
                     )?;
                 }
                 None => {
-                    app_launcher::moa::launch_moa_selector(&app_handle)?;
+                    app_launcher::moa::launch_moa_selector(app_handle)?;
                 }
             }
 
