@@ -14,7 +14,10 @@ use crate::{
         },
         node::NodeKind,
     },
-    services::{db::DB_MANAGER, image_crop_service::create_image_crop_in_tx},
+    services::{
+        db::DB_MANAGER,
+        image_crop_service::{create_image_crop_in_tx, ImageCropOptions},
+    },
     utils::date::get_now_date,
 };
 
@@ -35,12 +38,14 @@ pub async fn create_memo(
         let crop_node_id = create_image_crop_in_tx(
             &mut tx,
             &target_node_id,
-            origin_hash.as_deref(),
-            &crop_payload.rect,
-            crop_payload.reference_width,
-            crop_payload.reference_height,
-            crop_payload.is_relative,
-            &now,
+            ImageCropOptions {
+                expected_origin_hash: origin_hash.as_deref(),
+                rect: &crop_payload.rect,
+                reference_width: crop_payload.reference_width,
+                reference_height: crop_payload.reference_height,
+                is_relative: crop_payload.is_relative,
+                now: &now,
+            },
         )
         .await?;
 

@@ -14,7 +14,8 @@ use tracing::{info, warn};
 
 use crate::{
     db::repository::{
-        file_repository::FileRepository, node_repository::NodeRepository,
+        file_repository::{FileRepository, MountUpdateOptions},
+        node_repository::NodeRepository,
         sroot_repository::SrootRepository,
     },
     models::{
@@ -65,10 +66,7 @@ impl UpsertFolderMetrics {
         self.upsert_file_count += 1;
 
         let bucket = FileSizeBucket::from_size(size);
-        let entry = self
-            .file_size_buckets
-            .entry(bucket)
-            .or_insert_with(BucketStats::default);
+        let entry = self.file_size_buckets.entry(bucket).or_default();
         entry.duration += elapsed;
         entry.count += 1;
     }
@@ -115,6 +113,33 @@ impl UpsertFolderMetrics {
             bucket_summary,
         );
     }
+}
+
+#[derive(Clone)]
+struct FolderUpsertConfig<'a> {
+    recursive: bool,
+    make_virtual_folder: Option<bool>,
+    selection: Option<&'a SelectionPlan>,
+    root_path: &'a Path,
+    extension_filter: &'a ExtensionFilter,
+    progress: Option<Arc<Mutex<ImportProgressTracker>>>,
+}
+
+impl<'a> FolderUpsertConfig<'a> {
+    fn with_make_virtual_folder(
+        mut self,
+        make_virtual_folder: Option<bool>,
+    ) -> Self {
+        self.make_virtual_folder = make_virtual_folder;
+        self
+    }
+}
+
+struct FileEntryParams<'a> {
+    parent_real_folder_id: &'a str,
+    parent_virtual_folder_id: &'a str,
+    entry: &'a fs::DirEntry,
+    allowed_types: Option<&'a HashSet<FileType>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -641,19 +666,22 @@ pub async fn first_mount_folder(
 
     let extension_filter = ExtensionFilter::default();
 
+    let upsert_config = FolderUpsertConfig {
+        recursive: true,
+        make_virtual_folder: Some(true),
+        selection: selection_plan.as_ref(),
+        root_path: &norm_path,
+        extension_filter: &extension_filter,
+        progress: Some(progress.clone()),
+    };
+
     let upsert_result = upsert_folder(
         &mut tx,
-        &app,
         &moa_id,
         real_folder_id.clone(),
         virtual_folder_id.clone(),
         &norm_path,
-        true,
-        Some(true),
-        selection_plan.as_ref(),
-        &norm_path,
-        Some(progress.clone()),
-        &extension_filter,
+        upsert_config,
     )
     .await;
 
@@ -680,7 +708,7 @@ pub async fn first_mount_folder(
 
 /// Re-run ingestion for an existing virtual folder mount to pull in filesystem changes.
 pub async fn sync_virtual_folder(
-    app: &AppHandle,
+    _app: &AppHandle,
     moa_id: &str,
     virtual_node_id: &str,
 ) -> Result<()> {
@@ -717,19 +745,22 @@ pub async fn sync_virtual_folder(
         &mount.exclude_extensions,
     );
 
+    let upsert_config = FolderUpsertConfig {
+        recursive: mount.recursive,
+        make_virtual_folder: Some(true),
+        selection: None,
+        root_path: abs_path.as_path(),
+        extension_filter: &extension_filter,
+        progress: None,
+    };
+
     upsert_folder(
         &mut tx,
-        app,
         moa_id,
         mount.real_folder_id.clone(),
         virtual_node_id.to_string(),
         abs_path.as_path(),
-        mount.recursive,
-        Some(true),
-        None,
-        abs_path.as_path(),
-        None,
-        &extension_filter,
+        upsert_config,
     )
     .await?;
 
@@ -803,12 +834,14 @@ pub async fn update_virtual_folder_options(
     FileRepository::update_mount_options(
         tx.as_mut(),
         &mount.mount_id,
-        new_real_folder_id.as_deref(),
-        payload.recursive,
-        payload.sync_enabled,
-        payload.suppress_warnings,
-        include_extensions.as_deref(),
-        exclude_extensions.as_deref(),
+        MountUpdateOptions {
+            new_real_folder_id: new_real_folder_id.as_deref(),
+            recursive: payload.recursive,
+            sync_enabled: payload.sync_enabled,
+            suppress_warnings: payload.suppress_warnings,
+            include_extensions: include_extensions.as_deref(),
+            exclude_extensions: exclude_extensions.as_deref(),
+        },
     )
     .await?;
 
@@ -828,36 +861,24 @@ pub async fn start_scan_job(
 /// Recursively upsert folder and file information.
 async fn upsert_folder(
     tx: &mut Transaction<'_, Sqlite>,
-    app: &AppHandle,
     moa_id: &str,
     parent_real_folder_id: String,
     parent_virtual_folder_id: String,
     abs_dir: &Path,
-    recursive: bool,
-    make_virtual_folder: Option<bool>,
-    selection: Option<&SelectionPlan>,
-    root_path: &Path,
-    progress: Option<Arc<Mutex<ImportProgressTracker>>>,
-    extension_filter: &ExtensionFilter,
+    config: FolderUpsertConfig<'_>,
 ) -> Result<()> {
     let mut metrics = UpsertFolderMetrics::default();
     let total_timer = Instant::now();
 
     upsert_folder_impl(
         tx,
-        app,
         moa_id,
         parent_real_folder_id,
         parent_virtual_folder_id,
         abs_dir,
-        recursive,
-        make_virtual_folder,
-        selection,
-        root_path,
-        extension_filter,
+        config,
         None,
         &mut metrics,
-        progress,
     )
     .await?;
 
@@ -871,26 +892,20 @@ async fn upsert_folder(
 #[async_recursion]
 async fn upsert_folder_impl(
     tx: &mut Transaction<'_, Sqlite>,
-    app: &AppHandle,
     moa_id: &str,
     parent_real_folder_id: String,
     parent_virtual_folder_id: String,
     abs_dir: &Path,
-    recursive: bool,
-    make_virtual_folder: Option<bool>,
-    selection: Option<&SelectionPlan>,
-    root_path: &Path,
-    extension_filter: &ExtensionFilter,
+    config: FolderUpsertConfig<'_>,
     inherited_allowed_types: Option<HashSet<FileType>>,
     metrics: &mut UpsertFolderMetrics,
-    progress: Option<Arc<Mutex<ImportProgressTracker>>>,
 ) -> Result<()> {
-    let make_vf = make_virtual_folder.unwrap_or(true);
+    let make_vf = config.make_virtual_folder.unwrap_or(true);
 
-    let relative_key = relative_path_key(root_path, abs_dir);
+    let relative_key = relative_path_key(config.root_path, abs_dir);
     let mut current_allowed = inherited_allowed_types;
 
-    if let Some(plan) = selection {
+    if let Some(plan) = config.selection {
         if let Some(node_selection) = plan.get(&relative_key) {
             if !node_selection.include {
                 return Ok(());
@@ -938,8 +953,9 @@ async fn upsert_folder_impl(
             let mut include_child = true;
             let mut child_allowed = current_allowed.clone();
 
-            if let Some(plan) = selection {
-                let child_key = relative_path_key(root_path, &entry_path);
+            if let Some(plan) = config.selection {
+                let child_key =
+                    relative_path_key(config.root_path, &entry_path);
                 if let Some(child_selection) = plan.get(&child_key) {
                     if !child_selection.include {
                         include_child = false;
@@ -961,7 +977,7 @@ async fn upsert_folder_impl(
                 continue;
             }
 
-            if recursive {
+            if config.recursive {
                 folder_entries.push((entry_path, name, child_allowed));
             } else if make_vf {
                 let folder_timer = Instant::now();
@@ -977,21 +993,17 @@ async fn upsert_folder_impl(
                 metrics.record_folder_creation(folder_timer.elapsed());
             }
         } else if file_type.is_file() {
-            upsert_file_entry(
-                tx,
-                moa_id,
-                &parent_real_folder_id,
-                &parent_virtual_folder_id,
-                &entry,
-                extension_filter,
-                current_allowed.as_ref(),
-                metrics,
-                progress.clone(),
-            )
-            .await
-            .with_context(|| {
-                format!("upsert_file_entry failed for {:?}", entry_path)
-            })?;
+            let params = FileEntryParams {
+                parent_real_folder_id: &parent_real_folder_id,
+                parent_virtual_folder_id: &parent_virtual_folder_id,
+                entry: &entry,
+                allowed_types: current_allowed.as_ref(),
+            };
+            upsert_file_entry(tx, moa_id, params, &config, metrics)
+                .await
+                .with_context(|| {
+                    format!("upsert_file_entry failed for {:?}", entry_path)
+                })?;
         }
     }
     metrics.record_tree_scanning(tree_scan_timer.elapsed());
@@ -1005,7 +1017,7 @@ async fn upsert_folder_impl(
     .with_context(|| "failed to load storage_root for parent_real_folder_id")?
     .ok_or_else(|| anyhow!("parent_real_folder_id not found: {}", parent_real_folder_id))?;
 
-    if recursive {
+    if config.recursive {
         for (entry_path, name, child_allowed) in folder_entries {
             let folder_timer = Instant::now();
             let child_vf = FileRepository::create_virtual_folder(
@@ -1034,21 +1046,19 @@ async fn upsert_folder_impl(
             })?;
             metrics.record_folder_creation(folder_timer.elapsed());
 
+            let mut child_config =
+                config.clone().with_make_virtual_folder(Some(make_vf));
+            child_config.progress = config.progress.clone();
+
             if let Err(e) = upsert_folder_impl(
                 tx,
-                app,
                 moa_id,
                 child_real_folder_id,
                 child_vf.id,
                 &entry_path,
-                recursive,
-                Some(make_vf),
-                selection,
-                root_path,
-                extension_filter,
+                child_config,
                 child_allowed,
                 metrics,
-                progress.clone(),
             )
             .await
             {
@@ -1064,32 +1074,28 @@ async fn upsert_folder_impl(
 async fn upsert_file_entry(
     tx: &mut Transaction<'_, Sqlite>,
     moa_id: &str,
-    parent_real_folder_id: &str,
-    parent_virtual_folder_id: &str,
-    entry: &fs::DirEntry,
-    extension_filter: &ExtensionFilter,
-    allowed_types: Option<&HashSet<FileType>>,
+    params: FileEntryParams<'_>,
+    config: &FolderUpsertConfig<'_>,
     metrics: &mut UpsertFolderMetrics,
-    progress: Option<Arc<Mutex<ImportProgressTracker>>>,
 ) -> Result<()> {
     let file_timer = Instant::now();
-    let file_path = entry.path();
-    if !extension_filter.allows(file_path.as_path()) {
+    let file_path = params.entry.path();
+    if !config.extension_filter.allows(file_path.as_path()) {
         return Ok(());
     }
     let kind_guess = FileType::from(file_path.as_path());
 
-    if let Some(allowed) = allowed_types {
+    if let Some(allowed) = params.allowed_types {
         if !allowed.contains(&kind_guess) {
             return Ok(());
         }
     }
 
-    let file_name = entry.file_name().to_string_lossy().to_string();
+    let file_name = params.entry.file_name().to_string_lossy().to_string();
     let file_info = FileInfo::new(
-        &moa_id,
+        moa_id,
         &file_path,
-        parent_real_folder_id.to_string(),
+        params.parent_real_folder_id.to_string(),
         file_name,
     )
     .await?;
@@ -1102,7 +1108,7 @@ async fn upsert_file_entry(
 
     NodeRepository::upsert_file_node(
         tx.as_mut(),
-        parent_virtual_folder_id.to_string(),
+        params.parent_virtual_folder_id.to_string(),
         file_content_id.clone(),
     )
     .await?;
@@ -1124,7 +1130,7 @@ async fn upsert_file_entry(
     }
     metrics.record_upsert_file(file_info.file_size, file_timer.elapsed());
 
-    if let Some(tracker) = &progress {
+    if let Some(tracker) = &config.progress {
         let mut guard = tracker.lock().await;
         guard.record_file(file_info.file_size);
     }

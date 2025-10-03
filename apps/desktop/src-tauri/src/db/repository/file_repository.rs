@@ -44,6 +44,17 @@ pub struct MountInfo {
     pub stored_mtime: i64,
 }
 
+/// Configuration for updating options on an existing mount entry.
+#[derive(Debug, Clone)]
+pub struct MountUpdateOptions<'a> {
+    pub new_real_folder_id: Option<&'a str>,
+    pub recursive: bool,
+    pub sync_enabled: bool,
+    pub suppress_warnings: bool,
+    pub include_extensions: Option<&'a [String]>,
+    pub exclude_extensions: Option<&'a [String]>,
+}
+
 #[derive(Debug, Clone)]
 pub struct FilePathRecord {
     pub id: String,
@@ -268,21 +279,17 @@ impl FileRepository {
     pub async fn update_mount_options<'a, E>(
         executor: &mut E,
         mount_id: &str,
-        new_real_folder_id: Option<&str>,
-        recursive: bool,
-        sync_enabled: bool,
-        suppress_warnings: bool,
-        include_extensions: Option<&[String]>,
-        exclude_extensions: Option<&[String]>,
+        options: MountUpdateOptions<'a>,
     ) -> Result<()>
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
     {
-        let recursive = if recursive { 1_i64 } else { 0_i64 };
-        let sync_enabled = if sync_enabled { 1_i64 } else { 0_i64 };
-        let suppress_warnings = if suppress_warnings { 1_i64 } else { 0_i64 };
+        let recursive = if options.recursive { 1_i64 } else { 0_i64 };
+        let sync_enabled = if options.sync_enabled { 1_i64 } else { 0_i64 };
+        let suppress_warnings =
+            if options.suppress_warnings { 1_i64 } else { 0_i64 };
 
-        if let Some(new_real_folder_id) = new_real_folder_id {
+        if let Some(new_real_folder_id) = options.new_real_folder_id {
             sqlx::query!(
                 r#"
                     UPDATE virtual_folder_mount
@@ -321,8 +328,8 @@ impl FileRepository {
         Self::update_mount_extension_filters(
             executor,
             mount_id,
-            include_extensions,
-            exclude_extensions,
+            options.include_extensions,
+            options.exclude_extensions,
         )
         .await?;
 

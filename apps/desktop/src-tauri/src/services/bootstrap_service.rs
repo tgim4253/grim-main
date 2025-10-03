@@ -211,7 +211,7 @@ async fn set_status(
     percent: u8,
     note: Option<String>,
 ) {
-    let st = state.get_or_insert_status(&moa_id).await;
+    let st = state.get_or_insert_status(moa_id).await;
     let mut st = st.lock().await;
     if percent > st.percent {
         st.stage = stage;
@@ -628,8 +628,7 @@ pub async fn fetch_init_data_for_front(
 
 /// Ensure the workspace database is created and migrated before use.
 async fn apply_migrations(moa_id: &str) -> Result<()> {
-    let moa =
-        moa_services::MOA_DATA.read().unwrap().get_by_id(&moa_id).unwrap();
+    let moa = moa_services::MOA_DATA.read().unwrap().get_by_id(moa_id).unwrap();
 
     let name = moa.name;
     let path = moa.path;
@@ -642,7 +641,7 @@ async fn apply_migrations(moa_id: &str) -> Result<()> {
     let _ =
         bootstrap::ensure_layout(&base).await.context("Failed to prepare .moa");
 
-    let pool = db::DB_MANAGER.get_or_open(&moa_id).await?;
+    let pool = db::DB_MANAGER.get_or_open(moa_id).await?;
 
     integrity::ensure_schema(&pool).await.map_err(|e| {
         anyhow::anyhow!("Failed to ensure database schema: {}", e)
@@ -658,7 +657,7 @@ async fn apply_migrations(moa_id: &str) -> Result<()> {
 async fn ensure_mounted_volume(moa_id: &str) -> Result<()> {
     let mounted = enumerate_mounted_root()?;
 
-    let pool = DB_MANAGER.get_or_open(&moa_id).await?;
+    let pool = DB_MANAGER.get_or_open(moa_id).await?;
     let mut tx = pool.begin().await?;
 
     sqlx::query(
@@ -681,7 +680,7 @@ async fn ensure_mounted_volume(moa_id: &str) -> Result<()> {
             WHERE platform = $1 AND stable_id = $2
             "#,
         )
-        .bind(&m.platform)
+        .bind(m.platform)
         .bind(&m.stable_id)
         .fetch_optional(&mut *tx)
         .await?;

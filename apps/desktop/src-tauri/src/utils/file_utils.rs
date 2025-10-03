@@ -78,6 +78,6 @@ pub fn file_mtime_epoch(meta: &fs::Metadata) -> Result<i64> {
     let modified = meta.modified()?;
     let duration = modified
         .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        .map_err(std::io::Error::other)?;
     Ok(duration.as_secs() as i64)
 }

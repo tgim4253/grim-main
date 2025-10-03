@@ -79,8 +79,10 @@ fn main() {
         .plugin(tauri_plugin_http::init())
         .manage(AppState::default())
         .setup(|app| {
+            let app_handle = app.handle();
+
             let latest_moa = tauri::async_runtime::block_on(async {
-                moa_services::load_latest_moas(&app.handle()).await
+                moa_services::load_latest_moas(&app_handle).await
             })
             .unwrap_or_else(|err| {
                 error!("Failed to load recent MOA: {err}");
@@ -91,12 +93,12 @@ fn main() {
             match latest_moa {
                 Some(moa) => {
                     app_launcher::grim::launch_moa(
-                        &app.handle(),
+                        &app_handle,
                         moa.moa_id.clone(),
                     )?;
                 }
                 None => {
-                    app_launcher::moa::launch_moa_selector(&app.handle())?;
+                    app_launcher::moa::launch_moa_selector(&app_handle)?;
                 }
             }
 
@@ -104,7 +106,7 @@ fn main() {
             THUMBNAIL_WORKER_STATE.signal.set(tx).map_err(|_| {
                 anyhow::anyhow!("thumbnail worker already initialized")
             })?;
-            let app_handle = app.handle().clone();
+            let app_handle = app_handle.clone();
             tauri::async_runtime::spawn(worker_loop(app_handle, rx));
 
             Ok(())
