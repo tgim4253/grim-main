@@ -13,8 +13,8 @@
     "lint:rs": "cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings",
     "lint": "pnpm lint:ts && pnpm lint:rs",
     "lint:fix": "pnpm lint:ts && pnpm lint:rs --fix",
-    "lint:check": "eslint . --ext .ts,.tsx",
-    "format": "prettier --check . && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check",
+    "lint:check": "eslint . --ext .ts,.tsx && cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings",
+    "format:check": "prettier --check . && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check",
     "translate": "pnpm --filter @grim/scripts translate",
     "format:write": "prettier --write . && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml"
   },

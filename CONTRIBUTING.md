@@ -2,7 +2,9 @@ Here’s your **Grim Project Contribution Guide** in English (with the updates a
 
 ---
 
-# Grim Project Contribution Guide (with Updates)
+# Grim Project Contribution Guide
+
+[![CI](https://github.com/tgim-dev/grim/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/tgim-dev/grim/actions/workflows/ci.yaml)
 
 ## Development Environment
 
@@ -20,9 +22,9 @@ Here’s your **Grim Project Contribution Guide** in English (with the updates a
   - `pnpm lint:ts` — Lint & auto-fix TypeScript code
   - `pnpm lint:rs` — Lint Rust code (Clippy)
   - `pnpm lint` — Run TS + RS linting together
-  - `pnpm lint:check` — Check TS lint (no auto-fix)
+  - `pnpm lint:check` — Check TS lint and Cargo Clippy (no auto-fix)
   - `pnpm lint:fix` — Check TS lint (auto-fix)
-  - `pnpm format` — Verify Prettier & Cargo formatting
+  - `pnpm format:check` — Check Prettier & Cargo formatting
   - `pnpm format:write` — Apply Prettier & Cargo formatting
   - `pnpm translate` — Run translation script
 
