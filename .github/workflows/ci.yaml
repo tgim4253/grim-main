@@ -92,8 +92,7 @@ jobs:
             libayatana-appindicator \
             librsvg \
             sqlite \
-            libsoup \
-            javascriptcoregtk
+            libsoup
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@1.88.0
