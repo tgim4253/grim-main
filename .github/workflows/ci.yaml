@@ -89,7 +89,7 @@ jobs:
             webkitgtk \
             openssl \
             xdotool \
-            ayatana-appindicator \
+            libayatana-appindicator \
             librsvg \
             sqlite \
             libsoup \
