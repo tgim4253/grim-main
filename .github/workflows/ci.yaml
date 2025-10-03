@@ -68,7 +68,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Rust
+      - name: Set up Rustdd
         uses: dtolnay/rust-toolchain@stable
 
       - name: Format check (cargo fmt)
