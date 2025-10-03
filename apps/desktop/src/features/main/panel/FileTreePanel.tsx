@@ -19,8 +19,6 @@ import usePanelsStore from '@tgim/stores/panelStore';
 import { listen } from '@tauri-apps/api/event';
 import FolderImportProgressModal from '../../file/modal/FolderImportProgressModal';
 import FolderOptionsModal from '../../file/modal/FolderOptionsModal';
-import { GraphResponse } from '@tgim/types/graph';
-
 /* local utils for rendering */
 
 // Find node by id (UI helper)
@@ -103,7 +101,7 @@ export const FileTree = () => {
   const refreshTree = useCallback(async () => {
     if (!moaId) return;
     try {
-      const graph = (await ipc.graph.getGraphOne(moaId, 'root')) as GraphResponse;
+      const graph = await ipc.graph.getGraphOne(moaId, 'root');
       const next = convertToTreeData(graph);
       setTreeData(next);
       if (optionNode) {
@@ -155,8 +153,8 @@ export const FileTree = () => {
     onDragStartSelect,
   } = useMultiSelect(visibleOrder);
 
-  const skipSelectedSync = useRef(false);
-  const manualSelection = useRef(false);
+  const skipSelectedSync = { current: false };
+  const manualSelection = { current: false };
   const pendingScrollId = useRef<string | null>(null);
 
   const updateSelectedNode = useCallback(
@@ -175,7 +173,9 @@ export const FileTree = () => {
 
   // Hover-to-open folder while dragging
   const { hoverId, onDragOverHoverOpen, resetHoverOpen } = useHoverOpen(
-    id => setExpanded(prev => new Set(prev).add(id)),
+    id => {
+      setExpanded(prev => new Set(prev).add(id));
+    },
     { delay: 700, isValidTarget: () => true },
   );
 
@@ -269,7 +269,7 @@ export const FileTree = () => {
     if (!targetId || targetId !== selectedNodeId) return;
 
     const escapeId =
-      typeof window !== 'undefined' && window.CSS?.escape
+      typeof window !== 'undefined'
         ? window.CSS.escape(targetId)
         : targetId.replace(/["\\]/g, '\\$&');
 
@@ -421,7 +421,11 @@ export const FileTree = () => {
           onToggle={id => {
             setExpanded(prev => {
               const n = new Set(prev);
-              n.has(id) ? n.delete(id) : n.add(id);
+              if (n.has(id)) {
+                n.delete(id);
+              } else {
+                n.add(id);
+              }
               return n;
             });
           }}
@@ -474,7 +478,7 @@ export const FileTree = () => {
             >
               새 폴더 만들기
             </Button>
-            <Button variant="default" onClick={handleManualSync} disabled={isSyncing}>
+            <Button variant="default" onClick={() => void handleManualSync} disabled={isSyncing}>
               폴더/파일 업서트
             </Button>
             <Button
@@ -491,7 +495,12 @@ export const FileTree = () => {
       ) : null}
 
       {activeModal === 'new-folder' && (
-        <Modal onClose={() => setActiveModal(null)} className="bg-modal-bg">
+        <Modal
+          onClose={() => {
+            setActiveModal(null);
+          }}
+          className="bg-modal-bg"
+        >
           <NewFolderModal
             onClose={() => {
               setActiveModal(null);
@@ -503,8 +512,8 @@ export const FileTree = () => {
               if (hasPath) {
                 const context: ImportContext = {
                   folderName: d.name,
-                  totalBytes: d.expectedBytes ?? 0,
-                  totalFiles: d.expectedFiles ?? 0,
+                  totalBytes: d.expectedBytes,
+                  totalFiles: d.expectedFiles,
                   startedAt: Date.now(),
                 };
                 importContextRef.current = context;
@@ -513,9 +522,9 @@ export const FileTree = () => {
                   folderId: '',
                   state: 'running',
                   processedBytes: 0,
-                  totalBytes: d.expectedBytes ?? 0,
+                  totalBytes: d.expectedBytes,
                   processedFiles: 0,
-                  totalFiles: d.expectedFiles ?? 0,
+                  totalFiles: d.expectedFiles,
                   elapsedMs: 0,
                 });
                 setImportModalOpen(true);
@@ -552,12 +561,14 @@ export const FileTree = () => {
             setActiveModal(null);
             setOptionNode(undefined);
           }}
-          onUpdated={refreshTree}
+          onUpdated={() => void refreshTree()}
         />
       ) : null}
       {isSyncing ? (
         <Modal
-          onClose={() => setIsSyncing(false)}
+          onClose={() => {
+            setIsSyncing(false);
+          }}
           dismissible={false}
           className="bg-modal-bg max-w-xs text-center text-modal-text"
         >

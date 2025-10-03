@@ -21,6 +21,7 @@ Here’s your **Grim Project Contribution Guide** in English (with the updates a
   - `pnpm lint:rs` — Lint Rust code (Clippy)
   - `pnpm lint` — Run TS + RS linting together
   - `pnpm lint:check` — Check TS lint (no auto-fix)
+  - `pnpm lint:fix` — Check TS lint (auto-fix)
   - `pnpm format` — Verify Prettier & Cargo formatting
   - `pnpm format:write` — Apply Prettier & Cargo formatting
   - `pnpm translate` — Run translation script

@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { toast } from 'react-toastify';
@@ -20,7 +19,7 @@ const NewMoa: React.FC = () => {
       if (!name) throw Error('이름을 입력해주세요.');
       if (!path) throw Error('경로를 선택해주세요.');
 
-      const data = await ipc.moa.createMoa({
+      const _data = await ipc.moa.createMoa({
         name,
         path,
       });
@@ -37,7 +36,11 @@ const NewMoa: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl w-full px-8">
-        <Button variant="card" className="shadow-lg aspect-square" onClick={pickFolder}>
+        <Button
+          variant="card"
+          className="shadow-lg aspect-square"
+          onClick={() => void pickFolder()}
+        >
           <div className="flex flex-col items-center justify-center p-4">
             <h2 className="text-xl font-semibold mt-4">폴더 선택</h2>
             <p className="mt-1 text-sm text-text-soft text-center">보관할 폴더를 선택합니다.</p>
@@ -54,10 +57,12 @@ const NewMoa: React.FC = () => {
         <Input.Input
           placeholder="보관함 이름을 입력해주세요."
           className="input-default"
-          onChange={e => setName(e.target.value)}
+          onChange={e => {
+            setName(e.target.value);
+          }}
         />
         <div className="flex justify-end">
-          <Button variant="primary" onClick={handleCreate}>
+          <Button variant="primary" onClick={() => void handleCreate()}>
             생성하기
           </Button>
         </div>

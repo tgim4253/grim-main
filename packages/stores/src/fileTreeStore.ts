@@ -1,5 +1,11 @@
 import { create } from 'zustand';
-import { FileTreeData, GraphResponse, NodeFolder, NodeKind, RelationType } from '@tgim/types/index';
+import {
+  FileTreeData,
+  FolderMountState,
+  GraphResponse,
+  NodeKind,
+  RelationType,
+} from '@tgim/types/index';
 import { convertKeysToCamel } from '@tgim/utils/object';
 
 interface FileTreeState {
@@ -13,7 +19,7 @@ interface FileTreeState {
   ensureVisible: (id: string) => string[] | null;
 
   // move nodes into a parent (append)
-  onMove: (args: { dragIds: string[]; parentId: string; index?: number }) => void;
+  onMove: (args: { dragIds: string[] | null; parentId: string | null; index?: number }) => void;
 }
 
 /* utils */
@@ -37,7 +43,8 @@ const isDescendant = (tree: FileTreeData[], parentId: string, childId: string): 
   if (!parent?.children?.length) return false;
   const stack = [...parent.children];
   while (stack.length) {
-    const cur = stack.pop()!;
+    const cur = stack.pop();
+    if (!cur) continue;
     if (cur.id === childId) return true;
     if (cur.children?.length) stack.push(...cur.children);
   }
@@ -141,17 +148,20 @@ const batchMoveIntoParent = (tree: FileTreeData[], ids: string[], targetParent: 
 
 const useFileTreeStore = create<FileTreeState>((set, get) => ({
   treeData: [],
-  setTreeData: data =>
+  setTreeData: data => {
     set(state => {
       const next: Partial<FileTreeState> = { treeData: data };
       if (state.selectedNodeId && !findNode(data, state.selectedNodeId)) {
         next.selectedNodeId = null;
       }
       return next;
-    }),
+    });
+  },
 
   selectedNodeId: null,
-  setSelectedNode: id => set({ selectedNodeId: id }),
+  setSelectedNode: id => {
+    set({ selectedNodeId: id });
+  },
   ensureVisible: id => {
     if (!id) return null;
     const path = findPathToNode(get().treeData, id);
@@ -168,7 +178,7 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
     for (const n of nodes) {
       if (n.kind !== NodeKind.Folder) continue;
 
-      const folderData = (n.data?.['Folder'] as NodeFolder) ?? undefined;
+      const folderData = n.data.Folder ?? undefined;
       const mounts = folderData?.mounts ?? [];
       const health = folderData?.health ?? 'normal';
 
@@ -179,7 +189,7 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
         type: NodeKind.Folder,
         children: [],
         status: health,
-        mounts: convertKeysToCamel(mounts) as any,
+        mounts: convertKeysToCamel(mounts) as FolderMountState[] | undefined,
       });
 
       incoming.set(n.id, 0);
@@ -227,7 +237,7 @@ const useFileTreeStore = create<FileTreeState>((set, get) => ({
     const tree = get().treeData;
 
     // validate target container (except for "root")
-    if (parentId !== 'root') {
+    if (parentId && parentId !== 'root') {
       const target = findNode(tree, parentId);
       if (!canAcceptChildren(target)) return;
     }

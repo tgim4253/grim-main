@@ -92,8 +92,8 @@ export const toAbsoluteCropRect = (
     return null;
   }
 
-  const width = sourceWidth as number;
-  const height = sourceHeight as number;
+  const width = sourceWidth;
+  const height = sourceHeight;
   if (!(width > 0 && height > 0)) {
     return null;
   }
@@ -129,9 +129,9 @@ export const getCropPreviewStyle = (
     return null;
   }
 
-  const width = sourceWidth as number;
-  const height = sourceHeight as number;
-  if (!(width > 0 && height > 0)) {
+  const width = sourceWidth;
+  const height = sourceHeight;
+  if (!width || !height || !(width > 0 && height > 0)) {
     return null;
   }
 
@@ -149,8 +149,8 @@ export const getCropPreviewStyle = (
   const scale = Math.min(previewEdge / cropMaxEdge, 1);
   const displayWidth = Math.max(rect.width * scale, 1);
   const displayHeight = Math.max(rect.height * scale, 1);
-  const backgroundSize = `${width * scale}px ${height * scale}px`;
-  const backgroundPosition = `${-rect.startX * scale}px ${-rect.startY * scale}px`;
+  const backgroundSize = `${String(width * scale)}px ${String(height * scale)}px`;
+  const backgroundPosition = `${String(-rect.startX * scale)}px ${String(-rect.startY * scale)}px`;
 
   return {
     displayWidth,

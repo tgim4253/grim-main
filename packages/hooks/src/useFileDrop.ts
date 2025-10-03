@@ -20,8 +20,7 @@ interface FileDropFilePayload {
   dataBase64: string;
 }
 
-const INVALID_FILE_NAME_PATTERN = /[<>:"/\\|?*\u0000-\u001F]/g;
-const MIME_EXTENSION_MAP: Record<string, string> = {
+const MIME_EXTENSION_MAP: Partial<Record<string, string>> = {
   'image/jpeg': 'jpg',
   jpeg: 'jpg',
   jpg: 'jpg',
@@ -52,30 +51,12 @@ const MIME_EXTENSION_MAP: Record<string, string> = {
   bin: 'bin',
 };
 
-const createRandomId = (): string => {
-  if (typeof globalThis.crypto !== 'undefined' && 'randomUUID' in globalThis.crypto) {
-    return globalThis.crypto.randomUUID();
-  }
-  return Date.now().toString(36);
-};
-
 const decodeMaybe = (value: string): string => {
   try {
     return decodeURIComponent(value);
   } catch {
     return value;
   }
-};
-
-const sanitizeFileName = (value: string): string => {
-  const replaced = value.replace(INVALID_FILE_NAME_PATTERN, '_').replace(/\s+/g, ' ').trim();
-  const trimmed = replaced.replace(/^\.+/, '').replace(/\.+$/, '').trim();
-  return trimmed || `download-${createRandomId()}`;
-};
-
-const hasExtension = (value: string): boolean => {
-  const lastDot = value.lastIndexOf('.');
-  return lastDot > 0 && lastDot < value.length - 1;
 };
 
 const ensureExtension = (name: string, extension?: string | null): string => {
@@ -92,43 +73,23 @@ const ensureExtension = (name: string, extension?: string | null): string => {
   return `${name}.${normalized}`;
 };
 
-const extensionFromMime = (mime?: string | null): string | null => {
+const extensionFromMime = (mime?: string | null): string | undefined => {
   if (!mime) {
-    return null;
+    return undefined;
   }
   const normalized = mime.split(';')[0]?.trim().toLowerCase();
   if (!normalized) {
-    return null;
+    return undefined;
   }
   if (normalized in MIME_EXTENSION_MAP) {
     return MIME_EXTENSION_MAP[normalized];
   }
   const [, subtype] = normalized.split('/');
   if (!subtype) {
-    return null;
+    return undefined;
   }
   const cleaned = subtype.split('+')[0];
   return MIME_EXTENSION_MAP[cleaned] ?? cleaned;
-};
-
-const parseContentDispositionFilename = (header: string | null): string | null => {
-  if (!header) {
-    return null;
-  }
-  const filenameStarMatch = header.match(/filename\*=([^;]+)/i);
-  if (filenameStarMatch) {
-    let value = filenameStarMatch[1].trim();
-    if (value.toLowerCase().startsWith("utf-8''")) {
-      value = value.slice(7);
-    }
-    value = value.replace(/^"|"$/g, '');
-    return decodeMaybe(value);
-  }
-  const filenameMatch = header.match(/filename="?([^";]+)"?/i);
-  if (filenameMatch) {
-    return filenameMatch[1].trim();
-  }
-  return null;
 };
 
 const extractFilenameFromUrl = (url: string): string | null => {
@@ -151,25 +112,6 @@ const extractFilenameFromUrl = (url: string): string | null => {
   }
 };
 
-const resolveFileName = (
-  sourceUrl: string,
-  response: Response,
-  mimeType?: string | null,
-): string => {
-  const contentDispositionName = parseContentDispositionFilename(
-    response.headers.get('content-disposition'),
-  );
-  const urlName = extractFilenameFromUrl(sourceUrl);
-  const baseName = sanitizeFileName(
-    contentDispositionName ?? urlName ?? `download-${createRandomId()}`,
-  );
-  if (hasExtension(baseName)) {
-    return baseName;
-  }
-  const extension = extensionFromMime(mimeType ?? response.headers.get('content-type'));
-  return ensureExtension(baseName, extension);
-};
-
 const expandCandidateUrls = async (url: string): Promise<string[]> => {
   try {
     const expanded = await ipc.file.expandPreferredUrls(url);
@@ -187,8 +129,8 @@ const getDropCandidates = (dt: DataTransfer | null): ExtractedDropData => {
     return { urls: [], baseUrls: [] };
   }
 
-  const uriList = dt.getData('text/uri-list') ?? '';
-  const text = dt.getData('text/plain') ?? '';
+  const uriList = dt.getData('text/uri-list');
+  const text = dt.getData('text/plain');
 
   const htmlData = dt.getData('text/html');
   let url;
@@ -300,7 +242,7 @@ export const downloadUrlToFilePayload = async (
 
       const extension = extensionFromMime(mimeType);
       const fileName = ensureExtension(
-        extractFilenameFromUrl(url) ?? `download-${Date.now()}`,
+        extractFilenameFromUrl(url) ?? `download-${String(Date.now())}`,
         extension,
       );
 
@@ -331,7 +273,7 @@ export const useFileDrop = ({
   const shouldHandleDrag = useCallback(
     (dt: DataTransfer | null) => {
       if (!dropEnabled || !dt) return false;
-      const types = Array.from(dt.types ?? []);
+      const types = Array.from(dt.types);
       return (
         types.includes('Files') ||
         types.includes('text/uri-list') ||
@@ -349,7 +291,7 @@ export const useFileDrop = ({
       event.stopPropagation();
       setIsDropActive(false);
 
-      const files = Array.from(event.dataTransfer?.files ?? []);
+      const files = Array.from(event.dataTransfer.files);
       let filePayloads: FileDropFilePayload[] = [];
 
       if (files.length) {

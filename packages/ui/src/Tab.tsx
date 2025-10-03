@@ -13,7 +13,7 @@ interface TabProps {
   className?: string;
 }
 
-const Tab: React.FC<TabProps> = ({ tabs, containerId, selectedTabId, onSelectTab, className }) => {
+const Tab: React.FC<TabProps> = ({ tabs, selectedTabId, onSelectTab, className }) => {
   if (!selectedTabId) selectedTabId = tabs[0].panelId;
   return (
     <div className={cn('flex w-full flex-nowrap overflow-x-auto space-x-2 pr-2', className)}>
@@ -21,38 +21,15 @@ const Tab: React.FC<TabProps> = ({ tabs, containerId, selectedTabId, onSelectTab
         <Button
           variant="panel-tab"
           key={tab.panelId}
-          onClick={() => onSelectTab(tab.panelId)}
+          onClick={() => {
+            onSelectTab(tab.panelId);
+          }}
           className={selectedTabId === tab.panelId ? 'selected' : ''}
         >
           {tab.name}
         </Button>
       ))}
     </div>
-    // <Droppable id={containerId} variant="tabs">
-    //   <SortableList
-    //     items={tabs.map(tab => ({ id: tab.panelId, name: tab.name }))}
-    //     containerId={containerId}
-    //     strategy="horizontal"
-    //     renderItem={(tab, index) => (
-    //       <SortableItem handle={false} key={tab.id} id={tab.id} containerId={containerId}>
-    //         <button
-    //           key={tab.id}
-    //           onClick={() => onSelectTab(tab.id)}
-    //           style={{
-    //             padding: '10px 20px',
-    //             border: 'none',
-    //             backgroundColor: tab.id === selectedTabId ? theme.colors.primary : 'transparent',
-    //             color: tab.id === selectedTabId ? theme.colors.default : theme.colors.text,
-    //             cursor: 'pointer',
-    //             fontSize: theme.fontSizes.medium,
-    //           }}
-    //         >
-    //           {tab.name}
-    //         </button>
-    //       </SortableItem>
-    //     )}
-    //   />
-    // </Droppable>
   );
 };
 

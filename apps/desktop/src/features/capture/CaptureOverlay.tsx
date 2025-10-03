@@ -54,7 +54,7 @@ const CaptureOverlay: React.FC = () => {
   const [baseUrl, setBaseUrl] = useState<string | null>(null);
   const [windowOffset, setWindowOffset] = useState<PointerPoint>({ x: 0, y: 0 });
 
-  const confirmedRef = useRef(false);
+  const confirmedRef = { current: false };
 
   const windowRef = useRef(getCurrentWindow());
 
@@ -88,21 +88,21 @@ const CaptureOverlay: React.FC = () => {
   }, [moaId, sourceHash, sourceNodeId, savePath, sessionId, linkTypeForward, linkTypeReverse]);
 
   useEffect(() => {
-    let cancelled = false;
+    const cancelledRef = { current: false };
     void (async () => {
       try {
         const monitor = await currentMonitor();
-        if (cancelled) return;
+        if (cancelledRef.current) return;
         if (monitor) {
           setMonitorInfo({
             x: monitor.position.x,
             y: monitor.position.y,
             width: monitor.size.width,
             height: monitor.size.height,
-            scaleFactor: monitor.scaleFactor ?? window.devicePixelRatio ?? 1,
+            scaleFactor: monitor.scaleFactor,
           });
         } else {
-          const scale = window.devicePixelRatio ?? 1;
+          const scale = window.devicePixelRatio;
           setMonitorInfo({
             x: 0,
             y: 0,
@@ -112,8 +112,9 @@ const CaptureOverlay: React.FC = () => {
           });
         }
       } catch (error) {
+        if (cancelledRef.current) return;
         console.error('[Capture] Failed to resolve monitor info', error);
-        const scale = window.devicePixelRatio ?? 1;
+        const scale = window.devicePixelRatio;
         setMonitorInfo({
           x: 0,
           y: 0,
@@ -125,7 +126,7 @@ const CaptureOverlay: React.FC = () => {
     })();
 
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
     };
   }, []);
 
@@ -228,7 +229,7 @@ const CaptureOverlay: React.FC = () => {
           console.error('[Capture] Failed to refresh window offset', error);
         }
 
-        const fallbackScale = window.devicePixelRatio ?? 1;
+        const fallbackScale = window.devicePixelRatio;
         const scale = monitorInfo.scaleFactor > 0 ? monitorInfo.scaleFactor : fallbackScale;
         const offsetLogicalX = offsetX / scale;
         const offsetLogicalY = offsetY / scale;
@@ -319,10 +320,10 @@ const CaptureOverlay: React.FC = () => {
       <div
         className="absolute border-2 border-accent bg-accent/10"
         style={{
-          left: `${selection.x}px`,
-          top: `${selection.y}px`,
-          width: `${selection.width}px`,
-          height: `${selection.height}px`,
+          left: `${String(selection.x)}px`,
+          top: `${String(selection.y)}px`,
+          width: `${String(selection.width)}px`,
+          height: `${String(selection.height)}px`,
         }}
       >
         <div className="absolute right-2 top-2 rounded bg-accent px-2 py-1 text-xs text-black">
@@ -354,10 +355,10 @@ const CaptureOverlay: React.FC = () => {
               <Button variant="secondary" onClick={handleRetake} disabled={busy}>
                 Retake
               </Button>
-              <Button variant="secondary" onClick={handleCancel} disabled={busy}>
+              <Button variant="secondary" onClick={() => void handleCancel()} disabled={busy}>
                 Cancel
               </Button>
-              <Button variant="primary" onClick={handleConfirm} disabled={busy}>
+              <Button variant="primary" onClick={() => void handleConfirm()} disabled={busy}>
                 Confirm
               </Button>
             </div>
@@ -374,7 +375,9 @@ const CaptureOverlay: React.FC = () => {
       <div className="pointer-events-auto flex items-center gap-3">
         <Button
           variant="secondary"
-          onClick={() => setMode('freeform')}
+          onClick={() => {
+            setMode('freeform');
+          }}
           active={mode === 'freeform'}
           disabled={disabled}
         >
@@ -382,13 +385,15 @@ const CaptureOverlay: React.FC = () => {
         </Button>
         <Button
           variant="secondary"
-          onClick={() => setMode('square')}
+          onClick={() => {
+            setMode('square');
+          }}
           active={mode === 'square'}
           disabled={disabled}
         >
           Square
         </Button>
-        <Button variant="secondary" onClick={handleCancel} disabled={disabled}>
+        <Button variant="secondary" onClick={() => void handleCancel} disabled={disabled}>
           Cancel
         </Button>
       </div>

@@ -38,7 +38,7 @@ export const MasonryLayout: React.FC<Props> = ({
   const columnStyle = useMemo<React.CSSProperties>(
     () => ({
       columnCount: Math.max(columnCount, 1),
-      columnGap: `${MASONRY_COLUMN_GAP}px`,
+      columnGap: `${String(MASONRY_COLUMN_GAP)}px`,
       columnFill: 'balance',
     }),
     [columnCount],
@@ -48,7 +48,7 @@ export const MasonryLayout: React.FC<Props> = ({
     <div className="w-full" style={columnStyle}>
       {images.map((img: ImageItem) => (
         <div
-          key={img.id ?? img.hash}
+          key={img.id}
           className="mb-4 inline-block w-full align-top"
           style={{ breakInside: 'avoid' }}
         >

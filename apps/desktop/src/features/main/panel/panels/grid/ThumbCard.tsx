@@ -68,7 +68,9 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
     const el = containerRef.current;
     // Observe by hash to match visibility map keys
     observe(el, img.hash);
-    return () => unobserve(el);
+    return () => {
+      unobserve(el);
+    };
   }, [img.hash, observe, unobserve]);
 
   const handleImageLoad = useCallback(() => {
@@ -97,7 +99,7 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
   const cardStyle = useMemo<React.CSSProperties>(() => {
     if (!isMasonry) return {};
     return {
-      containIntrinsicSize: `${thumbSize}px ${thumbSize}px`,
+      containIntrinsicSize: `${String(thumbSize)}px ${String(thumbSize)}px`,
     };
   }, [isMasonry, thumbSize]);
 

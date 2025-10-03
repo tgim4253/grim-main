@@ -31,5 +31,4 @@ export interface CaptureContext {
   linkTypeForward?: string | null;
   linkTypeReverse?: string | null;
 }
-
-export interface CaptureOverlayPayload extends CaptureContext {}
+export type CaptureOverlayPayload = CaptureContext;

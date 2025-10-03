@@ -1,7 +1,4 @@
-import ManageMoaTitleBar from './layout/ManageMoaTitleBar';
-import ManageMoaSidebar from './layout/ManageMoaSidebar';
-import { Routes, Route, useNavigate } from 'react-router-dom';
-import TypeSelect from './TypeSelect';
+import { useNavigate } from 'react-router-dom';
 import NewMoa from './NewMoa';
 import { Button } from '@tgim/ui';
 import { useTranslation } from 'react-i18next';
@@ -34,7 +31,7 @@ const MoaDetail: React.FC<Props> = ({ type }) => {
       <Button
         variant="icon"
         className="absolute top-1 left-4 text-icon-main hover:text-icon-hover-main"
-        onClick={() => navigate(-1)}
+        onClick={() => void navigate(-1)}
       >
         <div className="flex items-center space-x-2">
           <BackIcon />

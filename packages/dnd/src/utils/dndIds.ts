@@ -23,11 +23,11 @@ export const createContainerId = (id: string) => `${CONTAINER_PREFIX}${id}`;
 export const createFolderId = (id: string) => `${FOLDER_PREFIX}${id}`;
 
 /* parser */
-export function parseDropTarget(overId: unknown): DropTarget {
+export const parseDropTarget = (overId: unknown): DropTarget => {
   if (typeof overId !== 'string') return null;
   if (overId.length === 0) return null;
 
-  const s = String(overId);
+  const s = overId;
   if (!s) return null;
 
   if (isContainerId(s)) {
@@ -41,4 +41,4 @@ export function parseDropTarget(overId: unknown): DropTarget {
     return { kind: 'folder', id, full: s };
   }
   return null;
-}
+};

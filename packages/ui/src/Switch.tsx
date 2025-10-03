@@ -40,7 +40,7 @@ const Switch = <T extends string | number>({
         className={cn('btn', 'switch', variantClasses[variant], className)}
       >
         {options.map(option => (
-          <option key={option.value + option.name} value={option.value}>
+          <option key={String(option.value) + option.name} value={option.value}>
             {option.name}
           </option>
         ))}

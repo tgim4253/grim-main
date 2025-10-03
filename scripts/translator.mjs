@@ -6,7 +6,7 @@ const args = process.argv.slice(2);
 const excelPath = args[0] || 'translations.xlsx';
 const outputDir = args[1] || '../apps/desktop/public/locales';
 if (!fs.existsSync(excelPath)) {
-  console.error(`❌ Excel file not found: ${excelPath}`);
+  console.error(`❌ Excel file not found: ${String(excelPath)}`);
   process.exit(1);
 }
 
@@ -78,10 +78,10 @@ workbook.worksheets.forEach(worksheet => {
 
     if (Object.keys(translations).length === 0) return;
 
-    const jsonPath = path.join(langDir, `${namespace}.json`);
+    const jsonPath = path.join(langDir, `${String(namespace)}.json`);
     fs.writeJsonSync(jsonPath, translations, { spaces: 2, encoding: 'utf-8' });
 
-    console.log(`✅ Generated: ${jsonPath}`);
+    console.log(`✅ Generated: ${String(jsonPath)}`);
   });
 });
 

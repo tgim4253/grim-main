@@ -45,9 +45,7 @@ export const useCropPreview = (
       return null;
     }
 
-    const rect = isNodeCrop(crop)
-      ? toAbsoluteCropRect(crop, sourceWidth, sourceHeight)
-      : (crop as AbsoluteCropRect | null | undefined);
+    const rect = isNodeCrop(crop) ? toAbsoluteCropRect(crop, sourceWidth, sourceHeight) : crop;
 
     return getCropPreviewStyle(rect, sourceWidth, sourceHeight, { maxEdge });
   }, [crop, maxEdge, sourceHeight, sourceWidth]);

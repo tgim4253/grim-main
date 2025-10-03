@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { FileType } from '@tgim/types/file';
-import { Connection, GraphResponse, Node, NodeCrop, NodeFile } from '@tgim/types/graph';
+import { NodeCrop, NodeFile } from '@tgim/types/graph';
 import { ipc } from '../../../../lib/ipc';
 import { FileText } from 'lucide-react';
 import { cn } from '@tgim/utils/index';
@@ -119,7 +119,9 @@ const FileViewer: React.FC<FileViewerProps> = ({ file, moaId, className, crop })
       setImageMetrics({ width: displayWidth, height: displayHeight, offsetX, offsetY });
     };
 
-    const resizeObserver = new ResizeObserver(() => updateMetrics());
+    const resizeObserver = new ResizeObserver(() => {
+      updateMetrics();
+    });
     if (imageWrapperRef.current) {
       resizeObserver.observe(imageWrapperRef.current);
     }
@@ -188,13 +190,15 @@ const FileViewer: React.FC<FileViewerProps> = ({ file, moaId, className, crop })
               {/* Make this column fill the panel and allow inner scrolling */}
               <div className="flex h-full min-h-0 w-full flex-col gap-3 relative">
                 {/* Toggle button pinned to the top-right over the viewer */}
-                {file ? (
+                {
                   <Button
                     type="button"
                     variant="icon"
                     aria-label={viewerSidebarVisible ? '사이드바 닫기' : '사이드바 열기'}
                     title={viewerSidebarVisible ? '사이드바 닫기' : '사이드바 열기'}
-                    onClick={() => setViewerSidebarVisible(prev => !prev)}
+                    onClick={() => {
+                      setViewerSidebarVisible(prev => !prev);
+                    }}
                     className="absolute right-0 top-0 h-8 w-8"
                     aria-controls="viewer-sidebar"
                     aria-expanded={viewerSidebarVisible}
@@ -202,22 +206,18 @@ const FileViewer: React.FC<FileViewerProps> = ({ file, moaId, className, crop })
                     {/* Keep it simple — use chevrons as text fallback */}
                     {viewerSidebarVisible ? '>' : '<'}
                   </Button>
-                ) : null}
+                }
 
                 {/* Header (non-scrolling) */}
                 <div className="flex flex-shrink-0 flex-col items-center gap-1 text-center px-8 pt-1">
                   {/* Guard against file being null/undefined */}
-                  <p className="max-w-full truncate text-lg font-semibold">
-                    {file?.fileName ?? '파일 없음'}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {fileDescription ?? '파일 설명이 없습니다.'}
-                  </p>
+                  <p className="max-w-full truncate text-lg font-semibold">{file.fileName}</p>
+                  <p className="text-sm text-muted-foreground">{fileDescription}</p>
                 </div>
 
                 {/* Content area (scrolling) */}
                 <div className="flex-1 min-h-0">
-                  {file?.kind === FileType.Image ? (
+                  {file.kind === FileType.Image ? (
                     <div
                       ref={imageWrapperRef}
                       className="relative flex h-full items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-muted"
@@ -227,7 +227,7 @@ const FileViewer: React.FC<FileViewerProps> = ({ file, moaId, className, crop })
                           <img
                             ref={imageElementRef}
                             src={imageSrc}
-                            alt={file?.fileName ?? 'image'}
+                            alt={file.fileName}
                             className="h-full w-full max-h-full max-w-full object-contain"
                           />
                           {normalizedCropRect && imageMetrics ? (
@@ -277,14 +277,21 @@ const FileViewer: React.FC<FileViewerProps> = ({ file, moaId, className, crop })
                 key="viewer-sidebar"
                 canHidden
                 hidden={!viewerSidebarVisible}
-                onHidden={hidden => hidden && setViewerSidebarVisible(false)}
+                onHidden={hidden => {
+                  if (hidden) setViewerSidebarVisible(false);
+                }}
                 hiddenSize={200}
                 minSize={280}
                 initialSize={360}
               >
                 {/* Add id for aria-controls */}
                 <div id="viewer-sidebar" className="h-full min-h-0">
-                  <FileDetailSidebar image={image} onClose={() => setViewerSidebarVisible(false)} />
+                  <FileDetailSidebar
+                    image={image}
+                    onClose={() => {
+                      setViewerSidebarVisible(false);
+                    }}
+                  />
                 </div>
               </SplitPanel>
             ) : null}

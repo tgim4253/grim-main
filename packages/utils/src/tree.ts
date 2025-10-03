@@ -24,9 +24,9 @@ const insertNodes = <T>(
     return [...before, ...nodesToInsert, ...after];
   }
   return tree.map(node => {
-    const nodeAny = node as any;
+    const nodeAny = node as unknown as { id: string; children?: T[] };
 
-    if (nodeAny?.id === parentId) {
+    if (nodeAny.id === parentId) {
       const children = Array.isArray(nodeAny.children) ? nodeAny.children : [];
       const before = children.slice(0, index);
       const after = children.slice(index);
