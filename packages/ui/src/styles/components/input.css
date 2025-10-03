@@ -17,7 +17,10 @@
   font-size: 0.875rem;
   font-weight: 400;
   line-height: 1.25rem;
-  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
   outline: none;
   appearance: none;
 }

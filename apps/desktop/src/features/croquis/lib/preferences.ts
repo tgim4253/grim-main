@@ -2,7 +2,7 @@ import { CroquisOption, CroquisPreferences, CroquisPreset } from '@tgim/types/cr
 
 const generatePresetId = (): string => {
   const cryptoApi = globalThis.crypto;
-  if (typeof cryptoApi?.randomUUID === 'function') {
+  if (typeof cryptoApi.randomUUID === 'function') {
     return cryptoApi.randomUUID();
   }
   return `preset-${Math.random().toString(36).slice(2, 10)}`;
@@ -29,33 +29,33 @@ export const normaliseCroquisOption = (option?: CroquisOption | null): CroquisOp
   const fallback = createDefaultCroquisOption();
   const next = option ?? fallback;
 
-  const maxTimeRaw = next.timer?.maxTime;
+  const maxTimeRaw = next.timer.maxTime;
   const maxTimeValue = Number.isFinite(maxTimeRaw)
-    ? Math.max(0, Math.round(maxTimeRaw as number))
+    ? Math.max(0, Math.round(maxTimeRaw))
     : fallback.timer.maxTime;
 
   return {
     window: {
-      width: next.window?.width ?? null,
-      height: next.window?.height ?? null,
+      width: next.window.width ?? null,
+      height: next.window.height ?? null,
     },
     auto: {
-      isSkip: next.auto?.isSkip ?? false,
+      isSkip: next.auto.isSkip,
     },
     timer: {
       maxTime: maxTimeValue,
     },
-    isCapture: next.isCapture ?? false,
-    savePath: next.savePath ?? '',
-    isGray: next.isGray ?? false,
-    isShuffle: next.isShuffle ?? false,
+    isCapture: next.isCapture,
+    savePath: next.savePath,
+    isGray: next.isGray,
+    isShuffle: next.isShuffle,
   };
 };
 
 const resolvePresetName = (name: string | undefined, index: number): string => {
   const trimmed = name?.trim();
   if (trimmed) return trimmed;
-  return `Preset ${index + 1}`;
+  return `Preset ${String(index + 1)}`;
 };
 
 export const createPreset = (
@@ -82,9 +82,9 @@ export const normaliseCroquisPreferences = (
   const rawPresets = preferences?.presets ?? [];
   const presets = rawPresets.length
     ? rawPresets.map((preset, index) => ({
-        id: preset?.id ?? generatePresetId(),
-        name: resolvePresetName(preset?.name, index),
-        option: normaliseCroquisOption(preset?.option),
+        id: preset.id,
+        name: resolvePresetName(preset.name, index),
+        option: normaliseCroquisOption(preset.option),
       }))
     : createDefaultCroquisPreferences().presets;
 

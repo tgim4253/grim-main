@@ -19,7 +19,6 @@ import {
   ThumbnailUsage,
 } from '@tgim/types/file';
 import {
-  CroquisOption,
   CroquisPreferences,
   CroquisSession,
   CroquisStartPayload,
@@ -51,20 +50,11 @@ const windowControllerIpc = {
 
 const moaIpc = {
   loadMoas: async () => {
-    const response = (await invoke('list_moas')) as {
-      name: string;
-      path: string;
-      moa_id: string;
-    }[];
+    const response = await invoke('list_moas');
     return convertKeysToCamel(response) as { name: string; path: string; moaId: string }[];
   },
   createMoa: async (data: { name: string; path: string }) => {
-    const response = (await invoke('create_moa', { moa: data })) as {
-      name: string;
-      path: string;
-      moa_id: string;
-      last_opened_at?: number | null;
-    };
+    const response = await invoke('create_moa', { moa: data });
     return convertKeysToCamel(response) as {
       name: string;
       path: string;
@@ -76,7 +66,7 @@ const moaIpc = {
     await invoke('open_moa', { moaId });
   },
   bootsrapMoa: async (moaId: string): Promise<GraphResponse> => {
-    const response = (await invoke('bootstrap_moa', { moaId })) as GraphResponse;
+    const response = await invoke('bootstrap_moa', { moaId });
     return convertKeysToCamel(response) as GraphResponse;
   },
 };

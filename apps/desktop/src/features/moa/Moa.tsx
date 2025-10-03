@@ -2,7 +2,6 @@ import ManageMoaTitleBar from './layout/ManageMoaTitleBar';
 import ManageMoaSidebar from './layout/ManageMoaSidebar';
 import { Routes, Route } from 'react-router-dom';
 import TypeSelect from './TypeSelect';
-import NewMoa from './NewMoa';
 import MoaDetail from './MoaDetail';
 import { ToastContainer } from 'react-toastify';
 import { platform } from '@tauri-apps/plugin-os';
@@ -16,9 +15,9 @@ const Moa: React.FC = () => {
   useEffect(() => {
     let mounted = true;
 
-    const detectPlatform = async () => {
+    const detectPlatform = () => {
       try {
-        const os = await platform();
+        const os = platform();
         if (mounted) {
           setIsMac(os === 'macos');
         }
@@ -29,7 +28,7 @@ const Moa: React.FC = () => {
       }
     };
 
-    void detectPlatform();
+    detectPlatform();
 
     return () => {
       mounted = false;

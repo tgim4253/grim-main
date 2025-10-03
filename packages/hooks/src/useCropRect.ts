@@ -21,11 +21,10 @@ export const useAbsoluteCropRect = (
   sourceWidth?: number | null,
   sourceHeight?: number | null,
 ): AbsoluteCropRect | null =>
-  useMemo(() => toAbsoluteCropRect(crop, sourceWidth ?? null, sourceHeight ?? null), [
-    crop,
-    sourceWidth,
-    sourceHeight,
-  ]);
+  useMemo(
+    () => toAbsoluteCropRect(crop, sourceWidth ?? null, sourceHeight ?? null),
+    [crop, sourceWidth, sourceHeight],
+  );
 
 type CropPreviewSource = NodeCrop | AbsoluteCropRect | null | undefined;
 
@@ -46,9 +45,7 @@ export const useCropPreview = (
       return null;
     }
 
-    const rect = isNodeCrop(crop)
-      ? toAbsoluteCropRect(crop, sourceWidth, sourceHeight)
-      : (crop as AbsoluteCropRect | null | undefined);
+    const rect = isNodeCrop(crop) ? toAbsoluteCropRect(crop, sourceWidth, sourceHeight) : crop;
 
     return getCropPreviewStyle(rect, sourceWidth, sourceHeight, { maxEdge });
   }, [crop, maxEdge, sourceHeight, sourceWidth]);

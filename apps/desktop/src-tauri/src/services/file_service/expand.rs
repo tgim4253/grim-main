@@ -249,7 +249,7 @@ fn expand_shopify_cdn(u: &reqwest::Url) -> Vec<String> {
         Regex::new(r"(?i)(?P<base>.+)_(\d+x\d*|\d+x)(\.(?P<ext>[a-z0-9]+))$")
             .unwrap()
     });
-    let mut segs: Vec<String> = u
+    let segs: Vec<String> = u
         .path_segments()
         .map(|it| it.map(|s| s.to_string()).collect())
         .unwrap_or_default();
@@ -395,7 +395,7 @@ fn expand_flickr(u: &reqwest::Url) -> Vec<String> {
         Regex::new(r"(?i)(?P<base>.+)_(?P<sz>[a-z])(\.(?P<ext>[a-z0-9]+))$")
             .unwrap()
     });
-    let mut segs: Vec<String> = u
+    let segs: Vec<String> = u
         .path_segments()
         .map(|it| it.map(|s| s.to_string()).collect())
         .unwrap_or_default();

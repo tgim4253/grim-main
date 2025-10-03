@@ -6,6 +6,10 @@ import jsxA11yPlugin from 'eslint-plugin-jsx-a11y';
 import importPlugin from 'eslint-plugin-import';
 import prettierPlugin from 'eslint-plugin-prettier';
 import prettier from 'eslint-config-prettier';
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const sharedConfig = {
   plugins: {
@@ -19,11 +23,17 @@ const sharedConfig = {
   rules: {
     'prettier/prettier': 'error',
     'react/react-in-jsx-scope': 'off',
-    'react/jsx-filename-extension': [1, { extensions: ['.tsx'] }],
     'import/extensions': 'off',
     'react/prop-types': 'off',
-    'arrow-body-style': 'off',
     'prefer-arrow-callback': 'off',
+    'no-control-regex': 'off',
+    '@typescript-eslint/no-unused-vars': [
+      'error',
+      {
+        varsIgnorePattern: '^_',
+        argsIgnorePattern: '^_',
+      },
+    ],
   },
   settings: {
     react: {
@@ -33,8 +43,8 @@ const sharedConfig = {
 };
 
 export default [
-  js.configs.recommended, // 기본 JS 룰
-  ...tseslint.configs.recommendedTypeChecked, // TypeScript용 룰
+  js.configs.recommended,
+  ...tseslint.configs.recommendedTypeChecked,
   ...tseslint.configs.strictTypeChecked,
   prettier,
   {
@@ -48,20 +58,22 @@ export default [
       '**/vite.config.ts',
       '**/tailwind.config.ts',
       '**/postcss.config.ts',
+      '**/postcss.config.cjs',
+      'scripts/translator.mjs',
       '*.d.ts',
+      '**/*.js',
       '.config/**',
       'scripts/dev.ts',
-      'apps/desktop/src-tauri/target/**',
+      'apps/desktop/src-tauri/**',
     ],
   },
-  // 📁 apps/desktop/renderer
   {
-    files: ['apps/desktop/renderer/**/*.{ts,tsx,js,jsx}'],
+    files: ['apps/desktop/**/*.{ts,tsx,js,jsx}'],
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: {
-        project: './apps/desktop/renderer/tsconfig.json',
-        tsconfigRootDir: new URL('.', import.meta.url),
+        project: './apps/desktop/tsconfig.json',
+        tsconfigRootDir: __dirname,
       },
     },
     ...sharedConfig,
@@ -69,62 +81,20 @@ export default [
       ...sharedConfig.settings,
       'import/resolver': {
         typescript: {
-          project: './apps/desktop/renderer/tsconfig.json',
-        },
-      },
-    },
-  },
-
-  // 📁 apps/desktop/main
-  {
-    files: ['apps/desktop/main/**/*.{ts,tsx,js,jsx}'],
-    languageOptions: {
-      parser: tseslint.parser,
-      parserOptions: {
-        project: './apps/desktop/main/tsconfig.json',
-        tsconfigRootDir: new URL('.', import.meta.url),
-      },
-    },
-    ...sharedConfig,
-    settings: {
-      ...sharedConfig.settings,
-      'import/resolver': {
-        typescript: {
-          project: './apps/desktop/main/tsconfig.json',
-        },
-      },
-    },
-  },
-
-  // 📁 apps/desktop/preload
-  {
-    files: ['apps/desktop/preload/**/*.{ts,tsx,js,jsx}'],
-    languageOptions: {
-      parser: tseslint.parser,
-      parserOptions: {
-        project: './apps/desktop/preload/tsconfig.json',
-        tsconfigRootDir: new URL('.', import.meta.url),
-      },
-    },
-    ...sharedConfig,
-    settings: {
-      ...sharedConfig.settings,
-      'import/resolver': {
-        typescript: {
-          project: './apps/desktop/preload/tsconfig.json',
+          project: './apps/desktop/tsconfig.json',
         },
       },
     },
   },
 
   // 📁 packages/*
-  ...['ui', 'hooks', 'utils'].map(pkg => ({
-    files: [`packages/${pkg}/**/*.{ts,tsx,js,jsx}`],
+  ...['ui', 'hooks', 'utils', 'dnd', 'types', 'stores'].map(pkg => ({
+    files: [`packages/${String(pkg)}/**/*.{ts,tsx,js,jsx}`],
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: {
-        project: `./packages/${pkg}/tsconfig.json`,
-        tsconfigRootDir: new URL('.', import.meta.url),
+        project: `./packages/${String(pkg)}/tsconfig.json`,
+        tsconfigRootDir: __dirname,
       },
     },
     ...sharedConfig,
@@ -132,7 +102,7 @@ export default [
       ...sharedConfig.settings,
       'import/resolver': {
         typescript: {
-          project: `./packages/${pkg}/tsconfig.json`,
+          project: `./packages/${String(pkg)}/tsconfig.json`,
         },
       },
     },

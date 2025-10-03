@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { parseDropTarget } from "../utils/dndIds";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { parseDropTarget } from '../utils/dndIds';
 
 // Hover-to-open: call targetOpen(id) after delay when dragging over a folder/container
 type HoverOpenOptions = {
@@ -10,7 +10,7 @@ type HoverOpenOptions = {
 
 export function useHoverOpen(
   targetOpen: (id: string) => void,
-  { delay = 700, disabled = false, isValidTarget }: HoverOpenOptions = {}
+  { delay = 700, disabled = false, isValidTarget }: HoverOpenOptions = {},
 ) {
   const [hoverId, setHoverId] = useState<string | null>(null);
 
@@ -38,7 +38,7 @@ export function useHoverOpen(
       const id = target?.id ?? null;
 
       // Update state only if it actually changes to reduce re-renders
-      setHoverId((prev) => (prev === id ? prev : id));
+      setHoverId(prev => (prev === id ? prev : id));
 
       // ignore self or null target
       if (!id || activeIds.includes(id)) {
@@ -65,7 +65,7 @@ export function useHoverOpen(
         }, delay);
       }
     },
-    [clearTimer, delay, disabled, isValidTarget, targetOpen]
+    [clearTimer, delay, disabled, isValidTarget, targetOpen],
   );
 
   // Public reset: call on drop/cancel/end of drag

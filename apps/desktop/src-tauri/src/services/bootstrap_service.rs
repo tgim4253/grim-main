@@ -211,7 +211,7 @@ async fn set_status(
     percent: u8,
     note: Option<String>,
 ) {
-    let st = state.get_or_insert_status(&moa_id).await;
+    let st = state.get_or_insert_status(moa_id).await;
     let mut st = st.lock().await;
     if percent > st.percent {
         st.stage = stage;
@@ -235,17 +235,6 @@ async fn perform_initial_scan(
     app: &tauri::AppHandle,
     moa_id: &str,
 ) -> Result<()> {
-    #[derive(sqlx::FromRow)]
-    struct MountRow {
-        virtual_node_id: String,
-        real_folder_id: String,
-        sync_enabled: i64,
-        abs_path: Option<String>,
-        stored_mtime: i64,
-        include_blob: Option<String>,
-        exclude_blob: Option<String>,
-    }
-
     let scan_id = get_unique_id();
     let now = get_now_date();
 
@@ -639,8 +628,7 @@ pub async fn fetch_init_data_for_front(
 
 /// Ensure the workspace database is created and migrated before use.
 async fn apply_migrations(moa_id: &str) -> Result<()> {
-    let moa =
-        moa_services::MOA_DATA.read().unwrap().get_by_id(&moa_id).unwrap();
+    let moa = moa_services::MOA_DATA.read().unwrap().get_by_id(moa_id).unwrap();
 
     let name = moa.name;
     let path = moa.path;
@@ -653,7 +641,7 @@ async fn apply_migrations(moa_id: &str) -> Result<()> {
     let _ =
         bootstrap::ensure_layout(&base).await.context("Failed to prepare .moa");
 
-    let pool = db::DB_MANAGER.get_or_open(&moa_id).await?;
+    let pool = db::DB_MANAGER.get_or_open(moa_id).await?;
 
     integrity::ensure_schema(&pool).await.map_err(|e| {
         anyhow::anyhow!("Failed to ensure database schema: {}", e)
@@ -669,7 +657,7 @@ async fn apply_migrations(moa_id: &str) -> Result<()> {
 async fn ensure_mounted_volume(moa_id: &str) -> Result<()> {
     let mounted = enumerate_mounted_root()?;
 
-    let pool = DB_MANAGER.get_or_open(&moa_id).await?;
+    let pool = DB_MANAGER.get_or_open(moa_id).await?;
     let mut tx = pool.begin().await?;
 
     sqlx::query(
@@ -692,7 +680,7 @@ async fn ensure_mounted_volume(moa_id: &str) -> Result<()> {
             WHERE platform = $1 AND stable_id = $2
             "#,
         )
-        .bind(&m.platform)
+        .bind(m.platform)
         .bind(&m.stable_id)
         .fetch_optional(&mut *tx)
         .await?;
@@ -703,7 +691,6 @@ async fn ensure_mounted_volume(moa_id: &str) -> Result<()> {
         // Check previous availability & primary mount to detect change
         #[derive(sqlx::FromRow)]
         struct PrevState {
-            is_available: bool,
             primary_mount: Option<String>,
         }
         let prev: PrevState = sqlx::query_as(

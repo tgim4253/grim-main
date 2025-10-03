@@ -63,17 +63,26 @@ pub(crate) fn validate_crop(
     Ok(())
 }
 
+pub(crate) struct ImageCropOptions<'a> {
+    pub expected_origin_hash: Option<&'a str>,
+    pub rect: &'a CropRectangle,
+    pub reference_width: Option<i64>,
+    pub reference_height: Option<i64>,
+    pub is_relative: bool,
+    pub now: &'a str,
+}
+
 pub(crate) async fn create_image_crop_in_tx(
     tx: &mut Transaction<'_, Sqlite>,
     origin_node_id: &str,
-    expected_origin_hash: Option<&str>,
-    rect: &CropRectangle,
-    reference_width: Option<i64>,
-    reference_height: Option<i64>,
-    is_relative: bool,
-    now: &str,
+    options: ImageCropOptions<'_>,
 ) -> Result<String> {
-    validate_crop(rect, is_relative, reference_width, reference_height)?;
+    validate_crop(
+        options.rect,
+        options.is_relative,
+        options.reference_width,
+        options.reference_height,
+    )?;
 
     let node_data = NodeRepository::fetch_file_node_data(
         tx.as_mut(),
@@ -90,34 +99,35 @@ pub(crate) async fn create_image_crop_in_tx(
         bail!("Only image files can be cropped");
     }
 
-    if let Some(expected_hash) = expected_origin_hash {
+    if let Some(expected_hash) = options.expected_origin_hash {
         if !origin_file.xxh3_64.eq_ignore_ascii_case(expected_hash) {
             bail!("Origin hash does not match the stored image hash");
         }
     }
 
     let crop_node_id =
-        NodeRepository::insert_node(tx.as_mut(), NodeKind::Crop, now).await?;
+        NodeRepository::insert_node(tx.as_mut(), NodeKind::Crop, options.now)
+            .await?;
 
     CropRepository::insert_crop(
         tx.as_mut(),
         NewImageCrop {
             node_id: &crop_node_id,
             origin_hash: &origin_file.xxh3_64,
-            start_x: rect.start_x,
-            start_y: rect.start_y,
-            width: rect.width,
-            height: rect.height,
-            reference_width,
-            reference_height,
-            is_relative,
-            now,
+            start_x: options.rect.start_x,
+            start_y: options.rect.start_y,
+            width: options.rect.width,
+            height: options.rect.height,
+            reference_width: options.reference_width,
+            reference_height: options.reference_height,
+            is_relative: options.is_relative,
+            now: options.now,
         },
     )
     .await?;
 
     let origin_id = origin_node_id.to_string();
-    let now_owned = now.to_string();
+    let now_owned = options.now.to_string();
 
     ConnectionRepository::insert_connection(
         tx.as_mut(),
@@ -160,12 +170,14 @@ pub async fn create_image_crop(
     create_image_crop_in_tx(
         &mut tx,
         &origin_node_id,
-        Some(origin_hash.as_str()),
-        &rect,
-        reference_width,
-        reference_height,
-        is_relative,
-        &now,
+        ImageCropOptions {
+            expected_origin_hash: Some(origin_hash.as_str()),
+            rect: &rect,
+            reference_width,
+            reference_height,
+            is_relative,
+            now: &now,
+        },
     )
     .await?;
 

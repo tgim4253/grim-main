@@ -9,9 +9,9 @@ const ProgressWindow: React.FC<Props> = ({ progress }) => {
         <div className="w-full h-3 rounded-full bg-surface-muted">
           <div
             className={`h-3 rounded-full ${
-              progress.stage === 'Error' ? 'bg-[var(--color-status-danger)]' : 'bg-accent'
+              progress.stage === 'Error' ? 'bg-status-danger' : 'bg-accent'
             }`}
-            style={{ width: `${progress.percent}%` }}
+            style={{ width: `${String(progress.percent)}%` }}
           ></div>
         </div>
         <div className="mb-2 text-sm font-medium text-text text-center">

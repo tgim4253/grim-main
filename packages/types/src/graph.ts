@@ -12,7 +12,7 @@ export interface GraphData {
 }
 
 export interface GraphNode {
-  [others: string]: any;
+  [others: string]: unknown;
   id: string;
   nodeId: string;
   label: string;
@@ -28,18 +28,11 @@ export interface GraphNode {
   fy?: number;
 }
 
-export type GraphNodeType =
-  | 'folder'
-  | 'tag'
-  | 'image'
-  | 'document'
-  | 'crop'
-  | 'default'
-  | string;
+export type GraphNodeType = 'folder' | 'tag' | 'image' | 'document' | 'crop' | 'default';
 
 export interface GraphConnection {
-  source: string;
-  target: string;
+  source: string | GraphNode;
+  target: string | GraphNode;
   label: string;
 
   data: Connection;
@@ -58,10 +51,10 @@ export interface Node {
   id: string;
   kind: NodeKind;
   data: {
-    ['File']?: NodeFile;
-    ['Folder']?: NodeFolder;
-    ['Crop']?: NodeCrop;
-    ['Memo']?: NodeMemo;
+    File?: NodeFile;
+    Folder?: NodeFolder;
+    Crop?: NodeCrop;
+    Memo?: NodeMemo;
   };
   createdAt: string;
   updatedAt: string;

@@ -93,7 +93,7 @@ const ThumbnailStorageModal: React.FC<ThumbnailStorageModalProps> = ({ open, onC
         </header>
 
         {error ? (
-          <div className="rounded-md border border-red-400/40 bg-red-400/10 p-3 text-sm text-red-200">
+          <div className="rounded-md border border-status-danger/40 bg-status-danger/10 p-3 text-sm text-status-danger/70">
             {error}
           </div>
         ) : null}
@@ -114,7 +114,7 @@ const ThumbnailStorageModal: React.FC<ThumbnailStorageModalProps> = ({ open, onC
               </div>
               <Button
                 variant="secondary"
-                onClick={handleClearBase}
+                onClick={() => void handleClearBase()}
                 disabled={disableActions}
                 className="whitespace-nowrap"
               >
@@ -138,7 +138,7 @@ const ThumbnailStorageModal: React.FC<ThumbnailStorageModalProps> = ({ open, onC
               </div>
               <Button
                 variant="secondary"
-                onClick={handleClearDerived}
+                onClick={() => void handleClearDerived()}
                 disabled={disableActions}
                 className="whitespace-nowrap"
               >
@@ -161,7 +161,7 @@ const ThumbnailStorageModal: React.FC<ThumbnailStorageModalProps> = ({ open, onC
             ) : null}
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={refresh} disabled={disableActions}>
+            <Button variant="secondary" onClick={() => void refresh()} disabled={disableActions}>
               {loading && !usage ? '불러오는 중...' : '새로고침'}
             </Button>
             <Button variant="primary" onClick={onClose}>

@@ -6,13 +6,17 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @grim/desktop dev",
-    "build": "pnpm --filter @grim/desktop build",
+    "build:front": "pnpm --filter @grim/desktop build",
+    "build": "pnpm --filter @grim/desktop tauri build",
     "tauri": "pnpm --filter @grim/desktop tauri",
-    "lint": "eslint . --ext .ts,.tsx --fix",
-    "lint:check": "eslint . --ext .ts,.tsx",
-    "format": "prettier --check .",
+    "lint:ts": "eslint . --ext .ts,.tsx --fix",
+    "lint:rs": "cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings",
+    "lint": "pnpm lint:ts && pnpm lint:rs",
+    "lint:fix": "pnpm lint:ts && pnpm lint:rs --fix",
+    "lint:check": "eslint . --ext .ts,.tsx && cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings",
+    "format:check": "prettier --check . && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check",
     "translate": "pnpm --filter @grim/scripts translate",
-    "format:write": "prettier --write ."
+    "format:write": "prettier --write . && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.7.1",
@@ -46,5 +50,6 @@
   },
   "dependencies": {
     "typescript-eslint": "^8.37.0"
-  }
+  },
+  "license": "GPL-3.0-or-later"
 }

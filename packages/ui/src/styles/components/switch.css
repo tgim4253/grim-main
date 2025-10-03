@@ -2,7 +2,10 @@
   cursor: pointer;
   border-radius: 0.5rem;
   padding: 0.5rem 0.75rem;
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
 }
 
 .switch-language {

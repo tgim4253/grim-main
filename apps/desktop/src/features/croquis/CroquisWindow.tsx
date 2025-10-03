@@ -19,7 +19,7 @@ const shuffleImages = (images: CroquisSessionImage[]): CroquisSessionImage[] => 
   return next;
 };
 
-const formatTime = (seconds: number): string => {
+const _formatTime = (seconds: number): string => {
   if (!Number.isFinite(seconds) || seconds < 0) return '00:00';
   const totalSeconds = Math.max(0, Math.floor(seconds));
   const minutes = Math.floor(totalSeconds / 60);
@@ -53,7 +53,7 @@ const CroquisWindow: React.FC = () => {
       return;
     }
 
-    let cancelled = false;
+    const cancelledRef = { current: false };
     void (async () => {
       try {
         const data = await ipc.croquis.loadSession(sessionId);
@@ -61,7 +61,7 @@ const CroquisWindow: React.FC = () => {
           console.warn('[Croquis] No session found for id', sessionId);
           return;
         }
-        if (cancelled) return;
+        if (cancelledRef.current) return;
         setSession(data);
         console.log('[Croquis] session hydrated', data);
       } catch (error) {
@@ -70,20 +70,20 @@ const CroquisWindow: React.FC = () => {
     })();
 
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
     };
   }, [params]);
 
   const option = session?.option;
-  const autoSkip = option?.auto?.isSkip ?? false;
+  const autoSkip = option?.auto.isSkip ?? false;
   const isCaptureEnabled = option?.isCapture ?? false;
   const isGray = option?.isGray ?? false;
 
   const imageList = useMemo(() => {
     if (!session) return [];
-    const base = session.images ?? [];
+    const base = session.images;
     if (!base.length) return [];
-    if (session.option?.isShuffle) return shuffleImages(base);
+    if (session.option.isShuffle) return shuffleImages(base);
     return [...base];
   }, [session]);
 
@@ -94,7 +94,7 @@ const CroquisWindow: React.FC = () => {
   const [isInitHeight, setIsInitHeight] = useState(false);
 
   useEffect(() => {
-    (async () => {
+    void (async () => {
       if (isInitHeight) return;
 
       try {
@@ -128,7 +128,7 @@ const CroquisWindow: React.FC = () => {
   }, [imageList, option]);
 
   // --- Timer logic ---
-  const maxTimeSecondsRaw = option?.timer?.maxTime ?? 0;
+  const maxTimeSecondsRaw = option?.timer.maxTime ?? 0;
   const maxTimeSeconds = Number.isFinite(maxTimeSecondsRaw) ? Math.max(0, maxTimeSecondsRaw) : 0;
   const maxTimeMs = maxTimeSeconds > 0 ? maxTimeSeconds * 1000 : 0;
 
@@ -206,21 +206,24 @@ const CroquisWindow: React.FC = () => {
   const [isMac, setIsMac] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
+    const mountedRef = { current: true };
+    (() => {
       try {
-        const os = await platform();
-        if (mounted) setIsMac(os === 'macos');
+        const os = platform();
+        if (mountedRef.current) setIsMac(os === 'macos');
       } catch {
-        if (mounted) setIsMac(false);
+        if (mountedRef.current) setIsMac(false);
       }
     })();
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
   }, []);
 
-  const currentImage = useMemo(() => imageList[currentIndex] ?? null, [currentIndex, imageList]);
+  const currentImage = useMemo(
+    () => (imageList.length > 0 ? (imageList[currentIndex] ?? null) : null),
+    [currentIndex, imageList],
+  );
   const currentImageSrc = useMemo(
     () => (currentImage ? convertFileSrc(currentImage.basePath) : null),
     [currentImage],
@@ -244,7 +247,7 @@ const CroquisWindow: React.FC = () => {
   const handleCapture = useCallback(() => {
     const sessionId = session?.sessionId ?? null;
     const hash = currentImage?.hash ?? null;
-    const savePath = session?.option?.savePath ?? '';
+    const savePath = session?.option.savePath ?? '';
 
     console.log('[Croquis] Opening capture overlay for', {
       sessionId,
@@ -265,7 +268,7 @@ const CroquisWindow: React.FC = () => {
     });
   }, [moaId, currentImage, session]);
 
-  const elapsedSeconds =
+  const _elapsedSeconds =
     maxTimeSeconds > 0 ? Math.min(maxTimeSeconds, elapsedMs / 1000) : elapsedMs / 1000;
   const progress = useMemo(
     () => (maxTimeMs > 0 ? Math.min(elapsedMs / maxTimeMs, 1) : 0),
@@ -283,8 +286,12 @@ const CroquisWindow: React.FC = () => {
       {/* Stage area */}
       <main
         className="relative flex h-full w-full flex-1 select-none bg-transparent flex-col"
-        onMouseEnter={() => setIsHover(true)}
-        onMouseLeave={() => setIsHover(false)}
+        onMouseEnter={() => {
+          setIsHover(true);
+        }}
+        onMouseLeave={() => {
+          setIsHover(false);
+        }}
       >
         <div className="relative flex h-full w-full items-center justify-center overflow-hidden">
           {currentImage && currentImageSrc ? (
@@ -304,8 +311,8 @@ const CroquisWindow: React.FC = () => {
           <div className="w-full max-w-[720px]">
             <div className="h-1 w-full overflow-hidden rounded-full bg-surface-muted">
               <div
-                className={`h-full ${isCritical ? 'bg-red-500' : 'bg-accent'}`}
-                style={{ width: `${Math.min(100, Math.max(0, progress * 100))}%` }}
+                className={`h-full ${isCritical ? 'bg-status-danger' : 'bg-accent'}`}
+                style={{ width: `${String(Math.min(100, Math.max(0, progress * 100)))}%` }}
               />
             </div>
           </div>

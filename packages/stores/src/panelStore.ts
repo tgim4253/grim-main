@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { createNewId } from '@tgim/utils/index';
+import { createNewId, omitKey } from '@tgim/utils/index';
 import { immer } from 'zustand/middleware/immer';
 
 /* ---------- Types ---------- */
@@ -23,18 +23,18 @@ type LayoutContainerId = string;
 interface LayoutContainer {
   id: LayoutContainerId;
   axis: 'vertical' | 'horizontal';
-  children: Array<LayoutContainerId | ContainerId>;
+  children: Array<LayoutContainerId>;
 }
 interface PanelsState {
   rootLayout: LayoutContainer | null;
-  layout: Record<LayoutContainerId, LayoutContainer>;
+  layout: Partial<Record<LayoutContainerId, LayoutContainer>>;
   // containerId -> layoutContainerIds
-  containerOwnership: Record<ContainerId, LayoutContainerId>;
+  containerOwnership: Partial<Record<ContainerId, LayoutContainerId>>;
 
-  panelEntities: Record<PanelId, PanelItem>;
-  containers: Record<ContainerId, PanelContainer>;
+  panelEntities: Partial<Record<PanelId, PanelItem>>;
+  containers: Partial<Record<ContainerId, PanelContainer>>;
   // panelId -> containerId
-  panelOwnership: Record<PanelId, ContainerId>;
+  panelOwnership: Partial<Record<PanelId, ContainerId>>;
 
   activePanelId: PanelId | null;
 
@@ -108,8 +108,9 @@ const usePanelsStore = create<PanelsState>()(
             state.removeContainer(child);
           }
         });
-        delete state.layout[layoutId];
-        delete state.containerOwnership[layoutId];
+
+        omitKey(state.layout, layoutId);
+        omitKey(state.containerOwnership, layoutId);
       });
     },
 
@@ -122,7 +123,8 @@ const usePanelsStore = create<PanelsState>()(
         const idx = layout.children.indexOf(containerId);
         if (idx === -1) return;
         layout.children.splice(idx, 1);
-        delete state.containerOwnership[containerId];
+
+        omitKey(state.containerOwnership, containerId);
 
         // if the layout becomes empty, remove it
         if (layout.children.length === 0) {
@@ -138,6 +140,7 @@ const usePanelsStore = create<PanelsState>()(
 
       set(state => {
         const layout = state.layout[layoutId];
+        if (!layout) return;
         state.containers[id] = { id, panelIds: [] };
         state.containerOwnership[id] = layoutId;
         layout.children = [...layout.children, id];
@@ -148,19 +151,19 @@ const usePanelsStore = create<PanelsState>()(
     removeContainer: containerId => {
       set(state => {
         state.removeContainerFromLayout(containerId);
-        const container: PanelContainer = state.containers[containerId];
+        const container: PanelContainer | undefined = state.containers[containerId];
         if (!container) return;
 
         // remove all panels in the container
         container.panelIds.forEach(pid => {
-          delete state.panelEntities[pid];
-          delete state.panelOwnership[pid];
+          omitKey(state.panelEntities, pid);
+          omitKey(state.panelOwnership, pid);
         });
-        delete state.containers[containerId];
+        omitKey(state.containers, containerId);
 
         // if the active panel was inside the deleted container
         if (state.activePanelId && !state.panelOwnership[state.activePanelId]) {
-          const firstContainer = Object.values(state.containers)[0] as PanelContainer;
+          const firstContainer = Object.values(state.containers)[0] as PanelContainer | undefined;
           state.activePanelId = firstContainer?.focusedPanelId ?? null;
         }
       });
@@ -170,10 +173,13 @@ const usePanelsStore = create<PanelsState>()(
       set(state => {
         const oldLayoutId = state.containerOwnership[containerId];
         if (oldLayoutId === layoutId) return;
+        if (!layoutId) return;
 
-        const oldLayout = state.layout[oldLayoutId];
-        if (oldLayout) {
-          state.removeContainerFromLayout(containerId);
+        if (oldLayoutId) {
+          const oldLayout = state.layout[oldLayoutId];
+          if (oldLayout) {
+            state.removeContainerFromLayout(containerId);
+          }
         }
 
         const layout = state.layout[layoutId];
@@ -185,7 +191,7 @@ const usePanelsStore = create<PanelsState>()(
     },
 
     splitContainer: (containerId, axis) => {
-      let newContainerId = createNewId();
+      const newContainerId = createNewId();
 
       set(state => {
         const container = state.containers[containerId];
@@ -193,6 +199,8 @@ const usePanelsStore = create<PanelsState>()(
 
         const parentLayoutId = state.containerOwnership[containerId] ?? state.getOrCreateLayoutId();
         const parentLayout = state.layout[parentLayoutId];
+
+        if (!parentLayout) return;
 
         // insert a new layout container
         const newLayoutId = createNewId();
@@ -225,12 +233,12 @@ const usePanelsStore = create<PanelsState>()(
         name: panelInput.name,
       };
       set(state => {
-        const container: PanelContainer = state.containers[containerId];
+        const container: PanelContainer | undefined = state.containers[containerId];
         if (!container) return;
 
         // If panel already exists in container, focus & set active
         const existingPanel = container.panelIds.find(
-          pid => state.panelEntities[pid].nodeId === panel.nodeId,
+          pid => state.panelEntities[pid]?.nodeId === panel.nodeId,
         );
         if (existingPanel) {
           container.focusedPanelId = existingPanel;
@@ -260,23 +268,25 @@ const usePanelsStore = create<PanelsState>()(
       set(state => {
         const containerId = state.panelOwnership[panelId];
         if (!containerId) return;
-        const container: PanelContainer = state.containers[containerId];
+        const container: PanelContainer | undefined = state.containers[containerId];
         if (!container) return;
 
         // remove panelId from container.panelIds
         const idx = container.panelIds.indexOf(panelId);
         if (idx !== -1) container.panelIds.splice(idx, 1);
-        delete state.panelEntities[panelId];
-        delete state.panelOwnership[panelId];
+
+        omitKey(state.panelEntities, panelId);
+        omitKey(state.panelOwnership, panelId);
 
         // if container has no panels left, remove the container
         if (container.panelIds.length === 0) {
-          delete state.containers[containerId];
+          omitKey(state.containers, containerId);
 
           // if active panel was deleted
           if (state.activePanelId === panelId) {
             state.activePanelId =
-              (Object.values(state.containers)[0] as PanelContainer)?.focusedPanelId ?? null;
+              (Object.values(state.containers)[0] as PanelContainer | undefined)?.focusedPanelId ??
+              null;
           }
         } else {
           // update focused panel
@@ -309,8 +319,10 @@ const usePanelsStore = create<PanelsState>()(
         // remove target panels from their source containers
         targetIds.forEach(pid => {
           const sourceContainerId = state.panelOwnership[pid];
+          if (!sourceContainerId) return;
           const sourceContainer = state.containers[sourceContainerId];
           if (!sourceContainer) return;
+
           affectedContainers.add(sourceContainerId);
 
           // remove from source container
@@ -336,8 +348,8 @@ const usePanelsStore = create<PanelsState>()(
         affectedContainers.forEach(cid => {
           const cont = state.containers[cid];
           if (cont && cont.panelIds.length === 0) {
-            delete state.containers[cid];
-          } else if (cont.focusedPanelId !== cid) {
+            omitKey(state.containers, cid);
+          } else if (cont && cont.focusedPanelId !== cid) {
             cont.focusedPanelId = cont.panelIds[cont.panelIds.length - 1] ?? null;
           }
         });
@@ -367,15 +379,17 @@ const usePanelsStore = create<PanelsState>()(
       return panelId ? (get().panelOwnership[panelId] ?? null) : null;
     },
 
-    setActivePanel: id =>
+    setActivePanel: id => {
       set(state => {
         if (id === null) return;
         const containerId = state.panelOwnership[id];
         if (!containerId) return;
-
-        state.containers[containerId].focusedPanelId = id;
+        const container = state.containers[containerId];
+        if (!container) return;
+        container.focusedPanelId = id;
         state.activePanelId = id;
-      }),
+      });
+    },
   })),
 );
 

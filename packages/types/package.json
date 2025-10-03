@@ -5,11 +5,15 @@
   "main": "index.tx",
   "keywords": [],
   "author": "",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "packageManager": "pnpm@10.13.1",
   "devDependencies": {
     "arborist": "^0.1.0",
     "react": "^19.1.0",
     "react-arborist": "^3.4.3"
+  },
+  "dependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0"
   }
 }

@@ -44,17 +44,17 @@ const OpenIcon = () => (
 const TypeSelect: React.FC = () => {
   const { t } = useTranslation(['common', 'moa']);
   const navigate = useNavigate();
-  const [paths, setPaths] = useState<string | string[] | null>(null);
+  const [_paths, setPaths] = useState<string | string[] | null>(null);
 
-  const pickFolder = async () => {
+  const _pickFolder = async () => {
     const result = await open({ directory: true });
     setPaths(result);
   };
   const handleNewMoa = () => {
-    navigate('/create-moa/new');
+    void navigate('/create-moa/new');
   };
   const handleImportMoa = () => {
-    navigate('/create-moa/import');
+    void navigate('/create-moa/import');
   };
 
   return (

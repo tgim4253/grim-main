@@ -23,9 +23,9 @@ const formatDuration = (milliseconds: number) => {
   const seconds = totalSeconds % 60;
 
   const parts: string[] = [];
-  if (hours > 0) parts.push(`${hours}시간`);
-  if (minutes > 0) parts.push(`${minutes}분`);
-  if (seconds > 0 || parts.length === 0) parts.push(`${seconds}초`);
+  if (hours > 0) parts.push(`${String(hours)}시간`);
+  if (minutes > 0) parts.push(`${String(minutes)}분`);
+  if (seconds > 0 || parts.length === 0) parts.push(`${String(seconds)}초`);
 
   return parts.join(' ');
 };
@@ -93,7 +93,7 @@ const FolderImportProgressModal: React.FC<Props> = ({
   }, [progress.state, safeName]);
 
   const dismissible = progress.state === 'completed' || progress.state === 'failed';
-  const barColor = progress.state === 'failed' ? 'bg-[var(--color-status-danger)]' : 'bg-accent';
+  const barColor = progress.state === 'failed' ? 'bg-status-danger' : 'bg-accent';
 
   return (
     <Modal onClose={onClose} className="bg-modal-bg w-[28rem]" dismissible={dismissible}>
@@ -107,7 +107,7 @@ const FolderImportProgressModal: React.FC<Props> = ({
           <div className="h-3 w-full overflow-hidden rounded-full bg-surface-muted">
             <div
               className={`h-full rounded-full transition-all ${barColor}`}
-              style={{ width: `${percent}%` }}
+              style={{ width: `${String(percent)}%` }}
             ></div>
           </div>
           <div className="mt-2 flex items-center justify-between text-sm font-medium">

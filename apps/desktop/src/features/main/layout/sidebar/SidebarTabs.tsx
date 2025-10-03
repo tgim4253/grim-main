@@ -14,21 +14,23 @@ const SidebarTabs: React.FC<SidebarProps> = ({ sidebarPosition }) => {
     })),
   );
   const setActiveTab = useCallback(
-    (newTab: string) => useSidebarStore.getState().setActiveTab(sidebarPosition, newTab),
+    (newTab: string) => {
+      useSidebarStore.getState().setActiveTab(sidebarPosition, newTab);
+    },
     [sidebarPosition],
   );
   const setHiddenPanel = useCallback(
-    (hidden: boolean) => useSidebarStore.getState().setHidden(sidebarPosition, hidden),
+    (hidden: boolean) => {
+      useSidebarStore.getState().setHidden(sidebarPosition, hidden);
+    },
     [sidebarPosition],
   );
 
-  const toggleHiddenPanel = useCallback(
-    () =>
-      useSidebarStore
-        .getState()
-        .setHidden(sidebarPosition, !useSidebarStore.getState().sidebars[sidebarPosition].hidden),
-    [sidebarPosition],
-  );
+  const toggleHiddenPanel = useCallback(() => {
+    useSidebarStore
+      .getState()
+      .setHidden(sidebarPosition, !useSidebarStore.getState().sidebars[sidebarPosition].hidden);
+  }, [sidebarPosition]);
 
   const [tOpen, setTOpen] = useState(false);
 
@@ -66,7 +68,12 @@ const SidebarTabs: React.FC<SidebarProps> = ({ sidebarPosition }) => {
       >
         Open
       </Button>
-      <ThumbnailStorageModal open={tOpen} onClose={() => setTOpen(false)}></ThumbnailStorageModal>
+      <ThumbnailStorageModal
+        open={tOpen}
+        onClose={() => {
+          setTOpen(false);
+        }}
+      ></ThumbnailStorageModal>
     </div>
   );
 };

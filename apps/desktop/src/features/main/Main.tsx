@@ -93,7 +93,9 @@ const Main: React.FC = () => {
       setReady(true);
     }, 100);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [progress.stage]);
 
   useEffect(() => {
@@ -129,7 +131,9 @@ const Main: React.FC = () => {
 
     return () => {
       cancelled = true;
-      timers.forEach(id => window.clearTimeout(id));
+      timers.forEach(id => {
+        window.clearTimeout(id);
+      });
       setProcessing(false);
     };
   }, [processing, progressQueue]);
@@ -238,17 +242,17 @@ const Main: React.FC = () => {
   }, [convertToTreeData, moaId, setTreeData]);
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
+    const mountedRef = { current: true };
+    (() => {
       try {
-        const os = await platform();
-        if (mounted) setIsMac(os === 'macos');
+        const os = platform();
+        if (mountedRef.current) setIsMac(os === 'macos');
       } catch {
-        if (mounted) setIsMac(false);
+        if (mountedRef.current) setIsMac(false);
       }
     })();
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
   }, []);
 
@@ -270,15 +274,19 @@ const Main: React.FC = () => {
           <Split position="horizontal" className="w-full h-screen">
             {({ Panel }) => (
               <>
-                {!leftSidebar.hidden ? (
+                {!leftSidebar?.hidden ? (
                   <Panel
                     key="left"
                     canHidden
-                    hiddenSize={leftSidebar.hiddenSize ?? leftSidebar.minSize}
-                    minSize={leftSidebar.minSize}
-                    initialSize={leftSidebar.size}
-                    onHidden={hidden => setSidebarHidden('left', hidden)}
-                    onSizeChange={size => setSidebarSize('left', size)}
+                    hiddenSize={leftSidebar?.hiddenSize ?? leftSidebar?.minSize}
+                    minSize={leftSidebar?.minSize}
+                    initialSize={leftSidebar?.size}
+                    onHidden={hidden => {
+                      setSidebarHidden('left', hidden);
+                    }}
+                    onSizeChange={size => {
+                      setSidebarSize('left', size);
+                    }}
                   >
                     <SidebarPanel sidebarPosition="left" />
                   </Panel>

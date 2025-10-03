@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                vfm.id                AS mount_id,\n                vfm.real_folder_id    AS real_folder_id,\n                vfm.recursive         AS recursive,\n                vfm.sync_enabled      AS sync_enabled,\n                vfm.suppress_warnings AS suppress_warnings,\n                vfm.include_glob      AS include_glob,\n                vfm.exclude_glob      AS exclude_glob,\n                rf.abs_path_cached    AS abs_path,\n                rf.error_flag         AS error_flag,\n                rf.error_msg          AS error_msg,\n                rf.last_seen_scan_id  AS last_seen_scan_id,\n                rf.last_seen_at       AS last_seen_at\n            FROM virtual_folder_mount vfm\n            LEFT JOIN real_folder rf ON rf.id = vfm.real_folder_id\n            WHERE vfm.virtual_node_id = ? AND vfm.enabled = 1\n            ORDER BY vfm.priority\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "mount_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "real_folder_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "recursive",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "sync_enabled",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "suppress_warnings",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "include_glob",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "exclude_glob",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "abs_path",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "error_flag",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "error_msg",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "last_seen_scan_id",
+        "ordinal": 10,
+        "type_info": "Text"
+      },
+      {
+        "name": "last_seen_at",
+        "ordinal": 11,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "bbc94a93fd7fda2cd74cf4094e8148ff62cad6cd9561d117d9d58cb16405f228"
+}

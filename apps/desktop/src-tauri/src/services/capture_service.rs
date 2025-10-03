@@ -1,6 +1,5 @@
 use std::{
     io::Cursor,
-    io::ErrorKind,
     path::{Path, PathBuf},
 };
 
@@ -9,7 +8,7 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use image::{DynamicImage, ImageFormat, RgbaImage};
 use screenshots::Screen;
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 use tokio::fs;
 use tracing::{debug, warn};
 
@@ -134,8 +133,8 @@ fn capture_region_as_png(
             let info = screen.display_info;
             info.x == monitor.x
                 && info.y == monitor.y
-                && info.width == monitor.width as u32
-                && info.height == monitor.height as u32
+                && info.width == monitor.width
+                && info.height == monitor.height
         })
         .or_else(|| Screen::from_point(monitor.x, monitor.y).ok())
         .ok_or_else(|| anyhow!("Failed to resolve monitor for capture"))?;

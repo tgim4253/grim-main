@@ -20,10 +20,7 @@ export interface UsePointerSelectionOptions<T extends Element = Element> {
   minSize?: number;
   disabled?: boolean;
   onSelectionStart?: (event: ReactPointerEvent<T>) => void;
-  onSelectionChange?: (
-    selection: PointerSelectionRect | null,
-    event: ReactPointerEvent<T>,
-  ) => void;
+  onSelectionChange?: (selection: PointerSelectionRect | null, event: ReactPointerEvent<T>) => void;
   onSelectionCancel?: (event: ReactPointerEvent<T>) => void;
   onSelectionInvalid?: (event: ReactPointerEvent<T>) => void;
 }
@@ -40,10 +37,7 @@ export interface UsePointerSelectionResult<T extends Element = Element> {
   handlePointerCancel: (event: ReactPointerEvent<T>) => void;
 }
 
-const createSquareRect = (
-  start: PointerPoint,
-  current: PointerPoint,
-): PointerSelectionRect => {
+const createSquareRect = (start: PointerPoint, current: PointerPoint): PointerSelectionRect => {
   const deltaX = current.x - start.x;
   const deltaY = current.y - start.y;
   const size = Math.max(Math.abs(deltaX), Math.abs(deltaY));
@@ -62,10 +56,7 @@ const createSquareRect = (
   };
 };
 
-const createFreeformRect = (
-  start: PointerPoint,
-  current: PointerPoint,
-): PointerSelectionRect => ({
+const createFreeformRect = (start: PointerPoint, current: PointerPoint): PointerSelectionRect => ({
   x: Math.min(start.x, current.x),
   y: Math.min(start.y, current.y),
   width: Math.abs(current.x - start.x),
@@ -111,8 +102,7 @@ export const usePointerSelection = <T extends Element = Element>(
   }, [onSelectionInvalid]);
 
   const [selection, setSelection] = useState<PointerSelectionRect | null>(null);
-  const [completedSelection, setCompletedSelection] =
-    useState<PointerSelectionRect | null>(null);
+  const [completedSelection, setCompletedSelection] = useState<PointerSelectionRect | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
 
   const updateSelection = useCallback(
@@ -196,10 +186,7 @@ export const usePointerSelection = <T extends Element = Element>(
         return;
       }
 
-      if (
-        currentSelection.width < minSize ||
-        currentSelection.height < minSize
-      ) {
+      if (currentSelection.width < minSize || currentSelection.height < minSize) {
         resetSelection();
         if (selectionInvalidRef.current) {
           selectionInvalidRef.current(event);

@@ -21,8 +21,8 @@ type ThumbKey = string;
 type Hash = string;
 
 interface ThumbState {
-  byKey: Record<ThumbKey, ThumbEntry>;
-  byHash: Record<Hash, ThumbKey[]>; // hash -> set of key
+  byKey: Partial<Record<ThumbKey, ThumbEntry>>;
+  byHash: Partial<Record<Hash, ThumbKey[]>>; // hash -> set of key
   lru: ThumbKey[]; // least resently used cache. (oldest first, least end)
 
   upsert: (thumbKey: ThumbKey, patch: Partial<ThumbEntry>) => void;
@@ -42,7 +42,7 @@ export const useThumbStore = create<ThumbState>()(
       lru: [],
 
       upsert: (key, patch) => {
-        const cur = get().byKey[key] ?? { status: 'pending', updatedAt: 0, v: 1 };
+        const cur = get().byKey[key] ?? { status: 'pending', url: undefined, pdatedAt: 0, v: 1 };
         const prevUrl = cur.url;
         const next = { ...cur, ...patch, updatedAt: Date.now() };
         set(s => {
@@ -53,7 +53,9 @@ export const useThumbStore = create<ThumbState>()(
           if (prevUrl && prevUrl !== next.url && prevUrl.startsWith('blob:')) {
             try {
               URL.revokeObjectURL(prevUrl);
-            } catch {}
+            } catch {
+              console.error('Failed to revoke blob URL');
+            }
           }
         });
         // Move to MRU only when entry becomes ready
@@ -97,7 +99,9 @@ export const useThumbStore = create<ThumbState>()(
           if (e?.url?.startsWith('blob:')) {
             try {
               URL.revokeObjectURL(e.url);
-            } catch {}
+            } catch {
+              console.error('Failed to revoke blob URL');
+            }
           }
         }
 
@@ -120,7 +124,9 @@ export const useThumbStore = create<ThumbState>()(
           if (url?.startsWith('blob:')) {
             try {
               URL.revokeObjectURL(url);
-            } catch {}
+            } catch {
+              console.error('Failed to revoke blob URL');
+            }
           }
         }
 
@@ -145,7 +151,7 @@ export const useThumbStore = create<ThumbState>()(
 
 export const convertToThumbKey = (hash: string, spec: Partial<ThumbSpec>) => {
   const { width, height, dpr, mode } = spec;
-  const result = `${hash}_${width}x${height}_dpr${dpr}_${mode}`;
+  const result = `${hash}_${String(width)}x${String(height)}_dpr${String(dpr)}_${String(mode)}`;
 
   return result;
 };

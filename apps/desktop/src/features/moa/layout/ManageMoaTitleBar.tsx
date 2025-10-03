@@ -8,11 +8,13 @@ const ManageMoaTitleBar: React.FC = () => {
       className="flex h-8 w-full items-center justify-between border-b border-border bg-shell-base/80 px-3 text-text backdrop-blur shadow-sm"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
-      <div className="text-sm font-semibold uppercase tracking-wide text-text-soft">Manage Vault</div>
+      <div className="text-sm font-semibold uppercase tracking-wide text-text-soft">
+        Manage Vault
+      </div>
       <div className="flex" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <Button
           variant="titlebar"
-          onClick={() => ipc.windowController.minimize()}
+          onClick={() => void ipc.windowController.minimize()}
           aria-label="Minimize window"
           className="flex items-center justify-center text-icon-main hover:text-icon-hover-main"
         >
@@ -20,7 +22,7 @@ const ManageMoaTitleBar: React.FC = () => {
         </Button>
         <Button
           variant="titlebar"
-          onClick={() => ipc.windowController.close()}
+          onClick={() => void ipc.windowController.close()}
           aria-label="Close window"
           className="flex items-center justify-center text-icon-main hover:text-icon-hover-main"
         >

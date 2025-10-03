@@ -1,5 +1,5 @@
 import { ImageItem, Size } from '@tgim/types/grid';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { FixedSizeGrid as WindowGrid, GridChildComponentProps } from 'react-window';
 import ThumbCard from './ThumbCard';
 import { useElementSize } from '@tgim/hooks/useElementSize';
@@ -49,7 +49,6 @@ export const VirtualGridLayout: React.FC<Props> = ({
   const gap = 16;
   const containerRef = useRef<HTMLDivElement>(null);
 
-  //@ts-expect-error.
   const { width, height } = useElementSize(containerRef);
 
   const cols = Math.max(1, Math.floor((width + gap) / (itemW + gap)));
@@ -133,7 +132,7 @@ export const VirtualGridLayout: React.FC<Props> = ({
       data: GridCellData;
     }) => {
       const idx = rowIndex * data.cols + columnIndex;
-      return data.images[idx]?.hash ?? `row${rowIndex}-col${columnIndex}`;
+      return data.images[idx]?.hash ?? `row${String(rowIndex)}-col${String(columnIndex)}`;
     },
     [],
   );

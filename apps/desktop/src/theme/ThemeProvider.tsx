@@ -21,7 +21,7 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 const prefersDark = () =>
-  typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+  typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
 const ensureAttributes = (mode: ThemeMode) => {
   if (typeof document === 'undefined') {
@@ -29,9 +29,7 @@ const ensureAttributes = (mode: ThemeMode) => {
   }
 
   applyTheme(mode, document.documentElement);
-  if (document.body) {
-    applyTheme(mode, document.body);
-  }
+  applyTheme(mode, document.body);
 };
 
 type ThemeState = {
@@ -83,10 +81,7 @@ export const ThemeProvider = ({ children }: PropsWithChildren) => {
       return;
     }
 
-    const media = window.matchMedia?.('(prefers-color-scheme: dark)');
-    if (!media) {
-      return;
-    }
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
 
     const handleChange = (event: MediaQueryListEvent) => {
       if (explicitRef.current) {
@@ -98,12 +93,9 @@ export const ThemeProvider = ({ children }: PropsWithChildren) => {
 
     if (typeof media.addEventListener === 'function') {
       media.addEventListener('change', handleChange);
-      return () => media.removeEventListener('change', handleChange);
-    }
-
-    if (typeof media.addListener === 'function') {
-      media.addListener(handleChange);
-      return () => media.removeListener(handleChange);
+      return () => {
+        media.removeEventListener('change', handleChange);
+      };
     }
 
     return;

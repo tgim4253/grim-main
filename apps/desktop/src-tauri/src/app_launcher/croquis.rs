@@ -1,4 +1,4 @@
-use tauri::{window::Color, Manager, WebviewUrl};
+use tauri::{window::Color, WebviewUrl};
 #[cfg(target_os = "macos")]
 use tauri_plugin_decorum::WebviewWindowExt;
 

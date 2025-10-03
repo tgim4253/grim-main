@@ -6,11 +6,13 @@ use tokio::io::{AsyncReadExt, BufReader};
 use twox_hash::XxHash64;
 
 use crate::{
-    app_launcher::moa, db::repository::file_repository::FileRepository,
-    models::file::FileType, services::db::DB_MANAGER,
+    db::repository::file_repository::FileRepository, models::file::FileType,
+    services::db::DB_MANAGER,
 };
 
 /// Compute the SHA256 hash of a file asynchronously.
+/// dead
+#[allow(dead_code)]
 async fn sha256_of(path: &Path) -> Result<String> {
     let file = tokio::fs::File::open(path)
         .await
@@ -31,6 +33,7 @@ async fn sha256_of(path: &Path) -> Result<String> {
 }
 
 /// Compute the SHA256 hash of an image file, validating the input first.
+#[allow(dead_code)]
 pub async fn sha256_of_img(path: &Path) -> Result<String> {
     if !matches!(FileType::from(path), FileType::Image) {
         bail!("Not an image file: {}", path.display());
@@ -75,7 +78,7 @@ pub async fn fetch_hash_by_file_info(
     file_name_norm: &str,
     mtime: i64,
 ) -> Result<Option<String>> {
-    let mut tx = DB_MANAGER.create_new_tx(&moa_id).await?;
+    let mut tx = DB_MANAGER.create_new_tx(moa_id).await?;
 
     let file_path_id = FileRepository::fetch_file_path_by_info(
         tx.as_mut(),

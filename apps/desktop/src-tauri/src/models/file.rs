@@ -3,7 +3,6 @@ use core::fmt;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Type};
 #[cfg(target_os = "macos")]
-use std::os::unix::fs::MetadataExt;
 use std::{
     convert::From,
     fs::{self, Metadata},
@@ -16,8 +15,7 @@ use tauri::{path::BaseDirectory, AppHandle, Manager};
 
 use crate::{
     config::file::IntegrityCheckResult,
-    db::repository::file_repository::FileRepository,
-    services::file_service::{self, hash, xxh3_64_of},
+    services::file_service::{self, xxh3_64_of},
     utils::file_utils::guess_mime,
 };
 
@@ -607,7 +605,6 @@ impl FileInfo {
 
 /// Payload used to upsert real-folder records in the database.
 pub struct RealFolderData {
-    pub id: String,
     pub storage_root_id: Option<String>,
     pub parent_id: Option<String>,
     pub name: String,
@@ -615,12 +612,6 @@ pub struct RealFolderData {
     pub root_rel_path: Option<String>,
     pub abs_path_cached: Option<String>,
     pub mtime: i64,
-    pub error_flag: IntegrityCheckResult,
-    pub error_msg: Option<String>,
-    pub last_seen_scan_id: Option<String>,
-    pub last_seen_at: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
 }
 
 // -- Thumb --
@@ -695,7 +686,7 @@ impl ThumbPath {
     /// path/to/ab/cd/<hash>/<hash>_<width>x<height>_dpr<1|2|3>[_modeToken].<ext>
     pub async fn new(
         app: &AppHandle,
-        _moa_id: &String,
+        _moa_id: &str,
         spec: ThumbSpec,
         hash: String,
         schema_version: u8,
@@ -856,9 +847,7 @@ impl From<ThumbPath> for PathBuf {
 
 /// Validate ASCII-hex strings (0-9a-fA-F) quickly.
 fn is_ascii_hex(s: &str) -> bool {
-    !s.is_empty()
-        && s.bytes()
-            .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F'))
+    !s.is_empty() && s.bytes().all(|b| (b as char).is_ascii_hexdigit())
 }
 
 /// Batch thumbnail request submitted from the frontend.

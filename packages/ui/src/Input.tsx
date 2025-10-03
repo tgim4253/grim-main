@@ -1,8 +1,7 @@
 import React from 'react';
 import { cn } from '@tgim/utils/index';
 
-export interface InputProps
-  extends React.InputHTMLAttributes<HTMLInputElement> {}
+export type InputProps = React.InputHTMLAttributes<HTMLInputElement>;
 
 // Lightweight input field that shares spacing tokens with buttons.
 const Input = React.forwardRef<HTMLInputElement, InputProps>(

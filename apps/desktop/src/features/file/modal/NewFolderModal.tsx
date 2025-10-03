@@ -50,9 +50,11 @@ const buildNodeIndex = (root: FolderPreview['root'] | null) => {
   if (!root) return map;
 
   const walk = (node: FolderPreview['root'], parent: string | null) => {
-    const key = node.relativePath ?? '';
+    const key = node.relativePath;
     map.set(key, { node, parent });
-    node.children.forEach(child => walk(child, key));
+    node.children.forEach(child => {
+      walk(child, key);
+    });
   };
 
   walk(root, null);
@@ -76,7 +78,7 @@ const flattenNodes = (root: FolderPreview['root'] | null) => {
 
 const initializeSelection = (preview: FolderPreview) => {
   const initial = new Map<string, SelectionState>();
-  const rootKey = preview.root.relativePath ?? '';
+  const rootKey = preview.root.relativePath;
   const rootTypes = new Set<FileType>(preview.summary.fileTypeTotals.map(stat => stat.fileType));
 
   if (rootTypes.size === 0) {
@@ -84,7 +86,7 @@ const initializeSelection = (preview: FolderPreview) => {
   }
 
   const walk = (node: FolderPreview['root']) => {
-    const key = node.relativePath ?? '';
+    const key = node.relativePath;
     initial.set(key, {
       include: true,
       fileTypes: key === rootKey ? new Set(rootTypes) : null,
@@ -103,7 +105,7 @@ const buildEffectiveSelections = (
   const effective = new Map<string, EffectiveSelection>();
   if (!preview) return effective;
 
-  const rootKey = preview.root.relativePath ?? '';
+  const rootKey = preview.root.relativePath;
   const rootState = selection.get(rootKey);
   const rootIncluded = rootState?.include ?? true;
   const rootTypes = rootState?.fileTypes ? new Set(rootState.fileTypes) : new Set(FILE_TYPE_ORDER);
@@ -113,7 +115,7 @@ const buildEffectiveSelections = (
     parentTypes: Set<FileType>,
     ancestorsIncluded: boolean,
   ) => {
-    const key = node.relativePath ?? '';
+    const key = node.relativePath;
     const state = selection.get(key);
     const isIncluded = ancestorsIncluded && (state?.include ?? true);
 
@@ -128,7 +130,9 @@ const buildEffectiveSelections = (
 
     effective.set(key, { include: isIncluded, types: allowedTypes });
 
-    node.children.forEach(child => walk(child, allowedTypes, isIncluded));
+    node.children.forEach(child => {
+      walk(child, allowedTypes, isIncluded);
+    });
   };
 
   walk(preview.root, rootTypes, rootIncluded);
@@ -139,13 +143,12 @@ const computeSelectionSummary = (
   preview: FolderPreview | null,
   effective: Map<string, EffectiveSelection>,
 ) => {
-  const totals = FILE_TYPE_ORDER.reduce(
-    (acc, type) => {
-      acc[type] = { count: 0, bytes: 0 };
-      return acc;
-    },
-    {} as Record<FileType, { count: number; bytes: number }>,
-  );
+  const totals = FILE_TYPE_ORDER.reduce<
+    Partial<Record<FileType, { count: number; bytes: number }>>
+  >((acc, type) => {
+    acc[type] = { count: 0, bytes: 0 };
+    return acc;
+  }, {});
 
   const summary = {
     totalFolders: 0,
@@ -157,7 +160,7 @@ const computeSelectionSummary = (
   if (!preview) return summary;
 
   const walk = (node: FolderPreview['root']) => {
-    const key = node.relativePath ?? '';
+    const key = node.relativePath;
     const entry = effective.get(key);
     if (!entry || !entry.include) return;
 
@@ -166,8 +169,12 @@ const computeSelectionSummary = (
       if (!entry.types.has(stat.fileType)) return;
       summary.totalFiles += stat.count;
       summary.totalBytes += stat.bytes;
-      summary.fileTypeTotals[stat.fileType].count += stat.count;
-      summary.fileTypeTotals[stat.fileType].bytes += stat.bytes;
+
+      const fileTypeTotals = summary.fileTypeTotals[stat.fileType];
+      if (fileTypeTotals) {
+        fileTypeTotals.count += stat.count;
+        fileTypeTotals.bytes += stat.bytes;
+      }
     });
 
     node.children.forEach(walk);
@@ -217,7 +224,7 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
     [preview, effectiveSelections],
   );
 
-  const rootKey = preview?.root?.relativePath ?? '';
+  const rootKey = preview?.root.relativePath ?? '';
   const rootState = selection.get(rootKey);
   const rootEffective = effectiveSelections.get(rootKey);
 
@@ -251,9 +258,10 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
   }, []);
 
   const handlePickFolder = useCallback(async () => {
-    const result = await open({ directory: true });
+    const result = await open({ directory: true, multiple: true });
     if (!result) return;
 
+    // todo-multi upsert folder
     const selected = Array.isArray(result) ? result[0] : result;
     if (!selected) return;
 
@@ -388,7 +396,9 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
               className="bg-modal-input-bg hover:bg-modal-input-hover shadow-lg"
               placeholder="폴더 이름"
               value={name}
-              onChange={event => setName(event.target.value)}
+              onChange={event => {
+                setName(event.target.value);
+              }}
             />
             <div className="flex items-center gap-3">
               <Input
@@ -400,7 +410,7 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
               <Button
                 variant="default"
                 className="whitespace-nowrap bg-modal-input-bg hover:bg-modal-input-hover"
-                onClick={handlePickFolder}
+                onClick={() => void handlePickFolder()}
               >
                 찾기
               </Button>
@@ -408,7 +418,7 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
             {loadingPreview && (
               <p className="text-sm text-modal-text-secondary">폴더 구조를 불러오는 중입니다...</p>
             )}
-            {previewError && <p className="text-sm text-red-400">{previewError}</p>}
+            {previewError && <p className="text-sm text-status-danger">{previewError}</p>}
             {preview && !loadingPreview && !previewError && (
               <div className="rounded-md bg-modal-input-bg/60 p-3 text-sm">
                 <div>폴더: {preview.summary.totalFolders.toLocaleString()}개</div>
@@ -435,7 +445,9 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
                     <input
                       type="checkbox"
                       checked={rootState?.include ?? true}
-                      onChange={event => handleRootIncludeToggle(event.target.checked)}
+                      onChange={event => {
+                        handleRootIncludeToggle(event.target.checked);
+                      }}
                     />
                     전체 폴더 포함
                   </label>
@@ -466,14 +478,16 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
                           type="checkbox"
                           checked={isChecked}
                           disabled={!rootState?.include}
-                          onChange={() => handleRootFileTypeToggle(type)}
+                          onChange={() => {
+                            handleRootFileTypeToggle(type);
+                          }}
                         />
                         <span className="flex-1">
-                          {FILE_TYPE_LABELS[type]} · {selected.count.toLocaleString()}개 /{' '}
+                          {FILE_TYPE_LABELS[type]} · {selected?.count.toLocaleString()}개 /{' '}
                           {total.count.toLocaleString()}개
                         </span>
                         <span className="text-xs text-modal-text-secondary">
-                          {formatBytes(selected.bytes)} / {formatBytes(total.bytes)}
+                          {formatBytes(selected?.bytes ?? 0)} / {formatBytes(total.bytes)}
                         </span>
                       </label>
                     );
@@ -484,7 +498,7 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
                 <h3 className="font-medium">폴더별 세부 설정</h3>
                 <div className="max-h-72 space-y-3 overflow-y-auto pr-2 text-sm">
                   {flattenedNodes.map(node => {
-                    const key = node.relativePath ?? '';
+                    const key = node.relativePath;
                     if (key === rootKey) return null;
                     const state = selection.get(key) ?? {
                       include: true,
@@ -514,9 +528,9 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
                               type="checkbox"
                               checked={state.include}
                               disabled={!ancestorIncluded}
-                              onChange={event =>
-                                handleFolderIncludeToggle(key, event.target.checked)
-                              }
+                              onChange={event => {
+                                handleFolderIncludeToggle(key, event.target.checked);
+                              }}
                             />
                             <span className="font-medium" style={{ paddingLeft: depth * 12 }}>
                               {node.name}
@@ -526,7 +540,9 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
                             <Button
                               variant="default"
                               className="px-2 py-1 text-xs text-modal-text-secondary"
-                              onClick={() => handleResetFolderTypes(key)}
+                              onClick={() => {
+                                handleResetFolderTypes(key);
+                              }}
                             >
                               초기화
                             </Button>
@@ -548,7 +564,9 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
                                     type="checkbox"
                                     checked={isAllowed}
                                     disabled={disabled}
-                                    onChange={() => handleFolderFileTypeToggle(key, type)}
+                                    onChange={() => {
+                                      handleFolderFileTypeToggle(key, type);
+                                    }}
                                   />
                                   <span className="flex-1">
                                     {FILE_TYPE_LABELS[type]} · {stat.count.toLocaleString()}개
@@ -582,19 +600,31 @@ const NewFolderModal: React.FC<Props> = ({ onClose, onSubmit }) => {
           </Button>
           {step === 'selection' ? (
             <>
-              <Button variant="default" onClick={() => setStep('details')} disabled={submitting}>
+              <Button
+                variant="default"
+                onClick={() => {
+                  setStep('details');
+                }}
+                disabled={submitting}
+              >
                 이전
               </Button>
-              <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
+              <Button variant="primary" onClick={() => void handleSubmit()} disabled={submitting}>
                 업서트
               </Button>
             </>
           ) : !isUpsert ? (
-            <Button variant="primary" onClick={handleSubmit} disabled={!canSubmit}>
+            <Button variant="primary" onClick={() => void handleSubmit()} disabled={!canSubmit}>
               생성
             </Button>
           ) : (
-            <Button variant="primary" onClick={handleNext} disabled={!canProceed}>
+            <Button
+              variant="primary"
+              onClick={() => {
+                handleNext();
+              }}
+              disabled={!canProceed}
+            >
               다음
             </Button>
           )}

@@ -105,7 +105,6 @@ const ensurePaletteObservers = () => {
     });
 
     const attachBodyObserver = () => {
-      if (!document.body) return;
       observer.observe(document.body, {
         attributes: true,
         attributeFilter: ['class', 'data-theme'],
@@ -122,12 +121,8 @@ const ensurePaletteObservers = () => {
     }
   }
 
-  const media = window.matchMedia?.('(prefers-color-scheme: dark)');
-  if (media) {
-    if ('addEventListener' in media) media.addEventListener('change', updateGraphPalette);
-    // @ts-ignore Safari legacy
-    else if ('addListener' in media) media.addListener(updateGraphPalette);
-  }
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+  if ('addEventListener' in media) media.addEventListener('change', updateGraphPalette);
 };
 
 ensurePaletteObservers();
@@ -150,14 +145,14 @@ type NormalizedCropRect = {
 };
 
 type NodeProp = {
-  [key: string]: any; // extensible payload
+  [key: string]: unknown; // extensible payload
   x: number;
   y: number;
   color?: string; // primary fill (legacy)
   bgColor?: string; // background fill (preferred)
   fgColor?: string; // foreground (strokes/text)
   size: number; // logical diameter
-  label: string;
+  label?: string;
   icon?: 'circle' | 'tag' | 'folder' | 'image';
   cropRect?: NormalizedCropRect;
 };
@@ -180,9 +175,6 @@ const withCtx = (ctx: CanvasRenderingContext2D, draw: () => void) => {
     ctx.restore();
   }
 };
-
-/** Keep stroke width roughly constant regardless of zoom */
-const constPx = (v: number, globalScale: number) => Math.max(1, v / Math.max(0.001, globalScale));
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
@@ -238,10 +230,12 @@ function getOrCreateSprite(
   // Render buffer at DPR * resScale for crisp output at zoom
   canvas.width = Math.max(1, Math.round(w * DPR * resScale));
   canvas.height = Math.max(1, Math.round(h * DPR * resScale));
-  canvas.style.width = `${w}px`;
-  canvas.style.height = `${h}px`;
+  canvas.style.width = `${String(w)}px`;
+  canvas.style.height = `${String(h)}px`;
 
-  const ctx = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('2D context not supported');
+
   ctx.scale(DPR * resScale, DPR * resScale);
   draw(ctx, w, h);
 
@@ -277,7 +271,8 @@ function getLabelSprite(
   resScale = 1,
 ): HTMLCanvasElement {
   // Pre-measure and ellipsize once in CSS pixels
-  const tmp = document.createElement('canvas').getContext('2d')!;
+  const tmp = document.createElement('canvas').getContext('2d');
+  if (!tmp) throw new Error('2D context not supported');
   tmp.font = font;
   const ellipsis = '...';
   const ellW = tmp.measureText(ellipsis).width;
@@ -295,7 +290,7 @@ function getLabelSprite(
     }
   }
 
-  const key = `label|${font}|${color}|${maxWidth}|${renderText}|${resScale}`;
+  const key = `label|${font}|${color}|${String(maxWidth)}|${renderText}|${String(resScale)}`;
   const hit = _textSpriteCache.get(key);
   if (hit) return hit;
 
@@ -307,10 +302,12 @@ function getLabelSprite(
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.round((textW + padX * 2) * DPR * resScale));
   canvas.height = Math.max(1, Math.round((textH + padY * 2) * DPR * resScale));
-  canvas.style.width = `${textW + padX * 2}px`;
-  canvas.style.height = `${textH + padY * 2}px`;
+  canvas.style.width = `${String(textW + padX * 2)}px`;
+  canvas.style.height = `${String(textH + padY * 2)}px`;
 
-  const ctx = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('2D context not supported');
+
   ctx.scale(DPR * resScale, DPR * resScale);
   ctx.font = font;
   ctx.textAlign = 'left';
@@ -327,7 +324,7 @@ function drawLabelCached(ctx: CanvasRenderingContext2D, node: NodeProp, globalSc
   const palette = getGraphPalette();
   const color = node.fgColor ?? palette.label;
   const maxWidth = node.size * 4;
-  const text = String(node.label ?? '');
+  const text = node.label ?? '';
   const scaleB = bucketScale(globalScale);
 
   const padding = 8;
@@ -371,7 +368,7 @@ const hexToRgba = (hex: string, alpha: number) => {
   const r = parseInt(normalized.substring(0, 2), 16);
   const g = parseInt(normalized.substring(2, 4), 16);
   const b = parseInt(normalized.substring(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  return `rgba(${String(r)}, ${String(g)}, ${String(b)}, ${String(alpha)})`;
 };
 
 const withAlpha = (color: string, alpha: number) => {
@@ -384,7 +381,7 @@ const withAlpha = (color: string, alpha: number) => {
     .match(/^rgba?\((\d+),(\d+),(\d+)(?:,(\d*\.?\d+))?\)$/i);
   if (match) {
     const [, r, g, b] = match;
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    return `rgba(${r}, ${g}, ${b}, ${String(alpha)})`;
   }
   return color;
 };
@@ -402,7 +399,7 @@ function getCircleSpriteNode(node: NodeProp, globalScale: number) {
   const palette = getGraphPalette();
   const bg = node.color ?? node.bgColor ?? palette.circleFill;
   const fg = node.fgColor ?? palette.circleStroke;
-  const key = `circle|${w}|${h}|${bg}|${fg}|${scaleB}`;
+  const key = `circle|${String(w)}|${String(h)}|${bg}|${fg}|${String(scaleB)}`;
 
   return getOrCreateSprite(
     key,
@@ -431,7 +428,7 @@ function getTagSpriteNode(node: NodeProp, globalScale: number) {
   const scaleB = bucketScale(globalScale);
   const palette = getGraphPalette();
   const fg = node.fgColor ?? palette.tagStroke;
-  const key = `tag|${w}|${h}|${fg}|${scaleB}`;
+  const key = `tag|${String(w)}|${String(h)}|${fg}|${String(scaleB)}`;
 
   return getOrCreateSprite(
     key,
@@ -452,12 +449,12 @@ function getTagSpriteNode(node: NodeProp, globalScale: number) {
       g.beginPath();
       g.moveTo(-xOff, -half);
       g.lineTo(-xOff, half);
-      g.moveTo(+xOff, -half);
-      g.lineTo(+xOff, half);
+      g.moveTo(xOff, -half);
+      g.lineTo(xOff, half);
       g.moveTo(-half - s * 0.06, -yOff);
       g.lineTo(half + s * 0.06, -yOff);
-      g.moveTo(-half - s * 0.06, +yOff);
-      g.lineTo(half + s * 0.06, +yOff);
+      g.moveTo(-half - s * 0.06, yOff);
+      g.lineTo(half + s * 0.06, yOff);
       g.stroke();
     },
     scaleB,
@@ -475,7 +472,7 @@ function getFolderSpriteNode(node: NodeProp, globalScale: number) {
   const frontLight = palette.folderFrontLight;
   const frontDark = palette.folderFrontDark;
   const edge = palette.folderEdge;
-  const key = `folder|${w}|${h}|${bgBack}|${frontLight}|${frontDark}|${edge}|${scaleB}`;
+  const key = `folder|${String(w)}|${String(h)}|${bgBack}|${frontLight}|${frontDark}|${edge}|${String(scaleB)}`;
 
   return getOrCreateSprite(
     key,
@@ -546,7 +543,7 @@ function getDocumentSpriteNode(node: NodeProp, globalScale: number) {
   const edge = palette.documentEdge;
   const shadow = palette.documentShadow;
   const line = palette.documentLine;
-  const key = `document|${w}|${h}|${paper}|${edge}|${shadow}|${line}|${scaleB}`;
+  const key = `document|${String(w)}|${String(h)}|${paper}|${edge}|${shadow}|${line}|${String(scaleB)}`;
 
   return getOrCreateSprite(
     key,
@@ -634,7 +631,7 @@ function getMaskedImageTile(
   radius: number,
   resScale = 1,
 ): HTMLCanvasElement | undefined {
-  const key = `imgtile|${src}|${w}|${h}|${radius}|${resScale}`;
+  const key = `imgtile|${src}|${String(w)}|${String(h)}|${String(radius)}|${String(resScale)}`;
   const hit = _imgTileCache.get(key);
   if (hit) return hit;
 
@@ -644,13 +641,14 @@ function getMaskedImageTile(
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.round(w * DPR * resScale));
   canvas.height = Math.max(1, Math.round(h * DPR * resScale));
-  canvas.style.width = `${w}px`;
-  canvas.style.height = `${h}px`;
+  canvas.style.width = `${String(w)}px`;
+  canvas.style.height = `${String(h)}px`;
 
-  const ctx = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('2D context not supported');
+
   ctx.scale(DPR * resScale, DPR * resScale);
   ctx.imageSmoothingEnabled = true;
-  // @ts-ignore TS doesn't include literal union
   ctx.imageSmoothingQuality = 'high';
 
   roundRect(ctx, 0, 0, w, h, radius);
@@ -727,7 +725,7 @@ const imageRenderer: NodeRenderer = (ctx, node, globalScale) => {
   const contentSize = Math.max(1, side - padding * 2);
   const clipRadius = Math.max(2, radius - padding * 0.5);
 
-  const backKey = `imgback|${side}|${radius}|${bg}|${fg}|${scaleB}`;
+  const backKey = `imgback|${String(side)}|${String(radius)}|${bg}|${fg}|${String(scaleB)}`;
   const backplate = getOrCreateSprite(
     backKey,
     side,
@@ -745,7 +743,7 @@ const imageRenderer: NodeRenderer = (ctx, node, globalScale) => {
   ctx.drawImage(backplate, node.x - side / 2, node.y - side / 2, side, side);
 
   const src = resolveImageSrc(node);
-  const cropRect = node.cropRect as NormalizedCropRect | undefined;
+  const cropRect = node.cropRect;
   const hasCropRect =
     cropRect &&
     Number.isFinite(cropRect.startX) &&
@@ -754,12 +752,10 @@ const imageRenderer: NodeRenderer = (ctx, node, globalScale) => {
     Number.isFinite(cropRect.height);
 
   let cropImage: HTMLImageElement | undefined;
-  let cropSource:
-    | { sx: number; sy: number; sw: number; sh: number }
-    | undefined;
+  let cropSource: { sx: number; sy: number; sw: number; sh: number } | undefined;
 
   if (src && hasCropRect) {
-    const rect = cropRect as NormalizedCropRect;
+    const rect = cropRect;
     const candidate = getOrCreateImage(src);
     if (candidate.complete && candidate.naturalWidth > 0 && candidate.naturalHeight > 0) {
       const iw = candidate.naturalWidth;
@@ -796,7 +792,6 @@ const imageRenderer: NodeRenderer = (ctx, node, globalScale) => {
   const drawWithMask = (render: () => void) => {
     withCtx(ctx, () => {
       ctx.imageSmoothingEnabled = true;
-      // @ts-ignore
       ctx.imageSmoothingQuality = 'high';
       roundRect(ctx, drawX, drawY, contentSize, contentSize, clipRadius);
       ctx.clip();
@@ -833,7 +828,7 @@ const imageRenderer: NodeRenderer = (ctx, node, globalScale) => {
     return;
   }
 
-  const phKey = `imgph|${side}|${radius}|${padding}|${clipRadius}|${scaleB}`;
+  const phKey = `imgph|${String(side)}|${String(radius)}|${String(padding)}|${String(clipRadius)}|${String(scaleB)}`;
   const placeholder = getOrCreateSprite(
     phKey,
     side,
@@ -882,12 +877,12 @@ type NodeRendererType = { [key in GraphNodeType]: NodeRenderer };
 
 export default (key: GraphNodeType): NodeRenderer => {
   const map: Partial<NodeRendererType> = {
-    default: circleRenderer as NodeRenderer,
-    tag: tagRenderer as NodeRenderer,
-    folder: folderRenderer as NodeRenderer,
-    image: imageRenderer as NodeRenderer,
-    crop: imageRenderer as NodeRenderer,
-    document: documentRenderer as NodeRenderer,
+    default: circleRenderer,
+    tag: tagRenderer,
+    folder: folderRenderer,
+    image: imageRenderer,
+    crop: imageRenderer,
+    document: documentRenderer,
   };
   return (map as NodeRendererType)[key];
 };

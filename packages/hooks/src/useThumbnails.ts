@@ -65,7 +65,7 @@ export function useThumbnails({ moaId, maxBatchSize = DEFAULT_MAX_BATCH }: UseTh
         seenKeys.add(key);
 
         const currentEntry = useThumbStore.getState().byKey[key];
-        if (currentEntry?.status === 'ready' && currentEntry.url) {
+        if (currentEntry && currentEntry.status === 'ready' && currentEntry.url) {
           continue;
         }
 
@@ -123,7 +123,7 @@ export function useThumbnails({ moaId, maxBatchSize = DEFAULT_MAX_BATCH }: UseTh
     (request: ThumbnailRequest) => {
       const key = getThumbnailKey(request);
       const entry = useThumbStore.getState().byKey[key];
-      if (entry?.status === 'ready' && entry.url) {
+      if (entry && entry.status === 'ready' && entry.url) {
         return { key, url: entry.url };
       }
       return { key, url: undefined };
