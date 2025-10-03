@@ -4,13 +4,9 @@ on:
   push:
     branches:
       - main
-      - develop
-      - release/**
   pull_request:
     branches:
       - main
-      - develop
-      - release/**
 
 jobs:
   frontend:
@@ -74,6 +70,12 @@ jobs:
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Install rustfmt
+        run: rustup component add rustfmt
+
+      - name: Install clippy
+        run: rustup component add clippy
 
       - name: Format check (cargo fmt)
         run: cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
