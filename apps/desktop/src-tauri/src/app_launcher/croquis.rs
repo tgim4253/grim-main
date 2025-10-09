@@ -46,12 +46,12 @@ pub fn launch_croquis(
     #[cfg(not(target_os = "macos"))]
     {
         builder = builder.decorations(false).transparent(true);
+        builder.build().map_err(|err| err.to_string())?;
     }
-
-    let window = builder.build().map_err(|err| err.to_string())?;
 
     #[cfg(target_os = "macos")]
     {
+        let window = builder.build().map_err(|err| err.to_string())?;
         window.create_overlay_titlebar().map_err(|err| err.to_string())?;
         window
             .set_traffic_lights_inset(12.0, 16.0)

@@ -228,7 +228,7 @@ mod platform_impl {
         GetVolumeNameForVolumeMountPointW, GetVolumePathNameW, QueryDosDeviceW,
     };
     use windows::Win32::System::WindowsProgramming::{
-        DRIVE_CDROM, DRIVE_FIXED, DRIVE_RAMDISK, DRIVE_REMOTE, DRIVE_REMOVABLE,
+        DRIVE_FIXED, DRIVE_RAMDISK, DRIVE_REMOTE, DRIVE_REMOVABLE,
     };
 
     // ---------- UTF-16 helpers (Windows-only) ----------
@@ -460,7 +460,7 @@ mod platform_impl {
 
     /// Classify storage kind using Windows-specific heuristics.
     pub fn classify_kind(
-        norm: &PathBuf,
+        _norm: &PathBuf,
         mount_path: &PathBuf,
         device: Option<&str>,
         fstype: Option<&str>,
