@@ -103,3 +103,54 @@ jobs:
 
       - name: Build (cargo build)
         run: cargo build --manifest-path apps/desktop/src-tauri/Cargo.toml --release
+
+  windows:
+    name: Windows Checks
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@1.88.0
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install rustfmt
+        run: rustup component add rustfmt
+
+      - name: Install clippy
+        run: rustup component add clippy
+
+      - name: Format check (cargo fmt)
+        run: cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
+
+      - name: Lint (cargo clippy)
+        run: cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
+
+      - name: Build (cargo build)
+        run: cargo build --manifest-path apps/desktop/src-tauri/Cargo.toml --release
+
+      - name: Build frontend
+        run: pnpm --filter @grim/desktop build
