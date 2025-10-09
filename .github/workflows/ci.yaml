@@ -6,7 +6,6 @@ on:
       - main
       - develop
       - release/**
-
   pull_request:
     branches:
       - main
@@ -19,32 +18,40 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Always start by checking out the repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Set up pnpm for consistent package management
       - name: Set up pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 10
 
+      # Install Node.js and enable pnpm cache for faster installs
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
 
+      # Install JS dependencies
       - name: Install dependencies
         run: pnpm install
 
+      # TypeScript linting
       - name: Lint (TypeScript)
         run: npx eslint . --ext .ts,.tsx
 
+      # Prettier formatting check
       - name: Format check (Prettier)
         run: npx prettier --check .
 
+      # Build the frontend app (adjust filter/package name if needed)
       - name: Build frontend
         run: pnpm --filter @grim/desktop build
 
+      # Leave a PR comment when this job fails (helpful for quick visibility)
       - name: Report failure on pull requests
         if: ${{ failure() && github.event_name == 'pull_request' }}
         uses: actions/github-script@v7
@@ -53,9 +60,9 @@ jobs:
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const jobName = context.job;
             const body = [
-              `❌ CI failed in **${jobName}** for commit ${context.sha}.\n\nLogs: ${runUrl}`,
+              `❌ CI failed in **${jobName}** for commit ${context.sha}.`,
               '',
-              `Check the logs for details: ${runUrl}`
+              `Logs: ${runUrl}`
             ].join('\n');
 
             await github.rest.issues.createComment({
@@ -65,21 +72,38 @@ jobs:
               body,
             });
 
-  rust:
-    name: Rust Checks
-    runs-on: macos-14
+  backend:
+    name: Backend Checks
+    # Single job with an OS matrix so we don't define OS-specific jobs separately
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14, windows-latest]
+    runs-on: ${{ matrix.os }}
+
     steps:
+      # Checkout codebase
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install minimal system deps (macOS)
+      # Install minimal system dependencies per OS (SQLite and pkg-config)
+      - name: Install system deps (Linux)
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libsqlite3-dev
+
+      - name: Install system deps (macOS)
+        if: ${{ runner.os == 'macOS' }}
         run: |
           brew update
           brew install pkg-config sqlite
 
+      # Rust toolchain setup
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@1.88.0
 
+      # Cache Cargo to speed up builds
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -89,17 +113,43 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
+      # Add rustfmt component for formatting checks
       - name: Install rustfmt
         run: rustup component add rustfmt
 
+      # Add clippy for lint checks
       - name: Install clippy
         run: rustup component add clippy
 
+      # Verify formatting (fail on diff)
       - name: Format check (cargo fmt)
         run: cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
 
+      # Run clippy with warnings treated as errors
       - name: Lint (cargo clippy)
         run: cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
 
+      # Build backend in release mode
       - name: Build (cargo build)
         run: cargo build --manifest-path apps/desktop/src-tauri/Cargo.toml --release
+
+      # Leave a PR comment when this job fails (so backend failures are visible, too)
+      - name: Report failure on pull requests
+        if: ${{ failure() && github.event_name == 'pull_request' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const jobName = context.job;
+            const body = [
+              `❌ CI failed in **${jobName}** for commit ${context.sha}.`,
+              '',
+              `Logs: ${runUrl}`
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              issue_number: context.payload.pull_request.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
