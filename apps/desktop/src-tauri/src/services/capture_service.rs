@@ -24,10 +24,17 @@ use crate::{
             CapturePreview, CaptureRect,
         },
         connection::RelationType,
-        file::{FileInfo, FileType},
+        file::FileInfo,
     },
-    services::{db::DB_MANAGER, storage_root},
-    utils::{date, path_utils::normalize_path},
+    services::{
+        db::DB_MANAGER, file_service::asset::ensure_file_asset_binding,
+        storage_root,
+    },
+    utils::{
+        date,
+        file_ops::{decode_data_url, ensure_unique_path},
+        path_utils::normalize_path,
+    },
 };
 
 /// Launch the transparent capture overlay used to select screen regions.
@@ -72,7 +79,7 @@ pub async fn confirm_capture(
         bail!("Capture payload is empty");
     }
 
-    let bytes = decode_data_url(&base_url)?;
+    let (bytes, _) = decode_data_url(&base_url)?;
 
     let (file_path, binding_context) =
         persist_capture_bytes(&context, bytes).await?;
@@ -167,16 +174,6 @@ fn capture_region_as_png(
     Ok(buffer)
 }
 
-fn decode_data_url(data_url: &str) -> Result<Vec<u8>> {
-    let delimiter = ",";
-    let (_, data) = data_url
-        .split_once(delimiter)
-        .ok_or_else(|| anyhow!("Invalid data URL payload"))?;
-    BASE64_STANDARD
-        .decode(data.trim())
-        .map_err(|err| anyhow!("Failed to decode capture payload: {err}"))
-}
-
 fn generate_capture_file_name(context: &CaptureContext) -> String {
     let timestamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
     let hash_component = context
@@ -198,28 +195,6 @@ fn generate_capture_file_name(context: &CaptureContext) -> String {
             ts = timestamp
         )
     }
-}
-
-async fn ensure_unique_path(path: PathBuf) -> Result<PathBuf> {
-    if fs::metadata(&path).await.is_err() {
-        return Ok(path);
-    }
-
-    let parent = path
-        .parent()
-        .map(Path::to_path_buf)
-        .ok_or_else(|| anyhow!("Capture path is missing a parent directory"))?;
-    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("capture");
-    let extension = path.extension().and_then(|s| s.to_str()).unwrap_or("png");
-
-    for index in 1..10_000 {
-        let candidate = parent.join(format!("{stem}-{index}.{extension}"));
-        if fs::metadata(&candidate).await.is_err() {
-            return Ok(candidate);
-        }
-    }
-
-    bail!("Unable to generate unique capture filename for {}", path.display())
 }
 
 async fn persist_capture_bytes(
@@ -336,83 +311,9 @@ async fn register_capture_in_workspace(
             .await
             .context("Failed to derive capture metadata")?;
 
-    let file_path_id =
-        FileRepository::insert_file_path(tx.as_mut(), &file_info).await?;
-    let file_content_id =
-        FileRepository::upsert_file_content(tx.as_mut(), &file_info).await?;
-    let is_dedupable =
-        matches!(file_info.kind_guess, FileType::Image | FileType::GraphicTool);
-
-    let existing_path_asset_id =
-        FileRepository::find_file_asset_id_by_path(tx.as_mut(), &file_path_id)
-            .await?;
-
-    let asset_id = if is_dedupable {
-        if let Some(asset_id) = FileRepository::find_file_asset_id_by_content(
-            tx.as_mut(),
-            &file_content_id,
-        )
-        .await?
-        {
-            FileRepository::update_file_asset_content(
-                tx.as_mut(),
-                &asset_id,
-                &file_content_id,
-                true,
-            )
-            .await?;
-            asset_id
-        } else if let Some(asset_id) = existing_path_asset_id {
-            FileRepository::update_file_asset_content(
-                tx.as_mut(),
-                &asset_id,
-                &file_content_id,
-                true,
-            )
-            .await?;
-            asset_id
-        } else {
-            FileRepository::insert_file_asset(
-                tx.as_mut(),
-                &file_content_id,
-                true,
-            )
-            .await?
-        }
-    } else if let Some(asset_id) = existing_path_asset_id {
-        let binding_count =
-            FileRepository::count_paths_for_asset(tx.as_mut(), &asset_id)
-                .await?;
-
-        if binding_count > 1 {
-            FileRepository::insert_file_asset(
-                tx.as_mut(),
-                &file_content_id,
-                false,
-            )
-            .await?
-        } else {
-            FileRepository::update_file_asset_content(
-                tx.as_mut(),
-                &asset_id,
-                &file_content_id,
-                false,
-            )
-            .await?;
-
-            asset_id
-        }
-    } else {
-        FileRepository::insert_file_asset(tx.as_mut(), &file_content_id, false)
-            .await?
-    };
-
-    FileRepository::upsert_file_path_asset_binding(
-        tx.as_mut(),
-        &file_path_id,
-        &asset_id,
-    )
-    .await?;
+    let (asset_id, _) = ensure_file_asset_binding(&mut tx, &file_info)
+        .await
+        .context("Failed to upsert capture asset binding")?;
 
     let file_node_id = if let Some(existing_node) =
         NodeRepository::fetch_node_id_by_asset_id(tx.as_mut(), asset_id.clone())

@@ -8,12 +8,16 @@ use uuid::Uuid;
 
 use crate::{
     bootstrap::PATH_MANAGER,
-    db::repository::{
-        file_repository::FileRepository, node_repository::NodeRepository,
-    },
+    db::repository::node_repository::NodeRepository,
     models::file::{FileInfo, FileType},
-    services::{db::DB_MANAGER, storage_root},
-    utils::path_utils::normalize_path,
+    services::{
+        db::DB_MANAGER, file_service::asset::ensure_file_asset_binding,
+        storage_root,
+    },
+    utils::{
+        file_ops::{decode_data_url, ensure_unique_path, extension_from_mime},
+        path_utils::normalize_path,
+    },
 };
 
 #[derive(Debug, Deserialize)]
@@ -164,10 +168,8 @@ async fn persist_uploaded_files(
 
         let sanitized_name = sanitize_file_name(&file.name);
         let has_extension = Path::new(&sanitized_name).extension().is_some();
-        let extension_hint = file
-            .mime_type
-            .as_deref()
-            .and_then(|mime| extract_extension_from_mime(mime));
+        let extension_hint =
+            file.mime_type.as_deref().and_then(extension_from_mime);
         let final_name = if has_extension {
             sanitized_name.clone()
         } else {
@@ -251,97 +253,9 @@ async fn register_path_with_virtual_folder(
         return Ok(false);
     }
 
-    let file_path_id =
-        FileRepository::insert_file_path(tx.as_mut(), &file_info)
-            .await
-            .context("failed to insert file path")?;
-
-    let file_content_id =
-        FileRepository::upsert_file_content(tx.as_mut(), &file_info)
-            .await
-            .context("failed to upsert file content")?;
-
-    let is_dedupable =
-        matches!(file_info.kind_guess, FileType::Image | FileType::GraphicTool);
-    let existing_path_asset_id =
-        FileRepository::find_file_asset_id_by_path(tx.as_mut(), &file_path_id)
-            .await
-            .context("failed to fetch existing asset binding")?;
-
-    let asset_id = if is_dedupable {
-        if let Some(asset_id) = FileRepository::find_file_asset_id_by_content(
-            tx.as_mut(),
-            &file_content_id,
-        )
+    let (asset_id, _) = ensure_file_asset_binding(&mut tx, &file_info)
         .await
-        .context("failed to lookup asset by content")?
-        {
-            FileRepository::update_file_asset_content(
-                tx.as_mut(),
-                &asset_id,
-                &file_content_id,
-                true,
-            )
-            .await
-            .context("failed to update asset content")?;
-            asset_id
-        } else if let Some(asset_id) = existing_path_asset_id {
-            FileRepository::update_file_asset_content(
-                tx.as_mut(),
-                &asset_id,
-                &file_content_id,
-                true,
-            )
-            .await
-            .context("failed to refresh asset content")?;
-            asset_id
-        } else {
-            FileRepository::insert_file_asset(
-                tx.as_mut(),
-                &file_content_id,
-                true,
-            )
-            .await
-            .context("failed to create file asset")?
-        }
-    } else if let Some(asset_id) = existing_path_asset_id {
-        let binding_count =
-            FileRepository::count_paths_for_asset(tx.as_mut(), &asset_id)
-                .await
-                .context("failed to count existing asset bindings")?;
-
-        if binding_count > 1 {
-            FileRepository::insert_file_asset(
-                tx.as_mut(),
-                &file_content_id,
-                false,
-            )
-            .await
-            .context("failed to create file asset for non-dedupable content")?
-        } else {
-            FileRepository::update_file_asset_content(
-                tx.as_mut(),
-                &asset_id,
-                &file_content_id,
-                false,
-            )
-            .await
-            .context("failed to refresh non-dedupable asset content")?;
-            asset_id
-        }
-    } else {
-        FileRepository::insert_file_asset(tx.as_mut(), &file_content_id, false)
-            .await
-            .context("failed to create file asset for non-dedupable content")?
-    };
-
-    FileRepository::upsert_file_path_asset_binding(
-        tx.as_mut(),
-        &file_path_id,
-        &asset_id,
-    )
-    .await
-    .context("failed to upsert file path binding")?;
+        .context("failed to upsert file asset binding")?;
 
     NodeRepository::upsert_file_node(
         tx.as_mut(),
@@ -354,14 +268,6 @@ async fn register_path_with_virtual_folder(
     tx.commit().await.context("failed to commit file import transaction")?;
 
     Ok(true)
-}
-
-fn extract_extension_from_mime(mime: &str) -> Option<String> {
-    mime.split('/')
-        .nth(1)
-        .and_then(|segment| segment.split(';').next())
-        .map(|ext| ext.trim().to_string())
-        .filter(|ext| !ext.is_empty())
 }
 
 fn infer_extension(bytes: &[u8]) -> Option<String> {
@@ -394,59 +300,4 @@ fn sanitize_file_name(name: &str) -> String {
 
 fn generate_default_name(prefix: &str) -> String {
     format!("{prefix}-{}", Uuid::new_v4())
-}
-
-async fn ensure_unique_path(path: PathBuf) -> Result<PathBuf> {
-    if fs::metadata(&path).await.is_err() {
-        return Ok(path);
-    }
-
-    let base = path
-        .file_stem()
-        .and_then(|stem| stem.to_str())
-        .map(|stem| stem.to_string())
-        .unwrap_or_else(|| generate_default_name("download"));
-    let extension = path
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| ext.to_string());
-    let parent = path
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| PathBuf::from("."));
-
-    for index in 1..10_000 {
-        let mut candidate = parent.join(format!("{base}-{index}"));
-        if let Some(ext) = extension.as_deref() {
-            candidate.set_extension(ext);
-        }
-        if fs::metadata(&candidate).await.is_err() {
-            return Ok(candidate);
-        }
-    }
-
-    Err(anyhow!("unable to generate unique path for {}", path.display()))
-}
-
-fn decode_data_url(payload: &str) -> Result<(Vec<u8>, Option<String>)> {
-    let (header, data) = payload
-        .split_once(',')
-        .ok_or_else(|| anyhow!("invalid data url payload"))?;
-
-    let mime = header
-        .strip_prefix("data:")
-        .and_then(|value| value.split(';').next())
-        .map(|value| value.to_string());
-
-    if !header.contains(";base64") {
-        return Err(anyhow!("unsupported data url encoding"));
-    }
-
-    let bytes = BASE64_STANDARD
-        .decode(data.trim())
-        .map_err(|err| anyhow!("failed to decode data url payload: {err}"))?;
-
-    let extension = mime.and_then(|mime| extract_extension_from_mime(&mime));
-
-    Ok((bytes, extension))
 }
