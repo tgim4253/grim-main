@@ -379,15 +379,29 @@ async fn register_capture_in_workspace(
             )
             .await?
         }
-    } else if let Some(_asset_id) = existing_path_asset_id {
-        let new_asset_id = FileRepository::insert_file_asset(
-            tx.as_mut(),
-            &file_content_id,
-            false,
-        )
-        .await?;
+    } else if let Some(asset_id) = existing_path_asset_id {
+        let binding_count =
+            FileRepository::count_paths_for_asset(tx.as_mut(), &asset_id)
+                .await?;
 
-        new_asset_id
+        if binding_count > 1 {
+            FileRepository::insert_file_asset(
+                tx.as_mut(),
+                &file_content_id,
+                false,
+            )
+            .await?
+        } else {
+            FileRepository::update_file_asset_content(
+                tx.as_mut(),
+                &asset_id,
+                &file_content_id,
+                false,
+            )
+            .await?;
+
+            asset_id
+        }
     } else {
         FileRepository::insert_file_asset(tx.as_mut(), &file_content_id, false)
             .await?

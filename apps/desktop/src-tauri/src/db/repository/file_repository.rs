@@ -669,6 +669,28 @@ impl FileRepository {
         Ok(asset_id)
     }
 
+    /// Count how many paths currently reference the provided asset.
+    pub async fn count_paths_for_asset<'a, E>(
+        executor: &mut E,
+        asset_id: &str,
+    ) -> Result<i64>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let count = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(*) AS "count!: i64"
+            FROM file_path_asset_binding
+            WHERE file_asset_id = ?1
+            "#,
+            asset_id
+        )
+        .fetch_one(&mut *executor)
+        .await?;
+
+        Ok(count)
+    }
+
     /// Create a new file asset row.
     pub async fn insert_file_asset<'a, E>(
         executor: &mut E,
