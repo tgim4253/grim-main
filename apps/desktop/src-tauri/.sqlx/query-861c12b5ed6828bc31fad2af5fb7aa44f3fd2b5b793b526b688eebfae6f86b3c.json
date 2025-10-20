@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS 'id!' FROM file_content WHERE xxh3_64 = ?1",
+  "query": "\n            SELECT id AS \"id!\"\n            FROM file_asset\n            WHERE file_content_id = ?1\n            ",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "a04febd2cbee659dbc2fec7b75fc76da1eb24fd109ca2bb433e6293fea4710a3"
+  "hash": "861c12b5ed6828bc31fad2af5fb7aa44f3fd2b5b793b526b688eebfae6f86b3c"
 }

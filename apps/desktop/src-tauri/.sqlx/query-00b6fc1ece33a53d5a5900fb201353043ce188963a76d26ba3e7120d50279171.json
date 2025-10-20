@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT\n                n.id          AS \"node_id!\",\n                n.kind        AS \"kind!\",\n                fc.id         AS \"file_id!\",\n                fc.mime       AS \"mime!\",\n                fc.size       AS \"size!\",\n                fc.sha256     AS \"sha256?\",\n                fc.xxh3_64     AS \"xxh3_64!\",\n                fc.display_name  AS \"file_name!\",\n                n.created_at AS \"created_at!\",\n                n.updated_at AS \"updated_at!\"\n            FROM node               n\n            JOIN node_file_binding  nfb ON nfb.node_id = n.id\n            JOIN file_content       fc  ON fc.id = nfb.file_content_id\n            WHERE n.kind = 'file'\n            ORDER BY n.created_at\n        ",
+  "query": "\n            SELECT\n                n.id          AS \"node_id!\",\n                n.kind        AS \"kind!\",\n                fc.id         AS \"file_id!\",\n                fc.mime       AS \"mime!\",\n                fc.size       AS \"size!\",\n                fc.sha256     AS \"sha256?\",\n                fc.xxh3_64     AS \"xxh3_64!\",\n                fc.display_name  AS \"file_name!\",\n                n.created_at AS \"created_at!\",\n                n.updated_at AS \"updated_at!\"\n            FROM node               n\n            JOIN node_file_binding  nfb ON nfb.node_id = n.id\n            JOIN file_asset         fa  ON fa.id = nfb.file_asset_id\n            JOIN file_content       fc  ON fc.id = fa.file_content_id\n            WHERE n.kind = 'file'\n            ORDER BY n.created_at\n        ",
   "describe": {
     "columns": [
       {
@@ -70,5 +70,5 @@
       false
     ]
   },
-  "hash": "9dad7e91619827d7e4be3918c16e76c998eb2eda94b6ee2cd89263ec4e51c082"
+  "hash": "00b6fc1ece33a53d5a5900fb201353043ce188963a76d26ba3e7120d50279171"
 }

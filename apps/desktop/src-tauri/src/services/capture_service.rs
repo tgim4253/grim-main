@@ -24,7 +24,7 @@ use crate::{
             CapturePreview, CaptureRect,
         },
         connection::RelationType,
-        file::FileInfo,
+        file::{FileInfo, FileType},
     },
     services::{db::DB_MANAGER, storage_root},
     utils::{date, path_utils::normalize_path},
@@ -340,27 +340,74 @@ async fn register_capture_in_workspace(
         FileRepository::insert_file_path(tx.as_mut(), &file_info).await?;
     let file_content_id =
         FileRepository::upsert_file_content(tx.as_mut(), &file_info).await?;
-    FileRepository::upsert_file_path_content_binding(
+    let is_dedupable =
+        matches!(file_info.kind_guess, FileType::Image | FileType::GraphicTool);
+
+    let existing_path_asset_id =
+        FileRepository::find_file_asset_id_by_path(tx.as_mut(), &file_path_id)
+            .await?;
+
+    let asset_id = if is_dedupable {
+        if let Some(asset_id) = FileRepository::find_file_asset_id_by_content(
+            tx.as_mut(),
+            &file_content_id,
+        )
+        .await?
+        {
+            FileRepository::update_file_asset_content(
+                tx.as_mut(),
+                &asset_id,
+                &file_content_id,
+                true,
+            )
+            .await?;
+            asset_id
+        } else if let Some(asset_id) = existing_path_asset_id {
+            FileRepository::update_file_asset_content(
+                tx.as_mut(),
+                &asset_id,
+                &file_content_id,
+                true,
+            )
+            .await?;
+            asset_id
+        } else {
+            FileRepository::insert_file_asset(
+                tx.as_mut(),
+                &file_content_id,
+                true,
+            )
+            .await?
+        }
+    } else if let Some(asset_id) = existing_path_asset_id {
+        FileRepository::update_file_asset_content(
+            tx.as_mut(),
+            &asset_id,
+            &file_content_id,
+            false,
+        )
+        .await?;
+        asset_id
+    } else {
+        FileRepository::insert_file_asset(tx.as_mut(), &file_content_id, false)
+            .await?
+    };
+
+    FileRepository::upsert_file_path_asset_binding(
         tx.as_mut(),
         &file_path_id,
-        &file_content_id,
+        &asset_id,
     )
     .await?;
 
     let file_node_id = if let Some(existing_node) =
-        NodeRepository::fetch_node_id_by_fc_id(
-            tx.as_mut(),
-            file_content_id.clone(),
-        )
-        .await?
+        NodeRepository::fetch_node_id_by_asset_id(tx.as_mut(), asset_id.clone())
+            .await?
     {
         existing_node
     } else {
-        NodeRepository::create_orphan_file_node(
-            tx.as_mut(),
-            file_content_id.clone(),
-        )
-        .await?
+        NodeRepository::create_orphan_file_node(tx.as_mut(), asset_id.clone())
+            .await?
     };
 
     let mut anchor_node_id = anchor_node_id;
@@ -371,16 +418,26 @@ async fn register_capture_in_workspace(
                 FileRepository::find_file_content_id(tx.as_mut(), hash.clone())
                     .await?
             {
-                if let Some(original_node_id) =
-                    NodeRepository::fetch_node_id_by_fc_id(
+                if let Some(original_asset_id) =
+                    FileRepository::find_file_asset_id_by_content(
                         tx.as_mut(),
-                        original_fc_id.clone(),
+                        &original_fc_id,
                     )
                     .await?
                 {
-                    anchor_node_id = Some(original_node_id);
+                    if let Some(original_node_id) =
+                        NodeRepository::fetch_node_id_by_asset_id(
+                            tx.as_mut(),
+                            original_asset_id,
+                        )
+                        .await?
+                    {
+                        anchor_node_id = Some(original_node_id);
+                    } else {
+                        warn!(hash = %hash, "Capture source node missing; skipping link");
+                    }
                 } else {
-                    warn!(hash = %hash, "Capture source node missing; skipping link");
+                    warn!(hash = %hash, "Capture source asset missing; skipping link");
                 }
             } else {
                 warn!(

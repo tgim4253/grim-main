@@ -1107,17 +1107,70 @@ async fn upsert_file_entry(
     let file_content_id =
         FileRepository::upsert_file_content(tx.as_mut(), &file_info).await?;
 
-    NodeRepository::upsert_file_node(
+    let is_dedupable =
+        matches!(file_info.kind_guess, FileType::Image | FileType::GraphicTool);
+
+    let existing_path_asset_id =
+        FileRepository::find_file_asset_id_by_path(tx.as_mut(), &file_path_id)
+            .await?;
+
+    let asset_id = if is_dedupable {
+        if let Some(asset_id) = FileRepository::find_file_asset_id_by_content(
+            tx.as_mut(),
+            &file_content_id,
+        )
+        .await?
+        {
+            FileRepository::update_file_asset_content(
+                tx.as_mut(),
+                &asset_id,
+                &file_content_id,
+                true,
+            )
+            .await?;
+            asset_id
+        } else if let Some(asset_id) = existing_path_asset_id {
+            FileRepository::update_file_asset_content(
+                tx.as_mut(),
+                &asset_id,
+                &file_content_id,
+                true,
+            )
+            .await?;
+            asset_id
+        } else {
+            FileRepository::insert_file_asset(
+                tx.as_mut(),
+                &file_content_id,
+                true,
+            )
+            .await?
+        }
+    } else if let Some(asset_id) = existing_path_asset_id {
+        FileRepository::update_file_asset_content(
+            tx.as_mut(),
+            &asset_id,
+            &file_content_id,
+            false,
+        )
+        .await?;
+        asset_id
+    } else {
+        FileRepository::insert_file_asset(tx.as_mut(), &file_content_id, false)
+            .await?
+    };
+
+    FileRepository::upsert_file_path_asset_binding(
         tx.as_mut(),
-        params.parent_virtual_folder_id.to_string(),
-        file_content_id.clone(),
+        &file_path_id,
+        &asset_id,
     )
     .await?;
 
-    FileRepository::upsert_file_path_content_binding(
+    NodeRepository::upsert_file_node(
         tx.as_mut(),
-        &file_path_id,
-        &file_content_id,
+        params.parent_virtual_folder_id.to_string(),
+        asset_id.clone(),
     )
     .await?;
 
@@ -1209,23 +1262,30 @@ pub async fn fetch_one_file_path(
             anyhow!("No file content found for xxh3_64: {}", xxhs)
         })?;
 
+    let asset_id =
+        FileRepository::find_file_asset_id_by_content(tx.as_mut(), &fc_id)
+            .await?
+            .ok_or_else(|| {
+                anyhow!("No file asset found for file content ID: {}", fc_id)
+            })?;
+
     let active_path_ids =
-        FileRepository::fetch_matched_file_path_ids(tx.as_mut(), &fc_id)
+        FileRepository::fetch_file_path_ids_for_asset(tx.as_mut(), &asset_id)
             .await?;
 
     if active_path_ids.is_empty() {
-        bail!("No active file path found for file content ID: {fc_id}");
+        bail!("No file path found for file asset ID: {asset_id}");
     }
 
     let file_path_id = active_path_ids.first().ok_or_else(|| {
-        anyhow!("No active file path found for file content ID: {fc_id}")
+        anyhow!("No file path found for file asset ID: {asset_id}")
     })?;
 
     let Some(path) =
         FileRepository::fetch_file_abs_path_cached(tx.as_mut(), file_path_id)
             .await?
     else {
-        bail!("No file path found for file content ID: {fc_id}");
+        bail!("No file path found for file asset ID: {asset_id}");
     };
 
     Ok(path)

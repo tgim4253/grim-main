@@ -114,10 +114,10 @@ impl NodeRepository {
         (out, health)
     }
 
-    /// Fetch the node identifier associated with a given file-content id.
-    pub async fn fetch_node_id_by_fc_id<'a, E>(
+    /// Fetch the node identifier associated with a given file-asset id.
+    pub async fn fetch_node_id_by_asset_id<'a, E>(
         executor: &mut E,
-        file_content_id: String,
+        file_asset_id: String,
     ) -> Result<Option<String>>
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
@@ -126,9 +126,9 @@ impl NodeRepository {
             r#"
                 SELECT node_id
                 FROM node_file_binding
-                WHERE file_content_id = ?1
+                WHERE file_asset_id = ?1
             "#,
-            file_content_id
+            file_asset_id
         )
         .fetch_optional(executor)
         .await?;
@@ -189,7 +189,8 @@ impl NodeRepository {
                 c.display_name    AS "file_name!",
                 c.kind            AS "kind!"
             FROM node_file_binding b
-            JOIN file_content c ON c.id = b.file_content_id
+            JOIN file_asset fa ON fa.id = b.file_asset_id
+            JOIN file_content c ON c.id = fa.file_content_id
             WHERE b.node_id = ?1
         "#,
             node_id
@@ -518,7 +519,8 @@ impl NodeRepository {
                 n.updated_at AS "updated_at!"
             FROM node               n
             JOIN node_file_binding  nfb ON nfb.node_id = n.id
-            JOIN file_content       fc  ON fc.id = nfb.file_content_id
+            JOIN file_asset         fa  ON fa.id = nfb.file_asset_id
+            JOIN file_content       fc  ON fc.id = fa.file_content_id
             WHERE n.kind = 'file'
             ORDER BY n.created_at
         "#,
@@ -580,7 +582,7 @@ impl NodeRepository {
     /// Create a file node without attaching it to a folder hierarchy.
     pub async fn create_orphan_file_node<'a, E>(
         executor: &mut E,
-        file_content_id: String,
+        file_asset_id: String,
     ) -> Result<String>
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
@@ -590,7 +592,7 @@ impl NodeRepository {
         Self::insert_node_file_binding(
             executor,
             node_id.clone(),
-            file_content_id,
+            file_asset_id,
             now,
         )
         .await?;
@@ -600,7 +602,7 @@ impl NodeRepository {
     async fn insert_node_file_binding<'a, E>(
         executor: &mut E,
         node_id: String,
-        file_content_id: String,
+        file_asset_id: String,
         now: String,
     ) -> Result<String>
     where
@@ -610,12 +612,12 @@ impl NodeRepository {
 
         sqlx::query!(
             r#"
-            INSERT INTO node_file_binding (id, node_id, file_content_id, created_at)
+            INSERT INTO node_file_binding (id, node_id, file_asset_id, created_at)
             VALUES (?1, ?2, ?3, ?4)
             "#,
             binding_id,
             node_id,
-            file_content_id,
+            file_asset_id,
             now,
         )
         .execute(&mut *executor)
@@ -686,11 +688,11 @@ impl NodeRepository {
         Ok(node_id)
     }
 
-    /// Ensure a file node exists for the provided content identifier.
+    /// Ensure a file node exists for the provided file-asset identifier.
     pub async fn upsert_file_node<'a, E>(
         executor: &mut E,
         parent_node_id: String,
-        file_content_id: String,
+        file_asset_id: String,
     ) -> Result<()>
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
@@ -698,9 +700,9 @@ impl NodeRepository {
         let now = crate::utils::date::get_now_date();
 
         let node_id = if let Some(node_id) =
-            NodeRepository::fetch_node_id_by_fc_id(
+            NodeRepository::fetch_node_id_by_asset_id(
                 executor,
-                file_content_id.clone(),
+                file_asset_id.clone(),
             )
             .await?
         {
@@ -711,7 +713,7 @@ impl NodeRepository {
             Self::insert_node_file_binding(
                 executor,
                 node_id.clone(),
-                file_content_id.clone(),
+                file_asset_id.clone(),
                 now.clone(),
             )
             .await?;

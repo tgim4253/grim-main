@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT file_asset_id AS \"file_asset_id!\"\n            FROM file_path_asset_binding\n            WHERE file_path_id = ?1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "file_asset_id!",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "79afed31f8468659b280eb586bad58d7ef23d9ab6ba94c98c8468ba50b532bce"
+}

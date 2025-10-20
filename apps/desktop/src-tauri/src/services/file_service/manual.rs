@@ -261,10 +261,48 @@ async fn register_path_with_virtual_folder(
             .await
             .context("failed to upsert file content")?;
 
-    FileRepository::upsert_file_path_content_binding(
+    let existing_path_asset_id =
+        FileRepository::find_file_asset_id_by_path(tx.as_mut(), &file_path_id)
+            .await
+            .context("failed to fetch existing asset binding")?;
+
+    let asset_id = if let Some(asset_id) =
+        FileRepository::find_file_asset_id_by_content(
+            tx.as_mut(),
+            &file_content_id,
+        )
+        .await
+        .context("failed to lookup asset by content")?
+    {
+        FileRepository::update_file_asset_content(
+            tx.as_mut(),
+            &asset_id,
+            &file_content_id,
+            true,
+        )
+        .await
+        .context("failed to update asset content")?;
+        asset_id
+    } else if let Some(asset_id) = existing_path_asset_id {
+        FileRepository::update_file_asset_content(
+            tx.as_mut(),
+            &asset_id,
+            &file_content_id,
+            true,
+        )
+        .await
+        .context("failed to refresh asset content")?;
+        asset_id
+    } else {
+        FileRepository::insert_file_asset(tx.as_mut(), &file_content_id, true)
+            .await
+            .context("failed to create file asset")?
+    };
+
+    FileRepository::upsert_file_path_asset_binding(
         tx.as_mut(),
         &file_path_id,
-        &file_content_id,
+        &asset_id,
     )
     .await
     .context("failed to upsert file path binding")?;
@@ -272,7 +310,7 @@ async fn register_path_with_virtual_folder(
     NodeRepository::upsert_file_node(
         tx.as_mut(),
         virtual_node_id.to_string(),
-        file_content_id.clone(),
+        asset_id.clone(),
     )
     .await
     .context("failed to associate file node with virtual folder")?;

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n                SELECT node_id\n                FROM node_file_binding\n                WHERE file_content_id = ?1\n            ",
+  "query": "\n                SELECT node_id\n                FROM node_file_binding\n                WHERE file_asset_id = ?1\n            ",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "1d8b8cbc46159581dce38a98f39123de04149a0c596a27ae3442bfccb8d6b9a8"
+  "hash": "c460e8e0ef948c7fe733465a1017be6bb91d52645059b66e34256547c4ec9290"
 }
