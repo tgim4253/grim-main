@@ -3,7 +3,6 @@ use core::fmt;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Type};
 
-#[cfg(not(target_os = "windows"))]
 use std::{
     convert::From,
     fs::{self, Metadata},

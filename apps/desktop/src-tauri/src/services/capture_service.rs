@@ -288,7 +288,7 @@ fn platform_capture_rect(
         let y = ((rect.y as f64) * scale).round() as i32;
         let width = ((rect.width as f64) * scale).round().max(1.0) as u32;
         let height = ((rect.height as f64) * scale).round().max(1.0) as u32;
-        return (x, y, width, height);
+        (x, y, width, height)
     }
 
     #[cfg(not(target_os = "windows"))]
