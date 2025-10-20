@@ -379,15 +379,15 @@ async fn register_capture_in_workspace(
             )
             .await?
         }
-    } else if let Some(asset_id) = existing_path_asset_id {
-        FileRepository::update_file_asset_content(
+    } else if let Some(_asset_id) = existing_path_asset_id {
+        let new_asset_id = FileRepository::insert_file_asset(
             tx.as_mut(),
-            &asset_id,
             &file_content_id,
             false,
         )
         .await?;
-        asset_id
+
+        new_asset_id
     } else {
         FileRepository::insert_file_asset(tx.as_mut(), &file_content_id, false)
             .await?
