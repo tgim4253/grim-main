@@ -1,5 +1,6 @@
 //! Async helpers for importing folders, hashing files, and rendering thumbnails.
 
+pub mod asset;
 pub mod cache;
 pub mod detail;
 pub mod expand;
