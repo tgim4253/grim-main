@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO file_asset\n                (id, file_content_id, is_dedupable, created_at, updated_at)\n            VALUES\n                (?1, ?2, ?3, ?4, ?4)\n            RETURNING id as \"id!: String\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b57fa30261b71a7080502df716ba7bcd0357848cf589174e33cf6d5f9a4e8969"
+}

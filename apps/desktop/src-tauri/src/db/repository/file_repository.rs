@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use sqlx::{Executor, Sqlite};
 
 use crate::{
-    config::file::{IntegrityCheckResult, MatchStates},
+    config::file::IntegrityCheckResult,
     db::repository::node_repository::NodeRepository,
     models::{
         file::{
@@ -527,7 +527,7 @@ impl FileRepository {
         Ok(folder_id)
     }
 
-    /// Fetch a file-content identifier by xxHash digest.
+    /// Fetch an image/design file-content identifier by xxHash digest.
     pub async fn find_file_content_id<'a, E>(
         executor: &mut E,
         xxh3_64: String,
@@ -536,8 +536,13 @@ impl FileRepository {
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
     {
         let id = sqlx::query_scalar!(
-            "SELECT id AS 'id!' FROM file_content WHERE xxh3_64 = ?1",
-            xxh3_64
+            r#"
+            SELECT id AS "id!"
+            FROM file_content
+            WHERE xxh3_64 = ?1
+              AND kind IN ('image', 'graphictool')
+            "#,
+            xxh3_64,
         )
         .fetch_optional(&mut *executor)
         .await?;
@@ -553,23 +558,56 @@ impl FileRepository {
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
     {
         let now = crate::utils::date::get_now_date();
+        let is_dedupable = matches!(
+            file_info.kind_guess,
+            FileType::Image | FileType::GraphicTool
+        );
+
+        if is_dedupable {
+            if let Some(existing_id) =
+                Self::find_file_content_id(executor, file_info.xxh3_64.clone())
+                    .await?
+            {
+                sqlx::query!(
+                    r#"
+                    UPDATE file_content
+                       SET mime         = ?2,
+                           size         = ?3,
+                           display_name = ?4,
+                           sha256       = ?5,
+                           kind         = ?6,
+                           updated_at   = ?7
+                     WHERE id = ?1
+                    "#,
+                    existing_id,
+                    file_info.mime_guess,
+                    file_info.file_size,
+                    file_info.file_name,
+                    file_info.sha256,
+                    file_info.kind_guess,
+                    now
+                )
+                .execute(&mut *executor)
+                .await
+                .map_err(|e| {
+                    anyhow!(format!(
+                        "Failed to update file_content metadata: {}",
+                        e
+                    ))
+                })?;
+
+                return Ok(existing_id);
+            }
+        }
+
         let new_id = get_unique_id();
 
-        let file_content_id = sqlx::query_scalar!(
+        sqlx::query!(
             r#"
             INSERT INTO file_content
                 (id, mime, size, xxh3_64, sha256, kind, display_name, created_at, updated_at)
             VALUES
-                (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-            ON CONFLICT(xxh3_64) DO UPDATE SET
-                mime         = excluded.mime,
-                size         = excluded.size,
-                kind         = excluded.kind,
-                display_name = excluded.display_name,
-                sha256        = excluded.sha256,
-                xxh3_64      = excluded.xxh3_64,
-                updated_at   = excluded.updated_at
-            RETURNING id as "id!: String"
+                (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
             "#,
             new_id,
             file_info.mime_guess,
@@ -578,76 +616,174 @@ impl FileRepository {
             file_info.sha256,
             file_info.kind_guess,
             file_info.file_name,
-            now,
+            now
+        )
+        .execute(&mut *executor)
+        .await
+        .map_err(|e| anyhow!(format!("Failed to insert file_content: {}", e)))?;
+
+        Ok(new_id)
+    }
+
+    /// Locate a file asset by its associated content identifier.
+    pub async fn find_file_asset_id_by_content<'a, E>(
+        executor: &mut E,
+        file_content_id: &str,
+    ) -> Result<Option<String>>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let asset_id = sqlx::query_scalar!(
+            r#"
+            SELECT id AS "id!"
+            FROM file_asset
+            WHERE file_content_id = ?1
+            "#,
+            file_content_id
+        )
+        .fetch_optional(&mut *executor)
+        .await?;
+
+        Ok(asset_id)
+    }
+
+    /// Fetch the file asset currently bound to the provided file path.
+    pub async fn find_file_asset_id_by_path<'a, E>(
+        executor: &mut E,
+        file_path_id: &str,
+    ) -> Result<Option<String>>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let asset_id = sqlx::query_scalar!(
+            r#"
+            SELECT file_asset_id AS "file_asset_id!"
+            FROM file_path_asset_binding
+            WHERE file_path_id = ?1
+            "#,
+            file_path_id
+        )
+        .fetch_optional(&mut *executor)
+        .await?;
+
+        Ok(asset_id)
+    }
+
+    /// Count how many paths currently reference the provided asset.
+    pub async fn count_paths_for_asset<'a, E>(
+        executor: &mut E,
+        asset_id: &str,
+    ) -> Result<i64>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let count = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(*) AS "count!: i64"
+            FROM file_path_asset_binding
+            WHERE file_asset_id = ?1
+            "#,
+            asset_id
+        )
+        .fetch_one(&mut *executor)
+        .await?;
+
+        Ok(count)
+    }
+
+    /// Create a new file asset row.
+    pub async fn insert_file_asset<'a, E>(
+        executor: &mut E,
+        file_content_id: &str,
+        is_dedupable: bool,
+    ) -> Result<String>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let asset_id = get_unique_id();
+        let now = crate::utils::date::get_now_date();
+
+        let asset_id = sqlx::query_scalar!(
+            r#"
+            INSERT INTO file_asset
+                (id, file_content_id, is_dedupable, created_at, updated_at)
+            VALUES
+                (?1, ?2, ?3, ?4, ?4)
+            RETURNING id as "id!: String"
+            "#,
+            asset_id,
+            file_content_id,
+            is_dedupable,
             now
         )
         .fetch_one(&mut *executor)
-        .await
-        .map_err(|e| anyhow!(format!("Failed to upsert file_content: {}", e)))?;
+        .await?;
 
-        Ok(file_content_id)
+        Ok(asset_id)
     }
 
-    /// Bind a file path to a file content record, marking it as active.
-    pub async fn upsert_file_path_content_binding<'a, E>(
+    /// Update the content pointer for an existing asset.
+    pub async fn update_file_asset_content<'a, E>(
+        executor: &mut E,
+        asset_id: &str,
+        file_content_id: &str,
+        is_dedupable: bool,
+    ) -> Result<()>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let now = crate::utils::date::get_now_date();
+        sqlx::query!(
+            r#"
+            UPDATE file_asset
+               SET file_content_id = ?2,
+                   is_dedupable    = ?3,
+                   updated_at      = ?4
+             WHERE id = ?1
+            "#,
+            asset_id,
+            file_content_id,
+            is_dedupable,
+            now
+        )
+        .execute(&mut *executor)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Ensure the path-to-asset binding exists and points to the provided asset.
+    pub async fn upsert_file_path_asset_binding<'a, E>(
         executor: &mut E,
         file_path_id: &str,
-        file_content_id: &str,
+        file_asset_id: &str,
     ) -> Result<String>
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
     {
         let now = crate::utils::date::get_now_date();
-        let new_id = get_unique_id();
-        sqlx::query!(
+        let binding_id = get_unique_id();
+
+        let binding_id = sqlx::query_scalar!(
             r#"
-            INSERT INTO file_path_content_binding
-                (id, file_path_id, file_content_id, match_states,is_active, created_at, updated_at, detected_at, resolved_at)
+            INSERT INTO file_path_asset_binding
+                (id, file_path_id, file_asset_id, created_at, updated_at)
             VALUES
-                (?1, ?2, ?3, ?4, 1, ?5, ?5, ?5, ?5)
-            ON CONFLICT(file_path_id, file_content_id) DO UPDATE SET
-                match_states = excluded.match_states,
-                is_active = 1,
-                updated_at   = excluded.updated_at
+                (?1, ?2, ?3, ?4, ?4)
+            ON CONFLICT(file_path_id) DO UPDATE SET
+                file_asset_id = excluded.file_asset_id,
+                updated_at    = excluded.updated_at
             RETURNING id as "id!: String"
             "#,
-            new_id,
+            binding_id,
             file_path_id,
-            file_content_id,
-            MatchStates::Match,
+            file_asset_id,
             now
         )
         .fetch_one(&mut *executor)
-        .await
-        .map_err(|e| anyhow!(format!("Failed to upsert file_path_content_binding: {}", e)))?;
-
-        Ok(new_id)
-    }
-
-    /// Mark competing file-path bindings as unknown while keeping the winner matched.
-    pub async fn set_other_path_content_binding_unknown<'a, E>(
-        executor: &mut E,
-        binding_id: &str,
-        file_path_id: &str,
-    ) -> Result<()>
-    where
-        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
-    {
-        let now = get_now_date();
-        sqlx::query!(
-            r#"
-            UPDATE file_path_content_binding
-               SET match_states = CASE WHEN id = ?1 THEN 'match' ELSE 'unknown' END,
-                   updated_at = ?2
-             WHERE file_path_id = ?3
-            "#,
-            binding_id,
-            now,
-            file_path_id
-        )
-        .execute(&mut *executor)
         .await?;
-        Ok(())
+
+        Ok(binding_id)
     }
 
     // -- file path --
@@ -690,10 +826,10 @@ impl FileRepository {
         Ok(file_path_id)
     }
 
-    /// Fetch active file-path identifiers bound to the provided file content.
-    pub async fn fetch_matched_file_path_ids<'a, E>(
+    /// Fetch file-path identifiers bound to the provided asset.
+    pub async fn fetch_file_path_ids_for_asset<'a, E>(
         executor: &mut E,
-        file_content_id: &str,
+        file_asset_id: &str,
     ) -> Result<Vec<String>>
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
@@ -701,14 +837,16 @@ impl FileRepository {
         let file_path_ids = sqlx::query_scalar!(
             r#"
             SELECT file_path_id AS "file_path_id!"
-            FROM file_path_content_binding
-            WHERE file_content_id = ?1 AND is_active = 1 AND match_states = 'match'
+            FROM file_path_asset_binding
+            WHERE file_asset_id = ?1
             "#,
-            file_content_id
+            file_asset_id
         )
         .fetch_all(&mut *executor)
         .await
-        .map_err(|e| anyhow!(format!("Failed to fetch active file_path_ids: {}", e)))?;
+        .map_err(|e| {
+            anyhow!(format!("Failed to fetch file_path_ids for asset: {}", e))
+        })?;
 
         Ok(file_path_ids)
     }
@@ -779,10 +917,10 @@ impl FileRepository {
         Ok(None)
     }
 
-    /// Load all active file paths bound to the provided file content identifier.
-    pub async fn fetch_paths_for_content<'a, E>(
+    /// Load all file paths bound to the provided file-asset identifier.
+    pub async fn fetch_paths_for_asset<'a, E>(
         executor: &mut E,
-        file_content_id: &str,
+        file_asset_id: &str,
     ) -> Result<Vec<FilePathRecord>>
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
@@ -803,13 +941,13 @@ impl FileRepository {
                 fp.file_name         AS "file_name!",
                 fp.mtime             AS "mtime?",
                 rf.abs_path_cached   AS "abs_path_cached?"
-            FROM file_path_content_binding fpcb
-            JOIN file_path fp ON fp.id = fpcb.file_path_id
+            FROM file_path_asset_binding fpab
+            JOIN file_path fp ON fp.id = fpab.file_path_id
             LEFT JOIN real_folder rf ON rf.id = fp.folder_id
-            WHERE fpcb.file_content_id = ?1 AND fpcb.is_active = 1
+            WHERE fpab.file_asset_id = ?1
             ORDER BY fp.updated_at DESC
             "#,
-            file_content_id,
+            file_asset_id,
         )
         .fetch_all(&mut *executor)
         .await?;
@@ -902,9 +1040,10 @@ impl FileRepository {
                 fc.sha256,
                 fc.kind
             FROM file_path fp
-            JOIN file_path_content_binding fpcb ON fp.id = fpcb.file_path_id
-            JOIN file_content fc ON fpcb.file_content_id = fc.id
-            WHERE fp.id = ?1 AND fpcb.is_active = 1
+            JOIN file_path_asset_binding fpab ON fp.id = fpab.file_path_id
+            JOIN file_asset fa ON fa.id = fpab.file_asset_id
+            JOIN file_content fc ON fa.file_content_id = fc.id
+            WHERE fp.id = ?1
             "#,
             file_path_id
         )

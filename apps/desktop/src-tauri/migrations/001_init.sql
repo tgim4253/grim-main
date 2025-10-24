@@ -120,18 +120,32 @@ CREATE TABLE IF NOT EXISTS file_content (
   kind         TEXT NOT NULL DEFAULT 'unknown'
                CHECK (kind IN ('image','video','document','graphictool','audio','archive','unknown')),
   created_at   TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
-
-  UNIQUE(xxh3_64)
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- Enforce uniqueness only when sha256 IS NOT NULL
 CREATE UNIQUE INDEX IF NOT EXISTS uq_file_content_sha256_notnull
   ON file_content(sha256) WHERE sha256 IS NOT NULL;
 
+-- Dedup required media (images, design files) share hashes
+CREATE UNIQUE INDEX IF NOT EXISTS uq_file_content_kind_hash
+  ON file_content(kind, xxh3_64)
+  WHERE xxh3_64 IS NOT NULL AND kind IN ('image','graphictool');
+
 
 -- Queries by size
 CREATE INDEX IF NOT EXISTS idx_file_content_size ON file_content(size);
+
+CREATE TABLE IF NOT EXISTS file_asset (
+  id             TEXT PRIMARY KEY NOT NULL,                                  -- uuid
+  file_content_id TEXT REFERENCES file_content(id) ON DELETE SET NULL,
+  is_dedupable   INTEGER NOT NULL DEFAULT 0 CHECK (is_dedupable IN (0,1)),
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_file_asset_content
+  ON file_asset(file_content_id) WHERE file_content_id IS NOT NULL;
 
 -- file_path
 CREATE TABLE IF NOT EXISTS file_path (
@@ -152,41 +166,53 @@ CREATE TABLE IF NOT EXISTS file_path (
 CREATE INDEX IF NOT EXISTS idx_file_path_folder_mtime ON file_path(folder_id, mtime);
 CREATE INDEX IF NOT EXISTS idx_file_path_err          ON file_path(is_found);
 
--- binding
-CREATE TABLE IF NOT EXISTS file_path_content_binding (
-  id              TEXT PRIMARY KEY NOT NULL,                              -- uuid
-  file_path_id    TEXT NOT NULL REFERENCES file_path(id) ON DELETE CASCADE,
-  file_content_id TEXT NOT NULL REFERENCES file_content(id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS file_path_asset_binding (
+  id             TEXT PRIMARY KEY NOT NULL,                              -- uuid
+  file_path_id   TEXT NOT NULL REFERENCES file_path(id) ON DELETE CASCADE,
+  file_asset_id  TEXT NOT NULL REFERENCES file_asset(id) ON DELETE CASCADE,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
 
-  detected_at     TEXT NOT NULL DEFAULT (datetime('now')),       -- first seen pairing
-  resolved_at     TEXT,                                          -- set when version resolution done
-
-  is_active       INTEGER NOT NULL DEFAULT 0 CHECK (is_active IN (0,1)),
-  match_states    TEXT NOT NULL DEFAULT 'unknown' CHECK (match_states IN ('unknown','mismatch','match')),
-  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
-
-  UNIQUE (file_path_id, file_content_id)
+  UNIQUE (file_path_id)
 );
 
--- Lookups
-CREATE INDEX IF NOT EXISTS idx_binding_file_path
-  ON file_path_content_binding(file_path_id);
+CREATE INDEX IF NOT EXISTS idx_fpab_asset
+  ON file_path_asset_binding(file_asset_id);
 
-CREATE INDEX IF NOT EXISTS idx_binding_file_content
-  ON file_path_content_binding(file_content_id);
+CREATE TRIGGER IF NOT EXISTS trg_fpab_enforce_single_path
+AFTER INSERT ON file_path_asset_binding
+WHEN (SELECT is_dedupable FROM file_asset WHERE id = NEW.file_asset_id) = 0
+     AND EXISTS (
+       SELECT 1 FROM file_path_asset_binding
+       WHERE file_asset_id = NEW.file_asset_id AND id != NEW.id
+     )
+BEGIN
+  SELECT RAISE(ABORT, 'non-dedupable asset cannot bind multiple paths');
+END;
 
--- Only one active binding per path (partial unique)
-CREATE UNIQUE INDEX IF NOT EXISTS uq_binding_active_per_path
-  ON file_path_content_binding(file_path_id)
-  WHERE is_active = 1;
+CREATE TRIGGER IF NOT EXISTS trg_fpab_enforce_single_path_update
+AFTER UPDATE ON file_path_asset_binding
+WHEN (SELECT is_dedupable FROM file_asset WHERE id = NEW.file_asset_id) = 0
+     AND EXISTS (
+       SELECT 1 FROM file_path_asset_binding
+       WHERE file_asset_id = NEW.file_asset_id AND id != NEW.id
+     )
+BEGIN
+  SELECT RAISE(ABORT, 'non-dedupable asset cannot bind multiple paths');
+END;
 
--- Optional: fast filter & combined match/active filter
-CREATE INDEX IF NOT EXISTS idx_binding_is_active
-  ON file_path_content_binding(is_active);
-
-CREATE INDEX IF NOT EXISTS idx_binding_match_active
-  ON file_path_content_binding(match_states, is_active);
+CREATE TRIGGER IF NOT EXISTS trg_file_asset_set_nondedupable_guard
+AFTER UPDATE OF is_dedupable ON file_asset
+WHEN NEW.is_dedupable = 0
+     AND EXISTS (
+       SELECT 1 FROM file_path_asset_binding
+       WHERE file_asset_id = NEW.id
+       GROUP BY file_asset_id
+       HAVING COUNT(*) > 1
+     )
+BEGIN
+  SELECT RAISE(ABORT, 'non-dedupable asset cannot bind multiple paths');
+END;
 
 /* ------------------------- Virtual mounts & direct node bindings ---------------------------------- */
 CREATE TABLE IF NOT EXISTS virtual_folder_mount (
@@ -211,12 +237,12 @@ CREATE INDEX IF NOT EXISTS idx_vfm_virtual_prio ON virtual_folder_mount(virtual_
 CREATE TABLE IF NOT EXISTS node_file_binding (
   id              TEXT PRIMARY KEY NOT NULL,                                   -- uuid
   node_id         TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE,       -- node.kind='file'
-  file_content_id TEXT NOT NULL REFERENCES file_content(id) ON DELETE CASCADE,
+  file_asset_id   TEXT NOT NULL REFERENCES file_asset(id) ON DELETE CASCADE,
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-  UNIQUE (node_id, file_content_id)
+  UNIQUE (node_id, file_asset_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_nfb_filepath ON node_file_binding(file_content_id);
+CREATE INDEX IF NOT EXISTS idx_nfb_asset ON node_file_binding(file_asset_id);
 
 /* ------------------------- Crop node ---------------------------------- */
 CREATE TABLE IF NOT EXISTS node_crop (

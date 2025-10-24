@@ -160,9 +160,18 @@ pub async fn get_file_detail(moa_id: &str, hash: &str) -> Result<FileDetail> {
         bail!("요청한 파일 정보를 찾을 수 없습니다");
     };
 
-    let Some(file_node_id) = NodeRepository::fetch_node_id_by_fc_id(
+    let Some(file_asset_id) = FileRepository::find_file_asset_id_by_content(
         tx.as_mut(),
-        file_content_id.clone(),
+        &file_content_id,
+    )
+    .await?
+    else {
+        bail!("파일 에셋 정보를 찾을 수 없습니다");
+    };
+
+    let Some(file_node_id) = NodeRepository::fetch_node_id_by_asset_id(
+        tx.as_mut(),
+        file_asset_id.clone(),
     )
     .await?
     else {
@@ -214,7 +223,7 @@ pub async fn get_file_detail(moa_id: &str, hash: &str) -> Result<FileDetail> {
     };
 
     let path_records =
-        FileRepository::fetch_paths_for_content(tx.as_mut(), &file_content_id)
+        FileRepository::fetch_paths_for_asset(tx.as_mut(), &file_asset_id)
             .await?;
 
     tx.commit().await?;
@@ -331,20 +340,22 @@ pub async fn link_file_path(
         bail!("파일 콘텐츠를 찾을 수 없습니다");
     };
 
+    let Some(file_asset_id) = FileRepository::find_file_asset_id_by_content(
+        tx.as_mut(),
+        &file_content_id,
+    )
+    .await?
+    else {
+        bail!("파일 에셋을 찾을 수 없습니다");
+    };
+
     let file_path_id =
         FileRepository::insert_file_path(tx.as_mut(), &file_info).await?;
 
-    let binding_id = FileRepository::upsert_file_path_content_binding(
+    FileRepository::upsert_file_path_asset_binding(
         tx.as_mut(),
         &file_path_id,
-        &file_content_id,
-    )
-    .await?;
-
-    FileRepository::set_other_path_content_binding_unknown(
-        tx.as_mut(),
-        &binding_id,
-        &file_path_id,
+        &file_asset_id,
     )
     .await?;
 

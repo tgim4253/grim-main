@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT\n                fp.file_name,\n                fp.folder_id,\n                fp.file_name_norm,\n                fp.mtime,\n                fp.is_found,\n                fc.mime,\n                fc.size,\n                fc.xxh3_64,\n                fc.sha256,\n                fc.kind\n            FROM file_path fp\n            JOIN file_path_content_binding fpcb ON fp.id = fpcb.file_path_id\n            JOIN file_content fc ON fpcb.file_content_id = fc.id\n            WHERE fp.id = ?1 AND fpcb.is_active = 1\n            ",
+  "query": "\n            SELECT\n                fp.file_name,\n                fp.folder_id,\n                fp.file_name_norm,\n                fp.mtime,\n                fp.is_found,\n                fc.mime,\n                fc.size,\n                fc.xxh3_64,\n                fc.sha256,\n                fc.kind\n            FROM file_path fp\n            JOIN file_path_asset_binding fpab ON fp.id = fpab.file_path_id\n            JOIN file_asset fa ON fa.id = fpab.file_asset_id\n            JOIN file_content fc ON fa.file_content_id = fc.id\n            WHERE fp.id = ?1\n            ",
   "describe": {
     "columns": [
       {
@@ -70,5 +70,5 @@
       false
     ]
   },
-  "hash": "fa4ef35c3f0ae1ebbfeeca7bc6d9a818b72de594339c6a16e52f41e4276723da"
+  "hash": "8cfd1838ef066102d8280607ccc4430b94a39e1c3c8962f5a108b85b19cda13d"
 }
