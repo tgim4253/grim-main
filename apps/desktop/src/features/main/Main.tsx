@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ComponentType, type SVGProps } from 'react';
 import { ipc } from '../../lib/ipc';
 import TitleBar from './layout/TitleBar';
 import { platform } from '@tauri-apps/plugin-os';
@@ -19,6 +19,17 @@ import useThumbStore from '@tgim/stores/thumbStore';
 import { useTheme } from '../../theme/ThemeProvider';
 import { convertKeysToCamel } from '@tgim/utils/object';
 import { ToastContainer } from 'react-toastify';
+import { NodeDndProvider, useStandardSensors, useNodeDndState, DragHandle } from '@tgim/dnd/index';
+import { closestCenter, DragOverlay } from '@dnd-kit/core';
+import {
+  Folder,
+  Image as ImageIcon,
+  File as FileIcon,
+  FileText,
+  Crop,
+  Tag,
+  NotebookPen,
+} from 'lucide-react';
 
 interface LayoutPorps {
   layoutId: string;
@@ -61,10 +72,46 @@ const Layout: React.FC<LayoutPorps> = ({ layoutId }) => {
   );
 };
 
+const iconByKind: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
+  folder: Folder,
+  image: ImageIcon,
+  document: FileText,
+  crop: Crop,
+  memo: NotebookPen,
+  tag: Tag,
+};
+
+const NodeDragOverlayRenderer: React.FC = () => {
+  const { activeNode } = useNodeDndState();
+  if (!activeNode) return null;
+
+  const Icon = iconByKind[activeNode.nodeKind ?? ''] ?? FileIcon;
+  const selectionCount = activeNode.selection?.length ?? 1;
+  const meta = (activeNode.meta ?? {}) as { name?: unknown };
+  const label = typeof meta.name === 'string' ? meta.name : null;
+
+  return (
+    <DragOverlay dropAnimation={null}>
+      <DragHandle>
+        <Icon className="size-3.5 text-text" />
+        <div className="flex flex-col items-start gap-0.5">
+          {label ? <span className="text-xs font-medium text-text">{label}</span> : null}
+          {selectionCount > 1 ? (
+            <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[11px] font-semibold text-text-soft">
+              +{selectionCount - 1}
+            </span>
+          ) : null}
+        </div>
+      </DragHandle>
+    </DragOverlay>
+  );
+};
+
 // Bootstraps the main workspace once backend bootstrap has finished.
 const Main: React.FC = () => {
   const { moaId } = useMoa(location);
   const { theme } = useTheme();
+  const dndSensors = useStandardSensors(4);
   const [progress, setProgress] = useState<AppProgressEvent>({
     stage: 'Migrating',
     percent: 0,
@@ -271,31 +318,36 @@ const Main: React.FC = () => {
         <div className="flex-1 w-full flex overflow-hidden">
           <SidebarTabs sidebarPosition="left" />
 
-          <Split position="horizontal" className="w-full h-screen">
-            {({ Panel }) => (
-              <>
-                {!leftSidebar?.hidden ? (
-                  <Panel
-                    key="left"
-                    canHidden
-                    hiddenSize={leftSidebar?.hiddenSize ?? leftSidebar?.minSize}
-                    minSize={leftSidebar?.minSize}
-                    initialSize={leftSidebar?.size}
-                    onHidden={hidden => {
-                      setSidebarHidden('left', hidden);
-                    }}
-                    onSizeChange={size => {
-                      setSidebarSize('left', size);
-                    }}
-                  >
-                    <SidebarPanel sidebarPosition="left" />
-                  </Panel>
-                ) : null}
+          <NodeDndProvider sensors={dndSensors} collisionDetection={closestCenter}>
+            <>
+              <Split position="horizontal" className="w-full h-screen">
+                {({ Panel }) => (
+                  <>
+                    {!leftSidebar?.hidden ? (
+                      <Panel
+                        key="left"
+                        canHidden
+                        hiddenSize={leftSidebar?.hiddenSize ?? leftSidebar?.minSize}
+                        minSize={leftSidebar?.minSize}
+                        initialSize={leftSidebar?.size}
+                        onHidden={hidden => {
+                          setSidebarHidden('left', hidden);
+                        }}
+                        onSizeChange={size => {
+                          setSidebarSize('left', size);
+                        }}
+                      >
+                        <SidebarPanel sidebarPosition="left" />
+                      </Panel>
+                    ) : null}
 
-                <Panel key="center">{rootLayout && <Layout layoutId={rootLayout.id} />}</Panel>
-              </>
-            )}
-          </Split>
+                    <Panel key="center">{rootLayout && <Layout layoutId={rootLayout.id} />}</Panel>
+                  </>
+                )}
+              </Split>
+              <NodeDragOverlayRenderer />
+            </>
+          </NodeDndProvider>
         </div>
       ) : (
         <ProgressWindow progress={progress} />

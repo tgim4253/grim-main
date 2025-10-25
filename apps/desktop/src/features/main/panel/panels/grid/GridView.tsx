@@ -1,5 +1,5 @@
 import { useMoa } from '@tgim/hooks/useMoa';
-import { useMultiSelect } from '@tgim/dnd/index';
+import { createNodeDragPayload, getNodeDragPayload, useMultiSelect } from '@tgim/dnd/index';
 import { GridData, ImageItem, Layout, Size } from '@tgim/types/grid';
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { ResizeMode } from '@tgim/types/file';
@@ -17,6 +17,7 @@ import { useElementSize } from '@tgim/hooks/useElementSize';
 import { Split } from '@tgim/ui/Splitter';
 import FileDetailSidebar from '../FileDetailSidebar';
 import { useDebouncedEffect } from '@tgim/hooks/useDebouncedEffect';
+import { useDndMonitor } from '@dnd-kit/core';
 
 /* ---------------------------------------------
  * Helper Icon Components (unchanged)
@@ -77,6 +78,8 @@ const LAYOUTS: Layout[] = ['grid', 'masonry'];
 const SCROLL_CONTAINER_PADDING_X = 32;
 const MAX_ITEMS_PER_REQ = 100;
 const INITIAL_FETCH_COUNT = 50;
+
+type GridDragMeta = { hash?: string };
 
 function calculateMasonryMetrics(containerWidth: number, size: Size) {
   const { idealWidth, maxColumns } = MASONRY_CONFIG[size];
@@ -205,6 +208,7 @@ export const GridContent: React.FC<Props> = ({ gridData, onImageOpen, onClearPre
     onItemClick: handleSelectionClick,
     clearSelection,
     isSelected,
+    onDragStartSelect,
   } = useMultiSelect(visibleOrder, {
     pruneOnVisibilityChange: true,
     keepSelectedOnClick: true,
@@ -226,6 +230,13 @@ export const GridContent: React.FC<Props> = ({ gridData, onImageOpen, onClearPre
 
   const selectedCount = selected.size;
   const selectedHashes = useMemo(() => Array.from(selected), [selected]);
+  const selectedNodeIds = useMemo(
+    () =>
+      selectedHashes
+        .map(hash => hashToImgMap[hash]?.nodeId)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0),
+    [hashToImgMap, selectedHashes],
+  );
 
   const handleStartCroquis = useCallback(() => {
     if (selectedCount === 0) return;
@@ -391,6 +402,31 @@ export const GridContent: React.FC<Props> = ({ gridData, onImageOpen, onClearPre
     [handleSelectionClick, selectMode, onImageOpen],
   );
 
+  const buildDragPayload = useCallback(
+    (img: ImageItem) => {
+      const baseSelection = selected.has(img.hash) ? [...selectedNodeIds] : [img.nodeId];
+      return createNodeDragPayload({
+        nodeId: img.nodeId,
+        nodeKind: img.type,
+        source: 'grid',
+        selection: baseSelection,
+        meta: { hash: img.hash, name: img.name },
+      });
+    },
+    [selected, selectedNodeIds],
+  );
+
+  useDndMonitor({
+    onDragStart: event => {
+      const payload = getNodeDragPayload(event.active.data.current);
+      if (!payload || payload.source !== 'grid') return;
+      const hash = (payload.meta as GridDragMeta | undefined)?.hash;
+      if (hash) {
+        onDragStartSelect(hash);
+      }
+    },
+  });
+
   return (
     <div className="flex flex-col w-full h-full bg-surface text-text font-sans">
       {/* Toolbar */}
@@ -475,6 +511,7 @@ export const GridContent: React.FC<Props> = ({ gridData, onImageOpen, onClearPre
             thumbSize={thumbSize}
             onNeedThumbs={handleNeedThumbs}
             isSelected={isSelected}
+            getDragData={buildDragPayload}
           />
         ) : (
           <MasonryLayout
@@ -486,6 +523,7 @@ export const GridContent: React.FC<Props> = ({ gridData, onImageOpen, onClearPre
             thumbSize={thumbSize}
             isSelected={isSelected}
             columnCount={masonryMetrics.columnCount}
+            getDragData={buildDragPayload}
           />
         )}
       </div>

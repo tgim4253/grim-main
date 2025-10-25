@@ -1,6 +1,11 @@
 import React from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { createContainerId, createFolderId, Droppable } from '@tgim/dnd/index';
+import {
+  createContainerId,
+  createFolderId,
+  createNodeDragPayload,
+  Droppable,
+} from '@tgim/dnd/index';
 import { CSSVariables, NodeKind, type FileTreeData } from '@tgim/types/index';
 import {
   AlertCircle,
@@ -26,6 +31,7 @@ export const TreeNode: React.FC<{
   onClickOption?: (node: FileTreeData | undefined, action?: 'menu' | 'options') => void;
   onSelect?: (e: React.MouseEvent, id: string) => void;
   openFile: (node: FileTreeData) => void;
+  selection: string[];
 }> = ({
   node,
   depth,
@@ -36,6 +42,7 @@ export const TreeNode: React.FC<{
   selected,
   onSelect,
   openFile,
+  selection,
 }) => {
   const isFolder = node.type === NodeKind.Folder;
   const isFile = node.type === NodeKind.File;
@@ -58,7 +65,16 @@ export const TreeNode: React.FC<{
     listeners,
     setNodeRef: setDragRef,
     isDragging,
-  } = useDraggable({ id: node.id });
+  } = useDraggable({
+    id: node.id,
+    data: createNodeDragPayload({
+      nodeId: node.id,
+      nodeKind: node.type,
+      source: 'file-tree',
+      selection,
+      meta: { name: node.name, icon: node.icon },
+    }),
+  });
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: createFolderId(node.id),
     disabled: !isFolder,
@@ -214,6 +230,7 @@ export const NodeList: React.FC<{
     const bHas = b.children == null ? 0 : 1;
     return bHas - aHas;
   });
+  const selectedIds = React.useMemo(() => Array.from(selectedSet), [selectedSet]);
 
   return (
     <Droppable
@@ -224,6 +241,7 @@ export const NodeList: React.FC<{
           const depth = depthMap.get(node.id) ?? 0;
           const expanded = expandedSet.has(node.id);
           const selected = selectedSet.has(node.id);
+          const selection = selected ? selectedIds : [node.id];
 
           return (
             <React.Fragment key={node.id}>
@@ -237,6 +255,7 @@ export const NodeList: React.FC<{
                 onSelect={onSelect}
                 openFile={openFile}
                 onClickOption={onClickOption}
+                selection={selection}
               />
               {node.children?.length && expanded ? (
                 <NodeList

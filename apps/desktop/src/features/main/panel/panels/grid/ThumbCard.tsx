@@ -4,6 +4,8 @@ import { ResizeMode } from '@tgim/types/file';
 import { ImageItem, Layout } from '@tgim/types/grid';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
+import { useDraggable } from '@dnd-kit/core';
+import type { NodeDragPayload } from '@tgim/dnd/index';
 
 // Keep a global set of keys that have completed loading to avoid re-fade
 const loadedOnceSet = new Set<string>();
@@ -19,6 +21,7 @@ type ThumbCardProps = {
   thumbSize: number;
   sizeClass?: string;
   isScrolling?: boolean;
+  dragData?: NodeDragPayload;
 };
 
 const ThumbCardComponent: React.FC<ThumbCardProps> = ({
@@ -32,6 +35,7 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
   sizeClass,
   thumbSize,
   isScrolling = false,
+  dragData,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -103,18 +107,37 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
     };
   }, [isMasonry, thumbSize]);
 
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: dragData?.nodeId ?? img.nodeId,
+    data: dragData,
+    disabled: !dragData,
+  });
+
+  const setRefs = useCallback(
+    (el: HTMLDivElement | null) => {
+      containerRef.current = el;
+      setNodeRef(el);
+    },
+    [setNodeRef],
+  );
+
   return (
     <div
-      ref={containerRef}
+      ref={setRefs}
       className={`group relative w-full ${
         isMasonry ? '' : 'h-full'
-      } overflow-hidden rounded-lg border ${selectionClasses} bg-surface shadow-sm transition-all duration-200 hover:border-accent hover:shadow-lg hover:-translate-y-1 cursor-pointer ${sizeClass ?? ''}`}
+      } overflow-hidden rounded-lg border ${selectionClasses} bg-surface shadow-sm transition-all duration-200 hover:border-accent hover:shadow-lg hover:-translate-y-1 cursor-pointer ${
+        dragData ? 'cursor-grab active:cursor-grabbing' : ''
+      } ${sizeClass ?? ''} ${isDragging ? 'opacity-70' : ''}`}
       onClick={handleCardClick}
       role="button"
       tabIndex={0}
       aria-selected={selected}
       data-selected={selected ? 'true' : 'false'}
+      data-dragging={isDragging ? 'true' : 'false'}
       style={cardStyle}
+      {...listeners}
+      {...attributes}
     >
       {showCheckbox && (
         <div className="absolute left-2 top-2 z-10">
