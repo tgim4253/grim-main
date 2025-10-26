@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType, type SVGProps } from 'react';
+import { useEffect, useState } from 'react';
 import { ipc } from '../../lib/ipc';
 import TitleBar from './layout/TitleBar';
 import { platform } from '@tauri-apps/plugin-os';
@@ -21,15 +21,7 @@ import { convertKeysToCamel } from '@tgim/utils/object';
 import { ToastContainer } from 'react-toastify';
 import { NodeDndProvider, useStandardSensors, useNodeDndState, DragHandle } from '@tgim/dnd/index';
 import { closestCenter, DragOverlay } from '@dnd-kit/core';
-import {
-  Folder,
-  Image as ImageIcon,
-  File as FileIcon,
-  FileText,
-  Crop,
-  Tag,
-  NotebookPen,
-} from 'lucide-react';
+import { getNodeIcon } from '@tgim/ui';
 
 interface LayoutPorps {
   layoutId: string;
@@ -72,20 +64,12 @@ const Layout: React.FC<LayoutPorps> = ({ layoutId }) => {
   );
 };
 
-const iconByKind: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
-  folder: Folder,
-  image: ImageIcon,
-  document: FileText,
-  crop: Crop,
-  memo: NotebookPen,
-  tag: Tag,
-};
-
 const NodeDragOverlayRenderer: React.FC = () => {
   const { activeNode } = useNodeDndState();
   if (!activeNode) return null;
 
-  const Icon = iconByKind[activeNode.nodeKind ?? ''] ?? FileIcon;
+  // eslint-disable-next-line
+  const Icon = getNodeIcon(activeNode.nodeKind);
   const selectionCount = activeNode.selection?.length ?? 1;
   const meta = (activeNode.meta ?? {}) as { name?: unknown };
   const label = typeof meta.name === 'string' ? meta.name : null;
@@ -269,7 +253,16 @@ const Main: React.FC = () => {
         const treeData = convertToTreeData(data);
         setTreeData(treeData);
       } catch (error) {
-        console.error('Failed to bootstrap MOA graph', error);
+        const normalizeError = (err: unknown): Error => {
+          if (err instanceof Error) return err;
+          if (typeof err === 'string') return new Error(err);
+          try {
+            return new Error(JSON.stringify(err));
+          } catch {
+            return new Error('Unknown bootstrap error');
+          }
+        };
+        console.error('Failed to bootstrap MOA graph', normalizeError(error));
       }
     };
 

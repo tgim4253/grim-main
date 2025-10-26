@@ -12,14 +12,13 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
-  File,
-  Folder,
   MoreVertical,
   RefreshCw,
 } from 'lucide-react';
 import cn from '@tgim/utils/cn';
 import Button from './Button';
 import { useDebouncedEffect } from '@tgim/hooks/useDebouncedEffect';
+import { getNodeIcon } from './icons/nodeIconMap';
 
 export const TreeNode: React.FC<{
   node: FileTreeData;
@@ -46,6 +45,7 @@ export const TreeNode: React.FC<{
 }) => {
   const isFolder = node.type === NodeKind.Folder;
   const isFile = node.type === NodeKind.File;
+  const LeadingIcon = getNodeIcon(node.type);
 
   const [queuedToggle, setQueuedToggle] = React.useState(false);
 
@@ -154,7 +154,7 @@ export const TreeNode: React.FC<{
         )}
 
         <span aria-hidden="true">
-          {isFolder ? <Folder className="icon" /> : <File className="icon" />}
+          <LeadingIcon className="icon" />
         </span>
 
         <span className="name" title={node.name}>

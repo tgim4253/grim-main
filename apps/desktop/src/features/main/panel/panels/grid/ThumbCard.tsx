@@ -130,8 +130,6 @@ const ThumbCardComponent: React.FC<ThumbCardProps> = ({
         dragData ? 'cursor-grab active:cursor-grabbing' : ''
       } ${sizeClass ?? ''} ${isDragging ? 'opacity-70' : ''}`}
       onClick={handleCardClick}
-      role="button"
-      tabIndex={0}
       aria-selected={selected}
       data-selected={selected ? 'true' : 'false'}
       data-dragging={isDragging ? 'true' : 'false'}

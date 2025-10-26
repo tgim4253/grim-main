@@ -11,3 +11,4 @@ export { default as Tab } from './Tab';
 export { default as NodeRenderer } from './Node';
 export { getGraphPalette, clearNodeSpriteCaches } from './Node';
 export { default as CropPreview } from './CropPreview';
+export { getNodeIcon, nodeIconMap } from './icons/nodeIconMap';
