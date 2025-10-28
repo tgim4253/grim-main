@@ -3,6 +3,7 @@ import { useCallback, useMemo, useRef } from 'react';
 import { FixedSizeGrid as WindowGrid, GridChildComponentProps } from 'react-window';
 import ThumbCard from './ThumbCard';
 import { useElementSize } from '@tgim/hooks/useElementSize';
+import type { NodeDragPayload } from '@tgim/dnd/index';
 
 interface Props {
   images: ImageItem[];
@@ -14,6 +15,7 @@ interface Props {
   thumbSize: number;
   onNeedThumbs: (items: ImageItem[]) => void;
   isSelected: (id: string) => boolean;
+  getDragData: (img: ImageItem) => NodeDragPayload | undefined;
 }
 
 type GridCellData = {
@@ -28,6 +30,7 @@ type GridCellData = {
   unobserve: (el: Element | null) => void;
   thumbSize: number;
   isSelected: (id: string) => boolean;
+  getDragData: (img: ImageItem) => NodeDragPayload | undefined;
 };
 /* ---------------------------------------------
  * Virtualized Grid (react-window)
@@ -43,6 +46,7 @@ export const VirtualGridLayout: React.FC<Props> = ({
   thumbSize,
   onNeedThumbs,
   isSelected,
+  getDragData,
 }) => {
   const itemW = size === 'small' ? 96 : size === 'large' ? 192 : 144;
   const itemH = itemW;
@@ -104,6 +108,7 @@ export const VirtualGridLayout: React.FC<Props> = ({
       unobserve,
       thumbSize,
       isSelected,
+      getDragData,
     }),
     [
       images,
@@ -117,6 +122,7 @@ export const VirtualGridLayout: React.FC<Props> = ({
       unobserve,
       thumbSize,
       isSelected,
+      getDragData,
     ],
   );
 
@@ -168,6 +174,7 @@ export const VirtualGridLayout: React.FC<Props> = ({
             thumbSize={data.thumbSize}
             selected={data.isSelected(img.hash)}
             isScrolling={!!isScrolling}
+            dragData={data.getDragData(img)}
           />
         </div>
       );

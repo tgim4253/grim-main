@@ -1,6 +1,7 @@
 import { ImageItem, Size } from '@tgim/types/grid';
 import { useMemo } from 'react';
 import ThumbCard from './ThumbCard';
+import type { NodeDragPayload } from '@tgim/dnd/index';
 
 interface Props {
   images: ImageItem[];
@@ -11,6 +12,7 @@ interface Props {
   thumbSize: number;
   isSelected: (id: string) => boolean;
   columnCount: number;
+  getDragData: (img: ImageItem) => NodeDragPayload | undefined;
 }
 export const MASONRY_CONFIG: Record<Size, { idealWidth: number; maxColumns: number }> = {
   small: { idealWidth: 160, maxColumns: 8 },
@@ -34,6 +36,7 @@ export const MasonryLayout: React.FC<Props> = ({
   thumbSize,
   isSelected,
   columnCount,
+  getDragData,
 }) => {
   const columnStyle = useMemo<React.CSSProperties>(
     () => ({
@@ -61,6 +64,7 @@ export const MasonryLayout: React.FC<Props> = ({
             unobserve={unobserve}
             thumbSize={thumbSize}
             selected={isSelected(img.hash)}
+            dragData={getDragData(img)}
           />
         </div>
       ))}
