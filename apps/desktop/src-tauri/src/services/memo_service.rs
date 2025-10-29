@@ -77,19 +77,11 @@ pub async fn create_memo(
     )
     .await?;
 
-    ConnectionRepository::insert_connection(
+    ConnectionRepository::insert_pair(
         tx.as_mut(),
         attachment_node_id.clone(),
         memo_node_id.clone(),
         RelationType::Memo,
-        now.clone(),
-    )
-    .await?;
-
-    ConnectionRepository::insert_connection(
-        tx.as_mut(),
-        memo_node_id.clone(),
-        attachment_node_id.clone(),
         RelationType::MemoTarget,
         now.clone(),
     )

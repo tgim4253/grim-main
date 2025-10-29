@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 use sqlx::{Executor, Sqlite};
 
 use crate::models::connection::{Connection, RelationType};
@@ -52,7 +52,7 @@ impl ConnectionRepository {
     {
         let connection_id = crate::utils::identifier::get_unique_id();
 
-        sqlx::query!(
+        let result = sqlx::query(
             r#"
             INSERT INTO connection (id, src_node_id, dst_node_id, kind_id, created_at)
             VALUES (
@@ -62,16 +62,78 @@ impl ConnectionRepository {
                 (SELECT id FROM connection_kind_rule WHERE kind = ?4),
                 ?5
             )
+            ON CONFLICT(src_node_id, dst_node_id, kind_id) DO NOTHING
             "#,
-            connection_id,
-            src_node_id,
-            dst_node_id,
-            kind,
-            now,
         )
+        .bind(&connection_id)
+        .bind(&src_node_id)
+        .bind(&dst_node_id)
+        .bind(kind)
+        .bind(&now)
         .execute(&mut *executor)
         .await?;
 
-        Ok(connection_id)
+        // When the unique constraint prevented an insert, return the existing row id.
+        if result.rows_affected() > 0 {
+            return Ok(connection_id);
+        }
+
+        let existing = sqlx::query_scalar::<_, String>(
+            r#"
+            SELECT id
+            FROM connection
+            WHERE src_node_id = ?1
+              AND dst_node_id = ?2
+              AND kind_id = (SELECT id FROM connection_kind_rule WHERE kind = ?3)
+            "#,
+        )
+        .bind(&src_node_id)
+        .bind(&dst_node_id)
+        .bind(kind)
+        .fetch_optional(&mut *executor)
+        .await
+        .context("Failed to fetch existing connection identifier")?;
+
+        existing.ok_or_else(|| {
+            anyhow!(
+                "Failed to upsert connection for {} -> {} ({:?})",
+                src_node_id,
+                dst_node_id,
+                kind
+            )
+        })
+    }
+
+    /// Ensure both forward and reverse relations exist between the given nodes.
+    pub async fn insert_pair<'a, E>(
+        executor: &mut E,
+        src_node_id: String,
+        dst_node_id: String,
+        forward: RelationType,
+        reverse: RelationType,
+        now: String,
+    ) -> Result<(String, String)>
+    where
+        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+    {
+        let forward_id = Self::insert_connection(
+            executor,
+            src_node_id.clone(),
+            dst_node_id.clone(),
+            forward,
+            now.clone(),
+        )
+        .await?;
+
+        let reverse_id = Self::insert_connection(
+            executor,
+            dst_node_id,
+            src_node_id,
+            reverse,
+            now,
+        )
+        .await?;
+
+        Ok((forward_id, reverse_id))
     }
 }

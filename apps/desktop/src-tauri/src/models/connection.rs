@@ -22,13 +22,16 @@ pub enum RelationType {
     BelongToFolder,
     ParentFolder,
     ChildFolder,
-    RelativeImage,
+    RelativeFile,
+    RelatedImage,
     CroquisResLink,
     CroquisRefLink,
     Cropped,
     CroppedOrigin,
     Memo,
     MemoTarget,
+    ReferenceFile,
+    ReferenceBy,
 }
 
 impl RelationType {
@@ -38,13 +41,16 @@ impl RelationType {
             RelationType::BelongToFolder => "belongtofolder",
             RelationType::ParentFolder => "parentfolder",
             RelationType::ChildFolder => "childfolder",
-            RelationType::RelativeImage => "relativeimage",
+            RelationType::RelativeFile => "relativefile",
+            RelationType::RelatedImage => "relatedimage",
             RelationType::CroquisResLink => "croquisreslink",
             RelationType::CroquisRefLink => "croquisreflink",
             RelationType::Cropped => "cropped",
             RelationType::CroppedOrigin => "croppedorigin",
             RelationType::Memo => "memo",
             RelationType::MemoTarget => "memotarget",
+            RelationType::ReferenceFile => "referencefile",
+            RelationType::ReferenceBy => "referenceby",
         }
     }
 }
