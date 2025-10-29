@@ -12,7 +12,7 @@ use crate::{
     models::file::{FileInfo, FileType},
     services::{
         db::DB_MANAGER, file_service::asset::ensure_file_asset_binding,
-        storage_root,
+        settings, storage_root,
     },
     utils::{
         file_ops::{decode_data_url, ensure_unique_path, extension_from_mime},
@@ -118,7 +118,9 @@ async fn resolve_download_directory(moa_id: &str) -> Result<PathBuf> {
         .get_or_add(moa_id)
         .await
         .context("failed to resolve moa paths")?;
-    let download_dir = paths.base_dir.join("download");
+    let workspace_settings = settings::load(&paths).await?;
+    let download_dir =
+        workspace_settings.effective_download_dir(&paths.base_dir);
     fs::create_dir_all(&download_dir).await.with_context(|| {
         format!(
             "failed to create download directory at {}",

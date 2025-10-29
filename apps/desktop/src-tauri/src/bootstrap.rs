@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use tokio::fs::{self, OpenOptions};
 use tokio::io::AsyncWriteExt;
 
-use crate::config::moa::MoaConfig;
+use crate::config::{moa::MoaConfig, settings::MoaSettings};
 use crate::services::moa_services;
 use crate::utils::date;
 use once_cell::sync::Lazy;
@@ -15,6 +15,7 @@ const CACHED_DIR_NAME: &str = ".cached";
 const THUMBS_DIR_NAME: &str = "thumbs";
 const DB_FILE_NAME: &str = "grim.db";
 const CFG_FILE_NAME: &str = "config.json";
+const SETTINGS_FILE_NAME: &str = "settings.json";
 
 #[derive(Clone)]
 pub struct MoaPaths {
@@ -24,6 +25,8 @@ pub struct MoaPaths {
     pub moa_dir: PathBuf,
     /// Location of the SQLite database file ("path/name/.moa/grim.db").
     pub db_path: PathBuf,
+    /// Path to the workspace settings file ("path/name/.moa/settings.json").
+    pub settings_path: PathBuf,
 }
 
 /// Lazily computed map of derived Moa paths keyed by workspace identifier.
@@ -83,6 +86,7 @@ pub async fn ensure_layout(base: &Path) -> Result<MoaPaths> {
 
     let db_path = moa_dir.join(DB_FILE_NAME);
     let cfg_path = moa_dir.join(CFG_FILE_NAME);
+    let settings_path = moa_dir.join(SETTINGS_FILE_NAME);
 
     if !cfg_path.exists() {
         // open with create_new to avoid races
@@ -111,6 +115,26 @@ pub async fn ensure_layout(base: &Path) -> Result<MoaPaths> {
         let _ = file.flush().await;
     }
 
+    if !settings_path.exists() {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&settings_path)
+            .await
+            .with_context(|| {
+                format!("Failed to create {}", settings_path.display())
+            })?;
+
+        let settings = MoaSettings::default().to_overrides();
+        let settings_bytes = serde_json::to_vec_pretty(&settings)
+            .context("Failed to serialize initial settings.json")?;
+
+        file.write_all(&settings_bytes).await.with_context(|| {
+            format!("Failed to write {}", settings_path.display())
+        })?;
+        let _ = file.flush().await;
+    }
+
     // .moa/.cached and thumbs
     let cached_dir = moa_dir.join(CACHED_DIR_NAME);
     let thumb_dir = cached_dir.join(THUMBS_DIR_NAME);
@@ -122,5 +146,10 @@ pub async fn ensure_layout(base: &Path) -> Result<MoaPaths> {
         .await
         .with_context(|| format!("Failed to create {}", thumb_dir.display()))?;
 
-    Ok(MoaPaths { base_dir: base.to_path_buf(), moa_dir, db_path })
+    Ok(MoaPaths {
+        base_dir: base.to_path_buf(),
+        moa_dir,
+        db_path,
+        settings_path,
+    })
 }

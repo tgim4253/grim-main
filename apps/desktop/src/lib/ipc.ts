@@ -32,6 +32,29 @@ import {
 } from '@tgim/types/capture';
 import { convertKeysToCamel } from '@tgim/utils/object';
 
+type WorkspaceSettings = {
+  downloadDir?: string | null;
+};
+
+const toWorkspaceSettings = (value: unknown): WorkspaceSettings => {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+
+  const record = value as Record<string, unknown>;
+  const downloadDirValue = record.downloadDir;
+
+  if (typeof downloadDirValue === 'string') {
+    return { downloadDir: downloadDirValue };
+  }
+
+  if (downloadDirValue === null) {
+    return { downloadDir: null };
+  }
+
+  return {};
+};
+
 const appWindow = getCurrentWindow();
 
 // Thin wrappers around Tauri invoke calls to keep React components lean.
@@ -210,6 +233,19 @@ const captureIpc = {
   },
 };
 
+const settingsIpc = {
+  load: async (moaId: string): Promise<WorkspaceSettings> => {
+    const response = await invoke('load_settings', { moaId });
+    const camelCased = convertKeysToCamel(response);
+    return toWorkspaceSettings(camelCased);
+  },
+  save: async (moaId: string, payload: WorkspaceSettings): Promise<WorkspaceSettings> => {
+    const response = await invoke('save_settings', { moaId, payload });
+    const camelCased = convertKeysToCamel(response);
+    return toWorkspaceSettings(camelCased);
+  },
+};
+
 export const ipc = {
   windowController: windowControllerIpc,
   moa: moaIpc,
@@ -219,4 +255,5 @@ export const ipc = {
   croquis: croquisIpc,
   capture: captureIpc,
   thumbnail: thumbnailIpc,
+  settings: settingsIpc,
 };
