@@ -69,6 +69,8 @@ fn main() {
             commands::croquis::start_croquis_session,
             commands::croquis::load_croquis_session,
             commands::croquis::load_croquis_option,
+            commands::settings::load_settings,
+            commands::settings::save_settings,
             commands::capture::open_capture_overlay,
             commands::capture::render_capture_preview,
             commands::capture::confirm_capture,

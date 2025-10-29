@@ -66,10 +66,9 @@ const Layout: React.FC<LayoutPorps> = ({ layoutId }) => {
 
 const NodeDragOverlayRenderer: React.FC = () => {
   const { activeNode } = useNodeDndState();
-  if (!activeNode) return null;
+  const Icon = activeNode ? getNodeIcon(activeNode.nodeKind) : null;
 
-  // eslint-disable-next-line
-  const Icon = getNodeIcon(activeNode.nodeKind);
+  if (!activeNode || !Icon) return null;
   const selectionCount = activeNode.selection?.length ?? 1;
   const meta = (activeNode.meta ?? {}) as { name?: unknown };
   const label = typeof meta.name === 'string' ? meta.name : null;

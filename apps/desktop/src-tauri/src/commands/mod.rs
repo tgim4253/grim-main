@@ -7,3 +7,4 @@ pub mod graph;
 pub mod image_crop;
 pub mod memo;
 pub mod moa;
+pub mod settings;

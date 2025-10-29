@@ -10,4 +10,5 @@ pub mod image_crop_service;
 pub mod integrity;
 pub mod memo_service;
 pub mod moa_services;
+pub mod settings;
 pub mod storage_root;

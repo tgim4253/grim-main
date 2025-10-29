@@ -255,15 +255,39 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   );
   const [defaultDownloadPath, setDefaultDownloadPath] = useState<string | null>(null);
 
+  const isAbsolutePath = useCallback((value: string) => {
+    return value.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(value) || value.startsWith('\\\\');
+  }, []);
+
   useEffect(() => {
+    if (!moaId) return;
+
     void (async () => {
       const moas = await ipc.moa.loadMoas();
       const target = moas.find(moa => moa.moaId === moaId);
       if (!target) return;
-      const defaultPath = await join(target.path, target.name, 'download');
-      setDefaultDownloadPath(defaultPath);
+      const basePath = await join(target.path, target.name);
+
+      let resolvedPath: string | null = null;
+      try {
+        const settings = await ipc.settings.load(moaId);
+        const overridePath = settings.downloadDir ?? null;
+        if (overridePath) {
+          resolvedPath = isAbsolutePath(overridePath)
+            ? overridePath
+            : await join(basePath, overridePath);
+        }
+      } catch (error) {
+        console.error('Failed to load workspace settings', error);
+      }
+
+      if (!resolvedPath) {
+        resolvedPath = await join(basePath, 'download');
+      }
+
+      setDefaultDownloadPath(resolvedPath);
     })();
-  }, [moaId]);
+  }, [isAbsolutePath, moaId]);
   const transformDataToGridData = useCallback((data: GraphResponse): GridData => {
     const items = data.nodes.filter(node => node.id !== data.rootNodeId);
     const imageItems: ImageItem[] = [];
