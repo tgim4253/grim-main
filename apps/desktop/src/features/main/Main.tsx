@@ -22,7 +22,6 @@ import { ToastContainer } from 'react-toastify';
 import { NodeDndProvider, useStandardSensors, useNodeDndState, DragHandle } from '@tgim/dnd/index';
 import { closestCenter, DragOverlay } from '@dnd-kit/core';
 import { getNodeIcon } from '@tgim/ui';
-import type { LucideIcon } from 'lucide-react';
 
 interface LayoutPorps {
   layoutId: string;
