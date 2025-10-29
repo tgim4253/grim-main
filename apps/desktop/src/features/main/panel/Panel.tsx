@@ -34,7 +34,7 @@ import ImageCropView from './panels/ImageCropView';
 import ImageMemoView, { MemoEntry as MemoViewEntry } from './panels/ImageMemoView';
 import { toNormalizedCropRect } from '@tgim/utils/crop';
 
-const DEFAULT_CAPTURE_LINK = 'relativeimage';
+const DEFAULT_CAPTURE_LINK = RelationType.RelativeFile;
 const FOLDER_CAPTURE_FORWARD_LINK = RelationType.ContainsFile;
 const FOLDER_CAPTURE_REVERSE_LINK = RelationType.BelongToFolder;
 
@@ -271,7 +271,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       let resolvedPath: string | null = null;
       try {
         const settings = await ipc.settings.load(moaId);
-        const overridePath = settings.downloadDir ?? null;
+        const overridePath = settings.download?.dir ?? null;
         if (overridePath) {
           resolvedPath = isAbsolutePath(overridePath)
             ? overridePath

@@ -129,19 +129,11 @@ pub(crate) async fn create_image_crop_in_tx(
     let origin_id = origin_node_id.to_string();
     let now_owned = options.now.to_string();
 
-    ConnectionRepository::insert_connection(
+    ConnectionRepository::insert_pair(
         tx.as_mut(),
-        origin_id.clone(),
+        origin_id,
         crop_node_id.clone(),
         RelationType::Cropped,
-        now_owned.clone(),
-    )
-    .await?;
-
-    ConnectionRepository::insert_connection(
-        tx.as_mut(),
-        crop_node_id.clone(),
-        origin_id,
         RelationType::CroppedOrigin,
         now_owned,
     )

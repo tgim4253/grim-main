@@ -32,8 +32,15 @@ import {
 } from '@tgim/types/capture';
 import { convertKeysToCamel } from '@tgim/utils/object';
 
+type DownloadSettings = {
+  dir?: string | null;
+};
+
+type GraphSettings = Record<string, unknown>;
+
 type WorkspaceSettings = {
-  downloadDir?: string | null;
+  download?: DownloadSettings;
+  graph?: GraphSettings;
 };
 
 const toWorkspaceSettings = (value: unknown): WorkspaceSettings => {
@@ -42,17 +49,43 @@ const toWorkspaceSettings = (value: unknown): WorkspaceSettings => {
   }
 
   const record = value as Record<string, unknown>;
-  const downloadDirValue = record.downloadDir;
+  const parsed: WorkspaceSettings = {};
 
-  if (typeof downloadDirValue === 'string') {
-    return { downloadDir: downloadDirValue };
+  const downloadValue = record.download;
+  if (downloadValue && typeof downloadValue === 'object' && !Array.isArray(downloadValue)) {
+    const downloadRecord = downloadValue as Record<string, unknown>;
+    const dir = downloadRecord.dir;
+
+    if (typeof dir === 'string' || dir === null) {
+      parsed.download = {
+        dir,
+      };
+    }
   }
 
-  if (downloadDirValue === null) {
-    return { downloadDir: null };
+  const graphValue = record.graph;
+  if (graphValue && typeof graphValue === 'object' && !Array.isArray(graphValue)) {
+    parsed.graph = graphValue as GraphSettings;
   }
 
-  return {};
+  return parsed;
+};
+
+const fromWorkspaceSettings = (settings: WorkspaceSettings): Record<string, unknown> => {
+  const payload: Record<string, unknown> = {};
+
+  if (settings.download) {
+    const { dir } = settings.download;
+    if (typeof dir === 'string' || dir === null) {
+      payload.download = { dir };
+    }
+  }
+
+  if (settings.graph) {
+    payload.graph = settings.graph;
+  }
+
+  return payload;
 };
 
 const appWindow = getCurrentWindow();
@@ -240,7 +273,10 @@ const settingsIpc = {
     return toWorkspaceSettings(camelCased);
   },
   save: async (moaId: string, payload: WorkspaceSettings): Promise<WorkspaceSettings> => {
-    const response = await invoke('save_settings', { moaId, payload });
+    const response = await invoke('save_settings', {
+      moaId,
+      payload: fromWorkspaceSettings(payload),
+    });
     const camelCased = convertKeysToCamel(response);
     return toWorkspaceSettings(camelCased);
   },

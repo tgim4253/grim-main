@@ -114,13 +114,16 @@ export enum RelationType {
   BelongToFolder = 'belongtofolder',
   ParentFolder = 'parentfolder',
   ChildFolder = 'childfolder',
-  RelativeImage = 'relativeimage',
+  RelativeFile = 'relativefile',
+  RelatedImage = 'relatedimage',
   CroquisResLink = 'croquisreslink',
   CroquisRefLink = 'croquisreflink',
   Cropped = 'cropped',
   CroppedOrigin = 'croppedorigin',
   Memo = 'memo',
   MemoTarget = 'memotarget',
+  ReferenceFile = 'referencefile',
+  ReferenceBy = 'referenceby',
 }
 
 export interface CropRectangle {

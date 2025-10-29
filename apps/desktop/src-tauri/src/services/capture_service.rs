@@ -365,25 +365,39 @@ async fn register_capture_in_workspace(
 
     if let Some(anchor_id) = anchor_node_id {
         let now = date::get_now_date();
-        if let Some(kind) = link_type_forward {
-            let _ = ConnectionRepository::insert_connection(
-                tx.as_mut(),
-                anchor_id.clone(),
-                file_node_id.clone(),
-                kind,
-                now.clone(),
-            )
-            .await?;
-        }
-        if let Some(kind) = link_type_reverse {
-            let _ = ConnectionRepository::insert_connection(
-                tx.as_mut(),
-                file_node_id.clone(),
-                anchor_id.clone(),
-                kind,
-                now,
-            )
-            .await?;
+        match (link_type_forward, link_type_reverse) {
+            (Some(forward), Some(reverse)) => {
+                let _ = ConnectionRepository::insert_pair(
+                    tx.as_mut(),
+                    anchor_id.clone(),
+                    file_node_id.clone(),
+                    forward,
+                    reverse,
+                    now,
+                )
+                .await?;
+            }
+            (Some(kind), None) => {
+                let _ = ConnectionRepository::insert_connection(
+                    tx.as_mut(),
+                    anchor_id.clone(),
+                    file_node_id.clone(),
+                    kind,
+                    now,
+                )
+                .await?;
+            }
+            (None, Some(kind)) => {
+                let _ = ConnectionRepository::insert_connection(
+                    tx.as_mut(),
+                    file_node_id.clone(),
+                    anchor_id.clone(),
+                    kind,
+                    now,
+                )
+                .await?;
+            }
+            (None, None) => {}
         }
     }
 

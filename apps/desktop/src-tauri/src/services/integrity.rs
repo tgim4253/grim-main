@@ -104,13 +104,16 @@ pub async fn seed_initial_data(pool: &Pool<Sqlite>) -> Result<()> {
         (RelationType::BelongToFolder, 3, 0, "File -> Folder"),
         (RelationType::ParentFolder, 3, 0, "Folder(child) -> Folder(parent)"),
         (RelationType::ChildFolder, 1, 0, "Folder(parent) -> Folder(child)"),
-        (RelationType::RelativeImage, 3, 0, "File -> File (relative image)"),
+        (RelationType::RelativeFile, 3, 0, "File -> File (relative file)"),
+        (RelationType::RelatedImage, 3, 0, "Image -> Image (related image)"),
         (RelationType::CroquisResLink, 1, 0, "origin -> croquis"),
         (RelationType::CroquisRefLink, 1, 0, "croquis -> origin"),
         (RelationType::Cropped, 1, 0, "origin -> crop"),
         (RelationType::CroppedOrigin, 1, 0, "crop -> origin"),
         (RelationType::Memo, 1, 0, "image/crop -> memo"),
         (RelationType::MemoTarget, 1, 0, "memo -> image/crop"),
+        (RelationType::ReferenceFile, 1, 0, "document -> file (reference)"),
+        (RelationType::ReferenceBy, 1, 0, "file -> document (referenced by)"),
     ];
 
     for (kind, default_level, editable, description) in seed_data {

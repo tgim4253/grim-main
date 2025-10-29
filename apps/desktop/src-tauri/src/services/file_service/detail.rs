@@ -27,11 +27,14 @@ fn infer_relation_kind(kind: &str) -> RelationType {
         "containsfile" => RelationType::ContainsFile,
         "parentfolder" => RelationType::ParentFolder,
         "childfolder" => RelationType::ChildFolder,
-        "relativeimage" => RelationType::RelativeImage,
+        "relativefile" => RelationType::RelativeFile,
+        "relatedimage" => RelationType::RelatedImage,
         "croquisreslink" => RelationType::CroquisResLink,
         "croquisreflink" => RelationType::CroquisRefLink,
         "cropped" => RelationType::Cropped,
         "croppedorigin" => RelationType::CroppedOrigin,
+        "referencefile" => RelationType::ReferenceFile,
+        "referenceby" => RelationType::ReferenceBy,
         _ => RelationType::BelongToFolder,
     }
 }

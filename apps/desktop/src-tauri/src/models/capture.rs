@@ -3,11 +3,11 @@ use serde::{Deserialize, Serialize};
 use crate::models::connection::RelationType;
 
 fn default_forward_link() -> Option<RelationType> {
-    Some(RelationType::RelativeImage)
+    Some(RelationType::RelativeFile)
 }
 
 fn default_reverse_link() -> Option<RelationType> {
-    Some(RelationType::RelativeImage)
+    Some(RelationType::RelativeFile)
 }
 
 /// Information required to launch or confirm a capture workflow.
