@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ipc } from '../../lib/ipc';
 import TitleBar from './layout/TitleBar';
 import { platform } from '@tauri-apps/plugin-os';
@@ -22,7 +22,6 @@ import { ToastContainer } from 'react-toastify';
 import { NodeDndProvider, useStandardSensors, useNodeDndState, DragHandle } from '@tgim/dnd/index';
 import { closestCenter, DragOverlay } from '@dnd-kit/core';
 import { getNodeIcon } from '@tgim/ui';
-import type { LucideIcon } from 'lucide-react';
 
 interface LayoutPorps {
   layoutId: string;
@@ -67,9 +66,9 @@ const Layout: React.FC<LayoutPorps> = ({ layoutId }) => {
 
 const NodeDragOverlayRenderer: React.FC = () => {
   const { activeNode } = useNodeDndState();
-  if (!activeNode) return null;
+  const Icon = activeNode ? getNodeIcon(activeNode.nodeKind) : null;
 
-  const Icon = useMemo<LucideIcon>(() => getNodeIcon(activeNode.nodeKind), [activeNode.nodeKind]);
+  if (!activeNode || !Icon) return null;
   const selectionCount = activeNode.selection?.length ?? 1;
   const meta = (activeNode.meta ?? {}) as { name?: unknown };
   const label = typeof meta.name === 'string' ? meta.name : null;
