@@ -2,14 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::connection::RelationType;
 
-fn default_forward_link() -> Option<RelationType> {
-    Some(RelationType::RelativeFile)
-}
-
-fn default_reverse_link() -> Option<RelationType> {
-    Some(RelationType::RelativeFile)
-}
-
 /// Information required to launch or confirm a capture workflow.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -23,9 +15,9 @@ pub struct CaptureContext {
     pub moa_id: String,
     #[serde(default)]
     pub save_path: String,
-    #[serde(default = "default_forward_link")]
+    #[serde(default)]
     pub link_type_forward: Option<RelationType>,
-    #[serde(default = "default_reverse_link")]
+    #[serde(default)]
     pub link_type_reverse: Option<RelationType>,
 }
 

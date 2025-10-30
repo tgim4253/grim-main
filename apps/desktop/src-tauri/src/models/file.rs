@@ -353,6 +353,19 @@ impl FileType {
         }
     }
 
+    /// Optional suffix used when constructing connection rule kinds.
+    pub const fn rule_suffix(&self) -> Option<&'static str> {
+        match self {
+            FileType::Image => Some("image"),
+            FileType::Video => Some("video"),
+            FileType::Document => Some("document"),
+            FileType::GraphicTool => Some("graphictool"),
+            FileType::Audio => Some("audio"),
+            FileType::Archive => Some("archive"),
+            FileType::Unknown => None,
+        }
+    }
+
     /// Validate an image file with size, signature, and pixel constraints.
     pub fn check_is_img(path: &Path) -> Result<()> {
         const MAX_BYTES: u64 = 20 * 1024 * 1024; // 20MB

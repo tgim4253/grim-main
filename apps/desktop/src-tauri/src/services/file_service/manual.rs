@@ -9,9 +9,12 @@ use uuid::Uuid;
 use crate::{
     bootstrap::PATH_MANAGER,
     db::repository::node_repository::NodeRepository,
+    models::connection::RelationType,
     models::file::{FileInfo, FileType},
     services::{
-        db::DB_MANAGER, file_service::asset::ensure_file_asset_binding,
+        connection_rules::{ensure_connections_for_nodes, load_engine_for_moa},
+        db::DB_MANAGER,
+        file_service::asset::ensure_file_asset_binding,
         settings, storage_root,
     },
     utils::{
@@ -255,17 +258,30 @@ async fn register_path_with_virtual_folder(
         return Ok(false);
     }
 
+    let engine = load_engine_for_moa(moa_id)
+        .await
+        .context("failed to load connection rules")?;
+
     let (asset_id, _) = ensure_file_asset_binding(&mut tx, &file_info)
         .await
         .context("failed to upsert file asset binding")?;
 
-    NodeRepository::upsert_file_node(
+    let file_node_id =
+        NodeRepository::upsert_file_node(tx.as_mut(), asset_id.clone())
+            .await
+            .context("failed to ensure file node")?;
+
+    ensure_connections_for_nodes(
         tx.as_mut(),
-        virtual_node_id.to_string(),
-        asset_id.clone(),
+        &engine,
+        virtual_node_id,
+        &file_node_id,
+        (Some(RelationType::ContainsFile), Some(RelationType::BelongToFolder)),
+        None,
+        false,
     )
     .await
-    .context("failed to associate file node with virtual folder")?;
+    .context("failed to link file to virtual folder")?;
 
     tx.commit().await.context("failed to commit file import transaction")?;
 

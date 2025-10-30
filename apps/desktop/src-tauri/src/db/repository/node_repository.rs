@@ -9,7 +9,6 @@ use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     str::FromStr,
 };
-use tracing::warn;
 
 use crate::{
     config::file::IntegrityCheckResult,
@@ -691,9 +690,8 @@ impl NodeRepository {
     /// Ensure a file node exists for the provided file-asset identifier.
     pub async fn upsert_file_node<'a, E>(
         executor: &mut E,
-        parent_node_id: String,
         file_asset_id: String,
-    ) -> Result<()>
+    ) -> Result<String>
     where
         for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
     {
@@ -720,19 +718,7 @@ impl NodeRepository {
             node_id
         };
 
-        // todo: upsert containse_edges?
-        if let Err(err) = Self::create_folder_file_edges(
-            executor,
-            parent_node_id,
-            node_id,
-            now,
-        )
-        .await
-        {
-            warn!("failed to create folder/file edges: {}", err);
-        }
-
-        Ok(())
+        Ok(node_id)
     }
     /// Create bidirectional edges between parent and child folder nodes.
     async fn create_folder_to_folder_edges<'a, E>(
@@ -759,38 +745,6 @@ impl NodeRepository {
             child_node_id.clone(),
             parent_node_id.clone(),
             RelationType::ParentFolder,
-            now.clone(),
-        )
-        .await?;
-
-        Ok(())
-    }
-
-    /// Create bidirectional edges between a folder node and a file node.
-    async fn create_folder_file_edges<'a, E>(
-        executor: &mut E,
-        folder_node_id: String,
-        file_node_id: String,
-        now: String,
-    ) -> Result<()>
-    where
-        for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
-    {
-        let _ = ConnectionRepository::insert_connection(
-            executor,
-            folder_node_id.clone(),
-            file_node_id.clone(),
-            RelationType::ContainsFile,
-            now.clone(),
-        )
-        .await?;
-
-        // child -> parent (containedIn)
-        let _ = ConnectionRepository::insert_connection(
-            executor,
-            file_node_id.clone(),
-            folder_node_id.clone(),
-            RelationType::BelongToFolder,
             now.clone(),
         )
         .await?;

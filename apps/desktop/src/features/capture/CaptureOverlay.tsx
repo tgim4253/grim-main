@@ -1,5 +1,4 @@
 import { CaptureContext, CaptureMonitor, CaptureRect } from '@tgim/types/capture';
-import { RelationType } from '@tgim/types/graph';
 import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -21,7 +20,6 @@ type CaptureMode = 'freeform' | 'square';
 
 const IDLE_OVERLAY_COLOR = 'rgba(0, 0, 0, 0.35)';
 const ACTIVE_OVERLAY_COLOR = 'rgba(0, 0, 0, 0)';
-const DEFAULT_LINK_TYPE = RelationType.RelativeFile;
 
 const normaliseRect = (rect: CaptureRect, monitor: CaptureMonitor): CaptureRect => {
   const maxWidth = monitor.width;
@@ -44,8 +42,8 @@ const CaptureOverlay: React.FC = () => {
   const moaId = params.get('moa_id');
   const sourceHash = params.get('source_hash') ?? params.get('image_hash');
   const sourceNodeId = params.get('source_node_id');
-  const linkTypeForward = params.get('link_type_forward') ?? DEFAULT_LINK_TYPE;
-  const linkTypeReverse = params.get('link_type_reverse') ?? DEFAULT_LINK_TYPE;
+  const linkTypeForward = params.get('link_type_forward');
+  const linkTypeReverse = params.get('link_type_reverse');
 
   const [context, setContext] = useState<CaptureContext | null>(null);
   const [monitorInfo, setMonitorInfo] = useState<CaptureMonitor | null>(null);

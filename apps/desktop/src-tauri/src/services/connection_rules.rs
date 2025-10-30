@@ -1,9 +1,21 @@
-use crate::config::settings::{
-    ConnectionRule, ConnectionRuleAction, ConnectionRuleMatch, GraphSettings,
-    MoaSettings,
+use anyhow::{Context, Result};
+
+use crate::{
+    bootstrap::PATH_MANAGER,
+    config::settings::{
+        ConnectionRule, ConnectionRuleAction, ConnectionRuleMatch,
+        GraphSettings, MoaSettings,
+    },
+    db::repository::{
+        connection_repository::ConnectionRepository,
+        node_repository::NodeRepository,
+    },
+    models::connection::RelationType,
+    services::settings,
+    utils::date,
 };
 
-use crate::models::connection::RelationType;
+use sqlx::{Executor, Sqlite};
 
 #[allow(dead_code)]
 /// Prepared connection rule engine that evaluates rules against link contexts.
@@ -90,7 +102,15 @@ fn kind_matches(expected: &str, actual: &str) -> bool {
         }
     }
 
-    expected.eq_ignore_ascii_case(actual)
+    if expected.eq_ignore_ascii_case(actual) {
+        return true;
+    }
+
+    if let Some((actual_prefix, _)) = actual.split_once(':') {
+        return expected.eq_ignore_ascii_case(actual_prefix);
+    }
+
+    false
 }
 
 #[allow(dead_code)]
@@ -107,4 +127,140 @@ pub struct RuleContext<'a> {
 pub struct ResolvedConnection {
     pub rule_id: String,
     pub action: ConnectionRuleAction,
+}
+
+/// Load connection rules for the given workspace.
+pub async fn load_engine_for_moa(moa_id: &str) -> Result<ConnectionRuleEngine> {
+    let paths = PATH_MANAGER
+        .get_or_add(moa_id)
+        .await
+        .context("Failed to resolve workspace paths for connection rules")?;
+
+    let settings = settings::load(&paths)
+        .await
+        .context("Failed to load workspace settings for connection rules")?;
+
+    Ok(ConnectionRuleEngine::from_settings(&settings))
+}
+
+/// Resolve the action to take when linking two nodes.
+pub async fn resolve_for_nodes<'a, E>(
+    executor: &mut E,
+    engine: &ConnectionRuleEngine,
+    src_node_id: &str,
+    dst_node_id: &str,
+    relation_hint: Option<RelationType>,
+    is_manual: bool,
+) -> Result<Option<ConnectionRuleAction>>
+where
+    for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+{
+    let nodes = NodeRepository::fetch_nodes_by_ids(
+        executor,
+        vec![src_node_id.to_string(), dst_node_id.to_string()],
+    )
+    .await?;
+
+    let mut src_kind: Option<String> = None;
+    let mut dst_kind: Option<String> = None;
+
+    for node in nodes {
+        let label = node.rule_match_kind();
+        if node.id == src_node_id {
+            src_kind = Some(label.clone());
+        }
+        if node.id == dst_node_id {
+            dst_kind = Some(label);
+        }
+    }
+
+    match (src_kind, dst_kind) {
+        (Some(src_kind), Some(dst_kind)) => {
+            let ctx = RuleContext {
+                src_kind: &src_kind,
+                dst_kind: &dst_kind,
+                relation_hint,
+                is_manual,
+            };
+
+            Ok(engine.resolve(&ctx).map(|resolved| resolved.action))
+        }
+        _ => Ok(None),
+    }
+}
+
+/// Ensure appropriate connections exist between two nodes, falling back to the provided relation types.
+pub async fn ensure_connections_for_nodes<'a, E>(
+    executor: &mut E,
+    engine: &ConnectionRuleEngine,
+    src_node_id: &str,
+    dst_node_id: &str,
+    fallback: (Option<RelationType>, Option<RelationType>),
+    relation_hint: Option<RelationType>,
+    is_manual: bool,
+) -> Result<()>
+where
+    for<'e> &'e mut E: Executor<'e, Database = Sqlite>,
+{
+    let now = date::get_now_date();
+    let (fallback_forward, fallback_reverse) = fallback;
+
+    if let Some(action) = resolve_for_nodes(
+        executor,
+        engine,
+        src_node_id,
+        dst_node_id,
+        relation_hint,
+        is_manual,
+    )
+    .await?
+    {
+        ConnectionRepository::insert_pair(
+            executor,
+            src_node_id.to_string(),
+            dst_node_id.to_string(),
+            action.forward_relation,
+            action.reverse_relation,
+            now,
+        )
+        .await?;
+        return Ok(());
+    }
+
+    match (fallback_forward, fallback_reverse) {
+        (Some(forward), Some(reverse)) => {
+            ConnectionRepository::insert_pair(
+                executor,
+                src_node_id.to_string(),
+                dst_node_id.to_string(),
+                forward,
+                reverse,
+                now,
+            )
+            .await?;
+        }
+        (Some(forward), None) => {
+            ConnectionRepository::insert_connection(
+                executor,
+                src_node_id.to_string(),
+                dst_node_id.to_string(),
+                forward,
+                now,
+            )
+            .await?;
+        }
+        (None, Some(reverse)) => {
+            ConnectionRepository::insert_connection(
+                executor,
+                dst_node_id.to_string(),
+                src_node_id.to_string(),
+                reverse,
+                now,
+            )
+            .await?;
+        }
+        (None, None) => {}
+    }
+
+    Ok(())
 }

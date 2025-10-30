@@ -27,7 +27,9 @@ use crate::{
         file::FileInfo,
     },
     services::{
-        db::DB_MANAGER, file_service::asset::ensure_file_asset_binding,
+        connection_rules::{load_engine_for_moa, resolve_for_nodes},
+        db::DB_MANAGER,
+        file_service::asset::ensure_file_asset_binding,
         storage_root,
     },
     utils::{
@@ -279,9 +281,9 @@ async fn register_capture_in_workspace(
         moa_id,
         file_path,
         source_hash,
-        anchor_node_id,
-        link_type_forward,
-        link_type_reverse,
+        mut anchor_node_id,
+        mut link_type_forward,
+        mut link_type_reverse,
     } = context;
 
     let parent = file_path
@@ -325,8 +327,6 @@ async fn register_capture_in_workspace(
             .await?
     };
 
-    let mut anchor_node_id = anchor_node_id;
-
     if anchor_node_id.is_none() {
         if let Some(hash) = source_hash.clone() {
             if let Some(original_fc_id) =
@@ -363,7 +363,30 @@ async fn register_capture_in_workspace(
         }
     }
 
-    if let Some(anchor_id) = anchor_node_id {
+    if let Some(anchor_id) = anchor_node_id.clone() {
+        if link_type_forward.is_none() || link_type_reverse.is_none() {
+            let engine = load_engine_for_moa(&moa_id).await?;
+
+            if let Some(action) = resolve_for_nodes(
+                tx.as_mut(),
+                &engine,
+                &anchor_id,
+                &file_node_id,
+                None,
+                false,
+            )
+            .await?
+            {
+                if link_type_forward.is_none() {
+                    link_type_forward = Some(action.forward_relation);
+                }
+
+                if link_type_reverse.is_none() {
+                    link_type_reverse = Some(action.reverse_relation);
+                }
+            }
+        }
+
         let now = date::get_now_date();
         match (link_type_forward, link_type_reverse) {
             (Some(forward), Some(reverse)) => {
