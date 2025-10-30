@@ -19,6 +19,7 @@ use crate::{
         sroot_repository::SrootRepository,
     },
     models::{
+        connection::RelationType,
         file::{
             FileInfo, FileType, FolderData, FolderOptionUpdatePayload,
             FolderSelection, RealFolderData,
@@ -26,6 +27,10 @@ use crate::{
         node::Node,
     },
     services::{
+        connection_rules::{
+            ensure_connections_for_nodes, load_engine_for_moa,
+            ConnectionRuleEngine,
+        },
         db::DB_MANAGER,
         file_service::{
             asset::ensure_file_asset_binding,
@@ -351,6 +356,7 @@ async fn upsert_folder(
 ) -> Result<()> {
     let mut metrics = UpsertFolderMetrics::default();
     let total_timer = Instant::now();
+    let engine = load_engine_for_moa(moa_id).await?;
 
     upsert_folder_impl(
         tx,
@@ -359,6 +365,7 @@ async fn upsert_folder(
         parent_virtual_folder_id,
         abs_dir,
         config,
+        &engine,
         None,
         &mut metrics,
     )
@@ -380,6 +387,7 @@ async fn upsert_folder_impl(
     parent_virtual_folder_id: String,
     abs_dir: &Path,
     config: FolderUpsertConfig<'async_recursion>,
+    engine: &ConnectionRuleEngine,
     inherited_allowed_types: Option<HashSet<FileType>>,
     metrics: &mut UpsertFolderMetrics,
 ) -> Result<()> {
@@ -482,7 +490,7 @@ async fn upsert_folder_impl(
                 entry: &entry,
                 allowed_types: current_allowed.as_ref(),
             };
-            upsert_file_entry(tx, moa_id, params, &config, metrics)
+            upsert_file_entry(tx, moa_id, params, &config, engine, metrics)
                 .await
                 .with_context(|| {
                     format!("upsert_file_entry failed for {:?}", entry_path)
@@ -540,6 +548,7 @@ async fn upsert_folder_impl(
                 child_vf.id,
                 &entry_path,
                 child_config,
+                engine,
                 child_allowed,
                 metrics,
             )
@@ -559,6 +568,7 @@ async fn upsert_file_entry(
     moa_id: &str,
     params: FileEntryParams<'_>,
     config: &FolderUpsertConfig<'_>,
+    engine: &ConnectionRuleEngine,
     metrics: &mut UpsertFolderMetrics,
 ) -> Result<()> {
     let file_timer = Instant::now();
@@ -585,10 +595,17 @@ async fn upsert_file_entry(
 
     let (asset_id, _) = ensure_file_asset_binding(tx, &file_info).await?;
 
-    NodeRepository::upsert_file_node(
+    let file_node_id =
+        NodeRepository::upsert_file_node(tx.as_mut(), asset_id.clone()).await?;
+
+    ensure_connections_for_nodes(
         tx.as_mut(),
-        params.parent_virtual_folder_id.to_string(),
-        asset_id.clone(),
+        engine,
+        params.parent_virtual_folder_id,
+        &file_node_id,
+        (Some(RelationType::ContainsFile), Some(RelationType::BelongToFolder)),
+        None,
+        false,
     )
     .await?;
 

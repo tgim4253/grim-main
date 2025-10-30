@@ -70,6 +70,30 @@ pub enum NodeData {
     Memo(NodeMemo),
 }
 
+impl Node {
+    /// Label used when matching the node kind against connection rules.
+    pub fn rule_match_kind(&self) -> String {
+        match self.kind {
+            NodeKind::File => {
+                let mut label = String::from("file");
+                if let Some(NodeData::File(file)) = self.data.as_ref() {
+                    if let Some(suffix) = file.kind.rule_suffix() {
+                        label.push(':');
+                        label.push_str(suffix);
+                    }
+                }
+                label
+            }
+            NodeKind::Folder => "folder".to_string(),
+            NodeKind::Crop => "crop".to_string(),
+            NodeKind::Memo => "memo".to_string(),
+            NodeKind::Tag => "tag".to_string(),
+            NodeKind::Annotation => "annotation".to_string(),
+            NodeKind::Unknown => "unknown".to_string(),
+        }
+    }
+}
+
 /// Wrapper bundling nodes and their connections.
 #[derive(Debug, FromRow, Serialize)]
 pub struct NodeWithConnections {
