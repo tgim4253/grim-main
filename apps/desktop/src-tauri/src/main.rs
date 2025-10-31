@@ -75,6 +75,8 @@ fn main() {
             commands::capture::render_capture_preview,
             commands::capture::confirm_capture,
             commands::document::create_document,
+            commands::document::load_document,
+            commands::document::update_document,
         ])
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_decorum::init())

@@ -21,7 +21,7 @@ interface FileViewerProps {
 
 const FileViewer: React.FC<FileViewerProps> = ({ file, moaId, className, crop }) => {
   if (file.kind === FileType.Document) {
-    return <DocumentViewer file={file} className={className} />;
+    return <DocumentViewer file={file} className={className} moaId={moaId} />;
   }
 
   const [viewerSidebarVisible, setViewerSidebarVisible] = useState(false);

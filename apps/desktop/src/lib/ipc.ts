@@ -30,7 +30,13 @@ import {
   CapturePreview,
   CapturePreviewPayload,
 } from '@tgim/types/capture';
-import { CreateDocumentPayload } from '@tgim/types/document';
+import {
+  CreateDocumentPayload,
+  DocumentData,
+  DocumentUpdateResult,
+  LoadDocumentPayload,
+  UpdateDocumentPayload,
+} from '@tgim/types/document';
 import { convertKeysToCamel } from '@tgim/utils/object';
 
 type DownloadSettings = {
@@ -271,6 +277,14 @@ const documentIpc = {
   create: async (payload: CreateDocumentPayload): Promise<GraphResponse> => {
     const response = await invoke('create_document', { payload });
     return convertKeysToCamel(response) as GraphResponse;
+  },
+  load: async (payload: LoadDocumentPayload): Promise<DocumentData> => {
+    const response = await invoke('load_document', { payload });
+    return convertKeysToCamel(response) as DocumentData;
+  },
+  save: async (payload: UpdateDocumentPayload): Promise<DocumentUpdateResult> => {
+    const response = await invoke('update_document', { payload });
+    return convertKeysToCamel(response) as DocumentUpdateResult;
   },
 };
 

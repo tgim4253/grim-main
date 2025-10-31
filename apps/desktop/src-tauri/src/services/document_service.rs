@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::Local;
@@ -8,11 +8,19 @@ use crate::{
     bootstrap::PATH_MANAGER,
     db::repository::{
         connection_repository::ConnectionRepository,
-        graph_repository::GraphRepository, node_repository::NodeRepository,
+        file_repository::{FilePathRecord, FileRepository},
+        graph_repository::GraphRepository,
+        node_repository::NodeRepository,
     },
     models::{
-        connection::RelationType, document::CreateDocumentPayload,
-        file::FileInfo, graph::GraphResponse,
+        connection::RelationType,
+        document::{
+            CreateDocumentPayload, DocumentData, DocumentUpdateResult,
+            LoadDocumentPayload, UpdateDocumentPayload,
+        },
+        file::{FileInfo, FileType},
+        graph::GraphResponse,
+        node::NodeData,
     },
     services::{
         connection_rules::{load_engine_for_moa, resolve_for_nodes},
@@ -26,6 +34,13 @@ use crate::{
 const DOCUMENT_DIR_NAME: &str = "document";
 const DEFAULT_DOCUMENT_PREFIX: &str = "document";
 const DOCUMENT_EXTENSION: &str = "md";
+
+fn build_document_path(record: &FilePathRecord) -> Option<PathBuf> {
+    let base = record.abs_path_cached.as_ref()?;
+    let mut path = PathBuf::from(base);
+    path.push(&record.file_name);
+    Some(path)
+}
 
 /// Create a new markdown document under the workspace document directory and link it to the anchor node.
 pub async fn create_document(
@@ -195,6 +210,204 @@ pub async fn create_document(
         .context("failed to commit document creation transaction")?;
 
     Ok(graph)
+}
+
+/// Load an existing markdown document and return its contents.
+pub async fn load_document(
+    payload: LoadDocumentPayload,
+) -> Result<DocumentData> {
+    let LoadDocumentPayload { moa_id, node_id } = payload;
+
+    if moa_id.trim().is_empty() {
+        bail!("moa id is required");
+    }
+    if node_id.trim().is_empty() {
+        bail!("node id is required");
+    }
+
+    let mut tx = DB_MANAGER.create_new_tx(&moa_id).await?;
+
+    let node =
+        NodeRepository::fetch_file_node_data(tx.as_mut(), node_id.clone())
+            .await
+            .context("failed to fetch document node data")?;
+
+    let file = match node {
+        NodeData::File(file) => file,
+        _ => bail!("requested node is not a file"),
+    };
+
+    if file.kind != FileType::Document {
+        bail!("requested file is not a document");
+    }
+
+    let asset_id = FileRepository::find_file_asset_id_by_content(
+        tx.as_mut(),
+        &file.file_id,
+    )
+    .await?
+    .ok_or_else(|| anyhow!("document asset not found"))?;
+
+    let paths = FileRepository::fetch_paths_for_asset(tx.as_mut(), &asset_id)
+        .await
+        .context("failed to load document file path")?;
+
+    let record =
+        paths.first().ok_or_else(|| anyhow!("document file path not found"))?;
+
+    let path = build_document_path(record)
+        .ok_or_else(|| anyhow!("document absolute path is unavailable"))?;
+
+    tx.commit().await?;
+
+    let markdown = fs::read_to_string(&path).await.with_context(|| {
+        format!("failed to read document at {}", path.display())
+    })?;
+
+    Ok(DocumentData { node_id, file_name: file.file_name, markdown })
+}
+
+/// Persist document changes and optionally rename the underlying file.
+pub async fn update_document(
+    payload: UpdateDocumentPayload,
+) -> Result<DocumentUpdateResult> {
+    let UpdateDocumentPayload { moa_id, node_id, markdown, base_name } =
+        payload;
+
+    if moa_id.trim().is_empty() {
+        bail!("moa id is required");
+    }
+    if node_id.trim().is_empty() {
+        bail!("node id is required");
+    }
+
+    let mut tx = DB_MANAGER.create_new_tx(&moa_id).await?;
+
+    let node =
+        NodeRepository::fetch_file_node_data(tx.as_mut(), node_id.clone())
+            .await
+            .context("failed to fetch document node data")?;
+
+    let file = match node {
+        NodeData::File(file) => file,
+        _ => bail!("requested node is not a file"),
+    };
+
+    if file.kind != FileType::Document {
+        bail!("requested file is not a document");
+    }
+
+    let asset_id = FileRepository::find_file_asset_id_by_content(
+        tx.as_mut(),
+        &file.file_id,
+    )
+    .await?
+    .ok_or_else(|| anyhow!("document asset not found"))?;
+
+    let paths = FileRepository::fetch_paths_for_asset(tx.as_mut(), &asset_id)
+        .await
+        .context("failed to load document file path")?;
+
+    let path_record =
+        paths.first().ok_or_else(|| anyhow!("document file path not found"))?;
+
+    let existing_info =
+        FileRepository::fetch_file_info(tx.as_mut(), &path_record.id)
+            .await?
+            .ok_or_else(|| anyhow!("document file metadata missing"))?;
+
+    let current_path = build_document_path(path_record)
+        .ok_or_else(|| anyhow!("document absolute path is unavailable"))?;
+
+    let parent_dir = current_path
+        .parent()
+        .ok_or_else(|| anyhow!("document path has no parent directory"))?
+        .to_path_buf();
+
+    let desired_stem = if base_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .is_some()
+    {
+        normalize_base_name(base_name.as_deref())
+    } else {
+        normalize_base_name(Some(&existing_info.file_name))
+    };
+
+    let file_name = format!("{desired_stem}.{DOCUMENT_EXTENSION}");
+    let target_path = parent_dir.join(&file_name);
+
+    if target_path != current_path {
+        fs::rename(&current_path, &target_path).await.with_context(|| {
+            format!(
+                "failed to rename document from {} to {}",
+                current_path.display(),
+                target_path.display()
+            )
+        })?;
+    }
+
+    fs::write(&target_path, markdown.as_bytes()).await.with_context(|| {
+        format!("failed to write document to {}", target_path.display())
+    })?;
+
+    let normalized_path = normalize_path(&target_path);
+
+    let file_info = FileInfo::new(
+        &moa_id,
+        &normalized_path,
+        existing_info.real_folder_id.clone(),
+        file_name.clone(),
+    )
+    .await
+    .context("failed to refresh document file metadata")?;
+
+    let new_path_id = FileRepository::insert_file_path(tx.as_mut(), &file_info)
+        .await
+        .context("failed to upsert document file path")?;
+
+    if new_path_id != path_record.id {
+        FileRepository::delete_file_path(tx.as_mut(), &path_record.id)
+            .await
+            .context("failed to remove old document file path")?;
+    }
+
+    let file_content_id =
+        FileRepository::upsert_file_content(tx.as_mut(), &file_info)
+            .await
+            .context("failed to update document content metadata")?;
+
+    FileRepository::update_file_asset_content(
+        tx.as_mut(),
+        &asset_id,
+        &file_content_id,
+        false,
+    )
+    .await
+    .context("failed to update document asset")?;
+
+    FileRepository::upsert_file_path_asset_binding(
+        tx.as_mut(),
+        &new_path_id,
+        &asset_id,
+    )
+    .await
+    .context("failed to bind document path to asset")?;
+
+    let node =
+        NodeRepository::fetch_file_node_data(tx.as_mut(), node_id.clone())
+            .await
+            .context("failed to reload document node data")?;
+
+    tx.commit().await?;
+
+    let file = match node {
+        NodeData::File(file) => file,
+        _ => bail!("document node is missing file data"),
+    };
+
+    Ok(DocumentUpdateResult { file })
 }
 
 fn normalize_base_name(raw: Option<&str>) -> String {

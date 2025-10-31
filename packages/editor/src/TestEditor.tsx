@@ -1,9 +1,11 @@
-import type { JSX } from 'react';
+import { type JSX, useEffect, useMemo, useRef } from 'react';
 
 import { LexicalCollaboration } from '@lexical/react/LexicalCollaborationContext';
 import { LexicalExtensionComposer } from '@lexical/react/LexicalExtensionComposer';
 import { defineExtension } from 'lexical';
-import { useMemo } from 'react';
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
+import { $createParagraphNode, $getRoot } from 'lexical';
+import { $convertFromMarkdownString, $convertToMarkdownString } from '@lexical/markdown';
 
 import { buildHTMLConfig } from './buildHTMLConfig';
 import { FlashMessageContext } from './context/FlashMessageContext';
@@ -14,13 +16,78 @@ import Editor from './Editor';
 import PlaygroundNodes from './nodes/PlaygroundNodes';
 import { TableContext } from './plugins/TablePlugin';
 import PlaygroundEditorTheme from './themes/PlaygroundEditorTheme';
+import { PLAYGROUND_TRANSFORMERS } from './plugins/MarkdownTransformers';
 import './index.css';
+
+import joinClasses from './utils/joinClasses';
+
+interface TestEditorProps {
+  docKey?: string;
+  initialMarkdown?: string;
+  onMarkdownChange?: (markdown: string) => void;
+  className?: string;
+}
+
+type MarkdownBridgeProps = {
+  docKey: string;
+  initialMarkdown?: string;
+  onMarkdownChange?: (markdown: string) => void;
+};
+
+const MarkdownBridgePlugin = ({
+  docKey,
+  initialMarkdown,
+  onMarkdownChange,
+}: MarkdownBridgeProps) => {
+  const [editor] = useLexicalComposerContext();
+  const lastEmittedRef = useRef<string>('');
+
+  useEffect(() => {
+    editor.update(() => {
+      const root = $getRoot();
+      root.clear();
+      const markdown = initialMarkdown ?? '';
+      if (markdown.trim().length > 0) {
+        $convertFromMarkdownString(markdown, PLAYGROUND_TRANSFORMERS);
+      } else {
+        const paragraph = $createParagraphNode();
+        root.append(paragraph);
+        paragraph.select();
+      }
+    });
+    lastEmittedRef.current = initialMarkdown ?? '';
+  }, [docKey, editor, initialMarkdown]);
+
+  useEffect(() => {
+    if (!onMarkdownChange) {
+      return editor.registerUpdateListener(() => {});
+    }
+
+    return editor.registerUpdateListener(({ editorState }) => {
+      editorState.read(() => {
+        const markdown = $convertToMarkdownString(PLAYGROUND_TRANSFORMERS);
+        if (markdown === lastEmittedRef.current) {
+          return;
+        }
+        lastEmittedRef.current = markdown;
+        onMarkdownChange(markdown);
+      });
+    });
+  }, [editor, onMarkdownChange]);
+
+  return null;
+};
 
 /**
  * Minimal wrapper that wires the Lexical playground editor with the smallest
  * amount of surrounding context so we can embed it in stories, demos, or tests.
  */
-export default function TestEditor(): JSX.Element {
+export default function TestEditor({
+  docKey = 'default',
+  initialMarkdown,
+  onMarkdownChange,
+  className,
+}: TestEditorProps): JSX.Element {
   const extension = useMemo(
     () =>
       defineExtension({
@@ -31,19 +98,24 @@ export default function TestEditor(): JSX.Element {
         nodes: PlaygroundNodes,
         theme: PlaygroundEditorTheme,
       }),
-    [],
+    [docKey],
   );
 
   return (
     <SettingsContext>
       <FlashMessageContext>
         <LexicalCollaboration>
-          <LexicalExtensionComposer extension={extension} contentEditable={null}>
+          <LexicalExtensionComposer key={docKey} extension={extension} contentEditable={null}>
             <SharedHistoryContext>
               <TableContext>
                 <ToolbarContext>
+                  <MarkdownBridgePlugin
+                    docKey={docKey}
+                    initialMarkdown={initialMarkdown}
+                    onMarkdownChange={onMarkdownChange}
+                  />
                   <div
-                    className="grim-editor"
+                    className={joinClasses('grim-editor', className)}
                     onPointerDownCapture={event => {
                       event.stopPropagation();
                       const nativeEvent = event.nativeEvent as typeof event.nativeEvent & {

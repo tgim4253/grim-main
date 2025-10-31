@@ -1,4 +1,5 @@
 import { usePanelsStore } from '@tgim/stores/index';
+import useFileTreeStore from '@tgim/stores/fileTreeStore';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import ReactDOM from 'react-dom';
@@ -65,6 +66,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       isActive: state.activePanelId === panelId,
     })),
   );
+  const addPanelWithoutContainer = usePanelsStore(state => state.addPanelWithoutContainer);
   const { moaId } = useMoa(location);
   const [container, setContainer] = useState<HTMLElement | null>(null);
   const transformDataToGraphData = useCallback((graphData: GraphResponse): GraphData => {
@@ -337,12 +339,39 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const handleCreateDocument = useCallback(async () => {
     if (!moaId || !rootNode) return;
     setDocumentBusy(true);
+    const previousNodeIds = new Set(Object.keys(rawNodesById));
     try {
-      await ipc.document.create({
+      const graph = await ipc.document.create({
         moaId,
         anchorNodeId: rootNode.id,
       });
-      await refreshPanelData();
+
+      handleGraphUpdate(graph);
+      setGridData(transformDataToGridData(graph));
+      setGraphRefreshKey(prev => prev + 1);
+      setGridRefreshKey(prev => prev + 1);
+
+      const treeStore = useFileTreeStore.getState();
+      const nextTree = treeStore.convertToTreeData(graph);
+      treeStore.setTreeData(nextTree);
+
+      const newDocumentNode = graph.nodes.find(node => {
+        if (previousNodeIds.has(node.id)) return false;
+        if (node.kind !== NodeKind.File) return false;
+        const file = node.data['File'];
+        return !!file && file.kind === FileType.Document;
+      });
+
+      if (newDocumentNode) {
+        const data = newDocumentNode.data['File'];
+        if (data) {
+          addPanelWithoutContainer({
+            nodeId: newDocumentNode.id,
+            name: data.fileName,
+          });
+        }
+      }
+
       toast.success('문서를 생성했습니다.');
     } catch (error) {
       console.error('[Panel] Failed to create document', error);
@@ -350,7 +379,14 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     } finally {
       setDocumentBusy(false);
     }
-  }, [moaId, refreshPanelData, rootNode]);
+  }, [
+    addPanelWithoutContainer,
+    handleGraphUpdate,
+    moaId,
+    rawNodesById,
+    rootNode,
+    transformDataToGridData,
+  ]);
 
   useEffect(() => {
     if (!moaId) return;
