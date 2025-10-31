@@ -107,4 +107,45 @@ export default [
       },
     },
   })),
+  {
+    files: ['packages/editor/**/*.{ts,tsx,js,jsx}'],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: {
+        project: './packages/editor/tsconfig.json',
+        tsconfigRootDir: __dirname,
+      },
+    },
+    ...sharedConfig,
+    settings: {
+      ...sharedConfig.settings,
+      'import/resolver': {
+        typescript: {
+          project: './packages/editor/tsconfig.json',
+        },
+      },
+    },
+    rules: {
+      ...sharedConfig.rules,
+      '@typescript-eslint/no-unnecessary-condition': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/restrict-template-expressions': 'off',
+      '@typescript-eslint/restrict-plus-operands': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-floating-promises': 'off',
+      '@typescript-eslint/only-throw-error': 'off',
+      '@typescript-eslint/no-deprecated': 'off',
+      '@typescript-eslint/require-await': 'off',
+      '@typescript-eslint/unbound-method': 'off',
+      '@typescript-eslint/use-unknown-in-catch-callback-variable': 'off',
+      '@typescript-eslint/prefer-promise-reject-errors': 'off',
+      '@typescript-eslint/no-misused-promises': 'off',
+      '@typescript-eslint/no-invalid-void-type': 'off',
+      '@typescript-eslint/no-unnecessary-type-conversion': 'off',
+      '@typescript-eslint/no-unnecessary-type-parameters': 'off',
+    },
+  },
 ];

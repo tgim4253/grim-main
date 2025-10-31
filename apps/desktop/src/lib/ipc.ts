@@ -30,6 +30,7 @@ import {
   CapturePreview,
   CapturePreviewPayload,
 } from '@tgim/types/capture';
+import { CreateDocumentPayload } from '@tgim/types/document';
 import { convertKeysToCamel } from '@tgim/utils/object';
 
 type DownloadSettings = {
@@ -266,6 +267,13 @@ const captureIpc = {
   },
 };
 
+const documentIpc = {
+  create: async (payload: CreateDocumentPayload): Promise<GraphResponse> => {
+    const response = await invoke('create_document', { payload });
+    return convertKeysToCamel(response) as GraphResponse;
+  },
+};
+
 const settingsIpc = {
   load: async (moaId: string): Promise<WorkspaceSettings> => {
     const response = await invoke('load_settings', { moaId });
@@ -290,6 +298,7 @@ export const ipc = {
   file: fileIpc,
   croquis: croquisIpc,
   capture: captureIpc,
+  document: documentIpc,
   thumbnail: thumbnailIpc,
   settings: settingsIpc,
 };
