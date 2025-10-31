@@ -4,6 +4,7 @@ pub mod capture;
 pub mod connection;
 pub mod crop;
 pub mod croquis;
+pub mod document;
 pub mod file;
 pub mod graph;
 pub mod memo;
