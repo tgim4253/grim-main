@@ -121,7 +121,9 @@ export default function ContextMenuPlugin(): JSX.Element {
           const selection = $getSelection();
           if ($isRangeSelection(selection)) {
             const currentNode = selection.anchor.getNode();
-            const ancestorNodeWithRootAsParent = currentNode.getParents().at(-2);
+            const parents = currentNode.getParents();
+            const ancestorNodeWithRootAsParent =
+              parents.length >= 2 ? parents[parents.length - 2] : undefined;
 
             ancestorNodeWithRootAsParent?.remove();
           } else if ($isNodeSelection(selection)) {

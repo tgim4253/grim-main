@@ -3,7 +3,8 @@
   "include": [
     "src",
     "../../packages/hooks/src/useThumbnails.ts",
-    "../../packages/hooks/src/useFileDrop.ts"
+    "../../packages/hooks/src/useFileDrop.ts",
+    "../../packages/editor/src/global.d.ts"
   ],
   "compilerOptions": {
     "outDir": "dist"

@@ -11,7 +11,7 @@ import './index.css';
 
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { DraggableBlockPlugin_EXPERIMENTAL } from '@lexical/react/LexicalDraggableBlockPlugin';
-import { $createParagraphNode, $getNearestNodeFromDOMNode } from 'lexical';
+import { $createParagraphNode, $getNearestNodeFromDOMNode, $isElementNode } from 'lexical';
 import { useRef, useState } from 'react';
 
 const DRAGGABLE_BLOCK_MENU_CLASSNAME = 'draggable-block-menu';
@@ -37,7 +37,7 @@ export default function DraggableBlockPlugin({
 
     editor.update(() => {
       const node = $getNearestNodeFromDOMNode(draggableElement);
-      if (!node) {
+      if (!$isElementNode(node)) {
         return;
       }
 

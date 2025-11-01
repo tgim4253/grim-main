@@ -18,6 +18,7 @@
     "@tgim/hooks": "workspace:*",
     "@tgim/ui": "workspace:*",
     "@tgim/utils": "workspace:*",
+    "@tgim/editor": "workspace:*",
     "@types/d3-force": "^3.0.10",
     "@types/lodash": "^4.17.20",
     "@types/node": "^24.3.0",

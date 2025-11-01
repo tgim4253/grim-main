@@ -2,7 +2,7 @@ import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'reac
 import { FileType } from '@tgim/types/file';
 import { NodeFile } from '@tgim/types/graph';
 import { cn } from '@tgim/utils/index';
-import { TestEditor } from '@tgim/editor';
+import { TestEditor } from '@tgim/editor/index';
 import { ipc } from '../../../../lib/ipc';
 import { usePanelsStore } from '@tgim/stores/index';
 import { toast } from 'react-toastify';

@@ -98,11 +98,11 @@ function buildExportMap(): DOMExportOutputMap {
                 generatedElement = after(generatedElement);
               }
               if (isHTMLElement(generatedElement) && generatedElement.tagName === 'P') {
-                for (const childNode of generatedElement.childNodes) {
+                for (const childNode of Array.from(generatedElement.childNodes)) {
                   if (isBlockDomNode(childNode)) {
                     const div = document.createElement('div');
                     div.setAttribute('role', 'paragraph');
-                    for (const attr of generatedElement.attributes) {
+                    for (const attr of Array.from(generatedElement.attributes)) {
                       div.setAttribute(attr.name, attr.value);
                     }
                     while (generatedElement.firstChild) {
