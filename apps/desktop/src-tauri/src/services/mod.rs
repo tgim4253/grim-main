@@ -5,6 +5,7 @@ pub mod capture_service;
 pub mod connection_rules;
 pub mod croquis_service;
 pub mod db;
+pub mod document_service;
 pub mod file_service;
 pub mod graph_service;
 pub mod image_crop_service;

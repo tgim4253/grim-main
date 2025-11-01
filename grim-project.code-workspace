@@ -20,6 +20,9 @@
       "name": "dnd",
       "path": "packages/dnd",
     },
+    {
+      "path": "packages",
+    },
   ],
   "settings": {
     "liveServer.settings.multiRootWorkspaceName": "grim-project",

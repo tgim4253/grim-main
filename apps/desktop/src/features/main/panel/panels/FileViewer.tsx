@@ -10,6 +10,7 @@ import Button from '@tgim/ui/Button';
 import FileDetailSidebar from './FileDetailSidebar';
 import { ImageItem } from '@tgim/types/grid';
 import { useNormalizedCropRect } from '@tgim/hooks/useCropRect';
+import DocumentViewer from './DocumentViewer';
 
 interface FileViewerProps {
   file: NodeFile;
@@ -19,6 +20,10 @@ interface FileViewerProps {
 }
 
 const FileViewer: React.FC<FileViewerProps> = ({ file, moaId, className, crop }) => {
+  if (file.kind === FileType.Document) {
+    return <DocumentViewer file={file} className={className} moaId={moaId} />;
+  }
+
   const [viewerSidebarVisible, setViewerSidebarVisible] = useState(false);
 
   const [imageSrc, setImageSrc] = useState<string | null>(null);

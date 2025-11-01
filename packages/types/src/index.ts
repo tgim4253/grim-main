@@ -7,3 +7,4 @@ export * from './croquis';
 export * from './capture';
 export * from './crop';
 export * from './css';
+export * from './document';

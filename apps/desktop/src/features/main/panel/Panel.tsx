@@ -1,4 +1,5 @@
 import { usePanelsStore } from '@tgim/stores/index';
+import useFileTreeStore from '@tgim/stores/fileTreeStore';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import ReactDOM from 'react-dom';
@@ -26,7 +27,7 @@ import { GridData, ImageItem } from '@tgim/types/grid';
 import { FileType } from '@tgim/types/file';
 import { Button } from '@tgim/ui';
 import cn from '@tgim/utils/cn';
-import { Camera, Crop, Eye, GitBranch, LayoutGrid, NotebookPen } from 'lucide-react';
+import { Camera, Crop, Eye, FileText, GitBranch, LayoutGrid, NotebookPen } from 'lucide-react';
 import FileViewer from './panels/FileViewer';
 import { useFileDrop } from '../../../../../../packages/hooks/src/useFileDrop';
 import { toast } from 'react-toastify';
@@ -51,6 +52,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   const [gridData, setGridData] = useState<GridData | null>(null);
   const [rootNodeId, setRootNodeId] = useState<string | null>(null);
   const [captureBusy, setCaptureBusy] = useState(false);
+  const [documentBusy, setDocumentBusy] = useState(false);
   const [rootNode, setRootNode] = useState<Node | null>(null);
   const [graphRefreshKey, setGraphRefreshKey] = useState(0);
   const [gridRefreshKey, setGridRefreshKey] = useState(0);
@@ -64,6 +66,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
       isActive: state.activePanelId === panelId,
     })),
   );
+  const addPanelWithoutContainer = usePanelsStore(state => state.addPanelWithoutContainer);
   const { moaId } = useMoa(location);
   const [container, setContainer] = useState<HTMLElement | null>(null);
   const transformDataToGraphData = useCallback((graphData: GraphResponse): GraphData => {
@@ -332,6 +335,58 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   useEffect(() => {
     void refreshPanelData();
   }, [refreshPanelData]);
+
+  const handleCreateDocument = useCallback(async () => {
+    if (!moaId || !rootNode) return;
+    setDocumentBusy(true);
+    const previousNodeIds = new Set(Object.keys(rawNodesById));
+    try {
+      const graph = await ipc.document.create({
+        moaId,
+        anchorNodeId: rootNode.id,
+      });
+
+      handleGraphUpdate(graph);
+      setGridData(transformDataToGridData(graph));
+      setGraphRefreshKey(prev => prev + 1);
+      setGridRefreshKey(prev => prev + 1);
+
+      const treeStore = useFileTreeStore.getState();
+      const nextTree = treeStore.convertToTreeData(graph);
+      treeStore.setTreeData(nextTree);
+
+      const newDocumentNode = graph.nodes.find(node => {
+        if (previousNodeIds.has(node.id)) return false;
+        if (node.kind !== NodeKind.File) return false;
+        const file = node.data['File'];
+        return !!file && file.kind === FileType.Document;
+      });
+
+      if (newDocumentNode) {
+        const data = newDocumentNode.data['File'];
+        if (data) {
+          addPanelWithoutContainer({
+            nodeId: newDocumentNode.id,
+            name: data.fileName,
+          });
+        }
+      }
+
+      toast.success('문서를 생성했습니다.');
+    } catch (error) {
+      console.error('[Panel] Failed to create document', error);
+      toast.error('문서를 생성할 수 없습니다.');
+    } finally {
+      setDocumentBusy(false);
+    }
+  }, [
+    addPanelWithoutContainer,
+    handleGraphUpdate,
+    moaId,
+    rawNodesById,
+    rootNode,
+    transformDataToGridData,
+  ]);
 
   useEffect(() => {
     if (!moaId) return;
@@ -637,6 +692,7 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
   }, []);
 
   const captureDisabled = !canCapture || captureBusy;
+  const documentDisabled = !moaId || !rootNode || documentBusy;
 
   if (!panel || !container) return null;
 
@@ -663,6 +719,17 @@ const Panel: React.FC<PanelProps> = ({ panelId, hidden }) => {
     >
       <div className="flex items-center justify-end border-b border-border bg-surface-raised px-3 py-2">
         <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="icon"
+            aria-label="문서 생성"
+            title="문서 생성"
+            onClick={() => void handleCreateDocument()}
+            disabled={documentDisabled}
+            className="h-8 w-8"
+          >
+            <FileText className="h-4 w-4" />
+          </Button>
           <Button
             type="button"
             variant="icon"
