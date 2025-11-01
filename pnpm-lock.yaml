@@ -86,6 +86,9 @@ importers:
       '@tauri-apps/plugin-os':
         specifier: ^2.3.0
         version: 2.3.0
+      '@tgim/editor':
+        specifier: workspace:*
+        version: link:../../packages/editor
       '@tgim/hooks':
         specifier: workspace:*
         version: link:../../packages/hooks
