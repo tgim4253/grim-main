@@ -7,10 +7,7 @@ export class EditorSafePointerSensor extends PointerSensor {
   static activators: typeof PointerSensor.activators = [
     {
       eventName: 'onPointerDown',
-      handler: (
-        { nativeEvent }: ReactPointerEvent<Element>,
-        { onActivation }: PointerSensorOptions,
-      ) => {
+      handler: ({ nativeEvent }: ReactPointerEvent, options: PointerSensorOptions) => {
         if (!nativeEvent.isPrimary || nativeEvent.button !== 0) {
           return false;
         }
@@ -20,7 +17,7 @@ export class EditorSafePointerSensor extends PointerSensor {
           return false;
         }
 
-        onActivation?.({ event: nativeEvent });
+        options.onActivation?.({ event: nativeEvent });
         return true;
       },
     },
