@@ -68,3 +68,6 @@ dist-ssr
 *.sw?
 
 target/*
+
+._*
+.DS_Store
