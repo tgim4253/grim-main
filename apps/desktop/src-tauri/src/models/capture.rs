@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use crate::models::connection::RelationType;
-
 /// Information required to launch or confirm a capture workflow.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -9,16 +7,13 @@ pub struct CaptureContext {
     #[serde(default)]
     pub session_id: Option<String>,
     #[serde(default)]
-    pub source_hash: Option<String>,
+    pub record_id: Option<String>,
     #[serde(default)]
-    pub source_node_id: Option<String>,
-    pub moa_id: String,
+    pub asset_id: Option<String>,
     #[serde(default)]
-    pub save_path: String,
+    pub target_seconds: Option<i64>,
     #[serde(default)]
-    pub link_type_forward: Option<RelationType>,
-    #[serde(default)]
-    pub link_type_reverse: Option<RelationType>,
+    pub actual_seconds: Option<f64>,
 }
 
 pub type CaptureOverlayPayload = CaptureContext;

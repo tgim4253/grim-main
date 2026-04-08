@@ -26,13 +26,9 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@tgim/ui': path.resolve(__dirname, '../../packages/ui/src'),
       '@tgim/hooks': path.resolve(__dirname, '../../packages/hooks/src'),
       '@tgim/utils': path.resolve(__dirname, '../../packages/utils/src'),
-      '@tgim/stores': path.resolve(__dirname, '../../packages/stores/src'),
       '@tgim/types': path.resolve(__dirname, '../../packages/types/src'),
-      '@tgim/dnd': path.resolve(__dirname, '../../packages/dnd/src'),
-      '@tgim/editor': path.resolve(__dirname, '../../packages/editor/src'),
     },
   },
 });

@@ -2,7 +2,9 @@
 
 - [English](./README.md) | [한국어](./README.ko.md)
 
-> Organize your reference materials with virtual folders and a graph view, and make your gesture drawing practice more effective with the **‘Croquis Window’** that pins selected images at the top. You can also add notes to each drawing, making it easy to capture feedback.
+> Manage croquis reference assets in a **single library** with virtual folders, tags, records, and sessions. Use the Croquis window and capture flow to save study results without the old project/graph workflow.
+>
+> Current direction: a **single-library croquis app** centered on assets, tags, virtual folders, records, and sessions. See [docs/croquis-library-refactor.md](./docs/croquis-library-refactor.md).
 
 ## Recommended Toolchain
 
@@ -13,22 +15,22 @@
 ## Project Highlights
 
 - **Cross-platform desktop**: Tauri + Rust deliver a lightweight, secure runtime.
-- **React 19 UI**: Built with React, TypeScript, and Tailwind CSS for fast, responsive interfaces.
-- **Shared state management**: Zustand stores live under `@tgim/stores` and power multiple apps.
-- **Modular architecture**: Shared UI, hooks, utilities, DnD helpers, and types are organised under `packages/*`.
+- **Croquis-first workflow**: The main app is now built around a single library, not multiple projects.
+- **React 19 UI**: Built with React, TypeScript, and design-token-driven CSS.
+- **Modular architecture**: Frontend pages/features/entities/shared structure sits on top of shared packages under `packages/*`.
 
 ## Repository Overview
 
 ```
 apps/desktop/        # Tauri front end and Rust backend
-apps/api-server/     # API server resources
 packages/ui          # Shared UI components
-packages/stores      # Global Zustand stores
+packages/stores      # Shared Zustand stores (legacy/shared package area)
 packages/hooks       # Custom React hooks
 packages/utils       # Utility functions and helpers
 packages/dnd         # Drag & Drop helpers
 packages/types       # Shared type definitions and models
 scripts/             # Translation and other automation scripts
+docs/                # Project documentation and refactor notes
 ```
 
 ## Quick Start
@@ -80,12 +82,12 @@ scripts/             # Translation and other automation scripts
 
 - Follow the feature-first folder layout within `apps/desktop/src/features` when shipping new UI flows.
 - Extend shared Zustand stores from `@tgim/stores` instead of creating duplicates.
-- Export shared UI components from `packages/ui/src/index.ts` and align Tailwind classes with the shared design tokens.
+- Export shared UI components from `packages/ui/src/index.ts` and align styles with the shared design tokens and CSS layers.
 - Update `scripts/translations.xlsx` and run `pnpm translate` whenever you touch user-facing copy.
 
 ## Tech Stack
 
-- **Front end**: React 19, TypeScript, Tailwind CSS
+- **Front end**: React 19, TypeScript, token-driven CSS
 - **Desktop shell**: Tauri, Rust, SQLx
 - **Localisation**: i18next with an automated translation pipeline (`scripts/translator.mjs`)
 

@@ -1,40 +1,71 @@
-use std::{collections::HashMap, io::ErrorKind};
+use std::{collections::HashMap, path::PathBuf};
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, Result};
 use once_cell::sync::Lazy;
-use tokio::{fs, sync::RwLock};
-use tracing::warn;
+use tokio::sync::RwLock;
 
 use crate::{
     app_launcher,
-    bootstrap::PATH_MANAGER,
     models::croquis::{
-        CroquisOption, CroquisPreferences, CroquisPreset, CroquisSession,
-        CroquisSessionImage, CroquisStartPayload, CroquisStartResponse,
+        CroquisPreferences, CroquisSession, CroquisSessionItem,
+        CroquisStartPayload, CroquisStartResponse,
     },
-    services::file_service::{
-        folder::fetch_one_file_path,
-        thumbnail::{ensure_base_thumbnail, BaseThumbInfo},
-    },
-    utils::{date, identifier::get_unique_id},
+    services::{library_service, media_service},
+    state::AppState,
+    utils::date::get_now_date,
 };
 
 /// In-memory registry of active Croquis sessions keyed by session identifier.
 static CROQUIS_SESSIONS: Lazy<RwLock<HashMap<String, CroquisSession>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
-const DEFAULT_PRESET_NAME: &str = "Preset 1";
+#[derive(Clone, Default)]
+pub struct CroquisService;
 
-fn build_single_preset(option: CroquisOption) -> CroquisPreferences {
-    let preset_id = get_unique_id();
-    CroquisPreferences {
-        active_preset_id: preset_id.clone(),
-        presets: vec![CroquisPreset {
-            id: preset_id,
-            name: DEFAULT_PRESET_NAME.to_string(),
-            option,
-        }],
+impl CroquisService {
+    pub fn new(
+        _app_state: AppState,
+        _library_service: crate::services::LibraryService,
+    ) -> Self {
+        Self
     }
+
+    pub async fn start_session(
+        &self,
+        app_handle: &tauri::AppHandle,
+        payload: CroquisStartPayload,
+    ) -> Result<CroquisStartResponse> {
+        start_session(app_handle, payload).await
+    }
+
+    pub async fn load_session(
+        &self,
+        session_id: &str,
+    ) -> Option<CroquisSession> {
+        load_session(session_id).await
+    }
+
+    pub async fn load_preferences(&self) -> Result<Option<CroquisPreferences>> {
+        load_preferences().await
+    }
+
+    pub async fn save_preferences(
+        &self,
+        preferences: &CroquisPreferences,
+    ) -> Result<CroquisPreferences> {
+        save_preferences(preferences).await
+    }
+}
+
+fn build_session_title(preset_name: &str) -> String {
+    format!("{preset_name} · {}", chrono::Local::now().format("%Y-%m-%d %H:%M"))
+}
+
+fn asset_source_path(
+    asset: &crate::models::library::AssetSummary,
+) -> Result<PathBuf> {
+    library_service::resolve_asset_source_path(asset)
+        .ok_or_else(|| anyhow!("Asset {} has no source path", asset.id))
 }
 
 /// Launch a new Croquis session by ensuring base images and spawning the window.
@@ -43,89 +74,102 @@ pub async fn start_session(
     payload: CroquisStartPayload,
 ) -> Result<CroquisStartResponse> {
     let CroquisStartPayload {
-        moa_id,
+        asset_ids,
+        preset_id,
         option,
-        image_hashes,
         save_option,
         preferences,
     } = payload;
 
-    if image_hashes.is_empty() {
-        bail!("At least one image hash must be provided to start Croquis");
+    if asset_ids.is_empty() {
+        bail!("At least one asset must be selected to start Croquis");
+    }
+
+    let preset =
+        library_service::load_session_preset(preset_id.as_deref()).await?;
+    if preset.steps.is_empty() {
+        bail!("Selected session preset does not have any steps");
     }
 
     if save_option {
-        let preferences_to_persist =
-            preferences.unwrap_or_else(|| build_single_preset(option.clone()));
-        persist_preferences(&moa_id, &preferences_to_persist).await?;
+        let mut settings = library_service::load_settings().await?;
+        settings.active_session_preset_id = Some(preset.id.clone());
+        if let Some(next_preferences) = preferences.clone() {
+            settings.croquis_preferences = Some(next_preferences);
+        }
+        let _ = library_service::save_settings(settings).await?;
     }
 
-    let mut images: Vec<CroquisSessionImage> =
-        Vec::with_capacity(image_hashes.len());
+    let assets = library_service::load_assets_by_ids(&asset_ids).await?;
+    let session_title = build_session_title(&preset.name);
+    let session_id =
+        library_service::create_session(&session_title, Some(&preset.id))
+            .await?;
 
-    for hash in &image_hashes {
-        let source_path = match fetch_one_file_path(
-            moa_id.clone(),
-            hash.clone(),
-        )
-        .await
-        {
-            Ok(path) => path,
-            Err(error) => {
-                warn!(
-                    error = ?error,
-                    %hash,
-                    "Failed to resolve source path for Croquis hash; skipping"
-                );
-                continue;
-            }
+    let mut items = Vec::new();
+    for asset in &assets {
+        let source_path = asset_source_path(asset)?;
+        if !media_service::is_supported_image(&source_path) {
+            continue;
+        }
+
+        let hash = match asset.hash.clone() {
+            Some(value) => Some(value),
+            None => Some(media_service::hash_file(&source_path).await?),
         };
+        let hash_value = hash.clone().unwrap_or_default();
+        let thumb_path =
+            asset.thumbnail_path.clone().map(PathBuf::from).unwrap_or_else(
+                || {
+                    let paths = library_service::library_paths()
+                        .expect("library paths should be available");
+                    media_service::thumbnail_path(&paths.thumb_dir, &hash_value)
+                },
+            );
+        let (thumb_width, thumb_height) =
+            media_service::ensure_thumbnail(&source_path, &thumb_path).await?;
 
-        let BaseThumbInfo { path, width, height } = match ensure_base_thumbnail(
-            app_handle,
-            &moa_id,
-            hash,
-            source_path.as_path(),
-        )
-        .await
-        {
-            Ok(info) => info,
-            Err(error) => {
-                warn!(
-                    error = ?error,
-                    %hash,
-                    "Failed to ensure base thumbnail for Croquis hash; skipping"
-                );
-                continue;
-            }
-        };
-
-        images.push(CroquisSessionImage {
-            hash: hash.clone(),
-            base_path: path.as_path().to_string_lossy().into_owned(),
-            base_width: width,
-            base_height: height,
-            source_path: source_path.to_string_lossy().into_owned(),
-        });
+        for step in &preset.steps {
+            let record_title = format!("{} · {}", asset.file_name, step.name);
+            let record = library_service::create_session_record(
+                &asset.id,
+                &session_id,
+                step,
+                &record_title,
+            )
+            .await?;
+            items.push(CroquisSessionItem {
+                record_id: record.id,
+                asset_id: asset.id.clone(),
+                file_name: asset.file_name.clone(),
+                hash: hash.clone(),
+                base_path: thumb_path.to_string_lossy().into_owned(),
+                base_width: thumb_width,
+                base_height: thumb_height,
+                source_path: source_path.to_string_lossy().into_owned(),
+                step_name: step.name.clone(),
+                step_index: step.step_order,
+                target_duration_seconds: step.default_duration_seconds,
+            });
+        }
     }
 
-    if images.is_empty() {
-        bail!("None of the provided image hashes could be loaded for Croquis");
+    if items.is_empty() {
+        bail!("No valid image assets were available for this Croquis session");
     }
 
-    let session_id = get_unique_id();
-    let created_at = date::get_now_date();
     let session = CroquisSession {
         session_id: session_id.clone(),
-        moa_id: moa_id.clone(),
-        option: option.clone(),
-        images,
-        created_at,
+        title: session_title,
+        option,
+        preset,
+        items,
+        created_at: get_now_date(),
     };
 
     let window_label =
-        app_launcher::croquis::launch_croquis(app_handle, &moa_id, &session)
-            .map_err(|err| anyhow!(err))?;
+        app_launcher::croquis::launch_croquis(app_handle, &session)
+            .map_err(anyhow::Error::msg)?;
 
     {
         let mut sessions = CROQUIS_SESSIONS.write().await;
@@ -141,89 +185,15 @@ pub async fn load_session(session_id: &str) -> Option<CroquisSession> {
     sessions.get(session_id).cloned()
 }
 
-/// Load the persisted Croquis preferences from the workspace settings directory.
-pub async fn load_preferences(
-    moa_id: &str,
-) -> Result<Option<CroquisPreferences>> {
-    let paths = PATH_MANAGER
-        .get_or_add(moa_id)
-        .await
-        .context("Failed to resolve workspace paths")?;
-
-    let settings_dir = paths.moa_dir.join("settings");
-    let file_path = settings_dir.join("croquis.json");
-
-    match fs::read(&file_path).await {
-        Ok(payload) => {
-            match serde_json::from_slice::<CroquisPreferences>(&payload) {
-                Ok(mut preferences) => {
-                    if preferences.presets.is_empty() {
-                        preferences =
-                            build_single_preset(CroquisOption::default());
-                    } else if preferences.active_preset_id.is_empty()
-                        || !preferences.presets.iter().any(|preset| {
-                            preset.id == preferences.active_preset_id
-                        })
-                    {
-                        if let Some(first) = preferences.presets.first() {
-                            preferences.active_preset_id = first.id.clone();
-                        }
-                    }
-
-                    Ok(Some(preferences))
-                }
-                Err(primary_error) => {
-                    match serde_json::from_slice::<CroquisOption>(&payload) {
-                        Ok(option) => {
-                            let preferences = build_single_preset(option);
-                            Ok(Some(preferences))
-                        }
-                        Err(_) => Err(primary_error).context(format!(
-                            "Failed to deserialise Croquis preferences from {}",
-                            file_path.display()
-                        )),
-                    }
-                }
-            }
-        }
-        Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(error).with_context(|| {
-            format!(
-                "Failed to read Croquis preferences from {}",
-                file_path.display()
-            )
-        }),
-    }
+pub async fn load_preferences() -> Result<Option<CroquisPreferences>> {
+    Ok(library_service::load_settings().await?.croquis_preferences)
 }
 
-/// Persist the Croquis preferences into the workspace `.moa/settings` folder.
-async fn persist_preferences(
-    moa_id: &str,
+pub async fn save_preferences(
     preferences: &CroquisPreferences,
-) -> Result<()> {
-    let paths = PATH_MANAGER
-        .get_or_add(moa_id)
-        .await
-        .context("Failed to resolve workspace paths")?;
-
-    let settings_dir = paths.moa_dir.join("settings");
-    fs::create_dir_all(&settings_dir).await.with_context(|| {
-        format!(
-            "Failed to create settings directory at {}",
-            settings_dir.display()
-        )
-    })?;
-
-    let file_path = settings_dir.join("croquis.json");
-    let payload = serde_json::to_vec_pretty(preferences)
-        .context("Failed to serialise Croquis preferences")?;
-
-    fs::write(&file_path, payload).await.with_context(|| {
-        format!(
-            "Failed to write Croquis preferences to {}",
-            file_path.display()
-        )
-    })?;
-
-    Ok(())
+) -> Result<CroquisPreferences> {
+    let mut settings = library_service::load_settings().await?;
+    settings.croquis_preferences = Some(preferences.clone());
+    let saved = library_service::save_settings(settings).await?;
+    Ok(saved.croquis_preferences.unwrap_or_else(|| preferences.clone()))
 }

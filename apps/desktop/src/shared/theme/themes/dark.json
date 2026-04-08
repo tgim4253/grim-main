@@ -1,0 +1,12 @@
+{
+  "palette.border.default": "rgba(255, 255, 255, 0.14)",
+  "palette.neutral.0": "#eef4fb",
+  "palette.neutral.50": "#b9c3cf",
+  "palette.neutral.800": "#151e27",
+  "palette.neutral.950": "#0f141a",
+  "border.default": "{palette.border.default}",
+  "color.bg.app": "{palette.neutral.950}",
+  "color.bg.surface": "{palette.neutral.800}",
+  "color.text.primary": "{palette.neutral.0}",
+  "color.text.secondary": "{palette.neutral.50}"
+}

@@ -23,7 +23,7 @@ const variantClasses: Record<NonNullable<ButtonProps['variant']>, string> = {
   default: 'btn-default',
   titlebar: 'btn-titlebar',
   'list-item': 'btn-list',
-  icon: 'btn-icon aspect-square',
+  icon: 'btn-icon',
   card: 'btn-card',
   primary: 'btn-primary',
   secondary: 'btn-secondary',

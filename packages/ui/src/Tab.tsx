@@ -16,7 +16,7 @@ interface TabProps {
 const Tab: React.FC<TabProps> = ({ tabs, selectedTabId, onSelectTab, className }) => {
   if (!selectedTabId) selectedTabId = tabs[0].panelId;
   return (
-    <div className={cn('flex w-full flex-nowrap overflow-x-auto space-x-2 pr-2', className)}>
+    <div className={cn('tab-strip', className)}>
       {tabs.map(tab => (
         <Button
           variant="panel-tab"

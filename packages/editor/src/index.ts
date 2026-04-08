@@ -1,6 +1,7 @@
 export { default as PlaygroundEditor } from './Editor';
 export { default as PlaygroundSettings } from './Settings';
 export { default as TestEditor } from './TestEditor';
+export type { EditorBridge } from './TestEditor';
 
 export { FlashMessageContext, useFlashMessageContext } from './context/FlashMessageContext';
 export { SettingsContext, useSettings } from './context/SettingsContext';

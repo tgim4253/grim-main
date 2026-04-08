@@ -1,3 +1,5 @@
+import type { SessionPreset } from './library';
+
 export interface CroquisWindowOption {
   width?: string | null;
   height?: string | null;
@@ -33,26 +35,33 @@ export interface CroquisPreferences {
 }
 
 export interface CroquisStartPayload {
-  moaId: string;
+  assetIds: string[];
+  presetId?: string | null;
   option: CroquisOption;
-  imageHashes: string[];
   saveOption?: boolean;
-  preferences?: CroquisPreferences;
+  preferences?: CroquisPreferences | null;
 }
 
-export interface CroquisSessionImage {
-  hash: string;
+export interface CroquisSessionItem {
+  recordId: string;
+  assetId: string;
+  fileName: string;
+  hash?: string | null;
   basePath: string;
   baseWidth: number;
   baseHeight: number;
   sourcePath: string;
+  stepName: string;
+  stepIndex: number;
+  targetDurationSeconds?: number | null;
 }
 
 export interface CroquisSession {
   sessionId: string;
-  moaId: string;
+  title: string;
   option: CroquisOption;
-  images: CroquisSessionImage[];
+  preset: SessionPreset;
+  items: CroquisSessionItem[];
   createdAt: string;
 }
 

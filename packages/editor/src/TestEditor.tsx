@@ -1,10 +1,9 @@
-import { type JSX, useEffect, useMemo, useRef } from 'react';
+import { type JSX, useEffect, useMemo, useRef, type MutableRefObject } from 'react';
 
 import { LexicalCollaboration } from '@lexical/react/LexicalCollaborationContext';
 import { LexicalExtensionComposer } from '@lexical/react/LexicalExtensionComposer';
-import { defineExtension } from 'lexical';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { $createParagraphNode, $getRoot } from 'lexical';
+import { defineExtension, $createParagraphNode, $getRoot } from 'lexical';
 import { $convertFromMarkdownString, $convertToMarkdownString } from '@lexical/markdown';
 
 import { buildHTMLConfig } from './buildHTMLConfig';
@@ -20,18 +19,52 @@ import { PLAYGROUND_TRANSFORMERS } from './plugins/MarkdownTransformers';
 import './index.css';
 
 import joinClasses from './utils/joinClasses';
+import type { EditorState, LexicalCommand } from 'lexical';
+
+export type EditorBridge = {
+  focus: () => void;
+  getEditorState: () => EditorState;
+  dispatchCommand: <T>(type: LexicalCommand<T>, payload: T) => void;
+  getRootElement?: () => HTMLElement | null;
+};
 
 interface TestEditorProps {
   docKey?: string;
   initialMarkdown?: string;
   onMarkdownChange?: (markdown: string) => void;
   className?: string;
+  editorRef?: MutableRefObject<EditorBridge | null>;
 }
 
 type MarkdownBridgeProps = {
   docKey: string;
   initialMarkdown?: string;
   onMarkdownChange?: (markdown: string) => void;
+};
+
+type EditorRefBridgeProps = {
+  editorRef?: MutableRefObject<EditorBridge | null>;
+};
+
+const EditorRefBridgePlugin = ({ editorRef }: EditorRefBridgeProps) => {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(() => {
+    if (!editorRef) return;
+    editorRef.current = {
+      focus: () => {
+        editor.focus();
+      },
+      getEditorState: () => editor.getEditorState(),
+      dispatchCommand: (type, payload) => editor.dispatchCommand(type, payload),
+      getRootElement: () => editor.getRootElement(),
+    };
+    return () => {
+      editorRef.current = null;
+    };
+  }, [editor, editorRef]);
+
+  return null;
 };
 
 const MarkdownBridgePlugin = ({
@@ -87,6 +120,7 @@ export default function TestEditor({
   initialMarkdown,
   onMarkdownChange,
   className,
+  editorRef,
 }: TestEditorProps): JSX.Element {
   const extension = useMemo(
     () =>
@@ -114,6 +148,7 @@ export default function TestEditor({
                     initialMarkdown={initialMarkdown}
                     onMarkdownChange={onMarkdownChange}
                   />
+                  <EditorRefBridgePlugin editorRef={editorRef} />
                   <div
                     className={joinClasses('grim-editor', className)}
                     onPointerDownCapture={event => {

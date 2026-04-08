@@ -1,0 +1,157 @@
+@layer app {
+  .c-button {
+    --button-background-default: transparent;
+    --button-background-hover: transparent;
+    --button-background-focus: transparent;
+    --button-border-default: transparent;
+    --button-border-hover: transparent;
+    --button-border-focus: transparent;
+    --button-height: var(--components-button-base-size-md-height);
+    --button-padding-y: var(--components-button-base-size-md-padding-y);
+    --button-padding-x: var(--components-button-base-size-md-padding-x);
+    --button-radius: var(--components-button-base-size-md-radius);
+    --button-font-size: var(--type-text-md-size);
+    --button-line-height: var(--type-text-md-line-height);
+    --button-font-weight: var(--font-weight-medium);
+    --button-text-color: var(--components-button-primary-text);
+
+    box-sizing: border-box;
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    height: var(--button-height);
+    padding: var(--button-padding-y) var(--button-padding-x);
+    border: var(--border-width-1) solid var(--button-border-default);
+    border-radius: var(--button-radius);
+    background: var(--button-background-default);
+    color: var(--button-text-color);
+    box-shadow: var(--effects-shadow-xs);
+    font-family: var(--font-sans);
+    font-size: var(--button-font-size);
+    font-weight: var(--button-font-weight);
+    line-height: var(--button-line-height);
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background-color var(--motion-duration-fast) var(--motion-easing-standard),
+      border-color var(--motion-duration-fast) var(--motion-easing-standard);
+  }
+
+  .c-button:disabled {
+    cursor: not-allowed;
+    opacity: var(--opacity-disabled);
+  }
+
+  .c-button--width-hug {
+    width: fit-content;
+  }
+
+  .c-button--width-fill {
+    width: 100%;
+  }
+
+  .c-button--size-sm {
+    --button-height: var(--components-button-base-size-sm-height);
+    --button-padding-y: var(--components-button-base-size-sm-padding-y);
+    --button-padding-x: var(--components-button-base-size-sm-padding-x);
+    --button-radius: var(--components-button-base-size-sm-radius);
+    --button-font-size: var(--components-button-base-size-sm-font-size);
+    --button-line-height: var(--type-text-sm-line-height);
+    --button-font-weight: var(--components-button-base-size-sm-font-weight);
+  }
+
+  .c-button--size-md {
+    --button-height: var(--components-button-base-size-md-height);
+    --button-padding-y: var(--components-button-base-size-md-padding-y);
+    --button-padding-x: var(--components-button-base-size-md-padding-x);
+    --button-radius: var(--components-button-base-size-md-radius);
+    --button-font-size: var(--components-button-base-size-md-font-size);
+    --button-line-height: var(--type-text-md-line-height);
+    --button-font-weight: var(--components-button-base-size-md-font-weight);
+  }
+
+  .c-button--size-lg {
+    --button-height: var(--components-button-base-size-lg-height);
+    --button-padding-y: var(--components-button-base-size-lg-padding-y);
+    --button-padding-x: var(--components-button-base-size-lg-padding-x);
+    --button-radius: var(--components-button-base-size-lg-radius);
+    --button-font-size: var(--components-button-base-size-lg-font-size);
+    --button-line-height: var(--type-text-lg-line-height);
+    --button-font-weight: var(--components-button-base-size-lg-font-weight);
+  }
+
+  .c-button--variant-primary {
+    --button-background-default: var(--components-button-primary-background);
+    --button-background-hover: var(--components-button-primary-background-hover);
+    --button-background-focus: var(--components-button-primary-background-active);
+    --button-border-default: var(--components-button-primary-border);
+    --button-border-hover: var(--components-button-primary-border);
+    --button-border-focus: var(--components-button-primary-border);
+    --button-text-color: var(--components-button-primary-text);
+  }
+
+  .c-button--variant-secondary {
+    --button-background-default: var(--components-button-secondary-background);
+    --button-background-hover: var(--components-button-secondary-background-hover);
+    --button-background-focus: var(--components-button-secondary-background-active);
+    --button-border-default: var(--components-button-secondary-border);
+    --button-border-hover: var(--components-button-secondary-border);
+    --button-border-focus: var(--components-button-secondary-border);
+    --button-text-color: var(--components-button-secondary-text);
+  }
+
+  .c-button--variant-ghost {
+    --button-background-default: var(--components-button-ghost-background);
+    --button-background-hover: var(--components-button-ghost-background-hover);
+    --button-background-focus: var(--components-button-ghost-background-active);
+    --button-border-default: var(--components-button-ghost-border);
+    --button-border-hover: var(--components-button-ghost-border);
+    --button-border-focus: var(--components-button-ghost-border);
+    --button-text-color: var(--components-button-ghost-text);
+  }
+
+  .c-button--variant-destructive {
+    --button-background-default: var(--components-button-destructive-background);
+    --button-background-hover: var(--components-button-destructive-background-hover);
+    --button-background-focus: var(
+      --components-button-destructive-background-active,
+      var(
+        --components-button-destructive-baground-active,
+        var(--components-button-destructive-background-hover)
+      )
+    );
+    --button-border-default: var(--components-button-destructive-border);
+    --button-border-hover: var(--components-button-destructive-border);
+    --button-border-focus: var(--components-button-destructive-border);
+    --button-text-color: var(--components-button-destructive-text);
+  }
+
+  .c-button:hover:not(:disabled) {
+    background: var(--button-background-hover);
+    border-color: var(--button-border-hover);
+  }
+
+  .c-button:active:not(:disabled),
+  .c-button:focus-visible:not(:disabled) {
+    background: var(--button-background-focus);
+    border-color: var(--button-border-focus);
+    outline: none;
+  }
+
+  .c-button:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  .c-button--variant-ghost {
+    box-shadow: none;
+    filter: drop-shadow(var(--effects-shadow-xs));
+  }
+
+  .c-button--variant-ghost:hover,
+  .c-button--variant-ghost:focus-visible,
+  .c-button--variant-ghost:active {
+    filter: none;
+  }
+}

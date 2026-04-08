@@ -1,16 +1,11 @@
-//! Backend services that power the desktop application.
-
-pub mod bootstrap_service;
-pub mod capture_service;
-pub mod connection_rules;
-pub mod croquis_service;
-pub mod db;
-pub mod document_service;
-pub mod file_service;
-pub mod graph_service;
-pub mod image_crop_service;
+#[path = "capture_service.rs"]
+pub(crate) mod capture_service;
+#[path = "croquis_service.rs"]
+pub(crate) mod croquis_service;
 pub mod integrity;
-pub mod memo_service;
-pub mod moa_services;
-pub mod settings;
-pub mod storage_root;
+pub(crate) mod library_service;
+pub mod media_service;
+
+pub use capture_service::CaptureService;
+pub use croquis_service::CroquisService;
+pub use library_service::LibraryService;

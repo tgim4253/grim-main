@@ -30,11 +30,11 @@ const CropPreview: React.FC<CropPreviewProps> = ({
 
   return (
     <div
-      className={cn('relative overflow-hidden rounded-md bg-background', className)}
+      className={cn('crop-preview', className)}
       style={{ width: preview.displayWidth, height: preview.displayHeight }}
     >
       <div
-        className="h-full w-full"
+        className="crop-preview__image"
         style={{
           backgroundImage: `url("${imageSrc}")`,
           backgroundRepeat: 'no-repeat',

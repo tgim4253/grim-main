@@ -23,12 +23,11 @@ export interface CapturePreview {
 }
 
 export interface CaptureContext {
-  moaId: string;
-  sourceHash?: string | null;
-  sourceNodeId?: string | null;
-  savePath: string;
   sessionId?: string | null;
-  linkTypeForward?: string | null;
-  linkTypeReverse?: string | null;
+  recordId?: string | null;
+  assetId?: string | null;
+  targetSeconds?: number | null;
+  actualSeconds?: number | null;
 }
+
 export type CaptureOverlayPayload = CaptureContext;

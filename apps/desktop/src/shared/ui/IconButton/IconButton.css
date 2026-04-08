@@ -1,0 +1,66 @@
+@layer app {
+  .c-icon-button {
+    --icon-button-size: var(--semantic-size-icon-button-md);
+    --icon-button-icon-color: var(--semantic-colors-text-tertiary);
+
+    box-sizing: border-box;
+    inline-size: var(--icon-button-size);
+    block-size: var(--icon-button-size);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--primitives-radius-2);
+    background: transparent;
+    color: var(--icon-button-icon-color);
+    cursor: pointer;
+    transition:
+      background-color var(--motion-duration-fast) var(--motion-easing-standard),
+      color var(--motion-duration-fast) var(--motion-easing-standard);
+  }
+
+  .c-icon-button--size-md {
+    --icon-button-size: var(--semantic-size-icon-button-md);
+  }
+
+  .c-icon-button--size-lg {
+    --icon-button-size: var(--semantic-size-icon-button-lg);
+  }
+
+  .c-icon-button--size-2xl {
+    --icon-button-size: var(--semantic-size-icon-button-2xl);
+  }
+
+  .c-icon-button .c-icon {
+    color: currentColor;
+  }
+
+  .c-icon-button:hover:not(:disabled) {
+    background: var(--components-icon-button-background-hover);
+    color: var(--semantic-colors-text-primary);
+  }
+
+  .c-icon-button:active:not(:disabled),
+  .c-icon-button--active:not(:disabled),
+  .c-icon-button[aria-pressed='true']:not(:disabled) {
+    background: var(--components-icon-button-background-active);
+    color: var(--semantic-colors-text-primary);
+  }
+
+  .c-icon-button:focus-visible:not(:disabled) {
+    background: var(--components-icon-button-background-focus);
+    color: var(--semantic-colors-text-primary);
+    outline: none;
+  }
+
+  .c-icon-button:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  .c-icon-button:disabled {
+    cursor: not-allowed;
+    opacity: var(--opacity-disabled);
+  }
+}

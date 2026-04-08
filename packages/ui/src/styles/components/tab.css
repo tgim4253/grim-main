@@ -1,0 +1,8 @@
+.tab-strip {
+  display: flex;
+  width: 100%;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-inline-end: 0.5rem;
+}

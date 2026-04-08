@@ -1,0 +1,7 @@
+@layer tokens-base, tokens-semantic, tokens-theme, app;
+
+@import '../shared/styles/tokens.base.css';
+@import '../shared/styles/tokens.semantic.css';
+@import '../shared/styles/themes/dark.css';
+@import '../shared/styles/themes/light.css';
+@import './app.css';

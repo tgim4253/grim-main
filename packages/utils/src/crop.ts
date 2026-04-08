@@ -1,4 +1,5 @@
-import { AbsoluteCropRect, NodeCrop, NormalizedCropRect } from '@tgim/types/index';
+import { AbsoluteCropRect, NormalizedCropRect } from '@tgim/types/crop';
+import { NodeCrop } from '@tgim/types/graph';
 import { clamp01, isFiniteNumber } from './number';
 
 export const toNormalizedCropRect = (crop?: NodeCrop | null): NormalizedCropRect | null => {

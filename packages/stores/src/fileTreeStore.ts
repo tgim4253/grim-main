@@ -1,250 +1,187 @@
 import { create } from 'zustand';
-import {
-  FileTreeData,
-  FolderMountState,
-  GraphResponse,
-  NodeKind,
-  RelationType,
-} from '@tgim/types/index';
-import { convertKeysToCamel } from '@tgim/utils/object';
+import type { VirtualFolder } from '@tgim/types/library';
 
-interface FileTreeState {
-  // current tree data
-  treeData: FileTreeData[];
-  setTreeData: (data: FileTreeData[]) => void;
-  convertToTreeData: (data: GraphResponse) => FileTreeData[];
+export type ExplorerSelection =
+  | { kind: 'allAssets' }
+  | { kind: 'uncategorized' }
+  | { kind: 'recentRecords' }
+  | { kind: 'sessions' }
+  | { kind: 'folder'; folderId: string }
+  | { kind: 'record'; recordId: string }
+  | { kind: 'session'; sessionId: string; firstRecordId?: string | null };
 
-  selectedNodeId: string | null;
-  setSelectedNode: (id: string | null) => void;
-  ensureVisible: (id: string) => string[] | null;
-
-  // move nodes into a parent (append)
-  onMove: (args: { dragIds: string[] | null; parentId: string | null; index?: number }) => void;
+export interface ExplorerFolderNode extends VirtualFolder {
+  depth: number;
+  children: ExplorerFolderNode[];
 }
 
-/* utils */
+interface FileTreeState {
+  folders: VirtualFolder[];
+  expandedFolderIds: string[];
+  selectedItem: ExplorerSelection;
+  setFolders: (folders: VirtualFolder[]) => void;
+  setSelectedItem: (item: ExplorerSelection) => void;
+  toggleFolder: (folderId: string) => void;
+  expandFolder: (folderId: string) => void;
+  collapseFolder: (folderId: string) => void;
+  ensureExpanded: (folderId: string) => void;
+  buildTree: () => ExplorerFolderNode[];
+}
 
-// Find node by id in the whole tree
-const findNode = (tree: FileTreeData[], id: string): FileTreeData | null => {
-  for (const n of tree) {
-    if (n.id === id) return n;
-    if (n.children?.length) {
-      const f = findNode(n.children, id);
-      if (f) return f;
+const sortFolders = (folders: VirtualFolder[]) => {
+  return [...folders].sort((left, right) => {
+    if (left.sortOrder !== right.sortOrder) {
+      return left.sortOrder - right.sortOrder;
     }
-  }
-  return null;
-};
 
-// Returns true if `childId` is within subtree rooted at `parentId` (self counts as descendant)
-const isDescendant = (tree: FileTreeData[], parentId: string, childId: string): boolean => {
-  if (parentId === childId) return true;
-  const parent = findNode(tree, parentId);
-  if (!parent?.children?.length) return false;
-  const stack = [...parent.children];
-  while (stack.length) {
-    const cur = stack.pop();
-    if (!cur) continue;
-    if (cur.id === childId) return true;
-    if (cur.children?.length) stack.push(...cur.children);
-  }
-  return false;
-};
-
-// A node can accept children if it's a folder-like node
-const canAcceptChildren = (node: FileTreeData | null): boolean => {
-  // Heuristic: folder icon OR already has children
-  if (!node) return false;
-  if (node.icon === 'folder') return true;
-  return !!node.children?.length;
-};
-
-// Remove a node by id; returns removed node and next tree
-const removeNode = (
-  tree: FileTreeData[],
-  id: string,
-): { removed: FileTreeData | null; next: FileTreeData[] } => {
-  const next: FileTreeData[] = [];
-  let removed: FileTreeData | null = null;
-
-  for (const n of tree) {
-    if (n.id === id) {
-      removed = { ...n };
-      continue;
-    }
-    if (n.children?.length) {
-      const { removed: r, next: ch } = removeNode(n.children, id);
-      if (r) removed = r;
-      next.push({ ...n, children: ch });
-    } else {
-      next.push(n);
-    }
-  }
-  return { removed, next };
-};
-
-// Path from root to id (inclusive) or null when not found
-const findPathToNode = (tree: FileTreeData[], id: string, path: string[] = []): string[] | null => {
-  for (const node of tree) {
-    const nextPath = [...path, node.id];
-    if (node.id === id) return nextPath;
-    if (node.children?.length) {
-      const found = findPathToNode(node.children, id, nextPath);
-      if (found) return found;
-    }
-  }
-  return null;
-};
-
-// Insert `node` under `parentId` (append). Special parentId "root" means top-level.
-const insertNode = (tree: FileTreeData[], parentId: string, node: FileTreeData): FileTreeData[] => {
-  if (parentId === 'root') return [...tree, node];
-  return tree.map(n => {
-    if (n.id !== parentId) {
-      return n.children?.length ? { ...n, children: insertNode(n.children, parentId, node) } : n;
-    }
-    const children = n.children?.length ? [...n.children, node] : [node];
-    return { ...n, children };
+    return left.fullPath.localeCompare(right.fullPath, undefined, {
+      numeric: true,
+      sensitivity: 'base',
+    });
   });
 };
 
-// Depth map (id -> depth) to process deeper nodes first
-const buildDepthMap = (
-  tree: FileTreeData[],
-  depth = 0,
-  map: Map<string, number> = new Map(),
-): Map<string, number> => {
-  for (const n of tree) {
-    map.set(n.id, depth);
-    if (n.children?.length) buildDepthMap(n.children, depth + 1, map);
+const buildFolderTree = (folders: VirtualFolder[]): ExplorerFolderNode[] => {
+  const byId = new Map<string, ExplorerFolderNode>();
+
+  for (const folder of sortFolders(folders)) {
+    byId.set(folder.id, {
+      ...folder,
+      depth: 0,
+      children: [],
+    });
   }
-  return map;
+
+  const roots: ExplorerFolderNode[] = [];
+  for (const folder of byId.values()) {
+    const parentId = folder.parentId ?? null;
+    if (!parentId) {
+      roots.push(folder);
+      continue;
+    }
+
+    const parent = byId.get(parentId);
+    if (!parent) {
+      roots.push(folder);
+      continue;
+    }
+
+    folder.depth = parent.depth + 1;
+    parent.children.push(folder);
+  }
+
+  const visit = (nodes: ExplorerFolderNode[], depth: number) => {
+    nodes.sort((left, right) => {
+      if (left.sortOrder !== right.sortOrder) {
+        return left.sortOrder - right.sortOrder;
+      }
+
+      return left.name.localeCompare(right.name, undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      });
+    });
+
+    for (const node of nodes) {
+      node.depth = depth;
+      visit(node.children, depth + 1);
+    }
+  };
+
+  visit(roots, 0);
+  return roots;
 };
 
-// Batch move into a parent (append), skipping invalid cycles and child-of-selected duplicates
-const batchMoveIntoParent = (tree: FileTreeData[], ids: string[], targetParent: string) => {
-  const depthMap = buildDepthMap(tree);
-  const unique = Array.from(new Set(ids));
+const buildAncestorIds = (folders: VirtualFolder[], folderId: string): string[] => {
+  const folderMap = new Map(folders.map(folder => [folder.id, folder]));
+  const ancestors: string[] = [];
+  let cursor = folderMap.get(folderId);
 
-  const filtered = unique
-    // prevent cycles: cannot move a node into its own descendant (or itself)
-    .filter(id => id !== targetParent && !isDescendant(tree, id, targetParent))
-    // drop children if their ancestor is also selected
-    .filter(id => !unique.some(o => o !== id && isDescendant(tree, o, id)));
-
-  // Move deeper nodes first
-  filtered.sort((a, b) => (depthMap.get(b) ?? 0) - (depthMap.get(a) ?? 0));
-
-  let next = tree;
-  for (const id of filtered) {
-    const { removed, next: n } = removeNode(next, id);
-    if (!removed) continue;
-    next = insertNode(n, targetParent, removed);
+  while (cursor?.parentId) {
+    ancestors.push(cursor.parentId);
+    cursor = folderMap.get(cursor.parentId);
   }
-  return next;
+
+  return ancestors;
 };
 
-/* store */
+const pushUnique = (source: string[], nextId: string) => {
+  if (source.includes(nextId)) {
+    return source;
+  }
+
+  return [...source, nextId];
+};
 
 const useFileTreeStore = create<FileTreeState>((set, get) => ({
-  treeData: [],
-  setTreeData: data => {
+  folders: [],
+  expandedFolderIds: [],
+  selectedItem: { kind: 'allAssets' },
+
+  setFolders: folders => {
     set(state => {
-      const next: Partial<FileTreeState> = { treeData: data };
-      if (state.selectedNodeId && !findNode(data, state.selectedNodeId)) {
-        next.selectedNodeId = null;
-      }
-      return next;
+      const sorted = sortFolders(folders);
+      const validIds = new Set(sorted.map(folder => folder.id));
+      const expandedFolderIds = state.expandedFolderIds.filter(id => validIds.has(id));
+      const selectedItem =
+        state.selectedItem.kind === 'folder' && !validIds.has(state.selectedItem.folderId)
+          ? { kind: 'allAssets' as const }
+          : state.selectedItem;
+
+      return {
+        folders: sorted,
+        expandedFolderIds,
+        selectedItem,
+      };
     });
   },
 
-  selectedNodeId: null,
-  setSelectedNode: id => {
-    set({ selectedNodeId: id });
-  },
-  ensureVisible: id => {
-    if (!id) return null;
-    const path = findPathToNode(get().treeData, id);
-    if (!path) return null;
-    return path.slice(0, -1);
-  },
-
-  convertToTreeData: data => {
-    const { nodes, connections } = data;
-
-    const nodeMap = new Map<string, FileTreeData>();
-    const incoming = new Map<string, number>();
-
-    for (const n of nodes) {
-      if (n.kind !== NodeKind.Folder) continue;
-
-      const folderData = n.data.Folder ?? undefined;
-      const mounts = folderData?.mounts ?? [];
-      const health = folderData?.health ?? 'normal';
-
-      nodeMap.set(n.id, {
-        id: n.id,
-        name: folderData?.folderName ?? '',
-        icon: 'folder',
-        type: NodeKind.Folder,
-        children: [],
-        status: health,
-        mounts: convertKeysToCamel(mounts) as FolderMountState[] | undefined,
-      });
-
-      incoming.set(n.id, 0);
-    }
-    const childrenMap = new Map<string, FileTreeData[]>();
-
-    for (const conn of connections) {
-      if (conn.kind !== RelationType.ChildFolder) continue;
-
-      const parent = nodeMap.get(conn.srcNodeId);
-      const child = nodeMap.get(conn.dstNodeId);
-
-      if (!parent || !child) continue;
-      if (parent.id === child.id) continue;
-      // if (parent.type !== "folder") continue;
-
-      const arr = childrenMap.get(parent.id) ?? [];
-      if (!arr.some(c => c.id === child.id)) arr.push(child);
-      childrenMap.set(parent.id, arr);
-
-      incoming.set(child.id, (incoming.get(child.id) ?? 0) + 1);
-    }
-
-    for (const [id, node] of nodeMap) {
-      node.children = childrenMap.get(id) ?? [];
-    }
-
-    const roots: FileTreeData[] = [];
-    for (const [id, cnt] of incoming) {
-      if (cnt === 0) {
-        const rootNode = nodeMap.get(id);
-        if (rootNode) roots.push(rootNode);
+  setSelectedItem: item => {
+    set(state => {
+      if (item.kind !== 'folder') {
+        return { selectedItem: item };
       }
-    }
 
-    return roots;
+      const ancestors = buildAncestorIds(state.folders, item.folderId);
+      return {
+        selectedItem: item,
+        expandedFolderIds: Array.from(new Set([...state.expandedFolderIds, ...ancestors])),
+      };
+    });
   },
 
-  onMove: ({ dragIds, parentId }) => {
-    if (!dragIds?.length) return;
-
-    // disallow moving into itself
-    if (parentId && dragIds.includes(parentId)) return;
-
-    const tree = get().treeData;
-
-    // validate target container (except for "root")
-    if (parentId && parentId !== 'root') {
-      const target = findNode(tree, parentId);
-      if (!canAcceptChildren(target)) return;
-    }
-
-    const next = batchMoveIntoParent(tree, dragIds, parentId ?? 'root');
-    set({ treeData: next });
+  toggleFolder: folderId => {
+    set(state => {
+      const isExpanded = state.expandedFolderIds.includes(folderId);
+      return {
+        expandedFolderIds: isExpanded
+          ? state.expandedFolderIds.filter(id => id !== folderId)
+          : [...state.expandedFolderIds, folderId],
+      };
+    });
   },
+
+  expandFolder: folderId => {
+    set(state => ({
+      expandedFolderIds: pushUnique(state.expandedFolderIds, folderId),
+    }));
+  },
+
+  collapseFolder: folderId => {
+    set(state => ({
+      expandedFolderIds: state.expandedFolderIds.filter(id => id !== folderId),
+    }));
+  },
+
+  ensureExpanded: folderId => {
+    set(state => {
+      const ancestors = buildAncestorIds(state.folders, folderId);
+      const nextExpanded = ancestors.reduce(pushUnique, state.expandedFolderIds);
+      return { expandedFolderIds: nextExpanded };
+    });
+  },
+
+  buildTree: () => buildFolderTree(get().folders),
 }));
 
 export default useFileTreeStore;

@@ -1,4 +1,4 @@
-import type { NodeKind } from '@tgim/types/index';
+import type { NodeKind } from '@tgim/types/graph';
 
 export const NODE_DRAG_TYPE = 'node' as const;
 

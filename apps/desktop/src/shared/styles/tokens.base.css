@@ -1,0 +1,66 @@
+@layer tokens-base {
+  :root {
+    --font-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+
+    --font-weight-regular: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+
+    --radius-lg: var(--primitives-radius-4, 16px);
+
+    --border-width-1: 1px;
+    --effects-shadow-xs: 0 1px 2px rgba(10, 13, 18, 0.05);
+    --opacity-disabled: 0.5;
+
+    --motion-duration-fast: 160ms;
+    --motion-easing-standard: ease;
+
+    --spacing-input-field-gap: 6px;
+
+    --type-display-2xl-size: 72px;
+    --type-display-2xl-line-height: 90px;
+    --type-display-2xl-letter-spacing: -0.02em;
+
+    --type-display-xl-size: 60px;
+    --type-display-xl-line-height: 72px;
+    --type-display-xl-letter-spacing: -0.02em;
+
+    --type-display-lg-size: 48px;
+    --type-display-lg-line-height: 60px;
+    --type-display-lg-letter-spacing: -0.02em;
+
+    --type-display-md-size: 36px;
+    --type-display-md-line-height: 44px;
+    --type-display-md-letter-spacing: -0.02em;
+
+    --type-display-sm-size: 30px;
+    --type-display-sm-line-height: 38px;
+    --type-display-sm-letter-spacing: -0.02em;
+
+    --type-display-xs-size: 24px;
+    --type-display-xs-line-height: 32px;
+    --type-display-xs-letter-spacing: -0.02em;
+
+    --type-text-xl-size: 20px;
+    --type-text-xl-line-height: 30px;
+    --type-text-xl-letter-spacing: 0;
+
+    --type-text-lg-size: 18px;
+    --type-text-lg-line-height: 28px;
+    --type-text-lg-letter-spacing: 0;
+
+    --type-text-md-size: 16px;
+    --type-text-md-line-height: 24px;
+    --type-text-md-letter-spacing: 0;
+
+    --type-text-sm-size: 14px;
+    --type-text-sm-line-height: 20px;
+    --type-text-sm-letter-spacing: 0;
+
+    --type-text-xs-size: 12px;
+    --type-text-xs-line-height: 18px;
+    --type-text-xs-letter-spacing: 0;
+  }
+}
