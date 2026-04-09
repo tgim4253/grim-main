@@ -18,7 +18,7 @@
 - **크로스 플랫폼 데스크톱**: Tauri + Rust로 가볍고 안전한 런타임 제공
 - **크로키 전용 흐름**: 다중 프로젝트 대신 단일 라이브러리 구조로 자료/기록/세션 관리
 - **React 19 UI**: React, TypeScript, 디자인 토큰 기반 CSS 구조
-- **모듈형 아키텍처**: 페이지/피처/엔티티/공유 계층과 `packages/*` 공용 패키지 조합
+- **앱 내부 구조 중심 아키텍처**: 페이지/피처/엔티티/공유 계층이 `apps/desktop/src` 안에 직접 정리됨
 
 ---
 
@@ -26,12 +26,6 @@
 
 ```
 apps/desktop/        # Tauri 프론트엔드와 Rust 백엔드
-packages/ui          # 공유 UI 컴포넌트
-packages/stores      # 공유 Zustand 스토어 영역
-packages/hooks       # 커스텀 React 훅
-packages/utils       # 유틸리티 함수와 헬퍼
-packages/dnd         # Drag & Drop 헬퍼
-packages/types       # 공유 타입 정의 및 모델
 scripts/             # 번역 및 자동화 스크립트
 docs/                # 프로젝트 문서와 리팩토링 노트
 ```
@@ -65,6 +59,7 @@ docs/                # 프로젝트 문서와 리팩토링 노트
 | 명령어              | 설명                                                 |
 | ------------------- | ---------------------------------------------------- |
 | `pnpm dev`          | 데스크톱 개발 서버 실행 (`@grim/desktop dev` 프록시) |
+| `pnpm ui:demo`      | 분리된 라이브러리 데모 페이지 엔트리 실행            |
 | `pnpm build:front`  | React/Vite 정적 프론트엔드 빌드 생성                 |
 | `pnpm build`        | `tauri build` 실행으로 전체 데스크톱 앱 번들링       |
 | `pnpm tauri`        | 임의의 `tauri` CLI 명령어 실행 헬퍼                  |
@@ -92,8 +87,8 @@ docs/                # 프로젝트 문서와 리팩토링 노트
 ## 개발 팁
 
 - `apps/desktop/src/features` 안에서 기능 중심(feature-first) 구조 유지
-- `@tgim/stores`를 확장하여 상태 관리 (중복 스토어 생성 금지)
-- UI 컴포넌트는 `packages/ui/src/index.ts`에서 내보내고, 스타일은 디자인 토큰과 CSS 레이어에 맞춰 유지하기
+- 재사용 코드는 우선 `apps/desktop/src/shared` 안에서 정리하기
+- 훅, 유틸, 타입은 별도 패키지보다 앱 내부 구조에서 먼저 관리하기
 - 사용자 노출 문자열 수정 시 `scripts/translations.xlsx` 갱신 후 `pnpm translate` 실행
 
 ---

@@ -17,18 +17,12 @@
 - **Cross-platform desktop**: Tauri + Rust deliver a lightweight, secure runtime.
 - **Croquis-first workflow**: The main app is now built around a single library, not multiple projects.
 - **React 19 UI**: Built with React, TypeScript, and design-token-driven CSS.
-- **Modular architecture**: Frontend pages/features/entities/shared structure sits on top of shared packages under `packages/*`.
+- **App-local architecture**: Frontend pages/features/entities/shared structure now lives directly inside `apps/desktop/src`.
 
 ## Repository Overview
 
 ```
 apps/desktop/        # Tauri front end and Rust backend
-packages/ui          # Shared UI components
-packages/stores      # Shared Zustand stores (legacy/shared package area)
-packages/hooks       # Custom React hooks
-packages/utils       # Utility functions and helpers
-packages/dnd         # Drag & Drop helpers
-packages/types       # Shared type definitions and models
 scripts/             # Translation and other automation scripts
 docs/                # Project documentation and refactor notes
 ```
@@ -58,6 +52,7 @@ docs/                # Project documentation and refactor notes
 | Command             | Description                                                               |
 | ------------------- | ------------------------------------------------------------------------- |
 | `pnpm dev`          | Launches the desktop development server (proxies to `@grim/desktop dev`). |
+| `pnpm ui:demo`      | Opens the standalone library demo page entry.                             |
 | `pnpm build:front`  | Produces a static React/Vite build for the desktop front end.             |
 | `pnpm build`        | Runs `tauri build` to bundle the full desktop application.                |
 | `pnpm tauri`        | Passthrough helper for arbitrary `tauri` CLI commands.                    |
@@ -81,8 +76,8 @@ docs/                # Project documentation and refactor notes
 ## Development Tips
 
 - Follow the feature-first folder layout within `apps/desktop/src/features` when shipping new UI flows.
-- Extend shared Zustand stores from `@tgim/stores` instead of creating duplicates.
-- Export shared UI components from `packages/ui/src/index.ts` and align styles with the shared design tokens and CSS layers.
+- Keep reusable code inside `apps/desktop/src/shared` unless there is a strong reason to split it further.
+- Prefer app-local hooks, utilities, and types over recreating another shared package layer.
 - Update `scripts/translations.xlsx` and run `pnpm translate` whenever you touch user-facing copy.
 
 ## Tech Stack

@@ -1,7 +1,0 @@
-/* Non-color design tokens (sizing, radius, etc.) */
-:root {
-  /* Radius */
-  --radius-2xl: 1rem; /* large rounded corners */
-
-  /* (Optional) Spacing scale, typography, etc. can be added here later */
-}

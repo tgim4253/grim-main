@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @grim/desktop dev",
+    "ui:demo": "pnpm --filter @grim/desktop ui:demo",
     "build:front": "pnpm --filter @grim/desktop build",
     "build": "pnpm --filter @grim/desktop tauri build",
     "tauri": "pnpm --filter @grim/desktop tauri",

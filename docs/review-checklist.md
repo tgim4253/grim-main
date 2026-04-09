@@ -16,7 +16,7 @@ Reviewers can use the checklist below to decide whether to approve a pull reques
 
 ## 3. Technical Guidelines
 
-- [ ] For React/TypeScript updates, does the change respect the existing structure and state management patterns? (`apps/desktop/src`, `packages/ui`, etc.)
+- [ ] For React/TypeScript updates, does the change respect the existing app-local structure and state management patterns? (`apps/desktop/src`)
 - [ ] For Rust/Tauri updates, are command registration, service layering, and SQLx usage policies followed? (`apps/desktop/src-tauri`)
 - [ ] Do dependency additions or updates align with repository policy?
 

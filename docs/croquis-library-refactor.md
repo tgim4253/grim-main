@@ -177,7 +177,6 @@ Main token/style locations:
 - `apps/desktop/src/shared/styles`
 - `apps/desktop/src/shared/theme`
 - `apps/desktop/src/shared/ui`
-- `packages/ui/src/styles`
 
 Additional cleanup completed in this phase:
 
@@ -192,8 +191,6 @@ The refactor work documented here has been checked with:
 
 - `pnpm lint`
 - `pnpm --filter @grim/desktop build`
-- `pnpm --filter @tgim/ui build`
-- `pnpm --filter @tgim/utils build`
 - `cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings`
 
 ## Notes

@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { convertKeysToCamel } from '@tgim/utils/object';
+import { convertKeysToCamel } from '../object';
 
 export const invokeCamel = async <T>(
   command: string,

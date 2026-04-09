@@ -81,16 +81,15 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/) speci
 
 - **React & Tailwind**
   - Implement feature components in `apps/desktop/src/features`.
-  - Share styles from `packages/ui/src/styles`.
+  - Keep shared styles and design tokens under `apps/desktop/src/shared`.
   - Prefer functional components + hooks.
-  - Use Tailwind utilities based on `apps/desktop/tailwind.config.ts` and shared UI design tokens.
+  - Use the app-local design token CSS system instead of a package-level UI layer.
 
 - **Zustand Store**
-  - For state management, extend/reuse shared stores from `@tgim/stores` (path: `packages/stores`).
-  - Avoid creating redundant state containers.
+  - Reuse existing app-local stores when possible and avoid redundant state containers.
 
 - **Type Definitions**
-  - When adding IPC payloads or new domain models, update shared types in `packages/types`.
+  - When adding IPC payloads or new domain models, update the app-local types in `apps/desktop/src/shared/types`.
 
 ---
 

@@ -3,8 +3,8 @@
 ## Repository Overview
 
 - This is a pnpm-powered monorepo for the Grim desktop application.
-- The desktop UI lives in `apps/desktop/src` and is built with React 19, TypeScript, Tailwind CSS, and Zustand state stores that are shared from `packages/stores`.
-- Shared front-end packages (UI components, hooks, utilities, dnd helpers, and types) reside under `packages/*` and are consumed through the `@tgim/*` path aliases defined in `tsconfig.base.json` and `apps/desktop/vite.config.ts`.
+- The desktop UI lives in `apps/desktop/src` and is built with React 19, TypeScript, token-driven CSS, and app-local Zustand state.
+- Shared front-end code now lives directly under `apps/desktop/src/shared` instead of `packages/*`.
 - The Tauri backend is implemented in Rust under `apps/desktop/src-tauri` with commands registered in `src-tauri/src/commands`, domain logic organized under `src-tauri/src/services`, and SQLx migrations located in `src-tauri/migrations`.
 - Localisation strings are generated from `scripts/translations.xlsx` into `apps/desktop/public/locales/*/*.json` via the translation script in `scripts/translator.mjs`.
 
@@ -26,10 +26,10 @@
 ## TypeScript & React Guidelines
 
 - Follow the existing feature-first structure inside `apps/desktop/src/features` when adding new UI flows, and colocate supporting hooks/utilities under the nearest `lib` or `types` folder when practical.
-- Reuse shared Zustand stores from `@tgim/stores` instead of creating duplicate state containers; extend the existing stores when new state is required.
-- Prefer functional React components with hooks, matching the patterns already in `packages/ui` and `apps/desktop/src`.
-- When adding shared UI, export it from `packages/ui/src/index.ts` and keep Tailwind classes aligned with the design tokens declared in `packages/ui/src/styles` and `apps/desktop/tailwind.config.ts`.
-- Keep TypeScript definitions in `packages/types` synchronized with any new IPC payloads or domain models you introduce.
+- Reuse existing app-local Zustand stores instead of creating duplicate state containers when new state is required.
+- Prefer functional React components with hooks, matching the patterns already in `apps/desktop/src`.
+- When adding shared UI, place it under `apps/desktop/src/shared/ui` and keep styles aligned with the app-local design token CSS.
+- Keep TypeScript definitions in `apps/desktop/src/shared/types` synchronized with any new IPC payloads or domain models you introduce.
 
 ## Rust & Tauri Guidelines
 

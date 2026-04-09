@@ -5,7 +5,7 @@ export type {
   CapturePreview,
   CapturePreviewPayload,
   CaptureRect,
-} from '@tgim/types/capture';
+} from './capture';
 export type {
   CroquisAutoOption,
   CroquisOption,
@@ -17,7 +17,7 @@ export type {
   CroquisStartResponse,
   CroquisTimerOption,
   CroquisWindowOption,
-} from '@tgim/types/croquis';
+} from './croquis';
 export type {
   AssetDetail,
   AssetListSource,
@@ -55,4 +55,4 @@ export type {
   UpdateAssetTagsPayload,
   UpdateCroquisRecordTagsPayload,
   VirtualFolder,
-} from '@tgim/types/library';
+} from './library';
