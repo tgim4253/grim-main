@@ -220,11 +220,10 @@ export function CaptureOverlay() {
                 {error ? <div className="capture-overlay__error">{error}</div> : null}
 
                 <div className="capture-overlay__actions">
-                  <Button variant="primary" disabled={busy} onClick={handleConfirmCapture}>
+                  <Button disabled={busy} onClick={handleConfirmCapture}>
                     {busy ? 'Saving...' : 'Confirm Capture'}
                   </Button>
                   <Button
-                    variant="secondary"
                     onClick={() => {
                       setPreviewUrl(null);
                       setPhase('selecting');
@@ -234,7 +233,6 @@ export function CaptureOverlay() {
                     Retake
                   </Button>
                   <Button
-                    variant="secondary"
                     onClick={() => {
                       void windowRef.current.close();
                     }}

@@ -1,7 +1,29 @@
 {
-  "palette.border.default": {},
-  "palette.neutral.0": {},
-  "palette.neutral.50": {},
-  "palette.neutral.800": {},
-  "palette.neutral.950": {}
+  "generatedFrom": "tokens.dark.json",
+  "tokens": {
+    "primitives.colors.White": "#ffffff",
+    "primitives.colors.Black": "#000000",
+    "primitives.colors.Charcoal.0": "#0e0e0e",
+    "primitives.colors.Charcoal.100": "#131313",
+    "primitives.colors.Charcoal.150": "#191a1a",
+    "primitives.colors.Charcoal.200": "#1f2020",
+    "primitives.colors.Charcoal.300": "#252626",
+    "primitives.colors.Charcoal.400": "#2d2d2d",
+    "primitives.colors.Charcoal.450": "#484848",
+    "primitives.colors.Charcoal.500": "#767575",
+    "primitives.colors.Charcoal.600": "#acabaa",
+    "primitives.colors.Charcoal.700": "#e7e5e4",
+    "primitives.colors.Emerald.300": "#4edea3",
+    "primitives.colors.Emerald.700": "#005236",
+    "primitives.colors.Emerald.800": "#004a31",
+    "primitives.colors.Error.100": "#fee4e2",
+    "primitives.colors.Error.500": "#f04438",
+    "primitives.colors.Error.700": "#b42318",
+    "primitives.colors.Error.800": "#912018",
+    "primitives.colors.Warning.100": "#fef0c7",
+    "primitives.colors.Warning.400": "#f59e0b",
+    "primitives.colors.Warning.700": "#b54708",
+    "primitives.colors.Info.400": "#36bffa",
+    "primitives.colors.Info.500": "#0ba5ec"
+  }
 }

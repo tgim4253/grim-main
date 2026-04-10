@@ -41,16 +41,14 @@ export function CroquisSessionHeader({
       </div>
 
       <div className="croquis-page__actions">
-        <Button variant="secondary" disabled={!hasPrevious} onClick={() => void onMovePrevious()}>
+        <Button disabled={!hasPrevious} onClick={() => void onMovePrevious()}>
           Prev
         </Button>
-        <Button variant="secondary" onClick={onTogglePlayback}>
-          {isPlaying ? 'Pause' : 'Resume'}
-        </Button>
-        <Button variant="secondary" disabled={!hasNext} onClick={() => void onMoveNext()}>
+        <Button onClick={onTogglePlayback}>{isPlaying ? 'Pause' : 'Resume'}</Button>
+        <Button disabled={!hasNext} onClick={() => void onMoveNext()}>
           Next
         </Button>
-        <Button variant="primary" disabled={!isCaptureEnabled} onClick={() => void onCapture()}>
+        <Button disabled={!isCaptureEnabled} onClick={() => void onCapture()}>
           Capture
         </Button>
       </div>

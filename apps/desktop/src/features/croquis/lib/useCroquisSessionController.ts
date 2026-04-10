@@ -6,6 +6,8 @@ import { ipc } from '../../../shared/lib/ipc';
 import type { CroquisSession, CroquisSessionItem } from '../../../shared/types';
 import { formatSeconds, shuffleItems, timestampNow } from './sessionUtils';
 
+const sessionLoadCache = new Map<string, Promise<CroquisSession | null>>();
+
 type UseCroquisSessionControllerParams = {
   sessionId: string | null;
 };
@@ -33,8 +35,19 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
 
     let cancelled = false;
     const load = async () => {
-      const payload = await ipc.session.load(sessionId);
-      if (!payload || cancelled) {
+      const cachedLoad =
+        sessionLoadCache.get(sessionId) ??
+        ipc.session.load(sessionId).finally(() => {
+          // Keep the settled promise so StrictMode remounts do not consume the one-shot payload twice.
+        });
+      sessionLoadCache.set(sessionId, cachedLoad);
+
+      const payload = await cachedLoad;
+      if (cancelled) {
+        return;
+      }
+      if (!payload) {
+        setStatus('Croquis session payload is no longer available.');
         return;
       }
 

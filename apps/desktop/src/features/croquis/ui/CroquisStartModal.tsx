@@ -93,15 +93,10 @@ export function CroquisStartModal({
       open={open}
       title="Start Croquis"
       onClose={onClose}
-      panelClassName="croquis-modal"
-      bodyClassName="croquis-modal__body"
       footer={
-        <ModalFooter layout="horizontal-right">
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
+        <ModalFooter>
+          <Button onClick={onClose}>Cancel</Button>
           <Button
-            variant="primary"
             disabled={busy || selectedPreset === null}
             onClick={() => {
               void handleStart();
