@@ -90,6 +90,45 @@
     flex-wrap: wrap;
   }
 
+  .ui-demo__button-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .ui-demo__button-card,
+  .ui-demo__button-width-card {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .ui-demo__button-card-title {
+    color: var(--semantic-colors-text-secondary);
+    font-size: var(--type-text-xs-size);
+    line-height: var(--type-text-xs-line-height);
+    text-transform: uppercase;
+  }
+
+  .ui-demo__button-stack {
+    display: grid;
+    justify-items: start;
+    gap: 12px;
+  }
+
+  .ui-demo__button-width-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .ui-demo__button-width-sample {
+    display: grid;
+    gap: 12px;
+  }
+
   .ui-demo__stack {
     display: grid;
     gap: 16px;

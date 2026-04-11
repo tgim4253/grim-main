@@ -1,5 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import {
+  BUTTON_SIZES,
+  BUTTON_VARIANTS,
+  BUTTON_WIDTHS,
+  Button,
   CHECKBOX_SIZES,
   Checkbox,
   CheckboxConditionalRow,
@@ -11,6 +15,9 @@ import {
   Icon,
   IconButton,
   Input,
+  type ButtonSize,
+  type ButtonVariant,
+  type ButtonWidth,
   type CheckboxRowWidth,
   type CheckboxSize,
   type ChipVariant,
@@ -26,6 +33,9 @@ const FEATURED_ICONS: IconName[] = ['folder-open', 'anatomy', 'file', 'chevron-u
 const SIZE_VARIANTS: IconSize[] = ['xs', 'sm', 'md', 'lg', 'xl'];
 const COLOR_VARIANTS: IconColor[] = ['text', 'brand'];
 const HIERARCHY_VARIANTS: IconHierarchy[] = ['primary', 'tertiary'];
+const BUTTON_SIZE_VARIANTS: ButtonSize[] = [...BUTTON_SIZES];
+const BUTTON_VARIANT_VARIANTS: ButtonVariant[] = [...BUTTON_VARIANTS];
+const BUTTON_WIDTH_VARIANTS: ButtonWidth[] = [...BUTTON_WIDTHS];
 const CHECKBOX_SIZE_VARIANTS: CheckboxSize[] = [...CHECKBOX_SIZES];
 const CHECKBOX_ROW_WIDTH_VARIANTS: CheckboxRowWidth[] = [...CHECKBOX_ROW_WIDTHS];
 const ROUNDED_CHIP_VARIANTS = [
@@ -117,12 +127,52 @@ export function UiDemoPage() {
         <div className="app-kicker">ui:demo</div>
         <h1 className="ui-demo__title">Grim Shared Section 8 Primitives</h1>
         <p className="ui-demo__copy">
-          The shared UI layer now includes token-driven Icon, IconButton, Checkbox, Chip,
+          The shared UI layer now includes token-driven Button, Icon, IconButton, Checkbox, Chip,
           ChipButton, and Input primitives translated from the Section 8 Figma library.
         </p>
       </header>
 
       <div className="ui-demo__grid">
+        <DemoSection
+          title="Button"
+          description="Primary, secondary, ghost, and destructive button variants mapped from the Section 8 family with size and width controls handled by live interaction states."
+        >
+          <DemoCard title="Variant Matrix">
+            <div className="ui-demo__button-grid">
+              {BUTTON_VARIANT_VARIANTS.map(variant => (
+                <div key={variant} className="ui-demo__button-card">
+                  <div className="ui-demo__button-card-title">{variant}</div>
+                  <div className="ui-demo__button-stack">
+                    {BUTTON_SIZE_VARIANTS.map(size => (
+                      <Button key={`${variant}-${size}`} variant={variant} size={size}>
+                        Button CTA
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </DemoCard>
+
+          <DemoCard title="Width Options">
+            <div className="ui-demo__button-width-grid">
+              {BUTTON_WIDTH_VARIANTS.map(width => (
+                <div key={width} className="ui-demo__button-width-card">
+                  <div className="ui-demo__button-card-title">{width}</div>
+                  <div className="ui-demo__button-width-sample">
+                    <Button variant="primary" width={width}>
+                      Button CTA
+                    </Button>
+                    <Button variant="secondary" width={width}>
+                      Button CTA
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </DemoCard>
+        </DemoSection>
+
         <DemoSection
           title="Catalog"
           description="All 25 glyphs rendered at the default md / text / primary combination."
