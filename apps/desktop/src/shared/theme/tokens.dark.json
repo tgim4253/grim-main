@@ -642,11 +642,11 @@
       "icon-button": {
         "sm": {
           "$value": 16,
-          "$type": "number"
+          "$type": "size"
         },
         "xs": {
           "$value": 12,
-          "$type": "number"
+          "$type": "size"
         },
         "md": {
           "$value": 24,
@@ -674,7 +674,7 @@
       "icon": {
         "2xs": {
           "$value": 6,
-          "$type": "number"
+          "$type": "size"
         },
         "xs": {
           "$value": 12,
@@ -863,7 +863,7 @@
       },
       "padding": {
         "$value": "{semantic.spacing.layout.md}",
-        "$type": "number"
+        "$type": "spacing"
       },
       "border-radius": {
         "$value": "{primitives.radius.05}",
@@ -894,11 +894,11 @@
       "shared": {
         "padding-x": {
           "$value": "{semantic.spacing.component.sm}",
-          "$type": "number"
+          "$type": "spacing"
         },
         "padding-y": {
           "$value": "{semantic.spacing.component.xs}",
-          "$type": "number"
+          "$type": "spacing"
         },
         "border-radius": {
           "$value": "{primitives.radius.full}",
