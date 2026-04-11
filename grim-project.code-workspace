@@ -12,17 +12,6 @@
       "name": "src-tauri",
       "path": "apps/desktop/src-tauri",
     },
-    {
-      "name": "ui",
-      "path": "packages/ui",
-    },
-    {
-      "name": "dnd",
-      "path": "packages/dnd",
-    },
-    {
-      "path": "packages",
-    },
   ],
   "settings": {
     "liveServer.settings.multiRootWorkspaceName": "grim-project",

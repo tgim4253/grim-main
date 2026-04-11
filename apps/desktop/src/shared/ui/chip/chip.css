@@ -1,0 +1,197 @@
+@layer app {
+  .c-chip {
+    --_chip-background: transparent;
+    --_chip-border-color: transparent;
+    --_chip-border-style: solid;
+    --_chip-border-radius: var(--primitives-radius-05);
+    --_chip-text-color: var(--semantic-colors-text-primary);
+    --_chip-height: 20px;
+    --_chip-padding-x: 9px;
+    --_chip-padding-y: 3px;
+    --_chip-gap: 0;
+    --_chip-font-size: var(--primitives-typography-font-size-2xs);
+    --_chip-font-weight: var(--primitives-typography-font-weight-medium);
+    --_chip-line-height: 15px;
+    --_chip-letter-spacing: 0;
+    --_chip-text-transform: none;
+    --_chip-icon-size: 7px;
+    --_chip-action-size: 0px;
+    --_chip-action-icon-size: var(--_chip-icon-size);
+    --_chip-button-background-hover: var(--_chip-background);
+    --_chip-button-background-active: var(--_chip-background);
+    --_chip-button-border-hover: var(--_chip-border-color);
+    --_chip-button-border-active: var(--_chip-border-color);
+    --_chip-button-text-hover: var(--_chip-text-color);
+    --_chip-button-text-active: var(--_chip-text-color);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--_chip-gap);
+    width: fit-content;
+    max-width: 100%;
+    height: var(--_chip-height);
+    padding: var(--_chip-padding-y) var(--_chip-padding-x);
+    border: 1px var(--_chip-border-style) var(--_chip-border-color);
+    border-radius: var(--_chip-border-radius);
+    background: var(--_chip-background);
+    color: var(--_chip-text-color);
+    box-sizing: border-box;
+    vertical-align: middle;
+    white-space: nowrap;
+    justify-self: start;
+  }
+
+  .c-chip--shape-pill {
+    --_chip-border-radius: var(--primitives-radius-full);
+  }
+
+  .c-chip--neutral-dismiss {
+    --_chip-background: var(--semantic-colors-surface-panel);
+    --_chip-border-color: var(--semantic-colors-border-primary);
+    --_chip-height: 25px;
+    --_chip-padding-x: 9px;
+    --_chip-padding-y: 5px;
+    --_chip-gap: 6px;
+    --_chip-text-color: var(--semantic-colors-text-primary);
+    --_chip-font-size: var(--primitives-typography-font-size-2xs);
+    --_chip-font-weight: var(--primitives-typography-font-weight-medium);
+    --_chip-line-height: 15px;
+    --_chip-action-size: var(--semantic-size-icon-button-xs);
+    --_chip-action-icon-size: var(--semantic-size-icon-2xs);
+    --_chip-button-background-hover: var(--semantic-colors-surface-tertiary);
+    --_chip-button-background-active: var(--semantic-colors-surface-elevated);
+  }
+
+  .c-chip--accent-outline {
+    --_chip-background: var(--components-croquis-meta-chip-background);
+    --_chip-border-color: var(--components-croquis-meta-chip-border);
+    --_chip-height: 20px;
+    --_chip-padding-x: 9px;
+    --_chip-padding-y: 3px;
+    --_chip-text-color: var(--components-croquis-meta-chip-text);
+    --_chip-font-size: var(--primitives-typography-font-size-3xs);
+    --_chip-font-weight: var(--primitives-typography-font-weight-semibold);
+    --_chip-line-height: 13.5px;
+    --_chip-letter-spacing: 0.225px;
+    --_chip-text-transform: uppercase;
+    --_chip-button-background-hover: var(--components-croquis-duration-chip-active-background);
+    --_chip-button-background-active: var(--components-croquis-duration-chip-active-background);
+    --_chip-button-border-hover: var(--components-croquis-duration-chip-active-border);
+    --_chip-button-border-active: var(--components-croquis-duration-chip-active-border);
+  }
+
+  .c-chip--accent-solid {
+    --_chip-background: var(--semantic-colors-brand-primary);
+    --_chip-border-color: var(--semantic-colors-brand-primary);
+    --_chip-height: 20px;
+    --_chip-padding-x: 9px;
+    --_chip-padding-y: 3px;
+    --_chip-text-color: var(--semantic-colors-text-on-brand);
+    --_chip-font-size: var(--primitives-typography-font-size-3xs);
+    --_chip-font-weight: var(--primitives-typography-font-weight-semibold);
+    --_chip-line-height: 13.5px;
+    --_chip-letter-spacing: 0.225px;
+    --_chip-text-transform: uppercase;
+    --_chip-button-background-hover: var(--semantic-colors-brand-secondary);
+    --_chip-button-background-active: var(--semantic-colors-brand-teritary);
+  }
+
+  .c-chip--add {
+    --_chip-border-color: var(--semantic-colors-border-primary);
+    --_chip-border-style: dashed;
+    --_chip-height: 25px;
+    --_chip-padding-x: 9px;
+    --_chip-padding-y: 5px;
+    --_chip-gap: 4px;
+    --_chip-text-color: var(--semantic-colors-text-secondary);
+    --_chip-font-size: var(--primitives-typography-font-size-2xs);
+    --_chip-font-weight: var(--primitives-typography-font-weight-semibold);
+    --_chip-line-height: 15px;
+    --_chip-icon-size: var(--semantic-size-icon-2xs);
+    --_chip-button-background-hover: var(--semantic-colors-surface-tertiary);
+    --_chip-button-background-active: var(--semantic-colors-surface-elevated);
+    --_chip-button-text-hover: var(--semantic-colors-text-primary);
+    --_chip-button-text-active: var(--semantic-colors-text-primary);
+  }
+
+  .c-chip--outline {
+    --_chip-background: var(--semantic-colors-surface-low);
+    --_chip-border-color: var(--semantic-colors-border-primary);
+    --_chip-height: 25px;
+    --_chip-padding-x: 11px;
+    --_chip-padding-y: 5px;
+    --_chip-text-color: var(--semantic-colors-brand-primary);
+    --_chip-font-size: var(--primitives-typography-font-size-2xs);
+    --_chip-font-weight: var(--primitives-typography-font-weight-semibold);
+    --_chip-line-height: 15px;
+    --_chip-button-background-hover: var(--semantic-colors-surface-tertiary);
+    --_chip-button-background-active: var(--components-croquis-duration-chip-active-background);
+    --_chip-button-border-active: var(--components-croquis-duration-chip-active-border);
+  }
+
+  .c-chip--selected {
+    --_chip-background: var(--components-croquis-duration-chip-active-background);
+    --_chip-border-color: var(--components-croquis-duration-chip-active-border);
+    --_chip-height: 25px;
+    --_chip-padding-x: 11px;
+    --_chip-padding-y: 5px;
+    --_chip-text-color: var(--semantic-colors-brand-primary);
+    --_chip-font-size: var(--primitives-typography-font-size-2xs);
+    --_chip-font-weight: var(--primitives-typography-font-weight-semibold);
+    --_chip-line-height: 15px;
+    --_chip-button-background-hover: var(--components-croquis-duration-chip-active-background);
+    --_chip-button-background-active: var(--components-croquis-duration-chip-active-background);
+    --_chip-button-border-hover: var(--components-croquis-duration-chip-active-border);
+    --_chip-button-border-active: var(--components-croquis-duration-chip-active-border);
+  }
+
+  .c-chip__label {
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    line-height: 0;
+    color: inherit;
+  }
+
+  .c-chip__text {
+    display: block;
+    font-family: var(--primitives-typography-font-family-ui);
+    font-size: var(--_chip-font-size);
+    font-weight: var(--_chip-font-weight);
+    line-height: var(--_chip-line-height);
+    letter-spacing: var(--_chip-letter-spacing);
+    text-transform: var(--_chip-text-transform);
+    color: inherit;
+  }
+
+  .c-chip__icon {
+    --_icon-size: var(--_chip-icon-size);
+    --_icon-color: currentColor;
+    display: block;
+    flex: none;
+    align-self: center;
+    pointer-events: none;
+  }
+
+  .c-chip__action {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: var(--_chip-action-size);
+    height: var(--_chip-action-size);
+    border-radius: var(--primitives-radius-2);
+    line-height: 0;
+    pointer-events: none;
+  }
+
+  .c-chip__action-icon {
+    --_icon-size: var(--_chip-action-icon-size);
+    --_icon-color: currentColor;
+    display: block;
+    flex: none;
+    align-self: center;
+    pointer-events: none;
+  }
+}

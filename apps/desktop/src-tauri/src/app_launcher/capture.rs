@@ -9,40 +9,41 @@ pub fn launch_capture_overlay(
     app: &tauri::AppHandle,
     payload: &CaptureOverlayPayload,
 ) -> Result<String, String> {
-    let mut params = vec![
-        format!("moa_id={}", payload.moa_id),
-        format!("save_path={}", payload.save_path),
-    ];
+    let mut params = Vec::new();
 
-    if let Some(hash) = &payload.source_hash {
-        params.push(format!("source_hash={}", hash));
+    if let Some(record_id) = &payload.record_id {
+        params.push(format!("record_id={record_id}"));
     }
-
-    if let Some(node_id) = &payload.source_node_id {
-        params.push(format!("source_node_id={}", node_id));
+    if let Some(asset_id) = &payload.asset_id {
+        params.push(format!("asset_id={asset_id}"));
     }
-
     if let Some(session_id) = &payload.session_id {
-        params.push(format!("session_id={}", session_id));
+        params.push(format!("session_id={session_id}"));
+    }
+    if let Some(target_seconds) = payload.target_seconds {
+        params.push(format!("target_seconds={target_seconds}"));
+    }
+    if let Some(actual_seconds) = payload.actual_seconds {
+        params.push(format!("actual_seconds={actual_seconds}"));
     }
 
-    if let Some(link) = payload.link_type_forward {
-        params.push(format!("link_type_forward={}", link.as_str()));
-    }
-
-    if let Some(link) = payload.link_type_reverse {
-        params.push(format!("link_type_reverse={}", link.as_str()));
-    }
-
-    let uri = format!("capture?{}", params.join("&"));
+    let uri = if params.is_empty() {
+        "capture".to_string()
+    } else {
+        format!("capture?{}", params.join("&"))
+    };
 
     #[cfg(debug_assertions)]
-    let url = WebviewUrl::App(format!("http://localhost:1420/#/{uri}").into());
+    let url = WebviewUrl::External(
+        format!("http://localhost:1420/#/{uri}")
+            .parse()
+            .map_err(|_| "Failed to parse dev url")?,
+    );
 
     #[cfg(not(debug_assertions))]
-    let url = WebviewUrl::App(format!("index.html#{uri}").into());
+    let url = WebviewUrl::App(format!("index.html#/{uri}").into());
 
-    let window_label = "moa-capture".to_string();
+    let window_label = "library-capture".to_string();
 
     if let Some(existing) = app.get_webview_window(&window_label) {
         let _ = existing.close();
@@ -73,8 +74,8 @@ pub fn launch_capture_overlay(
         let window = builder.build().map_err(|err| err.to_string())?;
         window
             .set_traffic_lights_inset(12.0, 16.0)
-            .and_then(|w| w.make_transparent())
-            .and_then(|w| w.set_focus())
+            .and_then(|current| current.make_transparent())
+            .and_then(|current| current.set_focus())
             .map_err(|err| err.to_string())?;
     }
 

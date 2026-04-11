@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window",
-  "windows": ["moa-main", "moa-create", "moa-croquis", "moa-capture"],
+  "windows": ["library-main", "library-croquis", "library-capture"],
   "permissions": [
     "core:default",
     "os:default",

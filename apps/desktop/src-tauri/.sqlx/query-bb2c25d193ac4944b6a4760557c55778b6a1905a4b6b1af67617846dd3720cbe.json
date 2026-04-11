@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE virtual_folder SET full_path = ?2 WHERE id = ?1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "bb2c25d193ac4944b6a4760557c55778b6a1905a4b6b1af67617846dd3720cbe"
+}

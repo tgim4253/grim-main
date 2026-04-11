@@ -1,11 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
-  "include": [
-    "src",
-    "../../packages/hooks/src/useThumbnails.ts",
-    "../../packages/hooks/src/useFileDrop.ts",
-    "../../packages/editor/src/global.d.ts"
-  ],
+  "include": ["src"],
   "compilerOptions": {
     "outDir": "dist"
   }

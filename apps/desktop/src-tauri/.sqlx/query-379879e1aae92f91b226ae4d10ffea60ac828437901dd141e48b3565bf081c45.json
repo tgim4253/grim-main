@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO croquis_record_tag (record_id, tag_id, created_at) VALUES (?1, ?2, ?3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "379879e1aae92f91b226ae4d10ffea60ac828437901dd141e48b3565bf081c45"
+}

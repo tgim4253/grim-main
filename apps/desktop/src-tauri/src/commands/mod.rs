@@ -1,11 +1,16 @@
-//! Tauri command handlers exposed to the renderer process.
-
-pub mod capture;
-pub mod croquis;
-pub mod document;
-pub mod file;
-pub mod graph;
-pub mod image_crop;
-pub mod memo;
-pub mod moa;
-pub mod settings;
+#[path = "asset.rs"]
+pub(crate) mod asset_commands;
+#[path = "capture.rs"]
+pub(crate) mod capture_commands;
+#[path = "folder.rs"]
+pub(crate) mod folder_commands;
+#[path = "import.rs"]
+pub(crate) mod import_commands;
+#[path = "library.rs"]
+pub(crate) mod library_commands;
+#[path = "record.rs"]
+pub(crate) mod record_commands;
+#[path = "session.rs"]
+pub(crate) mod session_commands;
+#[path = "tag.rs"]
+pub(crate) mod tag_commands;

@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::models::session::SessionPreset;
+
 /// Window sizing preferences supplied by the renderer when launching Croquis.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -14,6 +16,7 @@ pub struct CroquisWindowOption {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CroquisAutoOption {
+    #[serde(default)]
     pub is_skip: bool,
 }
 
@@ -57,7 +60,7 @@ pub struct CroquisPreset {
     pub option: CroquisOption,
 }
 
-/// Collection of Croquis presets remembered for a workspace.
+/// Collection of Croquis option presets remembered for the library.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CroquisPreferences {
@@ -71,24 +74,33 @@ pub struct CroquisPreferences {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CroquisStartPayload {
-    pub moa_id: String,
+    #[serde(default)]
+    pub asset_ids: Vec<String>,
+    #[serde(default)]
+    pub preset_id: Option<String>,
+    #[serde(default)]
     pub option: CroquisOption,
-    pub image_hashes: Vec<String>,
     #[serde(default)]
     pub save_option: bool,
     #[serde(default)]
     pub preferences: Option<CroquisPreferences>,
 }
 
-/// Metadata describing an ensured Croquis base image.
+/// Metadata describing a single queue item inside a Croquis session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CroquisSessionImage {
-    pub hash: String,
+pub struct CroquisSessionItem {
+    pub record_id: String,
+    pub asset_id: String,
+    pub file_name: String,
+    pub hash: Option<String>,
     pub base_path: String,
     pub base_width: u32,
     pub base_height: u32,
     pub source_path: String,
+    pub step_name: String,
+    pub step_index: i64,
+    pub target_duration_seconds: Option<i64>,
 }
 
 /// Persisted Croquis session information shared with the Croquis window.
@@ -96,9 +108,10 @@ pub struct CroquisSessionImage {
 #[serde(rename_all = "camelCase")]
 pub struct CroquisSession {
     pub session_id: String,
-    pub moa_id: String,
+    pub title: String,
     pub option: CroquisOption,
-    pub images: Vec<CroquisSessionImage>,
+    pub preset: SessionPreset,
+    pub items: Vec<CroquisSessionItem>,
     pub created_at: String,
 }
 

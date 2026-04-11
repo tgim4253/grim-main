@@ -1,0 +1,83 @@
+@layer app {
+  .c-input {
+    display: grid;
+    gap: var(--primitives-spacing-15);
+    width: 100%;
+    min-width: 0;
+  }
+
+  .c-input__label {
+    color: var(--semantic-colors-text-secondary);
+    font-family: var(--primitives-typography-font-family-ui);
+    font-size: var(--primitives-typography-font-size-md);
+    font-weight: var(--primitives-typography-font-weight-medium);
+    line-height: 20px;
+  }
+
+  .c-input__control {
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    padding: var(--components-input-container-size-padding-y)
+      var(--components-input-container-size-padding-x);
+    border: 1px solid var(--components-input-container-border);
+    border-radius: var(--components-input-container-size-radius);
+    background: var(--components-input-container-background);
+    box-shadow: var(--effects-shadow-xs);
+    transition:
+      border-color 120ms ease,
+      box-shadow 120ms ease;
+  }
+
+  .c-input__control:focus-within {
+    border-color: var(--components-input-container-border-focus);
+  }
+
+  .c-input__control--destructive,
+  .c-input__control--destructive:focus-within {
+    border-color: var(--components-input-container-border-error);
+  }
+
+  .c-input__field {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--components-input-text-val);
+    caret-color: var(--components-input-text-val);
+    font-family: var(--primitives-typography-font-family-ui);
+    font-size: var(--primitives-typography-font-size-lg);
+    font-weight: var(--primitives-typography-font-weight-normal);
+    line-height: 24px;
+    outline: none;
+  }
+
+  .c-input__field::placeholder {
+    color: var(--components-input-text-placeholder);
+    opacity: 1;
+  }
+
+  .c-input__field:disabled {
+    color: var(--components-input-text-disabled);
+    cursor: not-allowed;
+  }
+
+  .c-input__field:disabled::placeholder {
+    color: var(--components-input-text-disabled);
+  }
+
+  .c-input__hint {
+    color: var(--components-input-text-helper);
+    font-family: var(--primitives-typography-font-family-ui);
+    font-size: var(--primitives-typography-font-size-sm);
+    font-weight: var(--primitives-typography-font-weight-normal);
+    line-height: 18px;
+  }
+
+  .c-input__hint--error {
+    color: var(--components-input-text-error);
+  }
+}

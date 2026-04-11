@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM croquis_record_tag WHERE record_id = ?1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "958948c90cbb1bd85c123985238318ef5338cff61aa5368921e9abb2c31b768b"
+}

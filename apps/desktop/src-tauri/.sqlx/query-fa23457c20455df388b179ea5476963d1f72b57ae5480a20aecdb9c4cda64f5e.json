@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id, parent_id, name, full_path, alias, sort_order, created_at, updated_at\n            FROM virtual_folder\n            ORDER BY full_path ASC, sort_order ASC, name ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "parent_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "full_path",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "alias",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "sort_order",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 7,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "fa23457c20455df388b179ea5476963d1f72b57ae5480a20aecdb9c4cda64f5e"
+}

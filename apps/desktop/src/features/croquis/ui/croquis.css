@@ -1,0 +1,250 @@
+@layer app {
+  .croquis-modal {
+    width: min(760px, calc(100vw - 32px));
+  }
+
+  .croquis-modal__body {
+    align-items: stretch;
+  }
+
+  .croquis-modal__intro {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .croquis-modal__intro p {
+    margin: 0;
+    color: var(--semantic-colors-text-tertiary);
+    font-size: var(--type-text-sm-size);
+    line-height: var(--type-text-sm-line-height);
+  }
+
+  .croquis-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .croquis-field__label {
+    color: var(--semantic-colors-text-secondary);
+    font-size: var(--type-text-sm-size);
+    line-height: var(--type-text-sm-line-height);
+    font-weight: var(--font-weight-medium);
+  }
+
+  .croquis-control {
+    width: 100%;
+    min-height: var(--semantic-size-control-lg);
+    padding: 12px 14px;
+    border: 1px solid var(--components-input-container-border);
+    border-radius: var(--components-input-container-size-radius);
+    background: var(--components-input-container-background);
+    box-shadow: var(--effects-shadow-xs);
+    color: var(--components-input-text-val);
+  }
+
+  .croquis-control:focus-visible {
+    outline: none;
+    border-color: var(--components-input-container-border-focus);
+  }
+
+  .croquis-step-list,
+  .croquis-check-grid {
+    display: grid;
+    gap: 12px;
+  }
+
+  .croquis-step {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px;
+    border: 1px solid var(--semantic-colors-border-layout);
+    border-radius: 14px;
+    background: var(--semantic-colors-surface-secondary);
+  }
+
+  .croquis-step div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .croquis-step strong {
+    color: var(--semantic-colors-text-primary);
+    font-size: var(--type-text-sm-size);
+    line-height: var(--type-text-sm-line-height);
+  }
+
+  .croquis-step span {
+    color: var(--semantic-colors-text-tertiary);
+    font-size: var(--type-text-xs-size);
+    line-height: var(--type-text-xs-line-height);
+  }
+
+  .croquis-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .croquis-check-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .croquis-check {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--semantic-colors-border-layout);
+    border-radius: 14px;
+    background: var(--semantic-colors-surface-secondary);
+    color: var(--semantic-colors-text-secondary);
+  }
+
+  .croquis-inline-error,
+  .croquis-inline-status {
+    padding: 12px 14px;
+    border-radius: 14px;
+    font-size: var(--type-text-sm-size);
+    line-height: var(--type-text-sm-line-height);
+  }
+
+  .croquis-inline-error {
+    border: 1px solid color-mix(in srgb, var(--components-input-text-error) 40%, transparent);
+    background: color-mix(in srgb, var(--components-input-text-error) 12%, transparent);
+    color: var(--components-input-text-error);
+  }
+
+  .croquis-inline-status {
+    border: 1px solid color-mix(in srgb, var(--components-button-primary-border) 40%, transparent);
+    background: color-mix(in srgb, var(--components-button-primary-background) 12%, transparent);
+    color: var(--semantic-colors-text-primary);
+  }
+
+  .croquis-page {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: color-mix(in srgb, var(--semantic-colors-surface-primary) 92%, black);
+    color: var(--semantic-colors-text-primary);
+  }
+
+  .croquis-page__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--semantic-colors-border-layout);
+  }
+
+  .croquis-page__title {
+    display: block;
+    margin-top: 6px;
+    font-size: var(--type-text-lg-size);
+    line-height: var(--type-text-lg-line-height);
+  }
+
+  .croquis-page__copy {
+    display: block;
+    margin-top: 6px;
+    color: var(--semantic-colors-text-tertiary);
+    font-size: var(--type-text-sm-size);
+    line-height: var(--type-text-sm-line-height);
+  }
+
+  .croquis-page__actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .croquis-page__body {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+
+  .croquis-page__stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    overflow: hidden;
+    background: black;
+  }
+
+  .croquis-page__image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .croquis-page__sidebar {
+    min-height: 0;
+    overflow-y: auto;
+    padding: 20px;
+    border-left: 1px solid var(--semantic-colors-border-layout);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .croquis-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px;
+    border: 1px solid var(--semantic-colors-border-layout);
+    border-radius: 16px;
+    background: var(--semantic-colors-surface-secondary);
+  }
+
+  .croquis-panel strong {
+    color: var(--semantic-colors-text-primary);
+    font-size: var(--type-text-md-size);
+    line-height: var(--type-text-md-line-height);
+  }
+
+  .croquis-panel span {
+    color: var(--semantic-colors-text-tertiary);
+    font-size: var(--type-text-sm-size);
+    line-height: var(--type-text-sm-line-height);
+  }
+
+  .croquis-page__timer {
+    font-size: clamp(2rem, 6vw, 3rem);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .croquis-page__empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100dvh;
+    color: var(--semantic-colors-text-tertiary);
+    text-align: center;
+    padding: 32px;
+  }
+
+  @media (max-width: 960px) {
+    .croquis-grid,
+    .croquis-check-grid,
+    .croquis-page__body {
+      grid-template-columns: 1fr;
+    }
+
+    .croquis-page__sidebar {
+      border-left: 0;
+      border-top: 1px solid var(--semantic-colors-border-layout);
+    }
+  }
+}

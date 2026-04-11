@@ -1,0 +1,68 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT s.id,\n                   s.title,\n                   s.preset_id,\n                   s.started_at,\n                   s.finished_at,\n                   s.created_at,\n                   s.updated_at,\n                   (\n                       SELECT COUNT(*)\n                       FROM croquis_record r\n                       WHERE r.session_id = s.id\n                   ) AS \"record_count!: i64\",\n                   (\n                       SELECT r.id\n                       FROM croquis_record r\n                       WHERE r.session_id = s.id\n                       ORDER BY COALESCE(r.step_index, 999999) ASC, r.created_at ASC, r.id ASC\n                       LIMIT 1\n                   ) AS first_record_id\n            FROM session s\n            WHERE s.id = ?1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "title",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "preset_id",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "started_at",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "finished_at",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "record_count!: i64",
+        "ordinal": 7,
+        "type_info": "Null"
+      },
+      {
+        "name": "first_record_id",
+        "ordinal": 8,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      null,
+      false
+    ]
+  },
+  "hash": "aee5122c9a0bc4230741b2f15c76cb1603e34559137eb4553736d4a900f07fe0"
+}

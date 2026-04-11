@@ -1,12 +1,11 @@
 //! Core data models shared across services and commands.
 
+pub mod asset;
 pub mod capture;
-pub mod connection;
-pub mod crop;
 pub mod croquis;
-pub mod document;
-pub mod file;
-pub mod graph;
-pub mod memo;
-pub mod node;
+pub mod folder;
+pub mod library;
+pub mod record;
+pub mod session;
+pub mod settings;
 pub mod tag;

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO session_preset\n                (id, name, description, is_default, created_at, updated_at)\n                VALUES (?1, ?2, ?3, ?4, ?5, ?5)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "9e8342e19af6951d960f399a4dbd949152ef96b1eff456bc6f274764fb7415a2"
+}

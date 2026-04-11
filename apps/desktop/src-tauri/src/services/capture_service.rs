@@ -1,7 +1,4 @@
-use std::{
-    io::Cursor,
-    path::{Path, PathBuf},
-};
+use std::io::Cursor;
 
 use anyhow::{anyhow, bail, Context, Result};
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -9,35 +6,138 @@ use base64::Engine;
 use image::{DynamicImage, ImageFormat, RgbaImage};
 use screenshots::Screen;
 use tauri::Emitter;
-use tokio::fs;
-use tracing::{debug, warn};
 
 use crate::{
     app_launcher,
-    db::repository::{
-        connection_repository::ConnectionRepository,
-        file_repository::FileRepository, node_repository::NodeRepository,
-    },
     models::{
         capture::{
             CaptureContext, CaptureMonitor, CaptureOverlayPayload,
             CapturePreview, CaptureRect,
         },
-        connection::RelationType,
-        file::FileInfo,
+        record::SaveCroquisRecordPayload,
     },
-    services::{
-        connection_rules::{load_engine_for_moa, resolve_for_nodes},
-        db::DB_MANAGER,
-        file_service::asset::ensure_file_asset_binding,
-        storage_root,
-    },
-    utils::{
-        date,
-        file_ops::{decode_data_url, ensure_unique_path},
-        path_utils::normalize_path,
-    },
+    services::{AssetService, RecordService},
+    utils::file_ops::decode_data_url,
 };
+
+#[derive(Clone)]
+pub struct CaptureService {
+    asset_service: AssetService,
+    record_service: RecordService,
+}
+
+impl CaptureService {
+    pub fn new(
+        asset_service: AssetService,
+        record_service: RecordService,
+    ) -> Self {
+        Self { asset_service, record_service }
+    }
+
+    pub async fn open_capture_overlay(
+        &self,
+        app_handle: &tauri::AppHandle,
+        payload: CaptureOverlayPayload,
+    ) -> Result<()> {
+        open_capture_overlay(app_handle, payload).await
+    }
+
+    pub async fn render_capture_preview(
+        &self,
+        rect: CaptureRect,
+        monitor: CaptureMonitor,
+    ) -> Result<CapturePreview> {
+        render_capture_preview(rect, monitor).await
+    }
+
+    pub async fn confirm_capture(
+        &self,
+        app_handle: &tauri::AppHandle,
+        base_url: String,
+        context: CaptureContext,
+    ) -> Result<()> {
+        self.confirm_capture_inner(app_handle, base_url, context).await
+    }
+
+    async fn confirm_capture_inner(
+        &self,
+        app_handle: &tauri::AppHandle,
+        base_url: String,
+        context: CaptureContext,
+    ) -> Result<()> {
+        if base_url.is_empty() {
+            bail!("Capture payload is empty");
+        }
+
+        let (bytes, extension) = decode_data_url(&base_url)?;
+        let extension = extension.unwrap_or_else(|| "png".to_string());
+        if let Some(record_id) = context.record_id.as_deref() {
+            let _ = self.record_service.get_record(record_id).await?;
+        }
+        let file_name = context
+            .record_id
+            .as_ref()
+            .map(|record_id| format!("capture-{record_id}.{extension}"))
+            .unwrap_or_else(|| {
+                format!(
+                    "capture-{}.{}",
+                    chrono::Local::now().format("%Y%m%d-%H%M%S"),
+                    extension
+                )
+            });
+
+        let result_asset = self
+            .asset_service
+            .import_capture_result(&bytes, &file_name)
+            .await?;
+
+        let record = match context.record_id.as_deref() {
+            Some(record_id) => {
+                self.record_service
+                    .attach_result_asset(
+                        record_id,
+                        &result_asset.id,
+                        context.actual_seconds,
+                    )
+                    .await?
+            }
+            None => {
+                self.record_service
+                    .save_record(SaveCroquisRecordPayload {
+                        id: None,
+                        source_asset_id: context.asset_id.clone(),
+                        result_asset_id: Some(result_asset.id.clone()),
+                        session_id: context.session_id.clone(),
+                        step_index: None,
+                        step_name: Some("Capture".to_string()),
+                        title: Some("Captured Result".to_string()),
+                        note: None,
+                        target_duration_seconds: context.target_seconds,
+                        tag_ids: Vec::new(),
+                    })
+                    .await?
+            }
+        };
+
+        #[derive(serde::Serialize, Clone)]
+        #[serde(rename_all = "camelCase")]
+        struct CaptureCompletedPayload {
+            record_id: String,
+            result_asset_id: String,
+        }
+
+        let payload = CaptureCompletedPayload {
+            record_id: record.record.id,
+            result_asset_id: result_asset.id,
+        };
+
+        app_handle.emit("capture://completed", payload).map_err(|err| {
+            anyhow!("Failed to emit capture completion event: {err}")
+        })?;
+
+        Ok(())
+    }
+}
 
 /// Launch the transparent capture overlay used to select screen regions.
 pub async fn open_capture_overlay(
@@ -69,65 +169,6 @@ pub async fn render_capture_preview(
     let data_url = format!("data:image/png;base64,{base64}");
 
     Ok(CapturePreview { base_url: data_url })
-}
-
-/// Finalise a capture by writing it to disk and linking it in the graph.
-pub async fn confirm_capture(
-    app_handle: &tauri::AppHandle,
-    base_url: String,
-    context: CaptureContext,
-) -> Result<()> {
-    if base_url.is_empty() {
-        bail!("Capture payload is empty");
-    }
-
-    let (bytes, _) = decode_data_url(&base_url)?;
-
-    let (file_path, binding_context) =
-        persist_capture_bytes(&context, bytes).await?;
-
-    let file_node_id = register_capture_in_workspace(binding_context).await?;
-
-    debug!(
-        path = %file_path.display(),
-        session = ?context.session_id,
-        hash = context
-            .source_hash
-            .as_deref()
-            .unwrap_or("n/a"),
-        "Capture saved",
-    );
-
-    #[derive(serde::Serialize, Clone)]
-    struct CaptureCompletedPayload {
-        file_path: String,
-        file_node_id: String,
-        moa_id: String,
-    }
-
-    let payload = CaptureCompletedPayload {
-        file_path: file_path.to_string_lossy().into_owned(),
-        file_node_id,
-        moa_id: context.moa_id.clone(),
-    };
-
-    app_handle
-        .emit(&format!("capture://completed/{}", context.moa_id), payload)
-        .map_err(|err| {
-            anyhow!("Failed to emit capture completion event: {err}")
-        })?;
-
-    Ok(())
-}
-
-/// Context required to register a persisted capture in the workspace database.
-struct CaptureRegistrationContext {
-    moa_id: String,
-    file_path: PathBuf,
-    source_hash: Option<String>,
-    anchor_node_id: Option<String>,
-    link_type_forward: Option<RelationType>,
-    link_type_reverse: Option<RelationType>,
 }
 
 fn capture_region_as_png(
@@ -176,83 +217,6 @@ fn capture_region_as_png(
     Ok(buffer)
 }
 
-fn generate_capture_file_name(context: &CaptureContext) -> String {
-    let timestamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
-    let hash_component = context
-        .source_hash
-        .as_deref()
-        .filter(|hash| !hash.is_empty())
-        .unwrap_or("capture");
-    if let Some(session) = &context.session_id {
-        format!(
-            "capture_{session}_{hash}_{ts}.png",
-            session = session,
-            hash = hash_component,
-            ts = timestamp
-        )
-    } else {
-        format!(
-            "capture_{hash}_{ts}.png",
-            hash = hash_component,
-            ts = timestamp
-        )
-    }
-}
-
-async fn persist_capture_bytes(
-    context: &CaptureContext,
-    bytes: Vec<u8>,
-) -> Result<(PathBuf, CaptureRegistrationContext)> {
-    if context.save_path.trim().is_empty() {
-        bail!("Capture save path is not configured");
-    }
-
-    let mut target = PathBuf::from(&context.save_path);
-
-    let metadata = fs::metadata(&target).await.ok();
-    let treat_as_dir = metadata
-        .map(|meta| meta.is_dir())
-        .unwrap_or_else(|| target.extension().is_none());
-
-    let mut prepared_path = if treat_as_dir {
-        fs::create_dir_all(&target).await.with_context(|| {
-            format!("Failed to ensure capture directory {}", target.display())
-        })?;
-        let default_name = generate_capture_file_name(context);
-        ensure_unique_path(target.join(default_name)).await?
-    } else {
-        if target.extension().is_none() {
-            target.set_extension("png");
-        }
-        if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent).await.with_context(|| {
-                format!(
-                    "Failed to ensure capture parent directory {}",
-                    parent.display()
-                )
-            })?;
-        }
-        ensure_unique_path(target).await?
-    };
-
-    fs::write(&prepared_path, &bytes).await.with_context(|| {
-        format!("Failed to write capture to {}", prepared_path.display())
-    })?;
-
-    prepared_path = normalize_path(&prepared_path);
-
-    let registration = CaptureRegistrationContext {
-        moa_id: context.moa_id.clone(),
-        file_path: prepared_path.clone(),
-        source_hash: context.source_hash.clone(),
-        anchor_node_id: context.source_node_id.clone(),
-        link_type_forward: context.link_type_forward,
-        link_type_reverse: context.link_type_reverse,
-    };
-
-    Ok((prepared_path, registration))
-}
-
 #[cfg_attr(not(target_os = "windows"), allow(unused_variables))]
 fn platform_capture_rect(
     rect: CaptureRect,
@@ -272,159 +236,4 @@ fn platform_capture_rect(
     {
         (rect.x, rect.y, rect.width, rect.height)
     }
-}
-
-async fn register_capture_in_workspace(
-    context: CaptureRegistrationContext,
-) -> Result<String> {
-    let CaptureRegistrationContext {
-        moa_id,
-        file_path,
-        source_hash,
-        mut anchor_node_id,
-        mut link_type_forward,
-        mut link_type_reverse,
-    } = context;
-
-    let parent = file_path
-        .parent()
-        .map(Path::to_path_buf)
-        .ok_or_else(|| anyhow!("Capture file has no parent directory"))?;
-
-    let parent_norm = normalize_path(&parent);
-    let sroot_info = storage_root::detect_storage_root(&parent_norm)?;
-
-    let mut tx = DB_MANAGER.create_new_tx(&moa_id).await?;
-    let real_folder_id = storage_root::ensure_storage_root_and_real_folder(
-        &mut tx,
-        &sroot_info,
-        &parent_norm,
-    )
-    .await?;
-
-    let file_name = file_path
-        .file_name()
-        .and_then(|s| s.to_str())
-        .ok_or_else(|| anyhow!("Capture filename is invalid"))?
-        .to_string();
-
-    let file_info =
-        FileInfo::new(&moa_id, &file_path, real_folder_id.clone(), file_name)
-            .await
-            .context("Failed to derive capture metadata")?;
-
-    let (asset_id, _) = ensure_file_asset_binding(&mut tx, &file_info)
-        .await
-        .context("Failed to upsert capture asset binding")?;
-
-    let file_node_id = if let Some(existing_node) =
-        NodeRepository::fetch_node_id_by_asset_id(tx.as_mut(), asset_id.clone())
-            .await?
-    {
-        existing_node
-    } else {
-        NodeRepository::create_orphan_file_node(tx.as_mut(), asset_id.clone())
-            .await?
-    };
-
-    if anchor_node_id.is_none() {
-        if let Some(hash) = source_hash.clone() {
-            if let Some(original_fc_id) =
-                FileRepository::find_file_content_id(tx.as_mut(), hash.clone())
-                    .await?
-            {
-                if let Some(original_asset_id) =
-                    FileRepository::find_file_asset_id_by_content(
-                        tx.as_mut(),
-                        &original_fc_id,
-                    )
-                    .await?
-                {
-                    if let Some(original_node_id) =
-                        NodeRepository::fetch_node_id_by_asset_id(
-                            tx.as_mut(),
-                            original_asset_id,
-                        )
-                        .await?
-                    {
-                        anchor_node_id = Some(original_node_id);
-                    } else {
-                        warn!(hash = %hash, "Capture source node missing; skipping link");
-                    }
-                } else {
-                    warn!(hash = %hash, "Capture source asset missing; skipping link");
-                }
-            } else {
-                warn!(
-                    hash = %hash,
-                    "Capture source file content missing; skipping link",
-                );
-            }
-        }
-    }
-
-    if let Some(anchor_id) = anchor_node_id.clone() {
-        if link_type_forward.is_none() || link_type_reverse.is_none() {
-            let engine = load_engine_for_moa(&moa_id).await?;
-
-            if let Some(action) = resolve_for_nodes(
-                tx.as_mut(),
-                &engine,
-                &anchor_id,
-                &file_node_id,
-                None,
-                false,
-            )
-            .await?
-            {
-                if link_type_forward.is_none() {
-                    link_type_forward = Some(action.forward_relation);
-                }
-
-                if link_type_reverse.is_none() {
-                    link_type_reverse = Some(action.reverse_relation);
-                }
-            }
-        }
-
-        let now = date::get_now_date();
-        match (link_type_forward, link_type_reverse) {
-            (Some(forward), Some(reverse)) => {
-                let _ = ConnectionRepository::insert_pair(
-                    tx.as_mut(),
-                    anchor_id.clone(),
-                    file_node_id.clone(),
-                    forward,
-                    reverse,
-                    now,
-                )
-                .await?;
-            }
-            (Some(kind), None) => {
-                let _ = ConnectionRepository::insert_connection(
-                    tx.as_mut(),
-                    anchor_id.clone(),
-                    file_node_id.clone(),
-                    kind,
-                    now,
-                )
-                .await?;
-            }
-            (None, Some(kind)) => {
-                let _ = ConnectionRepository::insert_connection(
-                    tx.as_mut(),
-                    file_node_id.clone(),
-                    anchor_id.clone(),
-                    kind,
-                    now,
-                )
-                .await?;
-            }
-            (None, None) => {}
-        }
-    }
-
-    tx.commit().await?;
-
-    Ok(file_node_id)
 }

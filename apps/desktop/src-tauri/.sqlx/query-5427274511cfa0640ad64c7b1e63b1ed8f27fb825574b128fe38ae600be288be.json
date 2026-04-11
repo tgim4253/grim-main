@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT active_session_preset_id, croquis_preferences_json\n            FROM library_settings\n            WHERE id = ?1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "active_session_preset_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "croquis_preferences_json",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "5427274511cfa0640ad64c7b1e63b1ed8f27fb825574b128fe38ae600be288be"
+}

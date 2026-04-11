@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                UPDATE tag\n                SET group_id = ?2, name = ?3, color = ?4, sort_order = ?5, updated_at = ?6\n                WHERE id = ?1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "a5422240d461abf587eadf2736e2070d56152b0b56a022e3f449e80fe1b7f434"
+}

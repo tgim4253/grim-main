@@ -4,16 +4,10 @@
       "path": ".",
     },
     {
-      "path": "packages/ui",
-    },
-    {
       "path": "apps/desktop/src",
     },
     {
       "path": "apps/desktop/src-tauri",
-    },
-    {
-      "path": "packages",
     },
   ],
   "settings": {},

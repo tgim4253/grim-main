@@ -1,0 +1,128 @@
+@layer app {
+  .c-icon-button {
+    --_icon-button-size: var(--semantic-size-icon-button-md);
+    --_icon-button-background: transparent;
+    --_icon-button-border-left-color: transparent;
+    --_icon-button-icon-size: var(--semantic-size-icon-sm);
+    --_icon-button-icon-color-base: var(--semantic-colors-text-teritary);
+    --_icon-button-icon-color-interactive: var(--semantic-colors-text-primary);
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: var(--_icon-button-size);
+    height: var(--_icon-button-size);
+    padding: 0;
+    border: 0;
+    background: var(--_icon-button-background);
+    color: var(--_icon-button-icon-color-base);
+    box-sizing: border-box;
+    appearance: none;
+    overflow: hidden;
+    cursor: pointer;
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease,
+      color 120ms ease,
+      opacity 120ms ease;
+  }
+
+  .c-icon-button--button {
+    border-radius: var(--primitives-radius-2);
+  }
+
+  .c-icon-button--sidebar {
+    border-radius: 0;
+  }
+
+  .c-icon-button--sidebar::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 2px;
+    background: var(--_icon-button-border-left-color);
+    pointer-events: none;
+  }
+
+  .c-icon-button--size-sm {
+    --_icon-button-size: var(--semantic-size-icon-button-sm);
+  }
+
+  .c-icon-button--size-xs {
+    --_icon-button-size: var(--semantic-size-icon-button-xs);
+  }
+
+  .c-icon-button--size-md {
+    --_icon-button-size: var(--semantic-size-icon-button-md);
+  }
+
+  .c-icon-button--size-lg {
+    --_icon-button-size: var(--semantic-size-icon-button-lg);
+  }
+
+  .c-icon-button--size-2xl {
+    --_icon-button-size: var(--semantic-size-icon-button-2xl);
+  }
+
+  .c-icon-button--button:hover:not(:disabled) {
+    --_icon-button-background: var(--components-icon-button-background-hover);
+    color: var(--_icon-button-icon-color-interactive);
+  }
+
+  .c-icon-button--button:active:not(:disabled) {
+    --_icon-button-background: var(--components-icon-button-background-active);
+    color: var(--_icon-button-icon-color-interactive);
+  }
+
+  .c-icon-button--button:focus-visible:not(:disabled) {
+    --_icon-button-background: var(--components-icon-button-background-focus);
+    color: var(--_icon-button-icon-color-interactive);
+  }
+
+  .c-icon-button--sidebar:hover:not(:disabled) {
+    --_icon-button-background: var(--components-icon-button-sidebar-background-hover);
+    color: var(--_icon-button-icon-color-interactive);
+  }
+
+  .c-icon-button--sidebar:active:not(:disabled) {
+    --_icon-button-background: var(--components-icon-button-sidebar-background-click);
+    color: var(--_icon-button-icon-color-interactive);
+  }
+
+  .c-icon-button--sidebar:focus-visible:not(:disabled) {
+    --_icon-button-background: var(--components-icon-button-sidebar-background-hover);
+    color: var(--_icon-button-icon-color-interactive);
+  }
+
+  .c-icon-button[data-active='true'] {
+    color: var(--_icon-button-icon-color-interactive);
+  }
+
+  .c-icon-button--button[data-active='true'] {
+    --_icon-button-background: var(--components-icon-button-background-active);
+  }
+
+  .c-icon-button--sidebar[data-active='true'] {
+    --_icon-button-background: var(--components-icon-button-sidebar-background-active);
+    --_icon-button-border-left-color: var(--semantic-colors-brand-primary);
+  }
+
+  .c-icon-button:focus-visible {
+    outline: 2px solid var(--semantic-colors-border-focus);
+    outline-offset: 2px;
+  }
+
+  .c-icon-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.56;
+  }
+
+  .c-icon-button__icon {
+    --_icon-size: var(--_icon-button-icon-size);
+    --_icon-color: currentColor;
+    position: relative;
+    z-index: 1;
+    pointer-events: none;
+  }
+}
