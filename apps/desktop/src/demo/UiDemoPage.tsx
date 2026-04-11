@@ -1,38 +1,18 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import {
-  AccordionItem,
-  AccordionList,
-  Avatar,
-  Button,
-  Checkbox,
-  CheckboxConditionalRow,
-  CheckboxRow,
-  Chip,
-  EditableAvatar,
+  ICON_NAMES,
   Icon,
-  IconButton,
-  Input,
-  Logo,
-  Modal,
-  ModalFooter,
-  Select,
-  type SelectOption,
+  type IconColor,
+  type IconHierarchy,
+  type IconName,
+  type IconSize,
 } from '../shared/ui';
 import './uiDemo.css';
 
-const AVATAR_SRC = `data:image/svg+xml;utf8,${encodeURIComponent(`
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" fill="none">
-    <rect width="160" height="160" rx="24" fill="#1B1B1B"/>
-    <circle cx="80" cy="62" r="26" fill="#3EB282"/>
-    <path d="M40 142c10-26 27-39 40-39s30 13 40 39" fill="#F4F1EF"/>
-  </svg>
-`)}`;
-
-const DEFAULT_OPTIONS: SelectOption[] = [
-  { value: 'croquis', label: 'Croquis Studio' },
-  { value: 'capture', label: 'Capture Queue' },
-  { value: 'archive', label: 'Archive' },
-];
+const FEATURED_ICONS: IconName[] = ['folder-open', 'anatomy', 'file', 'chevron-up', 'close'];
+const SIZE_VARIANTS: IconSize[] = ['xs', 'sm', 'md', 'lg', 'xl'];
+const COLOR_VARIANTS: IconColor[] = ['text', 'brand'];
+const HIERARCHY_VARIANTS: IconHierarchy[] = ['primary', 'tertiary'];
 
 function DemoSection({
   title,
@@ -65,182 +45,97 @@ function DemoCard({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export function UiDemoPage() {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [defaultSelectValue, setDefaultSelectValue] = useState<string | null>('croquis');
-  const [checkboxEnabled, setCheckboxEnabled] = useState(true);
-
   return (
-    <>
-      <main className="ui-demo">
-        <header className="ui-demo__hero">
-          <div className="app-kicker">ui:demo</div>
-          <h1 className="ui-demo__title">Grim Shared UI Shells</h1>
-          <p className="ui-demo__copy">
-            The shared UI layer now exposes unstyled primitives and placeholder structures only.
-          </p>
-        </header>
+    <main className="ui-demo">
+      <header className="ui-demo__hero">
+        <div className="app-kicker">ui:demo</div>
+        <h1 className="ui-demo__title">Grim Shared Icons</h1>
+        <p className="ui-demo__copy">
+          The shared UI layer now has a token-driven icon primitive based on the Section 8 Figma
+          icon family.
+        </p>
+      </header>
 
-        <div className="ui-demo__grid">
-          <DemoSection
-            title="Forms"
-            description="Bare controls with behavior preserved and visual variants removed."
-          >
-            <DemoCard title="Actions">
-              <div className="ui-demo__row">
-                <Button>Start Croquis</Button>
-                <Button>Import</Button>
-                <IconButton icon="help-circle" aria-label="Help" />
-                <IconButton icon="folder-open" active aria-label="Explorer" />
-              </div>
-            </DemoCard>
-
-            <DemoCard title="Inputs">
-              <div className="ui-demo__stack">
-                <Input label="Session name" placeholder="Leg extension practice" />
-                <Input
-                  label="Fallback timer"
-                  hint="Used when the preset step does not define a value."
-                  placeholder="30"
-                  type="number"
-                />
-              </div>
-            </DemoCard>
-
-            <DemoCard title="Select">
-              <div className="ui-demo__stack">
-                <Select
-                  label="Preset"
-                  hint="Simple native select shell"
-                  options={DEFAULT_OPTIONS}
-                  value={defaultSelectValue}
-                  onChange={setDefaultSelectValue}
-                />
-              </div>
-            </DemoCard>
-          </DemoSection>
-
-          <DemoSection
-            title="State"
-            description="Minimal stateful controls and identity placeholders."
-          >
-            <DemoCard title="Checkboxes">
-              <div className="ui-demo__stack">
-                <div className="ui-demo__row">
-                  <Checkbox defaultChecked />
-                  <Checkbox />
+      <div className="ui-demo__grid">
+        <DemoSection
+          title="Catalog"
+          description="All 25 glyphs rendered at the default md / text / primary combination."
+        >
+          <DemoCard title="Glyph Set">
+            <div className="ui-demo__icon-grid">
+              {ICON_NAMES.map(name => (
+                <div key={name} className="ui-demo__icon-tile">
+                  <Icon name={name} />
+                  <span>{name}</span>
                 </div>
-                <CheckboxRow
-                  label="Enable capture"
-                  checked={checkboxEnabled}
-                  onCheckedChange={setCheckboxEnabled}
-                />
-                <CheckboxConditionalRow
-                  label="Advanced timing"
-                  checked={checkboxEnabled}
-                  onCheckedChange={setCheckboxEnabled}
-                >
-                  <div className="ui-demo__stack ui-demo__stack--compact">
-                    <CheckboxRow label="Auto skip on timeout" defaultChecked />
-                    <CheckboxRow label="Show countdown overlay" />
+              ))}
+            </div>
+          </DemoCard>
+        </DemoSection>
+
+        <DemoSection
+          title="Variants"
+          description="Official size scale plus tone spot checks so the stroke-weight shift is visible across token sizes."
+        >
+          <DemoCard title="Scale Matrix">
+            <div className="ui-demo__scale-table" role="table" aria-label="Icon scale matrix">
+              <div className="ui-demo__scale-row ui-demo__scale-row--header" role="row">
+                <div className="ui-demo__scale-name" role="columnheader">
+                  icon
+                </div>
+                {SIZE_VARIANTS.map(size => (
+                  <div key={size} className="ui-demo__scale-cell" role="columnheader">
+                    {size}
                   </div>
-                </CheckboxConditionalRow>
+                ))}
               </div>
-            </DemoCard>
 
-            <DemoCard title="Chips">
-              <div className="ui-demo__row ui-demo__row--wrap">
-                <Chip label="Female" />
-                <Chip label="Gesture" />
-                <Chip label="Add Tag" onClick={() => undefined} />
-              </div>
-            </DemoCard>
-
-            <DemoCard title="Identity">
-              <div className="ui-demo__row ui-demo__row--wrap">
-                <Avatar />
-                <Avatar src={AVATAR_SRC} alt="Demo avatar" />
-                <EditableAvatar />
-                <EditableAvatar src={AVATAR_SRC} alt="Editable demo avatar" />
-                <Logo kind="chesscom" />
-                <Logo kind="lichess" />
-              </div>
-            </DemoCard>
-
-            <DemoCard title="Placeholders">
-              <div className="ui-demo__row ui-demo__row--wrap">
-                <Icon name="folder-open" />
-                <Icon name="search" />
-                <Icon name="setting" />
-              </div>
-            </DemoCard>
-
-            <DemoCard title="Accordion">
-              <AccordionList title="Time Steps Pipeline" countLabel="2 Steps Total">
-                <AccordionItem index="01" title="Warm Up" tags={['Gesture']} value="30s" expanded>
-                  <Input label="Step name" value="Warm Up" readOnly />
-                </AccordionItem>
-                <AccordionItem index="02" title="Long Pose" tags={['Pose']} value="2m" />
-              </AccordionList>
-            </DemoCard>
-          </DemoSection>
-
-          <DemoSection
-            title="Modal"
-            description="Interactive modal shell with structure and close behavior only."
-          >
-            <DemoCard title="Launch">
-              <div className="ui-demo__stack">
-                <p className="ui-demo__card-copy">
-                  Open the modal to inspect the unstyled header, body, and footer structure.
-                </p>
-                <div className="ui-demo__row">
-                  <Button
-                    onClick={() => {
-                      setModalOpen(true);
-                    }}
-                  >
-                    Open Modal
-                  </Button>
+              {ICON_NAMES.map(name => (
+                <div key={name} className="ui-demo__scale-row" role="row">
+                  <div className="ui-demo__scale-name" role="rowheader">
+                    {name}
+                  </div>
+                  {SIZE_VARIANTS.map(size => (
+                    <div key={`${name}-${size}`} className="ui-demo__scale-cell" role="cell">
+                      <Icon
+                        name={name}
+                        size={size}
+                        aria-label={`${name} ${size}`}
+                        title={`${name} ${size}`}
+                      />
+                    </div>
+                  ))}
                 </div>
-              </div>
-            </DemoCard>
-          </DemoSection>
-        </div>
-      </main>
+              ))}
+            </div>
+          </DemoCard>
 
-      <Modal
-        open={modalOpen}
-        title="Start Croquis"
-        onClose={() => {
-          setModalOpen(false);
-        }}
-        footer={
-          <ModalFooter>
-            <Button
-              onClick={() => {
-                setModalOpen(false);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                setModalOpen(false);
-              }}
-            >
-              Start Session
-            </Button>
-          </ModalFooter>
-        }
-      >
-        <Input label="Session name" placeholder="Leg Extension Practice" />
-        <Select
-          label="Preset"
-          options={DEFAULT_OPTIONS}
-          value={defaultSelectValue}
-          onChange={setDefaultSelectValue}
-        />
-      </Modal>
-    </>
+          <DemoCard title="Tone Matrix">
+            <div className="ui-demo__tone-grid">
+              {FEATURED_ICONS.map(name => (
+                <div key={name} className="ui-demo__tone-card">
+                  <div className="ui-demo__tone-name">{name}</div>
+                  <div className="ui-demo__tone-matrix">
+                    {COLOR_VARIANTS.map(color =>
+                      HIERARCHY_VARIANTS.map(hierarchy => (
+                        <div key={`${name}-${color}-${hierarchy}`} className="ui-demo__tone-cell">
+                          <Icon
+                            name={name}
+                            color={color}
+                            hierarchy={hierarchy}
+                            aria-label={`${name} ${color} ${hierarchy}`}
+                          />
+                          <span>{`${color}/${hierarchy}`}</span>
+                        </div>
+                      )),
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </DemoCard>
+        </DemoSection>
+      </div>
+    </main>
   );
 }

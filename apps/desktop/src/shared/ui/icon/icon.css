@@ -1,0 +1,48 @@
+@layer app {
+  .c-icon {
+    --_icon-size: var(--semantic-size-icon-md);
+    --_icon-color: var(--semantic-colors-text-primary);
+    display: inline-block;
+    flex: none;
+    width: var(--_icon-size);
+    height: var(--_icon-size);
+    color: var(--_icon-color);
+    vertical-align: middle;
+  }
+
+  .c-icon--xs {
+    --_icon-size: var(--semantic-size-icon-xs);
+  }
+
+  .c-icon--sm {
+    --_icon-size: var(--semantic-size-icon-sm);
+  }
+
+  .c-icon--md {
+    --_icon-size: var(--semantic-size-icon-md);
+  }
+
+  .c-icon--lg {
+    --_icon-size: var(--semantic-size-icon-lg);
+  }
+
+  .c-icon--xl {
+    --_icon-size: var(--semantic-size-icon-xl);
+  }
+
+  .c-icon--text-primary {
+    --_icon-color: var(--semantic-colors-text-primary);
+  }
+
+  .c-icon--text-tertiary {
+    --_icon-color: var(--semantic-colors-text-teritary);
+  }
+
+  .c-icon--brand-primary {
+    --_icon-color: var(--semantic-colors-brand-primary);
+  }
+
+  .c-icon--brand-tertiary {
+    --_icon-color: var(--semantic-colors-brand-teritary);
+  }
+}
