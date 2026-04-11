@@ -15,6 +15,8 @@ import {
   Icon,
   IconButton,
   Input,
+  Select,
+  type SelectOption,
   type ButtonSize,
   type ButtonVariant,
   type ButtonWidth,
@@ -29,7 +31,7 @@ import {
 } from '../shared/ui';
 import './uiDemo.css';
 
-const FEATURED_ICONS: IconName[] = ['folder-open', 'anatomy', 'file', 'chevron-up', 'close'];
+const FEATURED_ICONS: IconName[] = ['folder-open', 'anatomy', 'file', 'check', 'close'];
 const SIZE_VARIANTS: IconSize[] = ['xs', 'sm', 'md', 'lg', 'xl'];
 const COLOR_VARIANTS: IconColor[] = ['text', 'brand'];
 const HIERARCHY_VARIANTS: IconHierarchy[] = ['primary', 'tertiary'];
@@ -66,6 +68,53 @@ const SIDEBAR_ICON_BUTTON_ROWS: IconName[] = [
   'setting',
   'user',
   'tree',
+];
+
+const BASIC_SELECT_OPTIONS: SelectOption[] = [
+  { value: 'olivia', label: 'Olivia Rhye' },
+  { value: 'phoenix', label: 'Phoenix Baker' },
+  { value: 'lana', label: 'Lana Steiner' },
+  { value: 'demi', label: 'Demi Wilkinson' },
+  { value: 'candice', label: 'Candice Wu', disabled: true },
+];
+
+const MEMBER_SELECT_OPTIONS: SelectOption[] = [
+  {
+    value: 'olivia',
+    label: 'Olivia Rhye',
+    supportingText: '@olivia',
+    menuLeading: <Icon name="user" size="md" hierarchy="tertiary" aria-hidden />,
+    valueLeading: <span className="ui-demo__select-avatar">OR</span>,
+  },
+  {
+    value: 'phoenix',
+    label: 'Phoenix Baker',
+    supportingText: '@phoenix',
+    menuLeading: <Icon name="user" size="md" hierarchy="tertiary" aria-hidden />,
+    valueLeading: <span className="ui-demo__select-avatar">PB</span>,
+  },
+  {
+    value: 'lana',
+    label: 'Lana Steiner',
+    supportingText: '@lana',
+    menuLeading: <Icon name="user" size="md" hierarchy="tertiary" aria-hidden />,
+    valueLeading: <span className="ui-demo__select-avatar">LS</span>,
+  },
+  {
+    value: 'demi',
+    label: 'Demi Wilkinson',
+    supportingText: '@demi',
+    menuLeading: <Icon name="user" size="md" hierarchy="tertiary" aria-hidden />,
+    valueLeading: <span className="ui-demo__select-avatar">DW</span>,
+  },
+  {
+    value: 'natali',
+    label: 'Natali Craig',
+    supportingText: '@natali',
+    menuLeading: <Icon name="user" size="md" hierarchy="tertiary" aria-hidden />,
+    valueLeading: <span className="ui-demo__select-avatar">NC</span>,
+    disabled: true,
+  },
 ];
 
 function DemoSection({
@@ -120,6 +169,83 @@ function ToggleableChipButtonDemo() {
   );
 }
 
+function SelectDemo() {
+  const [member, setMember] = useState('olivia');
+  const [searchValue, setSearchValue] = useState('olivia');
+
+  return (
+    <>
+      <DemoCard title="Trigger Types">
+        <div className="ui-demo__select-grid">
+          <div className="ui-demo__select-card">
+            <div className="ui-demo__input-card-title">default</div>
+            <Select
+              label="Team member"
+              placeholder="Select team member"
+              options={BASIC_SELECT_OPTIONS}
+              value={member}
+              onValueChange={setMember}
+            />
+          </div>
+
+          <div className="ui-demo__select-card">
+            <div className="ui-demo__input-card-title">icon leading</div>
+            <Select
+              label="Team member"
+              type="icon-leading"
+              placeholder="Select team member"
+              options={MEMBER_SELECT_OPTIONS}
+              value={member}
+              onValueChange={setMember}
+            />
+          </div>
+
+          <div className="ui-demo__select-card">
+            <div className="ui-demo__input-card-title">search</div>
+            <Select
+              label="Search"
+              type="search"
+              placeholder="Search"
+              options={BASIC_SELECT_OPTIONS}
+              value={searchValue}
+              onValueChange={setSearchValue}
+            />
+          </div>
+        </div>
+      </DemoCard>
+
+      <DemoCard title="Open Menu">
+        <div className="ui-demo__select-open-grid">
+          <div className="ui-demo__select-card ui-demo__select-card--open">
+            <div className="ui-demo__input-card-title">default / open</div>
+            <Select
+              defaultOpen
+              label="Team member"
+              placeholder="Select team member"
+              options={BASIC_SELECT_OPTIONS}
+              value={member}
+              onValueChange={setMember}
+            />
+          </div>
+
+          <div className="ui-demo__select-card ui-demo__select-card--open">
+            <div className="ui-demo__input-card-title">icon leading / open</div>
+            <Select
+              defaultOpen
+              label="Team member"
+              type="icon-leading"
+              placeholder="Select team member"
+              options={MEMBER_SELECT_OPTIONS}
+              value={member}
+              onValueChange={setMember}
+            />
+          </div>
+        </div>
+      </DemoCard>
+    </>
+  );
+}
+
 export function UiDemoPage() {
   return (
     <main className="ui-demo">
@@ -128,7 +254,7 @@ export function UiDemoPage() {
         <h1 className="ui-demo__title">Grim Shared Section 8 Primitives</h1>
         <p className="ui-demo__copy">
           The shared UI layer now includes token-driven Button, Icon, IconButton, Checkbox, Chip,
-          ChipButton, and Input primitives translated from the Section 8 Figma library.
+          ChipButton, Input, and Select primitives translated from the Section 8 Figma library.
         </p>
       </header>
 
@@ -175,7 +301,7 @@ export function UiDemoPage() {
 
         <DemoSection
           title="Catalog"
-          description="All 25 glyphs rendered at the default md / text / primary combination."
+          description={`${String(ICON_NAMES.length)} shared glyphs rendered at the default md / text / primary combination.`}
         >
           <DemoCard title="Glyph Set">
             <div className="ui-demo__icon-grid">
@@ -409,6 +535,13 @@ export function UiDemoPage() {
               />
             </div>
           </DemoCard>
+        </DemoSection>
+
+        <DemoSection
+          title="Select"
+          description="Default, icon-leading, and search select triggers mapped from the Section 8 Select family, with the menu now driven by canonical shared icons."
+        >
+          <SelectDemo />
         </DemoSection>
 
         <DemoSection

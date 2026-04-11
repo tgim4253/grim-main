@@ -354,6 +354,7 @@
   }
 
   .ui-demo__input-card,
+  .ui-demo__select-card,
   .ui-demo__input-stack {
     display: grid;
     gap: 10px;
@@ -370,6 +371,38 @@
 
   .ui-demo__input-stack {
     gap: 14px;
+  }
+
+  .ui-demo__select-grid,
+  .ui-demo__select-open-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .ui-demo__select-open-grid {
+    align-items: start;
+  }
+
+  .ui-demo__select-card--open {
+    min-height: 320px;
+    align-content: start;
+  }
+
+  .ui-demo__select-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--semantic-colors-brand-primary) 24%, transparent);
+    color: var(--semantic-colors-text-primary);
+    font-size: 10px;
+    font-weight: var(--font-weight-medium);
+    line-height: 1;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
 
   .ui-demo__sidebar-rail-demo {
@@ -474,6 +507,8 @@
 
     .ui-demo__checkbox-grid,
     .ui-demo__chip-grid,
+    .ui-demo__select-grid,
+    .ui-demo__select-open-grid,
     .ui-demo__icon-button-playground,
     .ui-demo__sidebar-rail-demo {
       grid-template-columns: minmax(0, 1fr);
