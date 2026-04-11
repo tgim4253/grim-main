@@ -5,8 +5,8 @@ import path from 'path';
 function withDemoTrailingSlash(rawUrl?: string | null): string | null {
   if (!rawUrl) return null;
   const [pathname, search = ''] = rawUrl.split('?', 2);
-  if (pathname === '/library-demo') {
-    return `/library-demo/${search ? `?${search}` : ''}`;
+  if (pathname === '/library-demo' || pathname === '/ui-demo') {
+    return `${pathname}/${search ? `?${search}` : ''}`;
   }
   return null;
 }
@@ -67,6 +67,7 @@ export default defineConfig({
       input: {
         app: path.resolve(process.cwd(), 'index.html'),
         libraryDemo: path.resolve(process.cwd(), 'library-demo/index.html'),
+        uiDemo: path.resolve(process.cwd(), 'ui-demo/index.html'),
       },
     },
   },

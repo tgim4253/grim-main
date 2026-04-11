@@ -4,12 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "theme:build": "node scripts/build-theme.mjs",
+    "predev": "node scripts/build-theme.mjs",
     "dev": "tauri dev",
+    "previte": "node scripts/build-theme.mjs",
     "vite": "vite",
-    "ui:demo": "vite --open /library-demo/",
-    "demo:library": "vite --open /library-demo/",
+    "demo:library": "node scripts/build-theme.mjs && vite --open /library-demo/",
+    "prebuild": "node scripts/build-theme.mjs",
     "build": "tsc && vite build",
+    "prepreview": "node scripts/build-theme.mjs",
     "preview": "vite preview",
+    "ui:demo": "node scripts/build-theme.mjs && vite --open /ui-demo/",
     "tauri": "tauri"
   },
   "dependencies": {
