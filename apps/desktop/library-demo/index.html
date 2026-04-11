@@ -8,24 +8,10 @@
   <body>
     <script>
       (function () {
-        var theme = 'dark';
-        try {
-          var stored = window.localStorage.getItem('grim-theme');
-          if (stored === 'light' || stored === 'dark') {
-            theme = stored;
-          } else if (window.matchMedia) {
-            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-          }
-        } catch (error) {
-          theme =
-            window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-              ? 'dark'
-              : 'light';
-        }
-
-        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.documentElement.style.colorScheme = 'dark';
         if (document.body) {
-          document.body.setAttribute('data-theme', theme);
+          document.body.setAttribute('data-theme', 'dark');
         }
       })();
     </script>
