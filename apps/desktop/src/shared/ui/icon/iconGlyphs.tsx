@@ -113,13 +113,8 @@ export const ICON_GLYPHS = {
   'chevron-up': <path d="m18 15-6-6-6 6" />,
   close: (
     <>
-      <path
-        d="M17.6667 1L1 17.6667M1 1L9.33333 9.33333L17.6667 17.6667"
-        stroke="white"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
     </>
   ),
   file: (
