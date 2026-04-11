@@ -1,8 +1,15 @@
 import type { ReactNode } from 'react';
 import {
+  CHECKBOX_SIZES,
+  Checkbox,
+  CheckboxConditionalRow,
+  CHECKBOX_ROW_WIDTHS,
+  CheckboxRow,
   ICON_NAMES,
   Icon,
   IconButton,
+  type CheckboxRowWidth,
+  type CheckboxSize,
   type IconButtonSize,
   type IconColor,
   type IconHierarchy,
@@ -15,6 +22,8 @@ const FEATURED_ICONS: IconName[] = ['folder-open', 'anatomy', 'file', 'chevron-u
 const SIZE_VARIANTS: IconSize[] = ['xs', 'sm', 'md', 'lg', 'xl'];
 const COLOR_VARIANTS: IconColor[] = ['text', 'brand'];
 const HIERARCHY_VARIANTS: IconHierarchy[] = ['primary', 'tertiary'];
+const CHECKBOX_SIZE_VARIANTS: CheckboxSize[] = [...CHECKBOX_SIZES];
+const CHECKBOX_ROW_WIDTH_VARIANTS: CheckboxRowWidth[] = [...CHECKBOX_ROW_WIDTHS];
 const BUTTON_ICON_BUTTON_ROWS: Array<{
   icon: IconName;
   label: string;
@@ -72,10 +81,10 @@ export function UiDemoPage() {
     <main className="ui-demo">
       <header className="ui-demo__hero">
         <div className="app-kicker">ui:demo</div>
-        <h1 className="ui-demo__title">Grim Shared Icon Primitives</h1>
+        <h1 className="ui-demo__title">Grim Shared Section 8 Primitives</h1>
         <p className="ui-demo__copy">
-          The shared UI layer now has token-driven icon and icon-button primitives based on the
-          Section 8 Figma library.
+          The shared UI layer now includes token-driven Icon, IconButton, and Checkbox primitives
+          translated from the Section 8 Figma library.
         </p>
       </header>
 
@@ -149,6 +158,65 @@ export function UiDemoPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          </DemoCard>
+        </DemoSection>
+
+        <DemoSection
+          title="Checkbox"
+          description="Primitive checkbox, inline row, and conditional row compositions mapped from the Section 8 Checkbox family."
+        >
+          <DemoCard title="Checkbox Scale">
+            <div className="ui-demo__checkbox-grid">
+              {CHECKBOX_SIZE_VARIANTS.map(size => (
+                <div key={size} className="ui-demo__checkbox-card">
+                  <div className="ui-demo__checkbox-card-title">{size}</div>
+                  <div className="ui-demo__checkbox-card-body">
+                    <div className="ui-demo__checkbox-pair">
+                      <Checkbox size={size} aria-label={`${size} unchecked`} />
+                      <Checkbox size={size} defaultChecked aria-label={`${size} checked`} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </DemoCard>
+
+          <DemoCard title="Row Variants">
+            <div className="ui-demo__checkbox-row-stack">
+              {CHECKBOX_ROW_WIDTH_VARIANTS.map(width => (
+                <div key={width} className="ui-demo__checkbox-width-card">
+                  <div className="ui-demo__checkbox-card-title">{width}</div>
+                  <div className="ui-demo__checkbox-width-sample">
+                    <CheckboxRow width={width} size="sm" label="Snap guides to visible shapes" />
+                    <CheckboxRow
+                      width={width}
+                      size="md"
+                      label="Include background when exporting the croquis pass"
+                    />
+                    <CheckboxRow
+                      width={width}
+                      size="lg"
+                      defaultChecked
+                      label="Pin this option for the next session"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </DemoCard>
+
+          <DemoCard title="Conditional Row">
+            <div className="ui-demo__checkbox-conditional-demo">
+              <CheckboxConditionalRow
+                defaultChecked
+                width="full"
+                label="Generate follow-up passes after the first croquis render"
+              >
+                <CheckboxRow width="full" size="sm" defaultChecked label="Sharpen silhouettes" />
+                <CheckboxRow width="full" size="sm" label="Keep the current canvas framing" />
+                <CheckboxRow width="full" size="sm" label="Reuse the active prompt seed" />
+              </CheckboxConditionalRow>
             </div>
           </DemoCard>
         </DemoSection>

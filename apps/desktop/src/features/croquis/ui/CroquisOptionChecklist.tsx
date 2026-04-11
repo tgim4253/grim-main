@@ -1,3 +1,5 @@
+import { CheckboxRow } from '../../../shared/ui';
+
 type ChecklistItem = {
   checked: boolean;
   label: string;
@@ -12,16 +14,14 @@ export function CroquisOptionChecklist({ items }: CroquisOptionChecklistProps) {
   return (
     <div className="croquis-check-grid">
       {items.map(item => (
-        <label key={item.label} className="croquis-check">
-          <input
-            type="checkbox"
-            checked={item.checked}
-            onChange={event => {
-              item.onChange(event.target.checked);
-            }}
-          />
-          <span>{item.label}</span>
-        </label>
+        <CheckboxRow
+          key={item.label}
+          className="croquis-check"
+          label={item.label}
+          width="full"
+          checked={item.checked}
+          onCheckedChange={item.onChange}
+        />
       ))}
     </div>
   );
