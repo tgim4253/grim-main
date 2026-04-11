@@ -48,3 +48,10 @@ export {
   type IconSize,
 } from './icon/iconGlyphs';
 export { Input, type InputProps } from './input/Input';
+export {
+  SELECT_TYPES,
+  Select,
+  type SelectOption,
+  type SelectProps,
+  type SelectType,
+} from './select/Select';
