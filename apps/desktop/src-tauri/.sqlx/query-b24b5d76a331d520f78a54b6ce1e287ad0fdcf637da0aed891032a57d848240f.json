@@ -1,0 +1,98 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id,\n                   title,\n                   note,\n                   source_asset_id,\n                   result_asset_id,\n                   session_id,\n                   step_index,\n                   step_name,\n                   target_duration_seconds,\n                   started_at,\n                   finished_at,\n                   finalized_at,\n                   created_at,\n                   updated_at\n            FROM croquis_record\n            WHERE id = ?1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "title",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "note",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "source_asset_id",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "result_asset_id",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "session_id",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "step_index",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "step_name",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "target_duration_seconds",
+        "ordinal": 8,
+        "type_info": "Integer"
+      },
+      {
+        "name": "started_at",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "finished_at",
+        "ordinal": 10,
+        "type_info": "Text"
+      },
+      {
+        "name": "finalized_at",
+        "ordinal": 11,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 12,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 13,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "b24b5d76a331d520f78a54b6ce1e287ad0fdcf637da0aed891032a57d848240f"
+}

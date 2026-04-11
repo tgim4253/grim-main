@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                    UPDATE virtual_folder\n                    SET name = ?2, parent_id = ?3, alias = ?4, updated_at = ?5\n                    WHERE id = ?1\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "0a63f726fac95eadadb4c46a4b5e0e5bf4436c4b649deb6e8ecbf008f01643c8"
+}

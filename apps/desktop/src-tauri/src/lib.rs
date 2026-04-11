@@ -9,7 +9,9 @@
 
 pub mod app_launcher;
 pub mod commands;
+pub mod errors;
 pub mod models;
+pub mod repositories;
 pub mod services;
 pub mod state;
 pub mod utils;
@@ -17,7 +19,17 @@ pub mod utils;
 use tauri::Manager;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
-use crate::services::{CaptureService, CroquisService, LibraryService};
+use crate::{
+    repositories::{
+        AssetRepository, FolderRepository, RecordRepository, SessionRepository,
+        SettingsRepository, TagRepository,
+    },
+    services::{
+        AssetService, CaptureService, CroquisService, FolderService,
+        LibraryService, LibraryStorage, RecordService, SessionService,
+        SettingsService, TagService,
+    },
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -80,13 +92,63 @@ pub fn run() {
                 state::AppState::initialize(handle),
             )
             .map_err(std::io::Error::other)?;
-            let library_service = LibraryService::new(app_state.clone());
-            let croquis_service =
-                CroquisService::new(app_state.clone(), library_service.clone());
-            let capture_service =
-                CaptureService::new(app_state.clone(), library_service.clone());
+            let settings_repository =
+                SettingsRepository::new(app_state.pool.clone());
+            let asset_repository = AssetRepository::new(app_state.pool.clone());
+            let folder_repository =
+                FolderRepository::new(app_state.pool.clone());
+            let tag_repository = TagRepository::new(app_state.pool.clone());
+            let session_repository =
+                SessionRepository::new(app_state.pool.clone());
+            let record_repository =
+                RecordRepository::new(app_state.pool.clone());
+
+            let library_storage =
+                LibraryStorage::new(app_state.library_paths.clone());
+            let settings_service =
+                SettingsService::new(settings_repository.clone());
+            let asset_service = AssetService::new(
+                asset_repository.clone(),
+                library_storage.clone(),
+            );
+            let folder_service = FolderService::new(folder_repository);
+            let tag_service = TagService::new(tag_repository.clone());
+            let record_service =
+                RecordService::new(record_repository, asset_repository);
+            let session_service = SessionService::new(
+                session_repository,
+                settings_repository,
+                tag_repository,
+                record_service.clone(),
+            );
+
+            let library_service = LibraryService::new(
+                settings_service.clone(),
+                asset_service.clone(),
+                folder_service.clone(),
+                tag_service.clone(),
+                session_service.clone(),
+                record_service.clone(),
+            );
+            let croquis_service = CroquisService::new(
+                session_service.clone(),
+                record_service.clone(),
+                asset_service.clone(),
+                settings_service.clone(),
+                library_storage,
+            );
+            let capture_service = CaptureService::new(
+                asset_service.clone(),
+                record_service.clone(),
+            );
 
             app.manage(app_state);
+            app.manage(settings_service);
+            app.manage(asset_service);
+            app.manage(folder_service);
+            app.manage(tag_service);
+            app.manage(record_service);
+            app.manage(session_service);
             app.manage(library_service);
             app.manage(croquis_service);
             app.manage(capture_service);

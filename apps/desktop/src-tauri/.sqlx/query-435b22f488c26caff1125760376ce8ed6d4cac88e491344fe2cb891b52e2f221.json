@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO croquis_record\n                (id, source_asset_id, result_asset_id, session_id, step_index, step_name, title, note,\n                 target_duration_seconds, created_at, updated_at)\n                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, COALESCE(?8, ''), ?9, ?10, ?10)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "435b22f488c26caff1125760376ce8ed6d4cac88e491344fe2cb891b52e2f221"
+}

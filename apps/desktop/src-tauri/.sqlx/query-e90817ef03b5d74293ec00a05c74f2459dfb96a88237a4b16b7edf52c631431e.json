@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM session_step_preset WHERE preset_id = ?1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "e90817ef03b5d74293ec00a05c74f2459dfb96a88237a4b16b7edf52c631431e"
+}

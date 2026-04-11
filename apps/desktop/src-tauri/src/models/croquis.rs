@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::models::library::SessionPreset;
+use crate::models::session::SessionPreset;
 
 /// Window sizing preferences supplied by the renderer when launching Croquis.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

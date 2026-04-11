@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT OR IGNORE INTO library_settings\n        (id, active_session_preset_id, croquis_preferences_json, created_at, updated_at)\n        VALUES (?1, NULL, NULL, ?2, ?2)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "756ce58aee78463ba1bb80155e764a0dd66da65ea5c6273683d95000baa5c15e"
+}

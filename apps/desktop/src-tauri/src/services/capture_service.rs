@@ -14,22 +14,24 @@ use crate::{
             CaptureContext, CaptureMonitor, CaptureOverlayPayload,
             CapturePreview, CaptureRect,
         },
-        library::SaveCroquisRecordPayload,
+        record::SaveCroquisRecordPayload,
     },
-    services::library_service,
-    state::AppState,
+    services::{AssetService, RecordService},
     utils::file_ops::decode_data_url,
 };
 
-#[derive(Clone, Default)]
-pub struct CaptureService;
+#[derive(Clone)]
+pub struct CaptureService {
+    asset_service: AssetService,
+    record_service: RecordService,
+}
 
 impl CaptureService {
     pub fn new(
-        _app_state: AppState,
-        _library_service: crate::services::LibraryService,
+        asset_service: AssetService,
+        record_service: RecordService,
     ) -> Self {
-        Self
+        Self { asset_service, record_service }
     }
 
     pub async fn open_capture_overlay(
@@ -54,7 +56,86 @@ impl CaptureService {
         base_url: String,
         context: CaptureContext,
     ) -> Result<()> {
-        confirm_capture(app_handle, base_url, context).await
+        self.confirm_capture_inner(app_handle, base_url, context).await
+    }
+
+    async fn confirm_capture_inner(
+        &self,
+        app_handle: &tauri::AppHandle,
+        base_url: String,
+        context: CaptureContext,
+    ) -> Result<()> {
+        if base_url.is_empty() {
+            bail!("Capture payload is empty");
+        }
+
+        let (bytes, extension) = decode_data_url(&base_url)?;
+        let extension = extension.unwrap_or_else(|| "png".to_string());
+        if let Some(record_id) = context.record_id.as_deref() {
+            let _ = self.record_service.get_record(record_id).await?;
+        }
+        let file_name = context
+            .record_id
+            .as_ref()
+            .map(|record_id| format!("capture-{record_id}.{extension}"))
+            .unwrap_or_else(|| {
+                format!(
+                    "capture-{}.{}",
+                    chrono::Local::now().format("%Y%m%d-%H%M%S"),
+                    extension
+                )
+            });
+
+        let result_asset = self
+            .asset_service
+            .import_capture_result(&bytes, &file_name)
+            .await?;
+
+        let record = match context.record_id.as_deref() {
+            Some(record_id) => {
+                self.record_service
+                    .attach_result_asset(
+                        record_id,
+                        &result_asset.id,
+                        context.actual_seconds,
+                    )
+                    .await?
+            }
+            None => {
+                self.record_service
+                    .save_record(SaveCroquisRecordPayload {
+                        id: None,
+                        source_asset_id: context.asset_id.clone(),
+                        result_asset_id: Some(result_asset.id.clone()),
+                        session_id: context.session_id.clone(),
+                        step_index: None,
+                        step_name: Some("Capture".to_string()),
+                        title: Some("Captured Result".to_string()),
+                        note: None,
+                        target_duration_seconds: context.target_seconds,
+                        tag_ids: Vec::new(),
+                    })
+                    .await?
+            }
+        };
+
+        #[derive(serde::Serialize, Clone)]
+        #[serde(rename_all = "camelCase")]
+        struct CaptureCompletedPayload {
+            record_id: String,
+            result_asset_id: String,
+        }
+
+        let payload = CaptureCompletedPayload {
+            record_id: record.record.id,
+            result_asset_id: result_asset.id,
+        };
+
+        app_handle.emit("capture://completed", payload).map_err(|err| {
+            anyhow!("Failed to emit capture completion event: {err}")
+        })?;
+
+        Ok(())
     }
 }
 
@@ -88,78 +169,6 @@ pub async fn render_capture_preview(
     let data_url = format!("data:image/png;base64,{base64}");
 
     Ok(CapturePreview { base_url: data_url })
-}
-
-/// Finalise a capture by writing it to the internal asset library.
-pub async fn confirm_capture(
-    app_handle: &tauri::AppHandle,
-    base_url: String,
-    context: CaptureContext,
-) -> Result<()> {
-    if base_url.is_empty() {
-        bail!("Capture payload is empty");
-    }
-
-    let (bytes, extension) = decode_data_url(&base_url)?;
-    let extension = extension.unwrap_or_else(|| "png".to_string());
-    let file_name = context
-        .record_id
-        .as_ref()
-        .map(|record_id| format!("capture-{record_id}.{extension}"))
-        .unwrap_or_else(|| {
-            format!(
-                "capture-{}.{}",
-                chrono::Local::now().format("%Y%m%d-%H%M%S"),
-                extension
-            )
-        });
-
-    let result_asset =
-        library_service::import_capture_result(&bytes, &file_name).await?;
-
-    let record = match context.record_id.as_deref() {
-        Some(record_id) => {
-            library_service::attach_result_asset(
-                record_id,
-                &result_asset.id,
-                context.actual_seconds,
-            )
-            .await?
-        }
-        None => {
-            library_service::save_record(SaveCroquisRecordPayload {
-                id: None,
-                source_asset_id: context.asset_id.clone(),
-                result_asset_id: Some(result_asset.id.clone()),
-                session_id: context.session_id.clone(),
-                step_index: None,
-                step_name: Some("Capture".to_string()),
-                title: Some("Captured Result".to_string()),
-                note: None,
-                target_duration_seconds: context.target_seconds,
-                tag_ids: Vec::new(),
-            })
-            .await?
-        }
-    };
-
-    #[derive(serde::Serialize, Clone)]
-    #[serde(rename_all = "camelCase")]
-    struct CaptureCompletedPayload {
-        record_id: String,
-        result_asset_id: String,
-    }
-
-    let payload = CaptureCompletedPayload {
-        record_id: record.record.id,
-        result_asset_id: result_asset.id,
-    };
-
-    app_handle.emit("capture://completed", payload).map_err(|err| {
-        anyhow!("Failed to emit capture completion event: {err}")
-    })?;
-
-    Ok(())
 }
 
 fn capture_region_as_png(

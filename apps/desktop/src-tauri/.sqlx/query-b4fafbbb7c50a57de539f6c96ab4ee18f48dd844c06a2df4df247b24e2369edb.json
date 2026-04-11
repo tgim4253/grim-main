@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO asset_tag (asset_id, tag_id, created_at) VALUES (?1, ?2, ?3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "b4fafbbb7c50a57de539f6c96ab4ee18f48dd844c06a2df4df247b24e2369edb"
+}

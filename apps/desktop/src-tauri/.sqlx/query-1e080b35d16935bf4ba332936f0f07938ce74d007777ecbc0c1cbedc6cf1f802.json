@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE session_preset SET is_default = 0, updated_at = ?1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "1e080b35d16935bf4ba332936f0f07938ce74d007777ecbc0c1cbedc6cf1f802"
+}

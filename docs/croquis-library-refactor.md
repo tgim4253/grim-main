@@ -105,20 +105,38 @@ Legacy command groups such as project/moa/graph/document/memo were removed from 
 
 ### Service Layer
 
-The large library service was split into domain-oriented modules under:
+The backend now uses thin command modules wired directly to domain services under:
 
-- `apps/desktop/src-tauri/src/services/library_service`
+- `apps/desktop/src-tauri/src/services/asset_service.rs`
+- `apps/desktop/src-tauri/src/services/folder_service.rs`
+- `apps/desktop/src-tauri/src/services/record_service.rs`
+- `apps/desktop/src-tauri/src/services/session_service.rs`
+- `apps/desktop/src-tauri/src/services/tag_service.rs`
+- `apps/desktop/src-tauri/src/services/settings_service.rs`
+- `apps/desktop/src-tauri/src/services/capture_service.rs`
+- `apps/desktop/src-tauri/src/services/croquis_service.rs`
 
-Current service areas include:
+`LibraryService` remains as a small snapshot aggregation service for the library landing state.
 
-- runtime/bootstrap concerns for the single library
-- assets
-- folders
-- records
-- tags
-- sessions
-- settings
-- mapping helpers
+### Model Layout
+
+Backend DTOs are split by domain under `apps/desktop/src-tauri/src/models`:
+
+- `asset.rs`
+- `folder.rs`
+- `record.rs`
+- `session.rs`
+- `settings.rs`
+- `tag.rs`
+- `library.rs` for aggregated library snapshot types
+
+### Croquis Session Handoff
+
+Croquis window payload handoff remains in-memory and one-shot:
+
+- `start_croquis_session` prepares runtime queue data and stores it transiently
+- `load_croquis_session` consumes that payload once when the croquis window boots
+- persisted state still lives at the step and record level rather than as a durable session snapshot
 
 ## Database Model
 

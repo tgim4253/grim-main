@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO tag_group (id, name, sort_order, created_at, updated_at)\n                VALUES (?1, ?2, ?3, ?4, ?4)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "293ac57c25d071a98762ee5e5fa0a6091bd8e0a74732650e893f8a7e90879eaf"
+}
