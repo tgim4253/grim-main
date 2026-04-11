@@ -68,3 +68,7 @@ dist-ssr
 *.sw?
 
 target/*
+apps/desktop/src-tauri/.dev/
+
+docs
+docs/*
