@@ -11,10 +11,20 @@ export {
   type CheckboxRowWidth,
 } from './checkbox/Checkbox';
 export {
+  CHIP_SHAPES,
+  CHIP_VARIANTS,
+  Chip,
+  type ChipProps,
+  type ChipShape,
+  type ChipVariant,
+} from './chip/Chip';
+export { ChipButton, type ChipButtonProps } from './chip-button/ChipButton';
+export {
   ICON_BUTTON_KINDS,
   ICON_BUTTON_SIZES,
   IconButton,
   type IconButtonColor,
+  type IconButtonIconSize,
   type IconButtonKind,
   type IconButtonProps,
   type IconButtonSize,

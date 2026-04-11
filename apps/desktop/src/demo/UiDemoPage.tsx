@@ -1,15 +1,18 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   CHECKBOX_SIZES,
   Checkbox,
   CheckboxConditionalRow,
   CHECKBOX_ROW_WIDTHS,
   CheckboxRow,
+  Chip,
+  ChipButton,
   ICON_NAMES,
   Icon,
   IconButton,
   type CheckboxRowWidth,
   type CheckboxSize,
+  type ChipVariant,
   type IconButtonSize,
   type IconColor,
   type IconHierarchy,
@@ -24,12 +27,20 @@ const COLOR_VARIANTS: IconColor[] = ['text', 'brand'];
 const HIERARCHY_VARIANTS: IconHierarchy[] = ['primary', 'tertiary'];
 const CHECKBOX_SIZE_VARIANTS: CheckboxSize[] = [...CHECKBOX_SIZES];
 const CHECKBOX_ROW_WIDTH_VARIANTS: CheckboxRowWidth[] = [...CHECKBOX_ROW_WIDTHS];
+const ROUNDED_CHIP_VARIANTS = [
+  'neutral-dismiss',
+  'accent-outline',
+  'accent-solid',
+  'add',
+] as const satisfies ChipVariant[];
+const PILL_CHIP_VARIANTS = ['outline', 'selected'] as const satisfies ChipVariant[];
 const BUTTON_ICON_BUTTON_ROWS: Array<{
   icon: IconName;
   label: string;
   size: IconButtonSize;
   iconSize?: IconSize;
 }> = [
+  { icon: 'close', label: 'close / xs', size: 'xs' },
   { icon: 'reload', label: 'reload / md', size: 'md' },
   { icon: 'plus', label: 'plus / lg', size: 'lg' },
   { icon: 'close', label: 'close / sm', size: 'sm' },
@@ -76,6 +87,28 @@ function DemoCard({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+function ToggleableChipButtonDemo() {
+  const [pressed, setPressed] = useState(true);
+
+  return (
+    <div className="ui-demo__chip-button-toggle">
+      <ChipButton
+        shape="pill"
+        variant="outline"
+        pressed={pressed}
+        onClick={() => {
+          setPressed(current => !current);
+        }}
+      >
+        Female
+      </ChipButton>
+      <span className="ui-demo__chip-button-hint">
+        {pressed ? 'pressed' : 'rest'} · click to toggle
+      </span>
+    </div>
+  );
+}
+
 export function UiDemoPage() {
   return (
     <main className="ui-demo">
@@ -83,8 +116,8 @@ export function UiDemoPage() {
         <div className="app-kicker">ui:demo</div>
         <h1 className="ui-demo__title">Grim Shared Section 8 Primitives</h1>
         <p className="ui-demo__copy">
-          The shared UI layer now includes token-driven Icon, IconButton, and Checkbox primitives
-          translated from the Section 8 Figma library.
+          The shared UI layer now includes token-driven Icon, IconButton, Checkbox, Chip, and
+          ChipButton primitives translated from the Section 8 Figma library.
         </p>
       </header>
 
@@ -107,7 +140,7 @@ export function UiDemoPage() {
 
         <DemoSection
           title="IconButton"
-          description="Interactive button and sidebar primitives. Hover, press, and focus the samples directly instead of rendering hardcoded state variants."
+          description="Interactive button and sidebar primitives, now including the new xs close affordance. Hover, press, and focus the samples directly instead of rendering hardcoded state variants."
         >
           <DemoCard title="Button Playground">
             <div className="ui-demo__icon-button-playground">
@@ -217,6 +250,68 @@ export function UiDemoPage() {
                 <CheckboxRow width="full" size="sm" label="Keep the current canvas framing" />
                 <CheckboxRow width="full" size="sm" label="Reuse the active prompt seed" />
               </CheckboxConditionalRow>
+            </div>
+          </DemoCard>
+        </DemoSection>
+
+        <DemoSection
+          title="Chip"
+          description="Rounded and pill chips mapped from the Section 8 Chip family, using the existing filter and croquis token groups."
+        >
+          <DemoCard title="Rounded Variants">
+            <div className="ui-demo__chip-grid">
+              {ROUNDED_CHIP_VARIANTS.map(variant => (
+                <div key={variant} className="ui-demo__chip-card">
+                  <div className="ui-demo__chip-card-title">{variant}</div>
+                  <Chip shape="rounded" variant={variant}>
+                    Female
+                  </Chip>
+                </div>
+              ))}
+            </div>
+          </DemoCard>
+
+          <DemoCard title="Pill Variants">
+            <div className="ui-demo__chip-grid ui-demo__chip-grid--compact">
+              {PILL_CHIP_VARIANTS.map(variant => (
+                <div key={variant} className="ui-demo__chip-card">
+                  <div className="ui-demo__chip-card-title">{variant}</div>
+                  <Chip shape="pill" variant={variant}>
+                    Female
+                  </Chip>
+                </div>
+              ))}
+            </div>
+          </DemoCard>
+
+          <DemoCard title="ChipButton">
+            <div className="ui-demo__chip-grid">
+              <div className="ui-demo__chip-card">
+                <div className="ui-demo__chip-card-title">neutral-dismiss</div>
+                <ChipButton variant="neutral-dismiss">Female</ChipButton>
+              </div>
+              <div className="ui-demo__chip-card">
+                <div className="ui-demo__chip-card-title">add</div>
+                <ChipButton variant="add">Female</ChipButton>
+              </div>
+              <div className="ui-demo__chip-card">
+                <div className="ui-demo__chip-card-title">accent-outline</div>
+                <ChipButton variant="accent-outline">Female</ChipButton>
+              </div>
+              <div className="ui-demo__chip-card">
+                <div className="ui-demo__chip-card-title">accent-solid</div>
+                <ChipButton variant="accent-solid">Female</ChipButton>
+              </div>
+              <div className="ui-demo__chip-card">
+                <div className="ui-demo__chip-card-title">outline / rest</div>
+                <ChipButton shape="pill" variant="outline">
+                  Female
+                </ChipButton>
+              </div>
+              <div className="ui-demo__chip-card">
+                <div className="ui-demo__chip-card-title">outline / pressed</div>
+                <ToggleableChipButtonDemo />
+              </div>
             </div>
           </DemoCard>
         </DemoSection>

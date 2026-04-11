@@ -1,0 +1,40 @@
+@layer app {
+  .c-chip-button {
+    appearance: none;
+    cursor: pointer;
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease,
+      color 120ms ease,
+      opacity 120ms ease;
+  }
+
+  .c-chip-button:not(:disabled):hover {
+    background: var(--_chip-button-background-hover);
+    border-color: var(--_chip-button-border-hover);
+    color: var(--_chip-button-text-hover);
+  }
+
+  .c-chip-button:not(:disabled):active {
+    background: var(--_chip-button-background-active);
+    border-color: var(--_chip-button-border-active);
+    color: var(--_chip-button-text-active);
+  }
+
+  .c-chip-button[aria-pressed='true'].c-chip--outline,
+  .c-chip-button--pressed.c-chip--outline {
+    background: var(--components-croquis-duration-chip-active-background);
+    border-color: var(--components-croquis-duration-chip-active-border);
+    color: var(--semantic-colors-brand-primary);
+  }
+
+  .c-chip-button:focus-visible {
+    outline: 2px solid var(--semantic-colors-border-focus);
+    outline-offset: 2px;
+  }
+
+  .c-chip-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.56;
+  }
+}
