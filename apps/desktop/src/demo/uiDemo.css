@@ -90,6 +90,43 @@
     flex-wrap: wrap;
   }
 
+  .ui-demo__accordion-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .ui-demo__accordion-card {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .ui-demo__accordion-root {
+    width: 100%;
+  }
+
+  .ui-demo__accordion-body-stack,
+  .ui-demo__accordion-checkbox-stack {
+    display: grid;
+    gap: 12px;
+  }
+
+  .ui-demo__accordion-chip-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .ui-demo__accordion-note {
+    color: var(--semantic-colors-text-secondary);
+    font-size: var(--type-text-xs-size);
+    line-height: var(--type-text-xs-line-height);
+  }
+
   .ui-demo__button-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -1,5 +1,10 @@
 import { useState, type ReactNode } from 'react';
 import {
+  ACCORDION_ROOT_TYPES,
+  AccordionItem,
+  AccordionItemBody,
+  AccordionItemHeader,
+  AccordionRoot,
   BUTTON_SIZES,
   BUTTON_VARIANTS,
   BUTTON_WIDTHS,
@@ -23,6 +28,7 @@ import {
   type CheckboxRowWidth,
   type CheckboxSize,
   type ChipVariant,
+  type AccordionRootType,
   type IconButtonSize,
   type IconColor,
   type IconHierarchy,
@@ -47,6 +53,7 @@ const ROUNDED_CHIP_VARIANTS = [
   'add',
 ] as const satisfies ChipVariant[];
 const PILL_CHIP_VARIANTS = ['outline', 'selected'] as const satisfies ChipVariant[];
+const ACCORDION_ROOT_VARIANTS: AccordionRootType[] = [...ACCORDION_ROOT_TYPES];
 const BUTTON_ICON_BUTTON_ROWS: Array<{
   icon: IconName;
   label: string;
@@ -246,6 +253,84 @@ function SelectDemo() {
   );
 }
 
+function AccordionDetailContent({ label, duration }: { label: string; duration: string }) {
+  return (
+    <div className="ui-demo__accordion-body-stack">
+      <div className="ui-demo__accordion-chip-row">
+        <Chip shape="rounded" variant="accent-outline">
+          GESTURE
+        </Chip>
+        <Chip shape="rounded" variant="accent-solid">
+          POSE
+        </Chip>
+        <Chip shape="rounded" variant="add">
+          Add tag
+        </Chip>
+      </div>
+
+      <Input label="Duration" defaultValue={duration} readOnly />
+
+      <div className="ui-demo__accordion-checkbox-stack">
+        <CheckboxRow label="Enable timer" defaultChecked width="full" />
+        <CheckboxConditionalRow label="Shuffle queue" width="full">
+          <div className="ui-demo__accordion-note">
+            {label} detail stays mounted while the accordion collapses.
+          </div>
+        </CheckboxConditionalRow>
+      </div>
+    </div>
+  );
+}
+
+function AccordionDemo() {
+  const rootMeta: Record<AccordionRootType, { defaultValue: string | string[] | null }> = {
+    single: { defaultValue: 'figure-studies' },
+    multiple: { defaultValue: ['warm-up', 'figure-studies'] },
+  };
+
+  return (
+    <div className="ui-demo__accordion-grid">
+      {ACCORDION_ROOT_VARIANTS.map(type => (
+        <div key={type} className="ui-demo__accordion-card">
+          <div className="ui-demo__input-card-title">{type}</div>
+          <AccordionRoot
+            type={type}
+            defaultValue={rootMeta[type].defaultValue}
+            className="ui-demo__accordion-root"
+          >
+            <AccordionItem value="warm-up">
+              <AccordionItemHeader index="01" meta="30s">
+                Warm-up Gestures
+              </AccordionItemHeader>
+              <AccordionItemBody>
+                <AccordionDetailContent label="Warm-up Gestures" duration="30 seconds" />
+              </AccordionItemBody>
+            </AccordionItem>
+
+            <AccordionItem value="figure-studies">
+              <AccordionItemHeader index="02" meta="60s">
+                Figure Studies
+              </AccordionItemHeader>
+              <AccordionItemBody>
+                <AccordionDetailContent label="Figure Studies" duration="60 seconds" />
+              </AccordionItemBody>
+            </AccordionItem>
+
+            <AccordionItem value="silhouettes">
+              <AccordionItemHeader index="03" meta="90s">
+                Silhouettes
+              </AccordionItemHeader>
+              <AccordionItemBody>
+                <AccordionDetailContent label="Silhouettes" duration="90 seconds" />
+              </AccordionItemBody>
+            </AccordionItem>
+          </AccordionRoot>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function UiDemoPage() {
   return (
     <main className="ui-demo">
@@ -254,11 +339,21 @@ export function UiDemoPage() {
         <h1 className="ui-demo__title">Grim Shared Section 8 Primitives</h1>
         <p className="ui-demo__copy">
           The shared UI layer now includes token-driven Button, Icon, IconButton, Checkbox, Chip,
-          ChipButton, Input, and Select primitives translated from the Section 8 Figma library.
+          ChipButton, Input, Select, and Accordion primitives translated from the Section 8 Figma
+          library.
         </p>
       </header>
 
       <div className="ui-demo__grid">
+        <DemoSection
+          title="Accordion"
+          description="Shared accordion shells translated from the updated Section 8 family. Single mode closes sibling items, while multiple mode allows independent expansion."
+        >
+          <DemoCard title="Root Behaviors">
+            <AccordionDemo />
+          </DemoCard>
+        </DemoSection>
+
         <DemoSection
           title="Button"
           description="Primary, secondary, ghost, and destructive button variants mapped from the Section 8 family with size and width controls handled by live interaction states."

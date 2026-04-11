@@ -1,4 +1,19 @@
 export {
+  ACCORDION_ROOT_TYPES,
+  AccordionDisclosure,
+  AccordionItem,
+  AccordionItemBody,
+  AccordionItemHeader,
+  AccordionRoot,
+  type AccordionDisclosureProps,
+  type AccordionItemBodyProps,
+  type AccordionItemHeaderProps,
+  type AccordionItemProps,
+  type AccordionRootProps,
+  type AccordionRootType,
+  type AccordionRootValue,
+} from './accordion/Accordion';
+export {
   BUTTON_SIZES,
   BUTTON_VARIANTS,
   BUTTON_WIDTHS,
