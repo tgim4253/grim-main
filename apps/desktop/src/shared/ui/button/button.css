@@ -39,11 +39,16 @@
   }
 
   .c-button--width-fill {
+    align-self: stretch;
+    justify-self: stretch;
     width: 100%;
   }
 
   .c-button--width-hug {
-    width: auto;
+    align-self: flex-start;
+    justify-self: start;
+    width: fit-content;
+    max-width: 100%;
   }
 
   .c-button--size-sm {
