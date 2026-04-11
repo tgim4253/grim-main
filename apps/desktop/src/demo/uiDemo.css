@@ -308,6 +308,31 @@
     line-height: var(--type-text-xs-line-height);
   }
 
+  .ui-demo__input-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .ui-demo__input-card,
+  .ui-demo__input-stack {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .ui-demo__input-card-title {
+    color: var(--semantic-colors-text-secondary);
+    font-size: var(--type-text-xs-size);
+    line-height: var(--type-text-xs-line-height);
+  }
+
+  .ui-demo__input-stack {
+    gap: 14px;
+  }
+
   .ui-demo__sidebar-rail-demo {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);

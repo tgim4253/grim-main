@@ -10,6 +10,7 @@ import {
   ICON_NAMES,
   Icon,
   IconButton,
+  Input,
   type CheckboxRowWidth,
   type CheckboxSize,
   type ChipVariant,
@@ -116,8 +117,8 @@ export function UiDemoPage() {
         <div className="app-kicker">ui:demo</div>
         <h1 className="ui-demo__title">Grim Shared Section 8 Primitives</h1>
         <p className="ui-demo__copy">
-          The shared UI layer now includes token-driven Icon, IconButton, Checkbox, Chip, and
-          ChipButton primitives translated from the Section 8 Figma library.
+          The shared UI layer now includes token-driven Icon, IconButton, Checkbox, Chip,
+          ChipButton, and Input primitives translated from the Section 8 Figma library.
         </p>
       </header>
 
@@ -312,6 +313,50 @@ export function UiDemoPage() {
                 <div className="ui-demo__chip-card-title">outline / pressed</div>
                 <ToggleableChipButtonDemo />
               </div>
+            </div>
+          </DemoCard>
+        </DemoSection>
+
+        <DemoSection
+          title="Input"
+          description="The shared input primitive maps the Section 8 label, hint, destructive, and state combinations while using live focus and disabled behavior."
+        >
+          <DemoCard title="Interactive Field States">
+            <div className="ui-demo__input-grid">
+              <div className="ui-demo__input-card">
+                <div className="ui-demo__input-card-title">placeholder</div>
+                <Input placeholder="olivia@untitledui.com" />
+              </div>
+              <div className="ui-demo__input-card">
+                <div className="ui-demo__input-card-title">filled</div>
+                <Input value="olivia@untitledui.com" readOnly />
+              </div>
+              <div className="ui-demo__input-card">
+                <div className="ui-demo__input-card-title">focus me</div>
+                <Input placeholder="olivia@untitledui.com" />
+              </div>
+              <div className="ui-demo__input-card">
+                <div className="ui-demo__input-card-title">disabled</div>
+                <Input value="olivia@untitledui.com" disabled readOnly />
+              </div>
+            </div>
+          </DemoCard>
+
+          <DemoCard title="Composed Variants">
+            <div className="ui-demo__input-stack">
+              <Input label="Email" placeholder="olivia@untitledui.com" />
+              <Input
+                label="Email"
+                hint="This is a hint text to help user."
+                placeholder="olivia@untitledui.com"
+              />
+              <Input label="Email" value="olivia@untitledui.com" readOnly />
+              <Input
+                label="Email"
+                error="This is an error message."
+                value="olivia@untitledui.com"
+                readOnly
+              />
             </div>
           </DemoCard>
         </DemoSection>

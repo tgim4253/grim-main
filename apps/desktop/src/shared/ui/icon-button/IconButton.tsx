@@ -5,20 +5,23 @@ import type { IconColor, IconHierarchy, IconName, IconSize } from '../icon/iconG
 import './icon-button.css';
 
 export const ICON_BUTTON_KINDS = ['button', 'sidebar'] as const;
-export const ICON_BUTTON_SIZES = ['sm', 'md', 'lg', '2xl'] as const;
+export const ICON_BUTTON_SIZES = ['xs', 'sm', 'md', 'lg', '2xl'] as const;
 
 export type IconButtonKind = (typeof ICON_BUTTON_KINDS)[number];
 export type IconButtonSize = (typeof ICON_BUTTON_SIZES)[number];
 export type IconButtonColor = IconColor | 'auto';
+export type IconButtonIconSize = IconSize | '2xs';
 
 const SIZE_CLASS_NAMES: Record<IconButtonSize, string> = {
+  xs: 'c-icon-button--size-xs',
   sm: 'c-icon-button--size-sm',
   md: 'c-icon-button--size-md',
   lg: 'c-icon-button--size-lg',
   '2xl': 'c-icon-button--size-2xl',
 };
 
-const DEFAULT_ICON_SIZES: Record<IconButtonSize, IconSize> = {
+const DEFAULT_ICON_SIZES: Record<IconButtonSize, IconButtonIconSize> = {
+  xs: '2xs',
   sm: 'xs',
   md: 'sm',
   lg: 'md',
@@ -36,7 +39,8 @@ const ICON_COLOR_VARIABLES: Record<IconColor, Record<IconHierarchy, string>> = {
   },
 };
 
-const ICON_SIZE_VARIABLES: Record<IconSize, string> = {
+const ICON_SIZE_VARIABLES: Record<IconButtonIconSize, string> = {
+  '2xs': 'var(--semantic-size-icon-2xs)',
   xs: 'var(--semantic-size-icon-xs)',
   sm: 'var(--semantic-size-icon-sm)',
   md: 'var(--semantic-size-icon-md)',
@@ -60,7 +64,7 @@ export type IconButtonProps = Omit<
   kind?: IconButtonKind;
   size?: IconButtonSize;
   active?: boolean;
-  iconSize?: IconSize;
+  iconSize?: IconButtonIconSize;
   iconColor?: IconButtonColor;
   iconHierarchy?: IconHierarchy;
 };

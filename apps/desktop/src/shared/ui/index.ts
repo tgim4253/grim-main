@@ -37,3 +37,4 @@ export {
   type IconName,
   type IconSize,
 } from './icon/iconGlyphs';
+export { Input, type InputProps } from './input/Input';

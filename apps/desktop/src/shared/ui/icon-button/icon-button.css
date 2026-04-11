@@ -49,6 +49,10 @@
     --_icon-button-size: var(--semantic-size-icon-button-sm);
   }
 
+  .c-icon-button--size-xs {
+    --_icon-button-size: var(--semantic-size-icon-button-xs);
+  }
+
   .c-icon-button--size-md {
     --_icon-button-size: var(--semantic-size-icon-button-md);
   }
