@@ -166,6 +166,42 @@
     gap: 12px;
   }
 
+  .ui-demo__modal-launch-grid,
+  .ui-demo__modal-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .ui-demo__modal-launch-card,
+  .ui-demo__modal-meta-card {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .ui-demo__modal-launch-stack {
+    display: grid;
+    justify-items: start;
+    gap: 12px;
+  }
+
+  .ui-demo__modal-note {
+    margin: 0;
+    color: var(--semantic-colors-text-secondary);
+    font-size: var(--type-text-xs-size);
+    line-height: var(--type-text-xs-line-height);
+  }
+
+  .ui-demo__modal-chip-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
   .ui-demo__stack {
     display: grid;
     gap: 16px;
@@ -544,6 +580,8 @@
 
     .ui-demo__checkbox-grid,
     .ui-demo__chip-grid,
+    .ui-demo__modal-launch-grid,
+    .ui-demo__modal-meta-grid,
     .ui-demo__select-grid,
     .ui-demo__select-open-grid,
     .ui-demo__icon-button-playground,

@@ -1,0 +1,171 @@
+@layer app {
+  .c-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    overflow: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--semantic-spacing-component-xl);
+    background: var(--components-modal-overlay);
+    box-sizing: border-box;
+  }
+
+  .c-modal {
+    --_modal-width: var(--components-modal-size-sm);
+    display: grid;
+    gap: var(--components-modal-size-layout-gap);
+    width: min(100%, var(--_modal-width));
+    max-height: calc(100dvh - (var(--semantic-spacing-component-xl) * 2));
+    min-width: 0;
+    padding: var(--components-modal-size-padding-y) var(--components-modal-size-padding-x);
+    border: 1px solid var(--components-modal-border);
+    border-radius: var(--components-modal-size-radius);
+    background: var(--components-modal-background);
+    box-shadow:
+      0 20px 24px -4px rgba(10, 13, 18, 0.08),
+      0 8px 8px -4px rgba(10, 13, 18, 0.03);
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .c-modal--has-header.c-modal--has-body.c-modal--has-footer {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .c-modal--has-header.c-modal--has-body:not(.c-modal--has-footer) {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .c-modal--has-body.c-modal--has-footer:not(.c-modal--has-header) {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .c-modal--has-body:not(.c-modal--has-header):not(.c-modal--has-footer) {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .c-modal--size-sm {
+    --_modal-width: var(--components-modal-size-sm);
+  }
+
+  .c-modal--size-md {
+    --_modal-width: var(--components-modal-size-md);
+  }
+
+  .c-modal--size-lg {
+    --_modal-width: var(--components-modal-size-lg);
+  }
+
+  .c-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--semantic-spacing-component-lg);
+    width: 100%;
+    min-width: 0;
+  }
+
+  .c-modal-header__title {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--primitives-colors-white);
+    font-family: var(--primitives-typography-font-family-ui);
+    font-size: var(--primitives-typography-font-size-lg-plus);
+    font-weight: var(--primitives-typography-font-weight-medium);
+    line-height: 28px;
+  }
+
+  .c-modal-body {
+    display: grid;
+    gap: var(--components-modal-size-body-gap);
+    width: 100%;
+    min-height: 0;
+    min-width: 0;
+  }
+
+  .c-modal__header-slot,
+  .c-modal__footer-slot {
+    min-width: 0;
+  }
+
+  .c-modal__body-slot {
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .c-modal-footer {
+    display: grid;
+    gap: var(--semantic-spacing-component-md);
+    width: 100%;
+    min-width: 0;
+  }
+
+  .c-modal-footer__leading {
+    min-width: 0;
+    width: fit-content;
+    max-width: 100%;
+    justify-self: start;
+    align-self: center;
+  }
+
+  .c-modal-footer__actions {
+    display: flex;
+    min-width: 0;
+    gap: var(--semantic-spacing-component-md);
+  }
+
+  .c-modal-footer--direction-horizontal {
+    align-items: center;
+  }
+
+  .c-modal-footer--direction-horizontal.c-modal-footer--with-leading.c-modal-footer--alignment-fill {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .c-modal-footer--direction-horizontal.c-modal-footer--with-leading.c-modal-footer--alignment-end {
+    grid-template-columns: auto auto;
+    justify-content: space-between;
+  }
+
+  .c-modal-footer--direction-horizontal:not(.c-modal-footer--with-leading)
+    .c-modal-footer__actions {
+    margin-left: auto;
+  }
+
+  .c-modal-footer--direction-horizontal.c-modal-footer--alignment-fill .c-modal-footer__actions {
+    width: 100%;
+  }
+
+  .c-modal-footer--direction-horizontal.c-modal-footer--alignment-fill
+    .c-modal-footer__actions
+    > * {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .c-modal-footer--direction-horizontal.c-modal-footer--alignment-end {
+    justify-items: end;
+  }
+
+  .c-modal-footer--direction-horizontal.c-modal-footer--alignment-end .c-modal-footer__actions {
+    justify-content: flex-end;
+    justify-self: end;
+  }
+
+  .c-modal-footer--direction-vertical {
+    align-items: stretch;
+  }
+
+  .c-modal-footer--direction-vertical .c-modal-footer__actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .c-modal-footer--direction-vertical .c-modal-footer__actions > * {
+    width: 100%;
+  }
+}

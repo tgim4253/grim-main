@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Input, Modal, ModalFooter } from '../../../shared/ui';
+import {
+  Button,
+  CheckboxRow,
+  Input,
+  Modal,
+  ModalFooter,
+  Select,
+  type SelectOption,
+} from '../../../shared/ui';
 import type { CroquisOption, LibrarySettings, SessionPreset } from '../../../shared/types';
 import { ipc } from '../../../shared/lib/ipc';
 import { CroquisOptionChecklist } from './CroquisOptionChecklist';
@@ -24,6 +32,15 @@ export function CroquisStartModal({
   onClose,
   onStarted,
 }: CroquisStartModalProps) {
+  const presetOptions: SelectOption[] = useMemo(
+    () =>
+      sessionPresets.map(preset => ({
+        value: preset.id,
+        label: preset.name,
+      })),
+    [sessionPresets],
+  );
+
   const fallbackPreset: SessionPreset | null = useMemo(() => {
     return findFallbackPreset(sessionPresets, librarySettings);
   }, [librarySettings.activeSessionPresetId, sessionPresets]);
@@ -94,9 +111,21 @@ export function CroquisStartModal({
       title="Start Croquis"
       onClose={onClose}
       footer={
-        <ModalFooter>
-          <Button onClick={onClose}>Cancel</Button>
+        <ModalFooter
+          alignment="end"
+          leading={
+            <CheckboxRow
+              label="Remember session configuration"
+              checked={rememberOption}
+              onCheckedChange={setRememberOption}
+            />
+          }
+        >
+          <Button size="lg" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
           <Button
+            size="lg"
             disabled={busy || selectedPreset === null}
             onClick={() => {
               void handleStart();
@@ -112,22 +141,13 @@ export function CroquisStartModal({
         <p>{assetIds.length} selected assets will be queued into a single library session.</p>
       </div>
 
-      <label className="croquis-field">
-        <span className="croquis-field__label">Session preset</span>
-        <select
-          value={selectedPresetId}
-          onChange={event => {
-            setSelectedPresetId(event.target.value);
-          }}
-          className="croquis-control"
-        >
-          {sessionPresets.map(preset => (
-            <option key={preset.id} value={preset.id}>
-              {preset.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <Select
+        label="Session preset"
+        placeholder="Select session preset"
+        options={presetOptions}
+        value={selectedPresetId}
+        onValueChange={setSelectedPresetId}
+      />
 
       <CroquisPresetStepList preset={selectedPreset} />
 
@@ -202,13 +222,6 @@ export function CroquisStartModal({
                 ...current,
                 isCapture: checked,
               }));
-            },
-          },
-          {
-            label: 'Remember these options',
-            checked: rememberOption,
-            onChange: (checked: boolean) => {
-              setRememberOption(checked);
             },
           },
         ]}

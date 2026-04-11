@@ -64,6 +64,22 @@ export {
 } from './icon/iconGlyphs';
 export { Input, type InputProps } from './input/Input';
 export {
+  MODAL_FOOTER_ALIGNMENTS,
+  MODAL_FOOTER_DIRECTIONS,
+  MODAL_SIZES,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  type ModalBodyProps,
+  type ModalFooterAlignment,
+  type ModalFooterDirection,
+  type ModalFooterProps,
+  type ModalHeaderProps,
+  type ModalProps,
+  type ModalSize,
+} from './modal/Modal';
+export {
   SELECT_TYPES,
   Select,
   type SelectOption,

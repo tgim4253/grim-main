@@ -20,8 +20,14 @@ import {
   Icon,
   IconButton,
   Input,
+  MODAL_SIZES,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
   Select,
   type SelectOption,
+  type ModalSize,
   type ButtonSize,
   type ButtonVariant,
   type ButtonWidth,
@@ -54,6 +60,7 @@ const ROUNDED_CHIP_VARIANTS = [
 ] as const satisfies ChipVariant[];
 const PILL_CHIP_VARIANTS = ['outline', 'selected'] as const satisfies ChipVariant[];
 const ACCORDION_ROOT_VARIANTS: AccordionRootType[] = [...ACCORDION_ROOT_TYPES];
+const MODAL_SIZE_VARIANTS: ModalSize[] = [...MODAL_SIZES];
 const BUTTON_ICON_BUTTON_ROWS: Array<{
   icon: IconName;
   label: string;
@@ -331,6 +338,133 @@ function AccordionDemo() {
   );
 }
 
+function ModalDemo() {
+  const [openSize, setOpenSize] = useState<ModalSize | null>(null);
+
+  const handleClose = () => {
+    setOpenSize(null);
+  };
+
+  const footer =
+    openSize === 'lg' ? (
+      <ModalFooter direction="vertical" alignment="fill">
+        <Button variant="primary" width="fill" onClick={handleClose}>
+          Start session
+        </Button>
+        <Button variant="secondary" width="fill" onClick={handleClose}>
+          Cancel
+        </Button>
+      </ModalFooter>
+    ) : openSize === 'md' ? (
+      <ModalFooter
+        direction="horizontal"
+        alignment="end"
+        leading={<CheckboxRow label="Auto-advance" defaultChecked />}
+      >
+        <Button size="lg" variant="secondary" onClick={handleClose}>
+          Dismiss
+        </Button>
+        <Button size="lg" variant="primary" onClick={handleClose}>
+          Continue
+        </Button>
+      </ModalFooter>
+    ) : (
+      <ModalFooter direction="horizontal" alignment="end">
+        <Button size="lg" variant="secondary" onClick={handleClose}>
+          Cancel
+        </Button>
+        <Button size="lg" variant="primary" onClick={handleClose}>
+          Confirm
+        </Button>
+      </ModalFooter>
+    );
+
+  return (
+    <>
+      <DemoCard title="Launch Sizes">
+        <div className="ui-demo__modal-launch-grid">
+          {MODAL_SIZE_VARIANTS.map(size => (
+            <div key={size} className="ui-demo__modal-launch-card">
+              <div className="ui-demo__input-card-title">{size}</div>
+              <div className="ui-demo__modal-launch-stack">
+                <Button
+                  size="lg"
+                  variant="secondary"
+                  onClick={() => {
+                    setOpenSize(size);
+                  }}
+                >
+                  Open {size}
+                </Button>
+                <p className="ui-demo__modal-note">
+                  {size === 'sm'
+                    ? 'Horizontal end-aligned footer.'
+                    : size === 'md'
+                      ? 'Checkbox-leading footer with right-aligned actions.'
+                      : 'Vertical stacked actions for dense flows.'}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </DemoCard>
+
+      <DemoCard title="Shell Notes">
+        <div className="ui-demo__modal-meta-grid">
+          <div className="ui-demo__modal-meta-card">
+            <div className="ui-demo__input-card-title">header</div>
+            <p className="ui-demo__modal-note">
+              Title row with close affordance driven by the shared IconButton primitive.
+            </p>
+          </div>
+          <div className="ui-demo__modal-meta-card">
+            <div className="ui-demo__input-card-title">body</div>
+            <p className="ui-demo__modal-note">
+              Generic stacked body shell. Feature content should be composed inside.
+            </p>
+          </div>
+          <div className="ui-demo__modal-meta-card">
+            <div className="ui-demo__input-card-title">footer</div>
+            <p className="ui-demo__modal-note">
+              Supports fill and end alignment, plus the checkbox-leading footer variant from the
+              Figma family.
+            </p>
+          </div>
+        </div>
+      </DemoCard>
+
+      <Modal
+        open={openSize !== null}
+        size={openSize ?? 'sm'}
+        aria-label={openSize ? `${openSize} modal preview` : undefined}
+        header={
+          openSize ? (
+            <ModalHeader title={`Croquis session / ${openSize}`} onClose={handleClose} />
+          ) : undefined
+        }
+        body={
+          openSize ? (
+            <ModalBody>
+              <Input label="Session title" defaultValue="Figure Studies" />
+              <div className="ui-demo__modal-chip-row">
+                <Chip shape="rounded" variant="accent-outline">
+                  GESTURE
+                </Chip>
+                <Chip shape="rounded" variant="accent-solid">
+                  POSE
+                </Chip>
+              </div>
+              <CheckboxRow width="full" defaultChecked label="Reuse active prompt seed" />
+            </ModalBody>
+          ) : undefined
+        }
+        footer={openSize ? footer : undefined}
+        onClose={handleClose}
+      />
+    </>
+  );
+}
+
 export function UiDemoPage() {
   return (
     <main className="ui-demo">
@@ -339,8 +473,8 @@ export function UiDemoPage() {
         <h1 className="ui-demo__title">Grim Shared Section 8 Primitives</h1>
         <p className="ui-demo__copy">
           The shared UI layer now includes token-driven Button, Icon, IconButton, Checkbox, Chip,
-          ChipButton, Input, Select, and Accordion primitives translated from the Section 8 Figma
-          library.
+          ChipButton, Input, Select, Accordion, and Modal primitives translated from the Section 8
+          Figma library.
         </p>
       </header>
 
@@ -586,6 +720,13 @@ export function UiDemoPage() {
               </div>
             </div>
           </DemoCard>
+        </DemoSection>
+
+        <DemoSection
+          title="Modal"
+          description="Shared modal shell primitives with size options and footer layout variants. The preview keeps feature content generic and focuses on shared structure."
+        >
+          <ModalDemo />
         </DemoSection>
 
         <DemoSection
