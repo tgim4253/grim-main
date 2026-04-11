@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import {
   ICON_NAMES,
   Icon,
+  IconButton,
+  type IconButtonSize,
   type IconColor,
   type IconHierarchy,
   type IconName,
@@ -13,6 +15,27 @@ const FEATURED_ICONS: IconName[] = ['folder-open', 'anatomy', 'file', 'chevron-u
 const SIZE_VARIANTS: IconSize[] = ['xs', 'sm', 'md', 'lg', 'xl'];
 const COLOR_VARIANTS: IconColor[] = ['text', 'brand'];
 const HIERARCHY_VARIANTS: IconHierarchy[] = ['primary', 'tertiary'];
+const BUTTON_ICON_BUTTON_ROWS: Array<{
+  icon: IconName;
+  label: string;
+  size: IconButtonSize;
+  iconSize?: IconSize;
+}> = [
+  { icon: 'reload', label: 'reload / md', size: 'md' },
+  { icon: 'plus', label: 'plus / lg', size: 'lg' },
+  { icon: 'close', label: 'close / sm', size: 'sm' },
+  { icon: 'chevron-down', label: 'chevron-down / lg shell + sm icon', size: 'lg', iconSize: 'sm' },
+  { icon: 'help-circle', label: 'help-circle / md', size: 'md' },
+];
+const SIDEBAR_ICON_BUTTON_ROWS: IconName[] = [
+  'folder-open',
+  'search',
+  'grid',
+  'star',
+  'setting',
+  'user',
+  'tree',
+];
 
 function DemoSection({
   title,
@@ -49,10 +72,10 @@ export function UiDemoPage() {
     <main className="ui-demo">
       <header className="ui-demo__hero">
         <div className="app-kicker">ui:demo</div>
-        <h1 className="ui-demo__title">Grim Shared Icons</h1>
+        <h1 className="ui-demo__title">Grim Shared Icon Primitives</h1>
         <p className="ui-demo__copy">
-          The shared UI layer now has a token-driven icon primitive based on the Section 8 Figma
-          icon family.
+          The shared UI layer now has token-driven icon and icon-button primitives based on the
+          Section 8 Figma library.
         </p>
       </header>
 
@@ -69,6 +92,63 @@ export function UiDemoPage() {
                   <span>{name}</span>
                 </div>
               ))}
+            </div>
+          </DemoCard>
+        </DemoSection>
+
+        <DemoSection
+          title="IconButton"
+          description="Interactive button and sidebar primitives. Hover, press, and focus the samples directly instead of rendering hardcoded state variants."
+        >
+          <DemoCard title="Button Playground">
+            <div className="ui-demo__icon-button-playground">
+              {BUTTON_ICON_BUTTON_ROWS.map(({ icon, label, size, iconSize }) => (
+                <div key={label} className="ui-demo__icon-button-swatch">
+                  <div className="ui-demo__icon-button-name">
+                    <span className="ui-demo__icon-button-label">{icon}</span>
+                    <span className="ui-demo__icon-button-meta">{label}</span>
+                  </div>
+                  <div className="ui-demo__icon-button-swatch-actions">
+                    <IconButton icon={icon} size={size} iconSize={iconSize} aria-label={label} />
+                    {icon === 'help-circle' ? (
+                      <IconButton
+                        icon={icon}
+                        size={size}
+                        iconSize={iconSize}
+                        active
+                        aria-label={`${label} active`}
+                      />
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </DemoCard>
+
+          <DemoCard title="Sidebar Rail">
+            <div className="ui-demo__sidebar-rail-demo">
+              <div className="ui-demo__sidebar-rail">
+                {SIDEBAR_ICON_BUTTON_ROWS.map(icon => (
+                  <IconButton
+                    key={icon}
+                    icon={icon}
+                    kind="sidebar"
+                    active={icon === 'folder-open'}
+                    iconColor={icon === 'folder-open' ? 'brand' : 'auto'}
+                    aria-label={`${icon} sidebar action`}
+                  />
+                ))}
+              </div>
+              <div className="ui-demo__sidebar-legend">
+                {SIDEBAR_ICON_BUTTON_ROWS.map(icon => (
+                  <div key={icon} className="ui-demo__sidebar-legend-item">
+                    <span className="ui-demo__icon-button-label">{icon}</span>
+                    <span className="ui-demo__icon-button-meta">
+                      {icon === 'folder-open' ? 'active' : 'interactive'}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </DemoCard>
         </DemoSection>
