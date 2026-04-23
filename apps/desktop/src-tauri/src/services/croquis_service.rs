@@ -12,10 +12,10 @@ use crate::{
     },
     models::record::SaveCroquisRecordPayload,
     services::{
-        media_service, AssetService, LibraryStorage, RecordService,
-        SessionService, SettingsService,
+        AssetService, LibraryStorage, RecordService, SessionService,
+        SettingsService,
     },
-    utils::date::get_now_date,
+    utils::{date::get_now_date, media},
 };
 
 /// In-memory registry of active Croquis sessions keyed by session identifier.
@@ -133,13 +133,13 @@ impl CroquisService {
                 .ok_or_else(|| {
                     anyhow!("Asset {} has no source path", asset.id)
                 })?;
-            if !media_service::is_supported_image(&source_path) {
+            if !media::is_supported_image(&source_path) {
                 continue;
             }
 
             let hash = match asset.hash.clone() {
                 Some(value) => Some(value),
-                None => Some(media_service::hash_file(&source_path).await?),
+                None => Some(media::hash_file(&source_path).await?),
             };
             let hash_value = hash.clone().unwrap_or_default();
             let thumb_path =
@@ -147,8 +147,7 @@ impl CroquisService {
                     || self.library_storage.thumbnail_path(&hash_value),
                 );
             let (thumb_width, thumb_height) =
-                media_service::ensure_thumbnail(&source_path, &thumb_path)
-                    .await?;
+                media::ensure_thumbnail(&source_path, &thumb_path).await?;
 
             for step in &preset.steps {
                 prepared_items.push(PreparedCroquisItem {

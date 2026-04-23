@@ -10,7 +10,6 @@ pub(crate) mod folder_service;
 pub(crate) mod library_service;
 #[path = "library_storage.rs"]
 pub(crate) mod library_storage;
-pub mod media_service;
 #[path = "record_service.rs"]
 pub(crate) mod record_service;
 #[path = "session_service.rs"]

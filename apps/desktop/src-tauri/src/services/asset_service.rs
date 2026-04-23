@@ -11,10 +11,10 @@ use crate::{
     repositories::{
         AssetRepository, NewImportedAssetInput, NewLinkedAssetInput,
     },
-    services::{media_service, LibraryStorage},
+    services::LibraryStorage,
     utils::{
         date::get_now_date, file_ops::ensure_unique_path,
-        file_utils::file_mtime_epoch, identifier::get_unique_id,
+        file_utils::file_mtime_epoch, identifier::get_unique_id, media,
     },
 };
 
@@ -138,7 +138,7 @@ impl AssetService {
         bytes: &[u8],
         file_name: &str,
     ) -> Result<AssetSummary> {
-        let hash = media_service::hash_bytes(bytes);
+        let hash = media::hash_bytes(bytes);
         if let Some(existing) =
             self.asset_repository.load_by_hash(&hash).await?
         {
@@ -148,27 +148,26 @@ impl AssetService {
         let tmp_file =
             ensure_unique_path(self.library_storage.temp_file(file_name))
                 .await?;
-        media_service::persist_bytes(&tmp_file, bytes).await?;
+        media::persist_bytes(&tmp_file, bytes).await?;
 
         let destination =
             self.library_storage.target_asset_path(&hash, &tmp_file);
         let destination_existed = fs::metadata(&destination).await.is_ok();
         if !destination_existed {
-            media_service::copy_file(&tmp_file, &destination).await?;
+            media::copy_file(&tmp_file, &destination).await?;
         }
 
         let thumb_path = self.library_storage.thumbnail_path(&hash);
         let thumbnail_existed = fs::metadata(&thumb_path).await.is_ok();
         let result = async {
-            media_service::ensure_thumbnail(&destination, &thumb_path).await?;
-            let (width, height) =
-                media_service::image_dimensions(&destination).await?;
+            media::ensure_thumbnail(&destination, &thumb_path).await?;
+            let (width, height) = media::image_dimensions(&destination).await?;
             let metadata = fs::metadata(&destination).await?;
             let now = get_now_date();
             let asset_id = get_unique_id();
             let destination_text = destination.to_string_lossy().to_string();
             let thumb_text = thumb_path.to_string_lossy().to_string();
-            let mime = media_service::source_mime(&destination);
+            let mime = media::source_mime(&destination);
 
             let mut tx = self.asset_repository.begin().await?;
             self.asset_repository
@@ -234,7 +233,7 @@ impl AssetService {
         file_path: &str,
     ) -> Result<Option<(AssetSummary, bool)>> {
         let source = PathBuf::from(file_path);
-        if !media_service::is_supported_image(&source) {
+        if !media::is_supported_image(&source) {
             return Ok(None);
         }
 
@@ -245,7 +244,7 @@ impl AssetService {
             return Ok(None);
         }
 
-        let hash = media_service::hash_file(&source).await?;
+        let hash = media::hash_file(&source).await?;
         if let Some(existing) =
             self.asset_repository.load_by_hash(&hash).await?
         {
@@ -274,22 +273,20 @@ impl AssetService {
             self.library_storage.target_asset_path(&hash, &source);
         let destination_existed = fs::metadata(&destination).await.is_ok();
         if !destination_existed {
-            media_service::copy_file(&source, &destination).await?;
+            media::copy_file(&source, &destination).await?;
         }
 
         let thumb_path = self.library_storage.thumbnail_path(&hash);
         let thumbnail_existed = fs::metadata(&thumb_path).await.is_ok();
         let result = async {
-            let _ = media_service::ensure_thumbnail(&destination, &thumb_path)
-                .await?;
-            let (width, height) =
-                media_service::image_dimensions(&destination).await?;
+            let _ = media::ensure_thumbnail(&destination, &thumb_path).await?;
+            let (width, height) = media::image_dimensions(&destination).await?;
             let modified_at = file_mtime_epoch(&metadata).ok();
             let now = get_now_date();
             let asset_id = get_unique_id();
             let destination_text = destination.to_string_lossy().to_string();
             let thumb_text = thumb_path.to_string_lossy().to_string();
-            let mime = media_service::source_mime(&source);
+            let mime = media::source_mime(&source);
 
             let mut tx = self.asset_repository.begin().await?;
             self.asset_repository
@@ -378,20 +375,18 @@ impl AssetService {
             .and_then(|value| value.to_str())
             .ok_or_else(|| anyhow!("Invalid file name: {}", source.display()))?
             .to_string();
-        let mime = media_service::source_mime(&source);
+        let mime = media::source_mime(&source);
         let modified_at = file_mtime_epoch(&metadata).ok();
         let now = get_now_date();
         let asset_id = get_unique_id();
 
         let (thumbnail_path, width, height, thumbnail_existed) =
-            if media_service::is_supported_image(&source) {
-                let hash = media_service::hash_file(&source).await?;
+            if media::is_supported_image(&source) {
+                let hash = media::hash_file(&source).await?;
                 let thumb_path = self.library_storage.thumbnail_path(&hash);
                 let thumb_existed = fs::metadata(&thumb_path).await.is_ok();
-                let _ = media_service::ensure_thumbnail(&source, &thumb_path)
-                    .await?;
-                let (width, height) =
-                    media_service::image_dimensions(&source).await?;
+                let _ = media::ensure_thumbnail(&source, &thumb_path).await?;
+                let (width, height) = media::image_dimensions(&source).await?;
                 (
                     Some(thumb_path.to_string_lossy().to_string()),
                     Some(width as i64),
