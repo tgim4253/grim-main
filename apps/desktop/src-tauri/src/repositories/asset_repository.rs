@@ -24,26 +24,11 @@ pub struct AssetRepository {
 pub struct NewImportedAssetInput<'a> {
     pub id: &'a str,
     pub hash: &'a str,
-    pub storage_path: &'a str,
-    pub thumbnail_path: &'a str,
     pub file_name: &'a str,
     pub file_size: i64,
     pub mime_type: &'a str,
     pub width: i64,
     pub height: i64,
-    pub modified_at: Option<i64>,
-    pub created_at: &'a str,
-}
-
-pub struct NewLinkedAssetInput<'a> {
-    pub id: &'a str,
-    pub external_path: &'a str,
-    pub thumbnail_path: Option<&'a str>,
-    pub file_name: &'a str,
-    pub file_size: i64,
-    pub mime_type: &'a str,
-    pub width: Option<i64>,
-    pub height: Option<i64>,
     pub modified_at: Option<i64>,
     pub created_at: &'a str,
 }
@@ -88,11 +73,7 @@ impl AssetRepository {
                     AssetRow,
                     r#"
                     SELECT id,
-                           type AS "type_: String",
                            hash,
-                           storage_path,
-                           external_path,
-                           thumbnail_path,
                            file_name,
                            file_size,
                            mime_type,
@@ -113,11 +94,7 @@ impl AssetRepository {
                     AssetRow,
                     r#"
                     SELECT id,
-                           type AS "type_: String",
                            hash,
-                           storage_path,
-                           external_path,
-                           thumbnail_path,
                            file_name,
                            file_size,
                            mime_type,
@@ -139,11 +116,7 @@ impl AssetRepository {
                     AssetRow,
                     r#"
                     SELECT a.id,
-                           a.type AS "type_: String",
                            a.hash,
-                           a.storage_path,
-                           a.external_path,
-                           a.thumbnail_path,
                            a.file_name,
                            a.file_size,
                            a.mime_type,
@@ -172,11 +145,7 @@ impl AssetRepository {
             AssetRow,
             r#"
             SELECT id,
-                   type AS "type_: String",
                    hash,
-                   storage_path,
-                   external_path,
-                   thumbnail_path,
                    file_name,
                    file_size,
                    mime_type,
@@ -288,11 +257,7 @@ impl AssetRepository {
             AssetRow,
             r#"
             SELECT id,
-                   type AS "type_: String",
                    hash,
-                   storage_path,
-                   external_path,
-                   thumbnail_path,
                    file_name,
                    file_size,
                    mime_type,
@@ -302,41 +267,9 @@ impl AssetRepository {
                    created_at,
                    updated_at
             FROM asset
-            WHERE type = 'imported_image' AND hash = ?1
+            WHERE hash = ?1
             "#,
             hash
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(row.map(asset_from_row))
-    }
-
-    pub async fn load_by_external_path(
-        &self,
-        path: &str,
-    ) -> Result<Option<AssetSummary>> {
-        let row = sqlx::query_as!(
-            AssetRow,
-            r#"
-            SELECT id,
-                   type AS "type_: String",
-                   hash,
-                   storage_path,
-                   external_path,
-                   thumbnail_path,
-                   file_name,
-                   file_size,
-                   mime_type,
-                   width,
-                   height,
-                   modified_at,
-                   created_at,
-                   updated_at
-            FROM asset
-            WHERE type = 'linked_external' AND external_path = ?1
-            "#,
-            path
         )
         .fetch_optional(&self.pool)
         .await?;
@@ -363,43 +296,12 @@ impl AssetRepository {
         sqlx::query!(
             r#"
             INSERT INTO asset
-            (id, type, hash, storage_path, external_path, thumbnail_path, file_name,
-             file_size, mime_type, width, height, modified_at, created_at, updated_at)
-            VALUES (?1, 'imported_image', ?2, ?3, NULL, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11)
+            (id, hash, file_name, file_size, mime_type, width, height,
+             modified_at, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)
             "#,
             input.id,
             input.hash,
-            input.storage_path,
-            input.thumbnail_path,
-            input.file_name,
-            input.file_size,
-            input.mime_type,
-            input.width,
-            input.height,
-            input.modified_at,
-            input.created_at
-        )
-        .execute(&mut **tx)
-        .await?;
-
-        Ok(())
-    }
-
-    pub async fn insert_linked_in_tx(
-        &self,
-        tx: &mut Transaction<'_, Sqlite>,
-        input: &NewLinkedAssetInput<'_>,
-    ) -> Result<()> {
-        sqlx::query!(
-            r#"
-            INSERT INTO asset
-            (id, type, hash, storage_path, external_path, thumbnail_path, file_name,
-             file_size, mime_type, width, height, modified_at, created_at, updated_at)
-            VALUES (?1, 'linked_external', NULL, NULL, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)
-            "#,
-            input.id,
-            input.external_path,
-            input.thumbnail_path,
             input.file_name,
             input.file_size,
             input.mime_type,

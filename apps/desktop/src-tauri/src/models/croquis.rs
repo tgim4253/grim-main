@@ -93,7 +93,7 @@ pub struct CroquisSessionItem {
     pub record_id: String,
     pub asset_id: String,
     pub file_name: String,
-    pub hash: Option<String>,
+    pub hash: String,
     pub base_path: String,
     pub base_width: u32,
     pub base_height: u32,

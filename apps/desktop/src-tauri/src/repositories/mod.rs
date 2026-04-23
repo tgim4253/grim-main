@@ -6,9 +6,7 @@ mod session_repository;
 mod settings_repository;
 mod tag_repository;
 
-pub use asset_repository::{
-    AssetRepository, NewImportedAssetInput, NewLinkedAssetInput,
-};
+pub use asset_repository::{AssetRepository, NewImportedAssetInput};
 pub use folder_repository::FolderRepository;
 pub use record_repository::RecordRepository;
 pub use session_repository::{

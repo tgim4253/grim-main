@@ -14,6 +14,8 @@ pub struct SessionStepPreset {
     pub auto_tags: Vec<Tag>,
     #[serde(default)]
     pub result_required: bool,
+    #[serde(default)]
+    pub result_external_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -44,6 +46,8 @@ pub struct SessionPresetStepDraft {
     pub auto_tag_names: Vec<String>,
     #[serde(default)]
     pub result_required: bool,
+    #[serde(default)]
+    pub result_external_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

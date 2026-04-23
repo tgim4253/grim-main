@@ -8,9 +8,7 @@ use crate::{
         AssetDetail, AssetListSource, AssetSummary, ImportRequest,
         ImportResult, UpdateAssetFoldersPayload, UpdateAssetTagsPayload,
     },
-    repositories::{
-        AssetRepository, NewImportedAssetInput, NewLinkedAssetInput,
-    },
+    repositories::{AssetRepository, NewImportedAssetInput},
     services::LibraryStorage,
     utils::{
         date::get_now_date, file_ops::ensure_unique_path,
@@ -106,31 +104,7 @@ impl AssetService {
             }
         }
 
-        Ok(ImportResult { imported, reused, linked: 0, assets })
-    }
-
-    pub async fn link_external_files(
-        &self,
-        request: ImportRequest,
-    ) -> Result<ImportResult> {
-        let mut linked = 0_usize;
-        let mut reused = 0_usize;
-        let mut assets = Vec::new();
-
-        for file_path in &request.file_paths {
-            if let Some((asset, is_reused)) =
-                self.link_external_asset(&request, file_path).await?
-            {
-                if is_reused {
-                    reused += 1;
-                } else {
-                    linked += 1;
-                }
-                assets.push(asset);
-            }
-        }
-
-        Ok(ImportResult { imported: 0, reused, linked, assets })
+        Ok(ImportResult { imported, reused, assets })
     }
 
     pub async fn import_capture_result(
@@ -165,8 +139,6 @@ impl AssetService {
             let metadata = fs::metadata(&destination).await?;
             let now = get_now_date();
             let asset_id = get_unique_id();
-            let destination_text = destination.to_string_lossy().to_string();
-            let thumb_text = thumb_path.to_string_lossy().to_string();
             let mime = media::source_mime(&destination);
 
             let mut tx = self.asset_repository.begin().await?;
@@ -176,8 +148,6 @@ impl AssetService {
                     &NewImportedAssetInput {
                         id: &asset_id,
                         hash: &hash,
-                        storage_path: &destination_text,
-                        thumbnail_path: &thumb_text,
                         file_name,
                         file_size: metadata.len() as i64,
                         mime_type: &mime,
@@ -220,11 +190,7 @@ impl AssetService {
         &self,
         asset: &AssetSummary,
     ) -> Option<PathBuf> {
-        asset
-            .storage_path
-            .as_deref()
-            .or(asset.external_path.as_deref())
-            .map(PathBuf::from)
+        Some(self.library_storage.asset_path(&asset.hash, &asset.file_name))
     }
 
     async fn import_image_asset(
@@ -284,8 +250,6 @@ impl AssetService {
             let modified_at = file_mtime_epoch(&metadata).ok();
             let now = get_now_date();
             let asset_id = get_unique_id();
-            let destination_text = destination.to_string_lossy().to_string();
-            let thumb_text = thumb_path.to_string_lossy().to_string();
             let mime = media::source_mime(&source);
 
             let mut tx = self.asset_repository.begin().await?;
@@ -295,8 +259,6 @@ impl AssetService {
                     &NewImportedAssetInput {
                         id: &asset_id,
                         hash: &hash,
-                        storage_path: &destination_text,
-                        thumbnail_path: &thumb_text,
                         file_name: &file_name,
                         file_size: metadata.len() as i64,
                         mime_type: &mime,
@@ -332,114 +294,6 @@ impl AssetService {
                 }
                 if !thumbnail_existed {
                     let _ = fs::remove_file(&thumb_path).await;
-                }
-                Err(error)
-            }
-        }
-    }
-
-    async fn link_external_asset(
-        &self,
-        request: &ImportRequest,
-        file_path: &str,
-    ) -> Result<Option<(AssetSummary, bool)>> {
-        let source = PathBuf::from(file_path);
-        let metadata = fs::metadata(&source).await.with_context(|| {
-            format!("Failed to read metadata for {}", source.display())
-        })?;
-        if !metadata.is_file() {
-            return Ok(None);
-        }
-
-        if let Some(existing) =
-            self.asset_repository.load_by_external_path(file_path).await?
-        {
-            let mut tx = self.asset_repository.begin().await?;
-            self.asset_repository
-                .assign_folders_and_tags_in_tx(
-                    &mut tx,
-                    &existing.id,
-                    &request.virtual_folder_ids,
-                    &request.tag_ids,
-                )
-                .await?;
-            tx.commit().await?;
-            return Ok(Some((
-                self.asset_repository.get_summary(&existing.id).await?,
-                true,
-            )));
-        }
-
-        let file_name = source
-            .file_name()
-            .and_then(|value| value.to_str())
-            .ok_or_else(|| anyhow!("Invalid file name: {}", source.display()))?
-            .to_string();
-        let mime = media::source_mime(&source);
-        let modified_at = file_mtime_epoch(&metadata).ok();
-        let now = get_now_date();
-        let asset_id = get_unique_id();
-
-        let (thumbnail_path, width, height, thumbnail_existed) =
-            if media::is_supported_image(&source) {
-                let hash = media::hash_file(&source).await?;
-                let thumb_path = self.library_storage.thumbnail_path(&hash);
-                let thumb_existed = fs::metadata(&thumb_path).await.is_ok();
-                let _ = media::ensure_thumbnail(&source, &thumb_path).await?;
-                let (width, height) = media::image_dimensions(&source).await?;
-                (
-                    Some(thumb_path.to_string_lossy().to_string()),
-                    Some(width as i64),
-                    Some(height as i64),
-                    thumb_existed,
-                )
-            } else {
-                (None, None, None, false)
-            };
-
-        let result = async {
-            let mut tx = self.asset_repository.begin().await?;
-            self.asset_repository
-                .insert_linked_in_tx(
-                    &mut tx,
-                    &NewLinkedAssetInput {
-                        id: &asset_id,
-                        external_path: file_path,
-                        thumbnail_path: thumbnail_path.as_deref(),
-                        file_name: &file_name,
-                        file_size: metadata.len() as i64,
-                        mime_type: &mime,
-                        width,
-                        height,
-                        modified_at,
-                        created_at: &now,
-                    },
-                )
-                .await?;
-            self.asset_repository
-                .assign_folders_and_tags_in_tx(
-                    &mut tx,
-                    &asset_id,
-                    &request.virtual_folder_ids,
-                    &request.tag_ids,
-                )
-                .await?;
-            tx.commit().await?;
-
-            Ok::<_, anyhow::Error>(asset_id)
-        }
-        .await;
-
-        match result {
-            Ok(asset_id) => Ok(Some((
-                self.asset_repository.get_summary(&asset_id).await?,
-                false,
-            ))),
-            Err(error) => {
-                if let Some(path) = thumbnail_path.as_ref() {
-                    if !thumbnail_existed {
-                        let _ = fs::remove_file(path).await;
-                    }
                 }
                 Err(error)
             }

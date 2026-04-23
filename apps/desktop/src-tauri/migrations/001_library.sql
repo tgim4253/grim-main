@@ -8,11 +8,7 @@ CREATE TABLE IF NOT EXISTS library_settings (
 
 CREATE TABLE IF NOT EXISTS asset (
   id             TEXT PRIMARY KEY NOT NULL,
-  type           TEXT NOT NULL CHECK (type IN ('imported_image', 'linked_external')),
-  hash           TEXT,
-  storage_path   TEXT,
-  external_path  TEXT,
-  thumbnail_path TEXT,
+  hash           TEXT NOT NULL,
   file_name      TEXT NOT NULL,
   file_size      INTEGER NOT NULL DEFAULT 0,
   mime_type      TEXT,
@@ -24,14 +20,8 @@ CREATE TABLE IF NOT EXISTS asset (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_asset_import_hash
-  ON asset(hash)
-  WHERE type = 'imported_image' AND hash IS NOT NULL;
+  ON asset(hash);
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_asset_external_path
-  ON asset(external_path)
-  WHERE type = 'linked_external' AND external_path IS NOT NULL;
-
-CREATE INDEX IF NOT EXISTS idx_asset_type ON asset(type);
 CREATE INDEX IF NOT EXISTS idx_asset_created_at ON asset(created_at DESC);
 
 CREATE TABLE IF NOT EXISTS virtual_folder (
@@ -101,6 +91,7 @@ CREATE TABLE IF NOT EXISTS session_step_preset (
   name                     TEXT NOT NULL,
   default_duration_seconds INTEGER,
   result_required          INTEGER NOT NULL DEFAULT 0 CHECK (result_required IN (0, 1)),
+  result_external_path     TEXT,
   created_at               TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at               TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE (preset_id, step_order)

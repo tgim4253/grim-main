@@ -25,6 +25,7 @@ pub struct SaveSessionPresetStepInput<'a> {
     pub name: &'a str,
     pub default_duration_seconds: Option<i64>,
     pub result_required: bool,
+    pub result_external_path: Option<&'a str>,
 }
 
 pub struct UpsertSessionPresetInput<'a> {
@@ -150,6 +151,7 @@ impl SessionRepository {
                    ssp.name,
                    ssp.default_duration_seconds,
                    ssp.result_required AS "result_required: bool",
+                   ssp.result_external_path,
                    t.id AS tag_id,
                    t.group_id,
                    t.name AS tag_name,
@@ -206,6 +208,7 @@ impl SessionRepository {
                 default_duration_seconds: row.default_duration_seconds,
                 auto_tags: Vec::new(),
                 result_required: row.result_required,
+                result_external_path: row.result_external_path.clone(),
             };
 
             if let Some(tag_id) = row.tag_id.clone() {
@@ -325,8 +328,8 @@ impl SessionRepository {
         sqlx::query!(
             r#"
             INSERT INTO session_step_preset
-            (id, preset_id, step_order, name, default_duration_seconds, result_required, created_at, updated_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
+            (id, preset_id, step_order, name, default_duration_seconds, result_required, result_external_path, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
             "#,
             input.id,
             input.preset_id,
@@ -334,6 +337,7 @@ impl SessionRepository {
             input.name,
             input.default_duration_seconds,
             result_required,
+            input.result_external_path,
             created_at
         )
         .execute(&mut **tx)

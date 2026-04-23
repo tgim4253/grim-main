@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
 
 use anyhow::{anyhow, bail, Result};
 use once_cell::sync::Lazy;
@@ -25,7 +25,7 @@ static CROQUIS_SESSIONS: Lazy<RwLock<HashMap<String, CroquisSession>>> =
 struct PreparedCroquisItem {
     asset_id: String,
     file_name: String,
-    hash: Option<String>,
+    hash: String,
     base_path: String,
     base_width: u32,
     base_height: u32,
@@ -137,15 +137,8 @@ impl CroquisService {
                 continue;
             }
 
-            let hash = match asset.hash.clone() {
-                Some(value) => Some(value),
-                None => Some(media::hash_file(&source_path).await?),
-            };
-            let hash_value = hash.clone().unwrap_or_default();
-            let thumb_path =
-                asset.thumbnail_path.clone().map(PathBuf::from).unwrap_or_else(
-                    || self.library_storage.thumbnail_path(&hash_value),
-                );
+            let hash_value = asset.hash.clone();
+            let thumb_path = self.library_storage.thumbnail_path(&hash_value);
             let (thumb_width, thumb_height) =
                 media::ensure_thumbnail(&source_path, &thumb_path).await?;
 
@@ -153,7 +146,7 @@ impl CroquisService {
                 prepared_items.push(PreparedCroquisItem {
                     asset_id: asset.id.clone(),
                     file_name: asset.file_name.clone(),
-                    hash: hash.clone(),
+                    hash: hash_value.clone(),
                     base_path: thumb_path.to_string_lossy().into_owned(),
                     base_width: thumb_width,
                     base_height: thumb_height,

@@ -18,6 +18,14 @@ impl LibraryStorage {
         media::target_asset_path(&self.paths.asset_dir, hash, source_path)
     }
 
+    pub fn asset_path(&self, hash: &str, file_name: &str) -> PathBuf {
+        media::target_asset_path(
+            &self.paths.asset_dir,
+            hash,
+            Path::new(file_name),
+        )
+    }
+
     pub fn thumbnail_path(&self, hash: &str) -> PathBuf {
         media::thumbnail_path(&self.paths.thumb_dir, hash)
     }

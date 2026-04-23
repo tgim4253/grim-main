@@ -13,11 +13,3 @@ pub async fn import_images(
 ) -> CommandResult<ImportResult> {
     asset_service.import_images(payload).await.into_command()
 }
-
-#[tauri::command]
-pub async fn link_external_files(
-    payload: ImportRequest,
-    asset_service: State<'_, AssetService>,
-) -> CommandResult<ImportResult> {
-    asset_service.link_external_files(payload).await.into_command()
-}

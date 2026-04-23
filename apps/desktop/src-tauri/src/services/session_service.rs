@@ -118,6 +118,9 @@ impl SessionService {
                         name: &step.name,
                         default_duration_seconds: step.default_duration_seconds,
                         result_required: step.result_required,
+                        result_external_path: step
+                            .result_external_path
+                            .as_deref(),
                     },
                     &now,
                 )
@@ -329,6 +332,7 @@ mod tests {
                         .map(|tag| tag.name.clone())
                         .collect(),
                     result_required: step.result_required,
+                    result_external_path: step.result_external_path.clone(),
                 })
                 .collect(),
         }

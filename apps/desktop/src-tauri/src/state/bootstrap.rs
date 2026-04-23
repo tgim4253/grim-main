@@ -96,8 +96,8 @@ pub async fn seed_defaults(pool: &Pool<Sqlite>) -> Result<()> {
         sqlx::query!(
             r#"
             INSERT INTO session_step_preset
-            (id, preset_id, step_order, name, default_duration_seconds, result_required, created_at, updated_at)
-            VALUES (?1, ?2, 1, 'Croquis', 180, 0, ?3, ?3)
+            (id, preset_id, step_order, name, default_duration_seconds, result_required, result_external_path, created_at, updated_at)
+            VALUES (?1, ?2, 1, 'Croquis', 180, 0, NULL, ?3, ?3)
             "#,
             step_id_ref,
             preset_id_ref,

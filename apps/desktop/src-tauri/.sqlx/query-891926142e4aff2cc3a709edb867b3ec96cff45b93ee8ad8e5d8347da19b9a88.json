@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO session_step_preset\n            (id, preset_id, step_order, name, default_duration_seconds, result_required, result_external_path, created_at, updated_at)\n            VALUES (?1, ?2, 1, 'Croquis', 180, 0, NULL, ?3, ?3)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "891926142e4aff2cc3a709edb867b3ec96cff45b93ee8ad8e5d8347da19b9a88"
+}

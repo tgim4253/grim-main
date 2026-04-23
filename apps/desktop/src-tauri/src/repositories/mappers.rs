@@ -1,5 +1,5 @@
 use crate::models::{
-    asset::{AssetSummary, AssetType},
+    asset::AssetSummary,
     folder::VirtualFolder,
     record::CroquisRecordSummary,
     session::SessionSummary,
@@ -8,11 +8,7 @@ use crate::models::{
 
 pub(crate) struct AssetRow {
     pub id: String,
-    pub type_: String,
-    pub hash: Option<String>,
-    pub storage_path: Option<String>,
-    pub external_path: Option<String>,
-    pub thumbnail_path: Option<String>,
+    pub hash: String,
     pub file_name: String,
     pub file_size: i64,
     pub mime_type: Option<String>,
@@ -113,6 +109,7 @@ pub(crate) struct SessionStepPresetJoinRow {
     pub name: String,
     pub default_duration_seconds: Option<i64>,
     pub result_required: bool,
+    pub result_external_path: Option<String>,
     pub tag_id: Option<String>,
     pub group_id: Option<String>,
     pub tag_name: Option<String>,
@@ -122,21 +119,10 @@ pub(crate) struct SessionStepPresetJoinRow {
     pub tag_updated_at: Option<String>,
 }
 
-pub(crate) fn asset_type_from_db(value: &str) -> AssetType {
-    match value {
-        "linked_external" => AssetType::LinkedExternal,
-        _ => AssetType::ImportedImage,
-    }
-}
-
 pub(crate) fn asset_from_row(row: AssetRow) -> AssetSummary {
     AssetSummary {
         id: row.id,
-        r#type: asset_type_from_db(&row.type_),
         hash: row.hash,
-        storage_path: row.storage_path,
-        external_path: row.external_path,
-        thumbnail_path: row.thumbnail_path,
         file_name: row.file_name,
         file_size: row.file_size,
         mime_type: row.mime_type,
