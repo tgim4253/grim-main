@@ -39,10 +39,8 @@ impl RecordRepository {
                    title,
                    source_asset_id,
                    result_asset_id,
-                   session_id,
-                   step_index,
-                   step_name,
                    target_duration_seconds,
+                   actual_duration_seconds,
                    started_at,
                    finished_at,
                    finalized_at,
@@ -53,38 +51,6 @@ impl RecordRepository {
             LIMIT ?1
             "#,
             limit
-        )
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(rows.into_iter().map(record_summary_from_row).collect())
-    }
-
-    pub async fn list_by_session(
-        &self,
-        session_id: &str,
-    ) -> Result<Vec<CroquisRecordSummary>> {
-        let rows = sqlx::query_as!(
-            CroquisRecordSummaryRow,
-            r#"
-            SELECT id,
-                   title,
-                   source_asset_id,
-                   result_asset_id,
-                   session_id,
-                   step_index,
-                   step_name,
-                   target_duration_seconds,
-                   started_at,
-                   finished_at,
-                   finalized_at,
-                   created_at,
-                   updated_at
-            FROM croquis_record
-            WHERE session_id = ?1
-            ORDER BY COALESCE(step_index, 999999) ASC, created_at ASC
-            "#,
-            session_id
         )
         .fetch_all(&self.pool)
         .await?;
@@ -104,10 +70,8 @@ impl RecordRepository {
                    note,
                    source_asset_id,
                    result_asset_id,
-                   session_id,
-                   step_index,
-                   step_name,
                    target_duration_seconds,
+                   actual_duration_seconds,
                    started_at,
                    finished_at,
                    finalized_at,
@@ -158,17 +122,13 @@ impl RecordRepository {
         let now_ref = now.as_str();
         let record_id = payload.id.clone().unwrap_or_else(get_unique_id);
         let record_id_ref = record_id.as_str();
-        let title = payload.title.clone().unwrap_or_else(|| {
-            payload
-                .step_name
-                .clone()
-                .unwrap_or_else(|| "Croquis Record".to_string())
-        });
+        let title = payload
+            .title
+            .clone()
+            .unwrap_or_else(|| "Croquis Record".to_string());
         let title_ref = title.as_str();
         let source_asset_id = payload.source_asset_id.as_deref();
         let result_asset_id = payload.result_asset_id.as_deref();
-        let session_id = payload.session_id.as_deref();
-        let step_name = payload.step_name.as_deref();
         let note = payload.note.as_deref();
 
         let mut tx = self.pool.begin().await?;
@@ -178,21 +138,15 @@ impl RecordRepository {
                 UPDATE croquis_record
                 SET source_asset_id = ?2,
                     result_asset_id = ?3,
-                    session_id = ?4,
-                    step_index = ?5,
-                    step_name = ?6,
-                    title = ?7,
-                    note = COALESCE(?8, note),
-                    target_duration_seconds = ?9,
-                    updated_at = ?10
+                    title = ?4,
+                    note = COALESCE(?5, note),
+                    target_duration_seconds = ?6,
+                    updated_at = ?7
                 WHERE id = ?1
                 "#,
                 record_id_ref,
                 source_asset_id,
                 result_asset_id,
-                session_id,
-                payload.step_index,
-                step_name,
                 title_ref,
                 note,
                 payload.target_duration_seconds,
@@ -204,16 +158,12 @@ impl RecordRepository {
             sqlx::query!(
                 r#"
                 INSERT INTO croquis_record
-                (id, source_asset_id, result_asset_id, session_id, step_index, step_name, title, note,
-                 target_duration_seconds, created_at, updated_at)
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, COALESCE(?8, ''), ?9, ?10, ?10)
+                (id, source_asset_id, result_asset_id, title, note, target_duration_seconds, created_at, updated_at)
+                VALUES (?1, ?2, ?3, ?4, COALESCE(?5, ''), ?6, ?7, ?7)
                 "#,
                 record_id_ref,
                 source_asset_id,
                 result_asset_id,
-                session_id,
-                payload.step_index,
-                step_name,
                 title_ref,
                 note,
                 payload.target_duration_seconds,
@@ -253,16 +203,6 @@ impl RecordRepository {
         sqlx::query!("DELETE FROM croquis_record WHERE id = ?1", record_id)
             .execute(&self.pool)
             .await?;
-        Ok(())
-    }
-
-    pub async fn delete_by_session(&self, session_id: &str) -> Result<()> {
-        sqlx::query!(
-            "DELETE FROM croquis_record WHERE session_id = ?1",
-            session_id
-        )
-        .execute(&self.pool)
-        .await?;
         Ok(())
     }
 
@@ -327,40 +267,24 @@ impl RecordRepository {
         let finalized_at_ref = finalized_at.as_str();
         let finished_at_value = Some(finished_at_ref);
         let finalized_at_value = Some(finalized_at_ref);
-        let title_suffix = payload
-            .actual_duration_seconds
-            .map(|value| format!(" ({value:.1}s)"));
 
         sqlx::query!(
             r#"
             UPDATE croquis_record
             SET finished_at = COALESCE(?2, finished_at),
                 finalized_at = COALESCE(?3, finalized_at),
-                updated_at = ?4
+                actual_duration_seconds = COALESCE(?4, actual_duration_seconds),
+                updated_at = ?5
             WHERE id = ?1
             "#,
             record_id,
             finished_at_value,
             finalized_at_value,
+            payload.actual_duration_seconds,
             now_ref
         )
         .execute(&self.pool)
         .await?;
-
-        if let Some(suffix) = title_suffix {
-            let title_pattern = format!("%{suffix}");
-            let suffix_ref = suffix.as_str();
-            let title_pattern_ref = title_pattern.as_str();
-            sqlx::query!(
-                "UPDATE croquis_record SET title = TRIM(title || ?2), updated_at = ?3 WHERE id = ?1 AND title NOT LIKE ?4",
-                record_id,
-                suffix_ref,
-                now_ref,
-                title_pattern_ref
-            )
-            .execute(&self.pool)
-            .await?;
-        }
 
         Ok(())
     }
@@ -369,6 +293,7 @@ impl RecordRepository {
         &self,
         record_id: &str,
         result_asset_id: &str,
+        actual_duration_seconds: Option<f64>,
     ) -> Result<()> {
         let now = get_now_date();
         let now_ref = now.as_str();
@@ -376,13 +301,15 @@ impl RecordRepository {
             r#"
             UPDATE croquis_record
             SET result_asset_id = ?2,
-                finished_at = COALESCE(finished_at, ?3),
-                finalized_at = ?3,
-                updated_at = ?3
+                actual_duration_seconds = COALESCE(?3, actual_duration_seconds),
+                finished_at = COALESCE(finished_at, ?4),
+                finalized_at = ?4,
+                updated_at = ?4
             WHERE id = ?1
             "#,
             record_id,
             result_asset_id,
+            actual_duration_seconds,
             now_ref
         )
         .execute(&self.pool)

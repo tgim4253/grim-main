@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::models::{
-    folder::VirtualFolder, record::CroquisRecordSummary, tag::Tag,
-};
+use crate::models::{folder::VirtualFolder, record::CroquisRecordSummary};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -31,8 +29,6 @@ pub struct AssetDetail {
     #[serde(default)]
     pub virtual_folders: Vec<VirtualFolder>,
     #[serde(default)]
-    pub tags: Vec<Tag>,
-    #[serde(default)]
     pub related_records: Vec<CroquisRecordSummary>,
 }
 
@@ -51,8 +47,6 @@ pub struct ImportRequest {
     pub file_paths: Vec<String>,
     #[serde(default)]
     pub virtual_folder_ids: Vec<String>,
-    #[serde(default)]
-    pub tag_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -70,12 +64,4 @@ pub struct UpdateAssetFoldersPayload {
     pub asset_id: String,
     #[serde(default)]
     pub virtual_folder_ids: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateAssetTagsPayload {
-    pub asset_id: String,
-    #[serde(default)]
-    pub tag_ids: Vec<String>,
 }

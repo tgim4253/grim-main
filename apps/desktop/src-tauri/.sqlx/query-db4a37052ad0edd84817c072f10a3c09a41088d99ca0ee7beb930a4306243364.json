@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT id,\n                   title,\n                   source_asset_id,\n                   result_asset_id,\n                   session_id,\n                   step_index,\n                   step_name,\n                   target_duration_seconds,\n                   started_at,\n                   finished_at,\n                   finalized_at,\n                   created_at,\n                   updated_at\n            FROM croquis_record\n            WHERE session_id = ?1\n            ORDER BY COALESCE(step_index, 999999) ASC, created_at ASC\n            ",
+  "query": "\n            SELECT id,\n                   title,\n                   note,\n                   source_asset_id,\n                   result_asset_id,\n                   target_duration_seconds,\n                   actual_duration_seconds,\n                   started_at,\n                   finished_at,\n                   finalized_at,\n                   created_at,\n                   updated_at\n            FROM croquis_record\n            WHERE id = ?1\n            ",
   "describe": {
     "columns": [
       {
@@ -14,58 +14,53 @@
         "type_info": "Text"
       },
       {
-        "name": "source_asset_id",
+        "name": "note",
         "ordinal": 2,
         "type_info": "Text"
       },
       {
-        "name": "result_asset_id",
+        "name": "source_asset_id",
         "ordinal": 3,
         "type_info": "Text"
       },
       {
-        "name": "session_id",
+        "name": "result_asset_id",
         "ordinal": 4,
         "type_info": "Text"
       },
       {
-        "name": "step_index",
+        "name": "target_duration_seconds",
         "ordinal": 5,
         "type_info": "Integer"
       },
       {
-        "name": "step_name",
+        "name": "actual_duration_seconds",
         "ordinal": 6,
-        "type_info": "Text"
-      },
-      {
-        "name": "target_duration_seconds",
-        "ordinal": 7,
-        "type_info": "Integer"
+        "type_info": "Float"
       },
       {
         "name": "started_at",
-        "ordinal": 8,
+        "ordinal": 7,
         "type_info": "Text"
       },
       {
         "name": "finished_at",
-        "ordinal": 9,
+        "ordinal": 8,
         "type_info": "Text"
       },
       {
         "name": "finalized_at",
-        "ordinal": 10,
+        "ordinal": 9,
         "type_info": "Text"
       },
       {
         "name": "created_at",
-        "ordinal": 11,
+        "ordinal": 10,
         "type_info": "Text"
       },
       {
         "name": "updated_at",
-        "ordinal": 12,
+        "ordinal": 11,
         "type_info": "Text"
       }
     ],
@@ -75,8 +70,7 @@
     "nullable": [
       false,
       false,
-      true,
-      true,
+      false,
       true,
       true,
       true,
@@ -88,5 +82,5 @@
       false
     ]
   },
-  "hash": "0be76e373fac2824c66fb87fe986f93de570fa5e1db2dd9f7a298207b593afda"
+  "hash": "db4a37052ad0edd84817c072f10a3c09a41088d99ca0ee7beb930a4306243364"
 }

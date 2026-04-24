@@ -2,7 +2,6 @@ use crate::models::{
     asset::AssetSummary,
     folder::VirtualFolder,
     record::CroquisRecordSummary,
-    session::SessionSummary,
     tag::{Tag, TagGroup},
 };
 
@@ -53,10 +52,8 @@ pub(crate) struct CroquisRecordSummaryRow {
     pub title: String,
     pub source_asset_id: Option<String>,
     pub result_asset_id: Option<String>,
-    pub session_id: Option<String>,
-    pub step_index: Option<i64>,
-    pub step_name: Option<String>,
     pub target_duration_seconds: Option<i64>,
+    pub actual_duration_seconds: Option<f64>,
     pub started_at: Option<String>,
     pub finished_at: Option<String>,
     pub finalized_at: Option<String>,
@@ -70,27 +67,13 @@ pub(crate) struct CroquisRecordDetailRow {
     pub note: String,
     pub source_asset_id: Option<String>,
     pub result_asset_id: Option<String>,
-    pub session_id: Option<String>,
-    pub step_index: Option<i64>,
-    pub step_name: Option<String>,
     pub target_duration_seconds: Option<i64>,
+    pub actual_duration_seconds: Option<f64>,
     pub started_at: Option<String>,
     pub finished_at: Option<String>,
     pub finalized_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
-}
-
-pub(crate) struct SessionSummaryRow {
-    pub id: String,
-    pub title: String,
-    pub preset_id: Option<String>,
-    pub started_at: Option<String>,
-    pub finished_at: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub record_count: i64,
-    pub first_record_id: Option<String>,
 }
 
 pub(crate) struct SessionPresetRow {
@@ -177,10 +160,8 @@ pub(crate) fn record_summary_from_row(
         title: row.title,
         source_asset_id: row.source_asset_id,
         result_asset_id: row.result_asset_id,
-        session_id: row.session_id,
-        step_index: row.step_index,
-        step_name: row.step_name,
         target_duration_seconds: row.target_duration_seconds,
+        actual_duration_seconds: row.actual_duration_seconds,
         started_at: row.started_at,
         finished_at: row.finished_at,
         finalized_at: row.finalized_at,
@@ -197,30 +178,12 @@ pub(crate) fn record_detail_row_into_summary(
         title: row.title.clone(),
         source_asset_id: row.source_asset_id.clone(),
         result_asset_id: row.result_asset_id.clone(),
-        session_id: row.session_id.clone(),
-        step_index: row.step_index,
-        step_name: row.step_name.clone(),
         target_duration_seconds: row.target_duration_seconds,
+        actual_duration_seconds: row.actual_duration_seconds,
         started_at: row.started_at.clone(),
         finished_at: row.finished_at.clone(),
         finalized_at: row.finalized_at.clone(),
         created_at: row.created_at.clone(),
         updated_at: row.updated_at.clone(),
-    }
-}
-
-pub(crate) fn session_summary_from_row(
-    row: SessionSummaryRow,
-) -> SessionSummary {
-    SessionSummary {
-        id: row.id,
-        title: row.title,
-        preset_id: row.preset_id,
-        started_at: row.started_at,
-        finished_at: row.finished_at,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-        record_count: row.record_count,
-        first_record_id: row.first_record_id,
     }
 }

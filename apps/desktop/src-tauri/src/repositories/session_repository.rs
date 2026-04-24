@@ -4,14 +4,11 @@ use anyhow::Result;
 use sqlx::{Sqlite, SqlitePool, Transaction};
 
 use crate::models::{
-    session::{SessionPreset, SessionStepPreset, SessionSummary},
+    session::{SessionPreset, SessionStepPreset},
     tag::Tag,
 };
 
-use super::mappers::{
-    session_summary_from_row, SessionPresetRow, SessionStepPresetJoinRow,
-    SessionSummaryRow,
-};
+use super::mappers::{SessionPresetRow, SessionStepPresetJoinRow};
 
 #[derive(Clone)]
 pub struct SessionRepository {
@@ -37,13 +34,6 @@ pub struct UpsertSessionPresetInput<'a> {
     pub is_update: bool,
 }
 
-pub struct NewSessionInput<'a> {
-    pub id: &'a str,
-    pub title: &'a str,
-    pub preset_id: Option<&'a str>,
-    pub started_at: &'a str,
-}
-
 impl SessionRepository {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
@@ -51,78 +41,6 @@ impl SessionRepository {
 
     pub async fn begin(&self) -> Result<Transaction<'_, Sqlite>> {
         Ok(self.pool.begin().await?)
-    }
-
-    pub async fn list_recent(&self, limit: i64) -> Result<Vec<SessionSummary>> {
-        let rows = sqlx::query_as!(
-            SessionSummaryRow,
-            r#"
-            SELECT s.id,
-                   s.title,
-                   s.preset_id,
-                   s.started_at,
-                   s.finished_at,
-                   s.created_at,
-                   s.updated_at,
-                   (
-                       SELECT COUNT(*)
-                       FROM croquis_record r
-                       WHERE r.session_id = s.id
-                   ) AS "record_count!: i64",
-                   (
-                       SELECT r.id
-                       FROM croquis_record r
-                       WHERE r.session_id = s.id
-                       ORDER BY COALESCE(r.step_index, 999999) ASC, r.created_at ASC, r.id ASC
-                       LIMIT 1
-                   ) AS first_record_id
-            FROM session s
-            ORDER BY s.created_at DESC
-            LIMIT ?1
-            "#,
-            limit
-        )
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(rows.into_iter().map(session_summary_from_row).collect())
-    }
-
-    pub async fn get_summary(
-        &self,
-        session_id: &str,
-    ) -> Result<SessionSummary> {
-        let row = sqlx::query_as!(
-            SessionSummaryRow,
-            r#"
-            SELECT s.id,
-                   s.title,
-                   s.preset_id,
-                   s.started_at,
-                   s.finished_at,
-                   s.created_at,
-                   s.updated_at,
-                   (
-                       SELECT COUNT(*)
-                       FROM croquis_record r
-                       WHERE r.session_id = s.id
-                   ) AS "record_count!: i64",
-                   (
-                       SELECT r.id
-                       FROM croquis_record r
-                       WHERE r.session_id = s.id
-                       ORDER BY COALESCE(r.step_index, 999999) ASC, r.created_at ASC, r.id ASC
-                       LIMIT 1
-                   ) AS first_record_id
-            FROM session s
-            WHERE s.id = ?1
-            "#,
-            session_id
-        )
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(session_summary_from_row(row))
     }
 
     pub async fn list_presets(&self) -> Result<Vec<SessionPreset>> {
@@ -410,33 +328,6 @@ impl SessionRepository {
             updated_at
         )
         .execute(&mut **tx)
-        .await?;
-        Ok(())
-    }
-
-    pub async fn delete(&self, session_id: &str) -> Result<()> {
-        sqlx::query!("DELETE FROM session WHERE id = ?1", session_id)
-            .execute(&self.pool)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn create_session(
-        &self,
-        input: &NewSessionInput<'_>,
-    ) -> Result<()> {
-        sqlx::query!(
-            r#"
-            INSERT INTO session
-            (id, preset_id, title, started_at, finished_at, created_at, updated_at)
-            VALUES (?1, ?2, ?3, ?4, NULL, ?4, ?4)
-            "#,
-            input.id,
-            input.preset_id,
-            input.title,
-            input.started_at
-        )
-        .execute(&self.pool)
         .await?;
         Ok(())
     }

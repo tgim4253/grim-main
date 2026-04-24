@@ -68,13 +68,6 @@ CREATE TABLE IF NOT EXISTS tag (
   UNIQUE (group_id, name)
 );
 
-CREATE TABLE IF NOT EXISTS asset_tag (
-  asset_id    TEXT NOT NULL REFERENCES asset(id) ON DELETE CASCADE,
-  tag_id      TEXT NOT NULL REFERENCES tag(id) ON DELETE CASCADE,
-  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-  PRIMARY KEY (asset_id, tag_id)
-);
-
 CREATE TABLE IF NOT EXISTS session_preset (
   id          TEXT PRIMARY KEY NOT NULL,
   name        TEXT NOT NULL UNIQUE,
@@ -104,28 +97,14 @@ CREATE TABLE IF NOT EXISTS session_step_preset_tag (
   PRIMARY KEY (step_preset_id, tag_id)
 );
 
-CREATE TABLE IF NOT EXISTS session (
-  id          TEXT PRIMARY KEY NOT NULL,
-  preset_id   TEXT REFERENCES session_preset(id) ON DELETE SET NULL,
-  title       TEXT NOT NULL,
-  started_at  TEXT,
-  finished_at TEXT,
-  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE INDEX IF NOT EXISTS idx_session_created_at ON session(created_at DESC);
-
 CREATE TABLE IF NOT EXISTS croquis_record (
   id                       TEXT PRIMARY KEY NOT NULL,
   source_asset_id          TEXT REFERENCES asset(id) ON DELETE SET NULL,
   result_asset_id          TEXT REFERENCES asset(id) ON DELETE SET NULL,
-  session_id               TEXT REFERENCES session(id) ON DELETE SET NULL,
-  step_index               INTEGER,
-  step_name                TEXT,
   title                    TEXT NOT NULL DEFAULT '',
   note                     TEXT NOT NULL DEFAULT '',
   target_duration_seconds  INTEGER,
+  actual_duration_seconds  REAL,
   started_at               TEXT,
   finished_at              TEXT,
   finalized_at             TEXT,
@@ -135,9 +114,6 @@ CREATE TABLE IF NOT EXISTS croquis_record (
 
 CREATE INDEX IF NOT EXISTS idx_croquis_record_created_at
   ON croquis_record(created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_croquis_record_session_id
-  ON croquis_record(session_id);
 
 CREATE INDEX IF NOT EXISTS idx_croquis_record_source_asset_id
   ON croquis_record(source_asset_id);

@@ -50,10 +50,6 @@ impl LibraryService {
                 .count_uncategorized_assets()
                 .await?,
             recent_records: self.record_service.list_recent_records(12).await?,
-            recent_sessions: self
-                .session_service
-                .list_recent_sessions(12)
-                .await?,
         };
         let session_presets =
             self.session_service.list_session_presets().await?;

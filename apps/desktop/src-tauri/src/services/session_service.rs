@@ -2,14 +2,12 @@ use anyhow::{anyhow, Result};
 
 use crate::{
     models::session::{
-        DeleteSessionPresetPayload, SaveSessionPresetPayload, SessionDetail,
-        SessionPreset, SessionSummary,
+        DeleteSessionPresetPayload, SaveSessionPresetPayload, SessionPreset,
     },
     repositories::{
-        NewSessionInput, SaveSessionPresetStepInput, SessionRepository,
-        SettingsRepository, TagRepository, UpsertSessionPresetInput,
+        SaveSessionPresetStepInput, SessionRepository, SettingsRepository,
+        TagRepository, UpsertSessionPresetInput,
     },
-    services::RecordService,
     utils::{date::get_now_date, identifier::get_unique_id},
 };
 
@@ -18,7 +16,6 @@ pub struct SessionService {
     session_repository: SessionRepository,
     settings_repository: SettingsRepository,
     tag_repository: TagRepository,
-    record_service: RecordService,
 }
 
 impl SessionService {
@@ -26,41 +23,8 @@ impl SessionService {
         session_repository: SessionRepository,
         settings_repository: SettingsRepository,
         tag_repository: TagRepository,
-        record_service: RecordService,
     ) -> Self {
-        Self {
-            session_repository,
-            settings_repository,
-            tag_repository,
-            record_service,
-        }
-    }
-
-    pub async fn list_recent_sessions(
-        &self,
-        limit: i64,
-    ) -> Result<Vec<SessionSummary>> {
-        self.session_repository.list_recent(limit).await
-    }
-
-    pub async fn get_session_detail(
-        &self,
-        session_id: &str,
-    ) -> Result<SessionDetail> {
-        let summary = self.session_repository.get_summary(session_id).await?;
-        let records =
-            self.record_service.list_records_by_session(session_id).await?;
-        let preset = match summary.preset_id.as_deref() {
-            Some(target_id) => self
-                .session_repository
-                .list_presets()
-                .await?
-                .into_iter()
-                .find(|candidate| candidate.id == target_id),
-            None => None,
-        };
-
-        Ok(SessionDetail { summary, preset, records })
+        Self { session_repository, settings_repository, tag_repository }
     }
 
     pub async fn list_session_presets(&self) -> Result<Vec<SessionPreset>> {
@@ -233,28 +197,6 @@ impl SessionService {
             .or_else(|| presets.into_iter().next())
             .ok_or_else(|| anyhow!("No session presets available"))
     }
-
-    pub async fn create_session(
-        &self,
-        title: &str,
-        preset_id: Option<&str>,
-    ) -> Result<String> {
-        let now = get_now_date();
-        let session_id = get_unique_id();
-        self.session_repository
-            .create_session(&NewSessionInput {
-                id: &session_id,
-                title,
-                preset_id,
-                started_at: &now,
-            })
-            .await?;
-        Ok(session_id)
-    }
-
-    pub async fn delete_session(&self, session_id: &str) -> Result<()> {
-        self.session_repository.delete(session_id).await
-    }
 }
 
 #[cfg(test)]
@@ -270,11 +212,7 @@ mod tests {
             DeleteSessionPresetPayload, SaveSessionPresetPayload,
             SessionPreset, SessionPresetStepDraft,
         },
-        repositories::{
-            AssetRepository, RecordRepository, SessionRepository,
-            SettingsRepository, TagRepository,
-        },
-        services::RecordService,
+        repositories::{SessionRepository, SettingsRepository, TagRepository},
         state::bootstrap::{ensure_schema, open_or_create_db, seed_defaults},
     };
 
@@ -296,16 +234,11 @@ mod tests {
     fn build_service(pool: sqlx::SqlitePool) -> SessionService {
         let settings_repository = SettingsRepository::new(pool.clone());
         let tag_repository = TagRepository::new(pool.clone());
-        let record_service = RecordService::new(
-            RecordRepository::new(pool.clone()),
-            AssetRepository::new(pool.clone()),
-        );
 
         SessionService::new(
             SessionRepository::new(pool),
             settings_repository,
             tag_repository,
-            record_service,
         )
     }
 

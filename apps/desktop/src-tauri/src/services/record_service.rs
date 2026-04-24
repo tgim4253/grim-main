@@ -30,13 +30,6 @@ impl RecordService {
         self.record_repository.list_recent(limit).await
     }
 
-    pub async fn list_records_by_session(
-        &self,
-        session_id: &str,
-    ) -> Result<Vec<CroquisRecordSummary>> {
-        self.record_repository.list_by_session(session_id).await
-    }
-
     pub async fn get_record(
         &self,
         record_id: &str,
@@ -72,13 +65,6 @@ impl RecordService {
         self.record_repository.delete(payload).await
     }
 
-    pub async fn delete_records_by_session(
-        &self,
-        session_id: &str,
-    ) -> Result<()> {
-        self.record_repository.delete_by_session(session_id).await
-    }
-
     pub async fn update_record_tags(
         &self,
         payload: UpdateCroquisRecordTagsPayload,
@@ -109,10 +95,14 @@ impl RecordService {
         &self,
         record_id: &str,
         result_asset_id: &str,
-        _actual_duration_seconds: Option<f64>,
+        actual_duration_seconds: Option<f64>,
     ) -> Result<CroquisRecordDetail> {
         self.record_repository
-            .attach_result_asset(record_id, result_asset_id)
+            .attach_result_asset(
+                record_id,
+                result_asset_id,
+                actual_duration_seconds,
+            )
             .await?;
         self.get_record(record_id).await
     }
@@ -168,9 +158,6 @@ mod tests {
                 id: None,
                 source_asset_id: None,
                 result_asset_id: None,
-                session_id: None,
-                step_index: None,
-                step_name: Some("Warmup".to_string()),
                 title: Some("Sketch".to_string()),
                 note: Some("first pass".to_string()),
                 target_duration_seconds: Some(180),
@@ -191,7 +178,7 @@ mod tests {
             .expect("failed to finalize record");
 
         assert!(finalized.record.finalized_at.is_some());
-        assert!(finalized.record.title.contains("(12.5s)"));
+        assert_eq!(finalized.record.actual_duration_seconds, Some(12.5));
 
         let _ = fs::remove_dir_all(dir);
     }

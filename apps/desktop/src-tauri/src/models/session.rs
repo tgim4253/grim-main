@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::models::{record::CroquisRecordSummary, tag::Tag};
+use crate::models::tag::Tag;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -68,32 +68,4 @@ pub struct SaveSessionPresetPayload {
 #[serde(rename_all = "camelCase")]
 pub struct DeleteSessionPresetPayload {
     pub preset_id: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct SessionSummary {
-    pub id: String,
-    pub title: String,
-    #[serde(default)]
-    pub preset_id: Option<String>,
-    #[serde(default)]
-    pub started_at: Option<String>,
-    #[serde(default)]
-    pub finished_at: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub record_count: i64,
-    #[serde(default)]
-    pub first_record_id: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct SessionDetail {
-    pub summary: SessionSummary,
-    #[serde(default)]
-    pub preset: Option<SessionPreset>,
-    #[serde(default)]
-    pub records: Vec<CroquisRecordSummary>,
 }

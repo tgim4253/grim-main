@@ -6,7 +6,7 @@ use tokio::fs;
 use crate::{
     models::asset::{
         AssetDetail, AssetListSource, AssetSummary, ImportRequest,
-        ImportResult, UpdateAssetFoldersPayload, UpdateAssetTagsPayload,
+        ImportResult, UpdateAssetFoldersPayload,
     },
     repositories::{AssetRepository, NewImportedAssetInput},
     services::LibraryStorage,
@@ -61,19 +61,6 @@ impl AssetService {
                 &asset_id,
                 &payload.virtual_folder_ids,
             )
-            .await?;
-        tx.commit().await?;
-        self.asset_repository.get_detail(&asset_id).await
-    }
-
-    pub async fn update_asset_tags(
-        &self,
-        payload: UpdateAssetTagsPayload,
-    ) -> Result<AssetDetail> {
-        let asset_id = payload.asset_id.clone();
-        let mut tx = self.asset_repository.begin().await?;
-        self.asset_repository
-            .replace_tags_in_tx(&mut tx, &asset_id, &payload.tag_ids)
             .await?;
         tx.commit().await?;
         self.asset_repository.get_detail(&asset_id).await
@@ -216,11 +203,10 @@ impl AssetService {
         {
             let mut tx = self.asset_repository.begin().await?;
             self.asset_repository
-                .assign_folders_and_tags_in_tx(
+                .assign_folders_in_tx(
                     &mut tx,
                     &existing.id,
                     &request.virtual_folder_ids,
-                    &request.tag_ids,
                 )
                 .await?;
             tx.commit().await?;
@@ -270,11 +256,10 @@ impl AssetService {
                 )
                 .await?;
             self.asset_repository
-                .assign_folders_and_tags_in_tx(
+                .assign_folders_in_tx(
                     &mut tx,
                     &asset_id,
                     &request.virtual_folder_ids,
-                    &request.tag_ids,
                 )
                 .await?;
             tx.commit().await?;

@@ -7,7 +7,7 @@ use sqlx::{
         SqliteConnectOptions, SqliteConnection, SqliteJournalMode,
         SqliteSynchronous,
     },
-    Executor, Pool, Sqlite,
+    Pool, Sqlite,
 };
 
 use crate::utils::{date::get_now_date, identifier::get_unique_id};
@@ -35,7 +35,6 @@ pub async fn open_or_create_db(db_path: &Path) -> Result<Pool<Sqlite>> {
                 sqlx::query!("PRAGMA foreign_keys = ON;")
                     .execute(&mut *conn)
                     .await?;
-                conn.execute("PRAGMA journal_mode = WAL;").await?;
                 sqlx::query!("PRAGMA synchronous = NORMAL;")
                     .execute(&mut *conn)
                     .await?;
