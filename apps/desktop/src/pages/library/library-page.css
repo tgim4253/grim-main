@@ -1,2 +1,28 @@
 @layer app {
+  .library-page {
+    background: var(--semantic-colors-surface-primary);
+  }
+
+  .library-page__layout {
+    min-height: 0;
+    background: var(--semantic-colors-surface-primary);
+  }
+
+  .library-page__sidebar {
+    width: 343px;
+    min-width: 343px;
+    border-right: 0;
+    background: transparent;
+  }
+
+  .library-page__workspace {
+    background: var(--semantic-colors-surface-workspace);
+  }
+
+  @media (max-width: 960px) {
+    .library-page__sidebar {
+      width: 320px;
+      min-width: 320px;
+    }
+  }
 }
