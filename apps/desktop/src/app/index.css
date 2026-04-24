@@ -2,5 +2,6 @@
 
 @import '../shared/styles/tokens.base.css';
 @import '../shared/styles/tokens.semantic.css';
+@import '../shared/styles/themes/light.css';
 @import '../shared/styles/themes/dark.css';
 @import './app.css';
