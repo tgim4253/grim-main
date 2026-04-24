@@ -55,10 +55,8 @@ pub fn run() {
             commands::asset_commands::list_assets,
             commands::asset_commands::get_asset_detail,
             commands::asset_commands::update_asset_folders,
-            commands::asset_commands::update_asset_tags,
             commands::asset_commands::reveal_path,
             commands::import_commands::import_images,
-            commands::import_commands::link_external_files,
             commands::record_commands::list_recent_records,
             commands::record_commands::get_record_detail,
             commands::record_commands::save_croquis_record,
@@ -66,8 +64,6 @@ pub fn run() {
             commands::record_commands::start_croquis_record,
             commands::record_commands::finalize_croquis_record,
             commands::record_commands::update_croquis_record_tags,
-            commands::session_commands::list_recent_sessions,
-            commands::session_commands::get_session_detail,
             commands::session_commands::list_session_presets,
             commands::session_commands::save_session_preset,
             commands::session_commands::delete_session_preset,
@@ -119,7 +115,6 @@ pub fn run() {
                 session_repository,
                 settings_repository,
                 tag_repository,
-                record_service.clone(),
             );
 
             let library_service = LibraryService::new(

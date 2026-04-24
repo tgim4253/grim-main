@@ -166,7 +166,7 @@ pub fn target_asset_path(
     hash: &str,
     source_path: &Path,
 ) -> PathBuf {
-    let mut destination = root.join(hash);
+    let mut destination = sharded_hash_path(root, hash);
     if let Some(ext) = source_path.extension().and_then(|value| value.to_str())
     {
         destination.set_extension(ext.to_ascii_lowercase());
@@ -175,9 +175,16 @@ pub fn target_asset_path(
 }
 
 pub fn thumbnail_path(root: &Path, hash: &str) -> PathBuf {
-    let mut path = root.join(hash);
+    let mut path = sharded_hash_path(root, hash);
     path.set_extension("jpg");
     path
+}
+
+pub fn sharded_hash_path(root: &Path, hash: &str) -> PathBuf {
+    match (hash.get(0..2), hash.get(2..4)) {
+        (Some(a), Some(b)) => root.join(a).join(b).join(hash),
+        _ => root.join(hash),
+    }
 }
 
 pub fn source_mime(path: &Path) -> String {

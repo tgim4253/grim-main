@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
 
 use anyhow::{anyhow, bail, Result};
 use once_cell::sync::Lazy;
@@ -12,10 +12,10 @@ use crate::{
     },
     models::record::SaveCroquisRecordPayload,
     services::{
-        media_service, AssetService, LibraryStorage, RecordService,
-        SessionService, SettingsService,
+        AssetService, LibraryStorage, RecordService, SessionService,
+        SettingsService,
     },
-    utils::date::get_now_date,
+    utils::{date::get_now_date, identifier::get_unique_id, media},
 };
 
 /// In-memory registry of active Croquis sessions keyed by session identifier.
@@ -25,7 +25,7 @@ static CROQUIS_SESSIONS: Lazy<RwLock<HashMap<String, CroquisSession>>> =
 struct PreparedCroquisItem {
     asset_id: String,
     file_name: String,
-    hash: Option<String>,
+    hash: String,
     base_path: String,
     base_width: u32,
     base_height: u32,
@@ -133,28 +133,20 @@ impl CroquisService {
                 .ok_or_else(|| {
                     anyhow!("Asset {} has no source path", asset.id)
                 })?;
-            if !media_service::is_supported_image(&source_path) {
+            if !media::is_supported_image(&source_path) {
                 continue;
             }
 
-            let hash = match asset.hash.clone() {
-                Some(value) => Some(value),
-                None => Some(media_service::hash_file(&source_path).await?),
-            };
-            let hash_value = hash.clone().unwrap_or_default();
-            let thumb_path =
-                asset.thumbnail_path.clone().map(PathBuf::from).unwrap_or_else(
-                    || self.library_storage.thumbnail_path(&hash_value),
-                );
+            let hash_value = asset.hash.clone();
+            let thumb_path = self.library_storage.thumbnail_path(&hash_value);
             let (thumb_width, thumb_height) =
-                media_service::ensure_thumbnail(&source_path, &thumb_path)
-                    .await?;
+                media::ensure_thumbnail(&source_path, &thumb_path).await?;
 
             for step in &preset.steps {
                 prepared_items.push(PreparedCroquisItem {
                     asset_id: asset.id.clone(),
                     file_name: asset.file_name.clone(),
-                    hash: hash.clone(),
+                    hash: hash_value.clone(),
                     base_path: thumb_path.to_string_lossy().into_owned(),
                     base_width: thumb_width,
                     base_height: thumb_height,
@@ -178,10 +170,8 @@ impl CroquisService {
         }
 
         let session_title = build_session_title(&preset.name);
-        let session_id = self
-            .session_service
-            .create_session(&session_title, Some(&preset.id))
-            .await?;
+        let session_id = get_unique_id();
+        let mut created_record_ids = Vec::with_capacity(prepared_items.len());
 
         let mut items = Vec::with_capacity(prepared_items.len());
         for prepared_item in prepared_items {
@@ -195,9 +185,6 @@ impl CroquisService {
                     id: None,
                     source_asset_id: Some(prepared_item.asset_id.clone()),
                     result_asset_id: None,
-                    session_id: Some(session_id.clone()),
-                    step_index: Some(prepared_item.step_index),
-                    step_name: Some(prepared_item.step_name.clone()),
                     title: Some(record_title),
                     note: None,
                     target_duration_seconds: prepared_item
@@ -208,10 +195,11 @@ impl CroquisService {
             {
                 Ok(record) => record,
                 Err(error) => {
-                    self.cleanup_failed_session(&session_id).await;
+                    self.cleanup_failed_records(&created_record_ids).await;
                     return Err(error);
                 }
             };
+            created_record_ids.push(record.record.id.clone());
             items.push(CroquisSessionItem {
                 record_id: record.record.id,
                 asset_id: prepared_item.asset_id,
@@ -240,7 +228,7 @@ impl CroquisService {
             match app_launcher::croquis::launch_croquis(app_handle, &session) {
                 Ok(window_label) => window_label,
                 Err(error) => {
-                    self.cleanup_failed_session(&session_id).await;
+                    self.cleanup_failed_records(&created_record_ids).await;
                     return Err(anyhow::Error::msg(error));
                 }
             };
@@ -253,9 +241,17 @@ impl CroquisService {
         Ok(CroquisStartResponse { session_id, window_label })
     }
 
-    async fn cleanup_failed_session(&self, session_id: &str) {
-        let _ = self.record_service.delete_records_by_session(session_id).await;
-        let _ = self.session_service.delete_session(session_id).await;
+    async fn cleanup_failed_records(&self, record_ids: &[String]) {
+        for record_id in record_ids {
+            let _ = self
+                .record_service
+                .delete_record(
+                    crate::models::record::DeleteCroquisRecordPayload {
+                        record_id: record_id.clone(),
+                    },
+                )
+                .await;
+        }
     }
 }
 

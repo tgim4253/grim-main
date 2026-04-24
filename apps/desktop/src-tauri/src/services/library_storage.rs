@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
 
-use crate::{services::media_service, state::LibraryPaths};
+use crate::{state::LibraryPaths, utils::media};
 
 #[derive(Clone)]
 pub struct LibraryStorage {
@@ -15,15 +15,19 @@ impl LibraryStorage {
     }
 
     pub fn target_asset_path(&self, hash: &str, source_path: &Path) -> PathBuf {
-        media_service::target_asset_path(
+        media::target_asset_path(&self.paths.asset_dir, hash, source_path)
+    }
+
+    pub fn asset_path(&self, hash: &str, file_name: &str) -> PathBuf {
+        media::target_asset_path(
             &self.paths.asset_dir,
             hash,
-            source_path,
+            Path::new(file_name),
         )
     }
 
     pub fn thumbnail_path(&self, hash: &str) -> PathBuf {
-        media_service::thumbnail_path(&self.paths.thumb_dir, hash)
+        media::thumbnail_path(&self.paths.thumb_dir, hash)
     }
 
     pub fn temp_file(&self, file_name: &str) -> PathBuf {

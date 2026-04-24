@@ -5,31 +5,11 @@ use crate::{
     models::{
         croquis::{CroquisSession, CroquisStartPayload, CroquisStartResponse},
         session::{
-            DeleteSessionPresetPayload, SaveSessionPresetPayload,
-            SessionDetail, SessionPreset, SessionSummary,
+            DeleteSessionPresetPayload, SaveSessionPresetPayload, SessionPreset,
         },
     },
     services::{CroquisService, SessionService},
 };
-
-#[tauri::command]
-pub async fn list_recent_sessions(
-    limit: Option<i64>,
-    session_service: State<'_, SessionService>,
-) -> CommandResult<Vec<SessionSummary>> {
-    session_service
-        .list_recent_sessions(limit.unwrap_or(24))
-        .await
-        .into_command()
-}
-
-#[tauri::command]
-pub async fn get_session_detail(
-    session_id: String,
-    session_service: State<'_, SessionService>,
-) -> CommandResult<SessionDetail> {
-    session_service.get_session_detail(&session_id).await.into_command()
-}
 
 #[tauri::command]
 pub async fn list_session_presets(

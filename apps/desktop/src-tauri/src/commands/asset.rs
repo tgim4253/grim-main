@@ -4,7 +4,6 @@ use crate::{
     errors::{CommandResult, IntoCommandResult},
     models::asset::{
         AssetDetail, AssetListSource, AssetSummary, UpdateAssetFoldersPayload,
-        UpdateAssetTagsPayload,
     },
     services::AssetService,
 };
@@ -31,14 +30,6 @@ pub async fn update_asset_folders(
     asset_service: State<'_, AssetService>,
 ) -> CommandResult<AssetDetail> {
     asset_service.update_asset_folders(payload).await.into_command()
-}
-
-#[tauri::command]
-pub async fn update_asset_tags(
-    payload: UpdateAssetTagsPayload,
-    asset_service: State<'_, AssetService>,
-) -> CommandResult<AssetDetail> {
-    asset_service.update_asset_tags(payload).await.into_command()
 }
 
 #[tauri::command]

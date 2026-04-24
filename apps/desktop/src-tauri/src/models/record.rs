@@ -13,13 +13,9 @@ pub struct CroquisRecordSummary {
     #[serde(default)]
     pub result_asset_id: Option<String>,
     #[serde(default)]
-    pub session_id: Option<String>,
-    #[serde(default)]
-    pub step_index: Option<i64>,
-    #[serde(default)]
-    pub step_name: Option<String>,
-    #[serde(default)]
     pub target_duration_seconds: Option<i64>,
+    #[serde(default)]
+    pub actual_duration_seconds: Option<f64>,
     #[serde(default)]
     pub started_at: Option<String>,
     #[serde(default)]
@@ -54,12 +50,6 @@ pub struct SaveCroquisRecordPayload {
     pub source_asset_id: Option<String>,
     #[serde(default)]
     pub result_asset_id: Option<String>,
-    #[serde(default)]
-    pub session_id: Option<String>,
-    #[serde(default)]
-    pub step_index: Option<i64>,
-    #[serde(default)]
-    pub step_name: Option<String>,
     #[serde(default)]
     pub title: Option<String>,
     #[serde(default)]

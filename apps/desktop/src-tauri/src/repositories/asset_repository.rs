@@ -6,14 +6,13 @@ use crate::{
         asset::{AssetDetail, AssetListSource, AssetSummary},
         folder::VirtualFolder,
         record::CroquisRecordSummary,
-        tag::Tag,
     },
     utils::date::get_now_date,
 };
 
 use super::mappers::{
-    asset_from_row, folder_from_row, record_summary_from_row, tag_from_row,
-    AssetRow, CroquisRecordSummaryRow, TagRow, VirtualFolderRow,
+    asset_from_row, folder_from_row, record_summary_from_row, AssetRow,
+    CroquisRecordSummaryRow, VirtualFolderRow,
 };
 
 #[derive(Clone)]
@@ -24,26 +23,11 @@ pub struct AssetRepository {
 pub struct NewImportedAssetInput<'a> {
     pub id: &'a str,
     pub hash: &'a str,
-    pub storage_path: &'a str,
-    pub thumbnail_path: &'a str,
     pub file_name: &'a str,
     pub file_size: i64,
     pub mime_type: &'a str,
     pub width: i64,
     pub height: i64,
-    pub modified_at: Option<i64>,
-    pub created_at: &'a str,
-}
-
-pub struct NewLinkedAssetInput<'a> {
-    pub id: &'a str,
-    pub external_path: &'a str,
-    pub thumbnail_path: Option<&'a str>,
-    pub file_name: &'a str,
-    pub file_size: i64,
-    pub mime_type: &'a str,
-    pub width: Option<i64>,
-    pub height: Option<i64>,
     pub modified_at: Option<i64>,
     pub created_at: &'a str,
 }
@@ -88,11 +72,7 @@ impl AssetRepository {
                     AssetRow,
                     r#"
                     SELECT id,
-                           type AS "type_: String",
                            hash,
-                           storage_path,
-                           external_path,
-                           thumbnail_path,
                            file_name,
                            file_size,
                            mime_type,
@@ -113,11 +93,7 @@ impl AssetRepository {
                     AssetRow,
                     r#"
                     SELECT id,
-                           type AS "type_: String",
                            hash,
-                           storage_path,
-                           external_path,
-                           thumbnail_path,
                            file_name,
                            file_size,
                            mime_type,
@@ -139,11 +115,7 @@ impl AssetRepository {
                     AssetRow,
                     r#"
                     SELECT a.id,
-                           a.type AS "type_: String",
                            a.hash,
-                           a.storage_path,
-                           a.external_path,
-                           a.thumbnail_path,
                            a.file_name,
                            a.file_size,
                            a.mime_type,
@@ -172,11 +144,7 @@ impl AssetRepository {
             AssetRow,
             r#"
             SELECT id,
-                   type AS "type_: String",
                    hash,
-                   storage_path,
-                   external_path,
-                   thumbnail_path,
                    file_name,
                    file_size,
                    mime_type,
@@ -220,26 +188,6 @@ impl AssetRepository {
         .fetch_all(&self.pool)
         .await?;
 
-        let tag_rows = sqlx::query_as!(
-            TagRow,
-            r#"
-            SELECT t.id,
-                   t.group_id,
-                   t.name,
-                   t.color,
-                   t.sort_order,
-                   t.created_at,
-                   t.updated_at
-            FROM tag t
-            INNER JOIN asset_tag at ON at.tag_id = t.id
-            WHERE at.asset_id = ?1
-            ORDER BY t.name ASC
-            "#,
-            asset_id
-        )
-        .fetch_all(&self.pool)
-        .await?;
-
         let record_rows = sqlx::query_as!(
             CroquisRecordSummaryRow,
             r#"
@@ -247,10 +195,8 @@ impl AssetRepository {
                    title,
                    source_asset_id,
                    result_asset_id,
-                   session_id,
-                   step_index,
-                   step_name,
                    target_duration_seconds,
+                   actual_duration_seconds,
                    started_at,
                    finished_at,
                    finalized_at,
@@ -272,7 +218,6 @@ impl AssetRepository {
                 .into_iter()
                 .map(folder_from_row)
                 .collect::<Vec<VirtualFolder>>(),
-            tags: tag_rows.into_iter().map(tag_from_row).collect::<Vec<Tag>>(),
             related_records: record_rows
                 .into_iter()
                 .map(record_summary_from_row)
@@ -288,11 +233,7 @@ impl AssetRepository {
             AssetRow,
             r#"
             SELECT id,
-                   type AS "type_: String",
                    hash,
-                   storage_path,
-                   external_path,
-                   thumbnail_path,
                    file_name,
                    file_size,
                    mime_type,
@@ -302,41 +243,9 @@ impl AssetRepository {
                    created_at,
                    updated_at
             FROM asset
-            WHERE type = 'imported_image' AND hash = ?1
+            WHERE hash = ?1
             "#,
             hash
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(row.map(asset_from_row))
-    }
-
-    pub async fn load_by_external_path(
-        &self,
-        path: &str,
-    ) -> Result<Option<AssetSummary>> {
-        let row = sqlx::query_as!(
-            AssetRow,
-            r#"
-            SELECT id,
-                   type AS "type_: String",
-                   hash,
-                   storage_path,
-                   external_path,
-                   thumbnail_path,
-                   file_name,
-                   file_size,
-                   mime_type,
-                   width,
-                   height,
-                   modified_at,
-                   created_at,
-                   updated_at
-            FROM asset
-            WHERE type = 'linked_external' AND external_path = ?1
-            "#,
-            path
         )
         .fetch_optional(&self.pool)
         .await?;
@@ -363,14 +272,12 @@ impl AssetRepository {
         sqlx::query!(
             r#"
             INSERT INTO asset
-            (id, type, hash, storage_path, external_path, thumbnail_path, file_name,
-             file_size, mime_type, width, height, modified_at, created_at, updated_at)
-            VALUES (?1, 'imported_image', ?2, ?3, NULL, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11)
+            (id, hash, file_name, file_size, mime_type, width, height,
+             modified_at, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)
             "#,
             input.id,
             input.hash,
-            input.storage_path,
-            input.thumbnail_path,
             input.file_name,
             input.file_size,
             input.mime_type,
@@ -385,41 +292,11 @@ impl AssetRepository {
         Ok(())
     }
 
-    pub async fn insert_linked_in_tx(
-        &self,
-        tx: &mut Transaction<'_, Sqlite>,
-        input: &NewLinkedAssetInput<'_>,
-    ) -> Result<()> {
-        sqlx::query!(
-            r#"
-            INSERT INTO asset
-            (id, type, hash, storage_path, external_path, thumbnail_path, file_name,
-             file_size, mime_type, width, height, modified_at, created_at, updated_at)
-            VALUES (?1, 'linked_external', NULL, NULL, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)
-            "#,
-            input.id,
-            input.external_path,
-            input.thumbnail_path,
-            input.file_name,
-            input.file_size,
-            input.mime_type,
-            input.width,
-            input.height,
-            input.modified_at,
-            input.created_at
-        )
-        .execute(&mut **tx)
-        .await?;
-
-        Ok(())
-    }
-
-    pub async fn assign_folders_and_tags_in_tx(
+    pub async fn assign_folders_in_tx(
         &self,
         tx: &mut Transaction<'_, Sqlite>,
         asset_id: &str,
         virtual_folder_ids: &[String],
-        tag_ids: &[String],
     ) -> Result<()> {
         for folder_id in virtual_folder_ids {
             let created_at = get_now_date();
@@ -432,23 +309,6 @@ impl AssetRepository {
                 "#,
                 asset_id,
                 folder_id,
-                created_at_ref
-            )
-            .execute(&mut **tx)
-            .await?;
-        }
-
-        for tag_id in tag_ids {
-            let created_at = get_now_date();
-            let created_at_ref = created_at.as_str();
-            sqlx::query!(
-                r#"
-                INSERT OR IGNORE INTO asset_tag
-                (asset_id, tag_id, created_at)
-                VALUES (?1, ?2, ?3)
-                "#,
-                asset_id,
-                tag_id,
                 created_at_ref
             )
             .execute(&mut **tx)
@@ -470,38 +330,6 @@ impl AssetRepository {
         )
         .execute(&mut **tx)
         .await?;
-        self.assign_folders_and_tags_in_tx(
-            tx,
-            asset_id,
-            virtual_folder_ids,
-            &[],
-        )
-        .await
-    }
-
-    pub async fn replace_tags_in_tx(
-        &self,
-        tx: &mut Transaction<'_, Sqlite>,
-        asset_id: &str,
-        tag_ids: &[String],
-    ) -> Result<()> {
-        let now = get_now_date();
-        let now_ref = now.as_str();
-        sqlx::query!("DELETE FROM asset_tag WHERE asset_id = ?1", asset_id)
-            .execute(&mut **tx)
-            .await?;
-
-        for tag_id in tag_ids {
-            sqlx::query!(
-                "INSERT OR IGNORE INTO asset_tag (asset_id, tag_id, created_at) VALUES (?1, ?2, ?3)",
-                asset_id,
-                tag_id,
-                now_ref
-            )
-            .execute(&mut **tx)
-            .await?;
-        }
-
-        Ok(())
+        self.assign_folders_in_tx(tx, asset_id, virtual_folder_ids).await
     }
 }

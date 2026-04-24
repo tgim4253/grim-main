@@ -7,7 +7,7 @@ use sqlx::{
         SqliteConnectOptions, SqliteConnection, SqliteJournalMode,
         SqliteSynchronous,
     },
-    Executor, Pool, Sqlite,
+    Pool, Sqlite,
 };
 
 use crate::utils::{date::get_now_date, identifier::get_unique_id};
@@ -35,7 +35,6 @@ pub async fn open_or_create_db(db_path: &Path) -> Result<Pool<Sqlite>> {
                 sqlx::query!("PRAGMA foreign_keys = ON;")
                     .execute(&mut *conn)
                     .await?;
-                conn.execute("PRAGMA journal_mode = WAL;").await?;
                 sqlx::query!("PRAGMA synchronous = NORMAL;")
                     .execute(&mut *conn)
                     .await?;
@@ -96,8 +95,8 @@ pub async fn seed_defaults(pool: &Pool<Sqlite>) -> Result<()> {
         sqlx::query!(
             r#"
             INSERT INTO session_step_preset
-            (id, preset_id, step_order, name, default_duration_seconds, result_required, created_at, updated_at)
-            VALUES (?1, ?2, 1, 'Croquis', 180, 0, ?3, ?3)
+            (id, preset_id, step_order, name, default_duration_seconds, result_required, result_external_path, created_at, updated_at)
+            VALUES (?1, ?2, 1, 'Croquis', 180, 0, NULL, ?3, ?3)
             "#,
             step_id_ref,
             preset_id_ref,

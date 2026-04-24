@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::models::{
     folder::VirtualFolder,
     record::CroquisRecordSummary,
-    session::{SessionPreset, SessionSummary},
+    session::SessionPreset,
     settings::LibrarySettings,
     tag::{Tag, TagGroup},
 };
@@ -17,8 +17,6 @@ pub struct ExplorerSnapshot {
     pub uncategorized_count: i64,
     #[serde(default)]
     pub recent_records: Vec<CroquisRecordSummary>,
-    #[serde(default)]
-    pub recent_sessions: Vec<SessionSummary>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

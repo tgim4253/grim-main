@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                UPDATE croquis_record\n                SET source_asset_id = ?2,\n                    result_asset_id = ?3,\n                    title = ?4,\n                    note = COALESCE(?5, note),\n                    target_duration_seconds = ?6,\n                    updated_at = ?7\n                WHERE id = ?1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "ad634d53e9418fc6dcc287428a622dfd5d7333524a6c5b920006f9f3292bee7a"
+}

@@ -8,11 +8,7 @@ CREATE TABLE IF NOT EXISTS library_settings (
 
 CREATE TABLE IF NOT EXISTS asset (
   id             TEXT PRIMARY KEY NOT NULL,
-  type           TEXT NOT NULL CHECK (type IN ('imported_image', 'linked_external')),
-  hash           TEXT,
-  storage_path   TEXT,
-  external_path  TEXT,
-  thumbnail_path TEXT,
+  hash           TEXT NOT NULL,
   file_name      TEXT NOT NULL,
   file_size      INTEGER NOT NULL DEFAULT 0,
   mime_type      TEXT,
@@ -24,14 +20,8 @@ CREATE TABLE IF NOT EXISTS asset (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_asset_import_hash
-  ON asset(hash)
-  WHERE type = 'imported_image' AND hash IS NOT NULL;
+  ON asset(hash);
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_asset_external_path
-  ON asset(external_path)
-  WHERE type = 'linked_external' AND external_path IS NOT NULL;
-
-CREATE INDEX IF NOT EXISTS idx_asset_type ON asset(type);
 CREATE INDEX IF NOT EXISTS idx_asset_created_at ON asset(created_at DESC);
 
 CREATE TABLE IF NOT EXISTS virtual_folder (
@@ -78,13 +68,6 @@ CREATE TABLE IF NOT EXISTS tag (
   UNIQUE (group_id, name)
 );
 
-CREATE TABLE IF NOT EXISTS asset_tag (
-  asset_id    TEXT NOT NULL REFERENCES asset(id) ON DELETE CASCADE,
-  tag_id      TEXT NOT NULL REFERENCES tag(id) ON DELETE CASCADE,
-  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-  PRIMARY KEY (asset_id, tag_id)
-);
-
 CREATE TABLE IF NOT EXISTS session_preset (
   id          TEXT PRIMARY KEY NOT NULL,
   name        TEXT NOT NULL UNIQUE,
@@ -101,6 +84,7 @@ CREATE TABLE IF NOT EXISTS session_step_preset (
   name                     TEXT NOT NULL,
   default_duration_seconds INTEGER,
   result_required          INTEGER NOT NULL DEFAULT 0 CHECK (result_required IN (0, 1)),
+  result_external_path     TEXT,
   created_at               TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at               TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE (preset_id, step_order)
@@ -113,28 +97,14 @@ CREATE TABLE IF NOT EXISTS session_step_preset_tag (
   PRIMARY KEY (step_preset_id, tag_id)
 );
 
-CREATE TABLE IF NOT EXISTS session (
-  id          TEXT PRIMARY KEY NOT NULL,
-  preset_id   TEXT REFERENCES session_preset(id) ON DELETE SET NULL,
-  title       TEXT NOT NULL,
-  started_at  TEXT,
-  finished_at TEXT,
-  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE INDEX IF NOT EXISTS idx_session_created_at ON session(created_at DESC);
-
 CREATE TABLE IF NOT EXISTS croquis_record (
   id                       TEXT PRIMARY KEY NOT NULL,
   source_asset_id          TEXT REFERENCES asset(id) ON DELETE SET NULL,
   result_asset_id          TEXT REFERENCES asset(id) ON DELETE SET NULL,
-  session_id               TEXT REFERENCES session(id) ON DELETE SET NULL,
-  step_index               INTEGER,
-  step_name                TEXT,
   title                    TEXT NOT NULL DEFAULT '',
   note                     TEXT NOT NULL DEFAULT '',
   target_duration_seconds  INTEGER,
+  actual_duration_seconds  REAL,
   started_at               TEXT,
   finished_at              TEXT,
   finalized_at             TEXT,
@@ -144,9 +114,6 @@ CREATE TABLE IF NOT EXISTS croquis_record (
 
 CREATE INDEX IF NOT EXISTS idx_croquis_record_created_at
   ON croquis_record(created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_croquis_record_session_id
-  ON croquis_record(session_id);
 
 CREATE INDEX IF NOT EXISTS idx_croquis_record_source_asset_id
   ON croquis_record(source_asset_id);
