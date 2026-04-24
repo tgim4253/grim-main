@@ -13,6 +13,7 @@
 
   * {
     box-sizing: border-box;
+    -webkit-user-drag: none;
   }
 
   html,
@@ -23,7 +24,8 @@
 
   body {
     margin: 0;
-    user-select: text;
+    user-select: none;
+    -webkit-user-select: none;
     background: var(--semantic-colors-surface-primary);
   }
 
@@ -32,6 +34,13 @@
   textarea,
   select {
     font: inherit;
+  }
+
+  input,
+  textarea,
+  select {
+    user-select: text;
+    -webkit-user-select: text;
   }
 
   button {

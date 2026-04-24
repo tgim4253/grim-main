@@ -1,0 +1,20 @@
+@layer app {
+  .app-top-bar {
+    --_app-top-bar-traffic-light-ring: color-mix(
+      in srgb,
+      var(--primitives-colors-black) 24%,
+      transparent
+    );
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    min-height: 32px;
+    height: 32px;
+    padding: 0 17px;
+    border-bottom: 1px solid var(--semantic-colors-border-primary);
+    box-sizing: border-box;
+    background: var(--semantic-colors-surface-toolbar);
+    user-select: none;
+  }
+}
