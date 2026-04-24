@@ -7,6 +7,7 @@ type SidebarPanelProps = {
   title?: string;
   actions?: ReactNode;
   children?: ReactNode;
+  collapsed?: boolean;
   className?: string;
   bodyClassName?: string;
 };
@@ -16,14 +17,19 @@ export function SidebarPanel({
   title,
   actions,
   children,
+  collapsed = false,
   className,
   bodyClassName,
 }: SidebarPanelProps) {
   return (
-    <aside className={cx('c-sidebar-panel', className)} aria-label={title ?? 'Sidebar panel'}>
+    <aside
+      className={cx('c-sidebar-panel', className)}
+      data-collapsed={collapsed ? 'true' : undefined}
+      aria-label={title ?? 'Sidebar panel'}
+    >
       {rail ? <div className="c-sidebar-panel__rail">{rail}</div> : null}
 
-      <div className={cx('c-sidebar-panel__body', bodyClassName)}>
+      <div className={cx('c-sidebar-panel__body', bodyClassName)} hidden={collapsed}>
         {title || actions ? (
           <header className="c-sidebar-panel__header">
             {title ? <div className="c-sidebar-panel__title">{title}</div> : <div />}

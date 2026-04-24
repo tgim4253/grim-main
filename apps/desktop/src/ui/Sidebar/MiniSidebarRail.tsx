@@ -1,40 +1,35 @@
 import { IconButton } from '../../shared/ui';
 import './mini-sidebar-rail.css';
 
-type PrimaryRailItem = {
+export type PrimaryRailAction =
+  | 'toggle-sidebar-panel'
+  | 'open-search'
+  | 'open-grid'
+  | 'open-favorites';
+
+export type PrimaryRailItem = {
   icon: 'folder-open' | 'search' | 'grid' | 'star';
   label: string;
+  action: PrimaryRailAction;
   active?: boolean;
+  disabled?: boolean;
   iconColor?: 'brand';
   iconHierarchy?: 'primary';
 };
 
-type SecondaryRailItem = {
+export type SecondaryRailItem = {
   icon: 'user' | 'setting';
   label: string;
+  disabled?: boolean;
 };
 
-const PRIMARY_ITEMS: readonly PrimaryRailItem[] = [
-  {
-    icon: 'folder-open',
-    label: 'Library',
-    active: true,
-  },
-  {
-    icon: 'search',
-    label: 'Search',
-  },
-  {
-    icon: 'grid',
-    label: 'Grid',
-  },
-  {
-    icon: 'star',
-    label: 'Favorites',
-  },
-];
+type MiniSidebarRailProps = {
+  primaryItems: readonly PrimaryRailItem[];
+  secondaryItems?: readonly SecondaryRailItem[];
+  onPrimaryAction?: (action: PrimaryRailAction, item: PrimaryRailItem) => void;
+};
 
-const SECONDARY_ITEMS: readonly SecondaryRailItem[] = [
+const DEFAULT_SECONDARY_ITEMS: readonly SecondaryRailItem[] = [
   {
     icon: 'user',
     label: 'Account',
@@ -45,11 +40,15 @@ const SECONDARY_ITEMS: readonly SecondaryRailItem[] = [
   },
 ];
 
-export function MiniSidebarRail() {
+export function MiniSidebarRail({
+  primaryItems,
+  secondaryItems = DEFAULT_SECONDARY_ITEMS,
+  onPrimaryAction,
+}: MiniSidebarRailProps) {
   return (
     <aside className="mini-sidebar-rail" aria-label="Primary navigation">
       <nav className="mini-sidebar-rail__primary" aria-label="Library sections">
-        {PRIMARY_ITEMS.map(item => (
+        {primaryItems.map(item => (
           <IconButton
             key={item.icon}
             aria-label={item.label}
@@ -58,8 +57,10 @@ export function MiniSidebarRail() {
             size="2xl"
             icon={item.icon}
             active={item.active}
+            disabled={item.disabled}
             iconColor={item.iconColor}
             iconHierarchy={item.iconHierarchy}
+            onClick={() => onPrimaryAction?.(item.action, item)}
           />
         ))}
       </nav>
@@ -67,13 +68,14 @@ export function MiniSidebarRail() {
       <div className="mini-sidebar-rail__spacer" aria-hidden="true" />
 
       <div className="mini-sidebar-rail__secondary" aria-label="Window utilities">
-        {SECONDARY_ITEMS.map(item => (
+        {secondaryItems.map(item => (
           <IconButton
             key={item.icon}
             aria-label={item.label}
             title={item.label}
             size="md"
             icon={item.icon}
+            disabled={item.disabled}
           />
         ))}
       </div>

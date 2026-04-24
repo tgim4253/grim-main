@@ -15,6 +15,11 @@
     background: transparent;
   }
 
+  .library-page__sidebar--collapsed {
+    width: 48px;
+    min-width: 48px;
+  }
+
   .library-page__workspace {
     background: var(--semantic-colors-surface-workspace);
   }
@@ -23,6 +28,11 @@
     .library-page__sidebar {
       width: 320px;
       min-width: 320px;
+    }
+
+    .library-page__sidebar--collapsed {
+      width: 48px;
+      min-width: 48px;
     }
   }
 }
