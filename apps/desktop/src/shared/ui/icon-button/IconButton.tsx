@@ -48,7 +48,13 @@ const ICON_SIZE_VARIABLES: Record<IconButtonIconSize, string> = {
   xl: 'var(--semantic-size-icon-xl)',
 };
 
-const DEFAULT_AUTO_ICON_COLOR: IconColor = 'text';
+const resolveAutoIconColor = (kind: IconButtonKind, interactive: boolean): IconColor => {
+  if (kind === 'sidebar' && interactive) {
+    return 'brand';
+  }
+
+  return 'text';
+};
 
 const resolveAutoIconHierarchy = (interactive: boolean): IconHierarchy =>
   interactive ? 'primary' : 'tertiary';
@@ -88,8 +94,9 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
 ) {
   const resolvedSize = size ?? (kind === 'sidebar' ? '2xl' : 'md');
   const resolvedIconSize = iconSize ?? DEFAULT_ICON_SIZES[resolvedSize];
-  const resolvedBaseColor = iconColor === 'auto' ? DEFAULT_AUTO_ICON_COLOR : iconColor;
-  const resolvedInteractiveColor = resolvedBaseColor;
+  const resolvedBaseColor = iconColor === 'auto' ? resolveAutoIconColor(kind, false) : iconColor;
+  const resolvedInteractiveColor =
+    iconColor === 'auto' ? resolveAutoIconColor(kind, true) : iconColor;
   const resolvedBaseHierarchy = iconHierarchy ?? resolveAutoIconHierarchy(false);
   const resolvedInteractiveHierarchy = iconHierarchy ?? resolveAutoIconHierarchy(true);
   const resolvedStyle = {
