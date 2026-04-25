@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM asset_virtual_folder WHERE virtual_folder_id = ?1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "251f1ebd17ca43c1afc23bc9b8fc0449a918bc5102cd3ea4b3ef3838bf52a76e"
+}

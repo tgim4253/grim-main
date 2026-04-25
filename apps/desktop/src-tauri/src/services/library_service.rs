@@ -40,17 +40,9 @@ impl LibraryService {
         }
     }
 
-    pub async fn load_snapshot(&self) -> Result<LibrarySnapshot> {
+    pub async fn load_library_snapshot(&self) -> Result<LibrarySnapshot> {
         let settings = self.settings_service.load_settings().await?;
-        let explorer = ExplorerSnapshot {
-            virtual_folders: self.folder_service.load_virtual_folders().await?,
-            all_assets_count: self.asset_service.count_all_assets().await?,
-            uncategorized_count: self
-                .asset_service
-                .count_uncategorized_assets()
-                .await?,
-            recent_records: self.record_service.list_recent_records(12).await?,
-        };
+        let explorer = self.load_explorer_snapshot().await?;
         let session_presets =
             self.session_service.list_session_presets().await?;
         let tag_groups: Vec<TagGroup> =
@@ -63,6 +55,19 @@ impl LibraryService {
             session_presets,
             tag_groups,
             tags,
+        })
+    }
+
+    pub async fn load_explorer_snapshot(&self) -> Result<ExplorerSnapshot> {
+        Ok(ExplorerSnapshot {
+            virtual_folders: self.folder_service.load_virtual_folders().await?,
+            folder_stats: self.folder_service.load_folder_stats().await?,
+            all_assets_count: self.asset_service.count_all_assets().await?,
+            unassigned_assets_count: self
+                .asset_service
+                .count_unassigned_assets()
+                .await?,
+            recent_records: self.record_service.list_recent_records(12).await?,
         })
     }
 }

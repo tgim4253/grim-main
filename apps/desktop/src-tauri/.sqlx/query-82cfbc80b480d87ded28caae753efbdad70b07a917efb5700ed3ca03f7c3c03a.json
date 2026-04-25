@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO asset\n            (id, hash, file_name, file_size, mime_type, width, height, modified_at, created_at, updated_at)\n            VALUES (?1, ?2, 'source.bmp', 1, 'image/bmp', 1, 1, NULL, 'now', 'now')\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "82cfbc80b480d87ded28caae753efbdad70b07a917efb5700ed3ca03f7c3c03a"
+}

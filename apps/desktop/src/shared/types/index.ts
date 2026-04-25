@@ -32,6 +32,7 @@ export type {
   DeleteVirtualFolderPayload,
   ExplorerSection,
   ExplorerSnapshot,
+  FolderStats,
   FinalizeCroquisRecordPayload,
   ImportRequest,
   ImportResult,
@@ -55,4 +56,5 @@ export type {
   UpdateAssetTagsPayload,
   UpdateCroquisRecordTagsPayload,
   VirtualFolder,
+  VirtualFolderKind,
 } from './library';

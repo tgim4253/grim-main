@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            WITH RECURSIVE parent_chain(id, parent_id) AS (\n                SELECT id, parent_id\n                FROM virtual_folder\n                WHERE id = ?1\n                UNION ALL\n                SELECT vf.id, vf.parent_id\n                FROM virtual_folder vf\n                INNER JOIN parent_chain pc ON vf.id = pc.parent_id\n            )\n            SELECT COUNT(*) AS \"count!: i64\"\n            FROM parent_chain\n            WHERE id = ?2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7d874f7fdfec556cebec8935c1e14cdc0b6cc06549409482999897ce6af1184e"
+}

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT virtual_folder_id\n            FROM asset_virtual_folder\n            WHERE asset_id = ?1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "virtual_folder_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ab57ae981fc2ef18622202fbaa8934cb86b52f506dc9a5a469f2ad3897edb699"
+}

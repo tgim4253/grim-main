@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT OR IGNORE INTO virtual_folder\n            (id, name, parent_id, full_path, alias, kind, sort_order, created_at, updated_at)\n            VALUES (?1, ?2, ?3, '', NULL, ?4, -1, ?5, ?5)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "d0d79952ef786ff1fd24e0ef3b740e90ee3f40c3d9c6b0e89dc71cacc92d3466"
+}

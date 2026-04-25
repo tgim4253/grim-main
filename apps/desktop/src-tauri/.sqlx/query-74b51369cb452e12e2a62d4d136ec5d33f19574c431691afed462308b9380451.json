@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO asset_virtual_folder\n                (asset_id, virtual_folder_id, source_type, created_at)\n                VALUES (?1, ?2, 'manual', 'now')\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "74b51369cb452e12e2a62d4d136ec5d33f19574c431691afed462308b9380451"
+}

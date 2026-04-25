@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                    INSERT INTO virtual_folder\n                    (id, name, parent_id, full_path, alias, kind, sort_order, created_at, updated_at)\n                    VALUES (?1, ?2, ?3, '', ?4, 'user', 0, ?5, ?5)\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "ea4b9be2da76b2d1fd8c678ad6b20bf8c6ee5782c4ffbf369e33fd78110dcbc1"
+}

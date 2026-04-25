@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT OR IGNORE INTO asset_virtual_folder\n            (asset_id, virtual_folder_id, source_type, created_at)\n            SELECT asset_id, ?2, source_type, created_at\n            FROM asset_virtual_folder\n            WHERE virtual_folder_id = ?1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "e9fc0712c73ec1fa32887211f014a71c4f9b4ef17531eb671247ab4a78751483"
+}

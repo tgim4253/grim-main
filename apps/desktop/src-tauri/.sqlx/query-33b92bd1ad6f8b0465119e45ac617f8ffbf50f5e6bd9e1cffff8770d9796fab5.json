@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT vf.id,\n                   vf.parent_id,\n                   vf.name,\n                   vf.full_path,\n                   vf.alias,\n                   vf.sort_order,\n                   vf.created_at,\n                   vf.updated_at\n            FROM virtual_folder vf\n            INNER JOIN asset_virtual_folder avf ON avf.virtual_folder_id = vf.id\n            WHERE avf.asset_id = ?1\n            ORDER BY vf.full_path ASC\n            ",
+  "query": "\n            SELECT vf.id,\n                   vf.parent_id,\n                   vf.name,\n                   vf.full_path,\n                   vf.alias,\n                   vf.kind,\n                   vf.sort_order,\n                   vf.created_at,\n                   vf.updated_at\n            FROM virtual_folder vf\n            INNER JOIN asset_virtual_folder avf ON avf.virtual_folder_id = vf.id\n            WHERE avf.asset_id = ?1\n            ORDER BY vf.full_path ASC\n            ",
   "describe": {
     "columns": [
       {
@@ -29,18 +29,23 @@
         "type_info": "Text"
       },
       {
-        "name": "sort_order",
+        "name": "kind",
         "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "sort_order",
+        "ordinal": 6,
         "type_info": "Integer"
       },
       {
         "name": "created_at",
-        "ordinal": 6,
+        "ordinal": 7,
         "type_info": "Text"
       },
       {
         "name": "updated_at",
-        "ordinal": 7,
+        "ordinal": 8,
         "type_info": "Text"
       }
     ],
@@ -55,8 +60,9 @@
       true,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "0081d16d9b755c3f1fc79c65011aa68965517dcfb493b33536d1914cd171f1d4"
+  "hash": "33b92bd1ad6f8b0465119e45ac617f8ffbf50f5e6bd9e1cffff8770d9796fab5"
 }

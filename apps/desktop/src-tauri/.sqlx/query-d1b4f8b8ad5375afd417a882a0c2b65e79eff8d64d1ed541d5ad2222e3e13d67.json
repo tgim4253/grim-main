@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT kind\n                FROM virtual_folder\n                WHERE id = ?1\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "kind",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d1b4f8b8ad5375afd417a882a0c2b65e79eff8d64d1ed541d5ad2222e3e13d67"
+}
