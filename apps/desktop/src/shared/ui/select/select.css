@@ -9,10 +9,10 @@
 
   .c-select__label {
     color: var(--semantic-colors-text-secondary);
-    font-family: var(--primitives-typography-font-family-ui);
-    font-size: var(--primitives-typography-font-size-md);
-    font-weight: var(--primitives-typography-font-weight-medium);
-    line-height: 20px;
+    font-family: var(--components-typography-control-label-font-family);
+    font-size: var(--components-typography-control-label-font-size);
+    font-weight: var(--components-typography-control-label-font-weight);
+    line-height: var(--components-typography-control-label-line-height);
   }
 
   .c-select__trigger {
@@ -97,10 +97,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-family: var(--primitives-typography-font-family-ui);
-    font-size: var(--primitives-typography-font-size-lg);
-    font-weight: var(--primitives-typography-font-weight-normal);
-    line-height: 24px;
+    font-family: var(--components-typography-control-value-font-family);
+    font-size: var(--components-typography-control-value-font-size);
+    font-weight: var(--components-typography-control-value-font-weight);
+    line-height: var(--components-typography-control-value-line-height);
   }
 
   .c-select__value {
@@ -117,10 +117,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-family: var(--primitives-typography-font-family-ui);
-    font-size: var(--primitives-typography-font-size-lg);
-    font-weight: var(--primitives-typography-font-weight-normal);
-    line-height: 24px;
+    font-family: var(--components-typography-control-value-font-family);
+    font-size: var(--components-typography-control-value-font-size);
+    font-weight: var(--components-typography-control-value-font-weight);
+    line-height: var(--components-typography-control-value-line-height);
   }
 
   .c-select__supporting {

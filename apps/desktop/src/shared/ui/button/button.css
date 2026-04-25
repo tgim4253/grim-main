@@ -9,9 +9,10 @@
     --_button-padding-x: var(--components-button-base-size-md-padding-x);
     --_button-padding-y: var(--components-button-base-size-md-padding-y);
     --_button-radius: var(--components-button-base-size-md-radius);
+    --_button-font-family: var(--components-button-base-size-md-font-family);
     --_button-font-size: var(--components-button-base-size-md-font-size);
     --_button-font-weight: var(--components-button-base-size-md-font-weight);
-    --_button-line-height: 24px;
+    --_button-line-height: var(--components-button-base-size-md-line-height);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -24,7 +25,7 @@
     background: var(--_button-background);
     box-shadow: var(--effects-shadow-xs);
     color: var(--_button-text);
-    font-family: var(--primitives-typography-font-family-ui);
+    font-family: var(--_button-font-family);
     font-size: var(--_button-font-size);
     font-weight: var(--_button-font-weight);
     line-height: var(--_button-line-height);
@@ -56,9 +57,10 @@
     --_button-padding-x: var(--components-button-base-size-sm-padding-x);
     --_button-padding-y: var(--components-button-base-size-sm-padding-y);
     --_button-radius: var(--components-button-base-size-sm-radius);
+    --_button-font-family: var(--components-button-base-size-sm-font-family);
     --_button-font-size: var(--components-button-base-size-sm-font-size);
     --_button-font-weight: var(--components-button-base-size-sm-font-weight);
-    --_button-line-height: 20px;
+    --_button-line-height: var(--components-button-base-size-sm-line-height);
   }
 
   .c-button--size-md {
@@ -66,9 +68,10 @@
     --_button-padding-x: var(--components-button-base-size-md-padding-x);
     --_button-padding-y: var(--components-button-base-size-md-padding-y);
     --_button-radius: var(--components-button-base-size-md-radius);
+    --_button-font-family: var(--components-button-base-size-md-font-family);
     --_button-font-size: var(--components-button-base-size-md-font-size);
     --_button-font-weight: var(--components-button-base-size-md-font-weight);
-    --_button-line-height: 24px;
+    --_button-line-height: var(--components-button-base-size-md-line-height);
   }
 
   .c-button--size-lg {
@@ -76,9 +79,10 @@
     --_button-padding-x: var(--components-button-base-size-lg-padding-x);
     --_button-padding-y: var(--components-button-base-size-lg-padding-y);
     --_button-radius: var(--components-button-base-size-lg-radius);
+    --_button-font-family: var(--components-button-base-size-lg-font-family);
     --_button-font-size: var(--components-button-base-size-lg-font-size);
     --_button-font-weight: var(--components-button-base-size-lg-font-weight);
-    --_button-line-height: 24px;
+    --_button-line-height: var(--components-button-base-size-lg-line-height);
   }
 
   .c-button--variant-primary {

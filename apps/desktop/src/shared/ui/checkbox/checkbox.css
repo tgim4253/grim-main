@@ -93,13 +93,10 @@
 
   .c-checkbox-row__label {
     min-width: 0;
-    font-family: var(--semantic-typography-body-base-font-family);
-    font-size: var(--semantic-typography-body-base-font-size);
-    font-weight: var(--semantic-typography-body-base-font-weight);
-    line-height: calc(
-      var(--semantic-typography-body-base-font-size) *
-        var(--semantic-typography-body-base-line-height)
-    );
+    font-family: var(--components-typography-checkbox-label-font-family);
+    font-size: var(--components-typography-checkbox-label-font-size);
+    font-weight: var(--components-typography-checkbox-label-font-weight);
+    line-height: var(--components-typography-checkbox-label-line-height);
     color: inherit;
   }
 

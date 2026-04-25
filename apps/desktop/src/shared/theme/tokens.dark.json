@@ -746,6 +746,242 @@
     }
   },
   "components": {
+    "typography": {
+      "app": {
+        "kicker": {
+          "font-family": {
+            "$value": "{semantic.typography.body.small.font-family}",
+            "$type": "fontFamily"
+          },
+          "font-size": {
+            "$value": "{semantic.typography.body.small.font-size}",
+            "$type": "fontSize"
+          },
+          "font-weight": {
+            "$value": "{primitives.typography.font-weight.medium}",
+            "$type": "fontWeight"
+          },
+          "line-height": {
+            "$value": "{semantic.typography.body.small.line-height}",
+            "$type": "lineHeight"
+          },
+          "letter-spacing": {
+            "$value": "0.12em",
+            "$type": "letterSpacing"
+          }
+        }
+      },
+      "accordion": {
+        "meta": {
+          "font-family": {
+            "$value": "{primitives.typography.font-family.mono}",
+            "$type": "fontFamily"
+          },
+          "font-size": {
+            "$value": "{primitives.typography.font-size.xs}",
+            "$type": "fontSize"
+          },
+          "font-weight": {
+            "$value": "{primitives.typography.font-weight.normal}",
+            "$type": "fontWeight"
+          },
+          "line-height": {
+            "$value": "{primitives.typography.line-height.normal}",
+            "$type": "lineHeight"
+          }
+        },
+        "title": {
+          "font-family": {
+            "$value": "{semantic.typography.body.base.font-family}",
+            "$type": "fontFamily"
+          },
+          "font-size": {
+            "$value": "{semantic.typography.body.base.font-size}",
+            "$type": "fontSize"
+          },
+          "font-weight": {
+            "$value": "{primitives.typography.font-weight.medium}",
+            "$type": "fontWeight"
+          },
+          "line-height": {
+            "$value": 1.4285714286,
+            "$type": "lineHeight"
+          }
+        }
+      },
+      "control": {
+        "label": {
+          "font-family": {
+            "$value": "{semantic.typography.body.base.font-family}",
+            "$type": "fontFamily"
+          },
+          "font-size": {
+            "$value": "{semantic.typography.body.base.font-size}",
+            "$type": "fontSize"
+          },
+          "font-weight": {
+            "$value": "{primitives.typography.font-weight.medium}",
+            "$type": "fontWeight"
+          },
+          "line-height": {
+            "$value": 1.4285714286,
+            "$type": "lineHeight"
+          }
+        },
+        "value": {
+          "font-family": {
+            "$value": "{semantic.typography.body.large.font-family}",
+            "$type": "fontFamily"
+          },
+          "font-size": {
+            "$value": "{semantic.typography.body.large.font-size}",
+            "$type": "fontSize"
+          },
+          "font-weight": {
+            "$value": "{semantic.typography.body.large.font-weight}",
+            "$type": "fontWeight"
+          },
+          "line-height": {
+            "$value": "{semantic.typography.body.large.line-height}",
+            "$type": "lineHeight"
+          }
+        },
+        "supporting": {
+          "font-family": {
+            "$value": "{semantic.typography.body.small.font-family}",
+            "$type": "fontFamily"
+          },
+          "font-size": {
+            "$value": "{semantic.typography.body.small.font-size}",
+            "$type": "fontSize"
+          },
+          "font-weight": {
+            "$value": "{semantic.typography.body.small.font-weight}",
+            "$type": "fontWeight"
+          },
+          "line-height": {
+            "$value": "{semantic.typography.body.small.line-height}",
+            "$type": "lineHeight"
+          }
+        }
+      },
+      "modal": {
+        "title": {
+          "font-family": {
+            "$value": "{primitives.typography.font-family.ui}",
+            "$type": "fontFamily"
+          },
+          "font-size": {
+            "$value": "{primitives.typography.font-size.lg-plus}",
+            "$type": "fontSize"
+          },
+          "font-weight": {
+            "$value": "{primitives.typography.font-weight.medium}",
+            "$type": "fontWeight"
+          },
+          "line-height": {
+            "$value": 1.5555555556,
+            "$type": "lineHeight"
+          }
+        }
+      },
+      "chip": {
+        "rounded": {
+          "font-family": {
+            "$value": "{primitives.typography.font-family.ui}",
+            "$type": "fontFamily"
+          },
+          "font-size": {
+            "$value": "{primitives.typography.font-size.2xs}",
+            "$type": "fontSize"
+          },
+          "font-weight": {
+            "$value": "{primitives.typography.font-weight.medium}",
+            "$type": "fontWeight"
+          },
+          "line-height": {
+            "$value": "{primitives.typography.line-height.normal}",
+            "$type": "lineHeight"
+          }
+        },
+        "pill": {
+          "font-family": {
+            "$value": "{primitives.typography.font-family.ui}",
+            "$type": "fontFamily"
+          },
+          "font-size": {
+            "$value": "{primitives.typography.font-size.2xs}",
+            "$type": "fontSize"
+          },
+          "font-weight": {
+            "$value": "{primitives.typography.font-weight.semibold}",
+            "$type": "fontWeight"
+          },
+          "line-height": {
+            "$value": "{primitives.typography.line-height.normal}",
+            "$type": "lineHeight"
+          }
+        },
+        "accent": {
+          "font-family": {
+            "$value": "{primitives.typography.font-family.ui}",
+            "$type": "fontFamily"
+          },
+          "font-size": {
+            "$value": "{primitives.typography.font-size.3xs}",
+            "$type": "fontSize"
+          },
+          "font-weight": {
+            "$value": "{primitives.typography.font-weight.semibold}",
+            "$type": "fontWeight"
+          },
+          "line-height": {
+            "$value": "{primitives.typography.line-height.normal}",
+            "$type": "lineHeight"
+          }
+        }
+      },
+      "checkbox": {
+        "label": {
+          "font-family": {
+            "$value": "{semantic.typography.body.base.font-family}",
+            "$type": "fontFamily"
+          },
+          "font-size": {
+            "$value": "{semantic.typography.body.base.font-size}",
+            "$type": "fontSize"
+          },
+          "font-weight": {
+            "$value": "{semantic.typography.body.base.font-weight}",
+            "$type": "fontWeight"
+          },
+          "line-height": {
+            "$value": "{semantic.typography.body.base.line-height}",
+            "$type": "lineHeight"
+          }
+        }
+      },
+      "sidebar-panel": {
+        "title": {
+          "font-family": {
+            "$value": "{semantic.typography.body.small.font-family}",
+            "$type": "fontFamily"
+          },
+          "font-size": {
+            "$value": "{semantic.typography.body.small.font-size}",
+            "$type": "fontSize"
+          },
+          "font-weight": {
+            "$value": "{primitives.typography.font-weight.bold}",
+            "$type": "fontWeight"
+          },
+          "line-height": {
+            "$value": "{semantic.typography.body.small.line-height}",
+            "$type": "lineHeight"
+          }
+        }
+      }
+    },
     "button": {
       "primary": {
         "background": {
@@ -1023,6 +1259,10 @@
             "$value": "{primitives.radius.05}",
             "$type": "borderRadius"
           },
+          "font-family": {
+            "$value": "{semantic.typography.body.small.font-family}",
+            "$type": "fontFamily"
+          },
           "font-size": {
             "$value": "{semantic.typography.body.small.font-size}",
             "$type": "fontSize"
@@ -1030,6 +1270,10 @@
           "font-weight": {
             "$value": "{primitives.typography.font-weight.medium}",
             "$type": "fontWeight"
+          },
+          "line-height": {
+            "$value": 1.6666666667,
+            "$type": "lineHeight"
           }
         },
         "md": {
@@ -1049,6 +1293,10 @@
             "$value": "{primitives.radius.05}",
             "$type": "borderRadius"
           },
+          "font-family": {
+            "$value": "{semantic.typography.body.base.font-family}",
+            "$type": "fontFamily"
+          },
           "font-size": {
             "$value": "{semantic.typography.body.base.font-size}",
             "$type": "fontSize"
@@ -1056,6 +1304,10 @@
           "font-weight": {
             "$value": "{primitives.typography.font-weight.medium}",
             "$type": "fontWeight"
+          },
+          "line-height": {
+            "$value": 1.7142857143,
+            "$type": "lineHeight"
           }
         },
         "lg": {
@@ -1075,6 +1327,10 @@
             "$value": "{primitives.radius.05}",
             "$type": "borderRadius"
           },
+          "font-family": {
+            "$value": "{semantic.typography.body.large.font-family}",
+            "$type": "fontFamily"
+          },
           "font-size": {
             "$value": "{semantic.typography.body.large.font-size}",
             "$type": "fontSize"
@@ -1082,6 +1338,10 @@
           "font-weight": {
             "$value": "{primitives.typography.font-weight.medium}",
             "$type": "fontWeight"
+          },
+          "line-height": {
+            "$value": "{semantic.typography.body.large.line-height}",
+            "$type": "lineHeight"
           }
         }
       }

@@ -62,19 +62,19 @@
   .c-accordion-item__index {
     flex: 0 0 auto;
     color: var(--semantic-colors-text-secondary);
-    font-family: var(--primitives-typography-font-family-mono);
-    font-size: var(--type-text-2xs-size);
-    font-weight: var(--primitives-typography-font-weight-normal);
-    line-height: var(--type-text-2xs-line-height);
+    font-family: var(--components-typography-accordion-meta-font-family);
+    font-size: var(--components-typography-accordion-meta-font-size);
+    font-weight: var(--components-typography-accordion-meta-font-weight);
+    line-height: var(--components-typography-accordion-meta-line-height);
   }
 
   .c-accordion-item__title {
     min-width: 0;
     color: var(--semantic-colors-text-primary);
-    font-family: var(--primitives-typography-font-family-ui);
-    font-size: var(--primitives-typography-font-size-md);
-    font-weight: var(--primitives-typography-font-weight-medium);
-    line-height: 20px;
+    font-family: var(--components-typography-accordion-title-font-family);
+    font-size: var(--components-typography-accordion-title-font-size);
+    font-weight: var(--components-typography-accordion-title-font-weight);
+    line-height: var(--components-typography-accordion-title-line-height);
   }
 
   .c-accordion-item[data-expanded='true'] .c-accordion-item__title {
@@ -105,10 +105,10 @@
   .c-accordion-disclosure__value {
     min-width: 0;
     color: inherit;
-    font-family: var(--primitives-typography-font-family-mono);
-    font-size: var(--type-text-2xs-size);
-    font-weight: var(--primitives-typography-font-weight-normal);
-    line-height: var(--type-text-2xs-line-height);
+    font-family: var(--components-typography-accordion-meta-font-family);
+    font-size: var(--components-typography-accordion-meta-font-size);
+    font-weight: var(--components-typography-accordion-meta-font-weight);
+    line-height: var(--components-typography-accordion-meta-line-height);
     white-space: nowrap;
   }
 

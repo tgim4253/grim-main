@@ -36,10 +36,10 @@
 
   .c-sidebar-panel__title {
     color: var(--semantic-colors-text-teritary);
-    font-family: var(--semantic-typography-body-small-font-family);
-    font-size: var(--semantic-typography-body-small-font-size);
-    font-weight: var(--primitives-typography-font-weight-bold);
-    line-height: calc(var(--semantic-typography-body-small-font-size) * 1.5);
+    font-family: var(--components-typography-sidebar-panel-title-font-family);
+    font-size: var(--components-typography-sidebar-panel-title-font-size);
+    font-weight: var(--components-typography-sidebar-panel-title-font-weight);
+    line-height: var(--components-typography-sidebar-panel-title-line-height);
     text-transform: uppercase;
   }
 
