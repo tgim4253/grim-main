@@ -22,7 +22,6 @@ export type {
   AssetDetail,
   AssetListSource,
   AssetSummary,
-  AssetType,
   CroquisRecordDetail,
   CroquisRecordSummary,
   DeleteCroquisRecordPayload,

@@ -257,6 +257,7 @@ impl AssetRepository {
                 .into_iter()
                 .map(record_summary_from_row)
                 .collect::<Vec<CroquisRecordSummary>>(),
+            last_croquis_at: None,
         })
     }
 

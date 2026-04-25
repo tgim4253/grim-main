@@ -107,6 +107,8 @@ pub(crate) fn asset_from_row(row: AssetRow) -> AssetSummary {
     AssetSummary {
         id: row.id,
         hash: row.hash,
+        storage_path: None,
+        thumbnail_path: None,
         file_name: row.file_name,
         file_size: row.file_size,
         mime_type: row.mime_type,
