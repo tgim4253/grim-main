@@ -1,0 +1,68 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id, parent_id, name, full_path, alias, kind, sort_order, created_at, updated_at\n            FROM virtual_folder\n            WHERE name LIKE ?1 OR full_path LIKE ?1 OR COALESCE(alias, '') LIKE ?1\n            ORDER BY full_path ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "parent_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "full_path",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "alias",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "kind",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "sort_order",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 8,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "1edf9edf72ad9d45c5a3f6dfff004e71cee05a60b7563a9987daa9569aebbb66"
+}

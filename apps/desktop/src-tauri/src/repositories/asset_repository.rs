@@ -49,7 +49,7 @@ impl AssetRepository {
         Ok(row.count)
     }
 
-    pub async fn count_uncategorized(&self) -> Result<i64> {
+    pub async fn count_unassigned_assets(&self) -> Result<i64> {
         let row = sqlx::query!(
             r#"
             SELECT COUNT(*) AS "count!: i64"
@@ -62,7 +62,7 @@ impl AssetRepository {
         Ok(row.count)
     }
 
-    pub async fn list(
+    pub async fn list_by_source(
         &self,
         source: AssetListSource,
     ) -> Result<Vec<AssetSummary>> {
@@ -134,6 +134,40 @@ impl AssetRepository {
                 .fetch_all(&self.pool)
                 .await?
             }
+            AssetListSource::FolderDescendants { folder_id } => {
+                sqlx::query_as!(
+                    AssetRow,
+                    r#"
+                    WITH RECURSIVE folder_tree(id) AS (
+                        SELECT id
+                        FROM virtual_folder
+                        WHERE id = ?1
+                        UNION ALL
+                        SELECT vf.id
+                        FROM virtual_folder vf
+                        INNER JOIN folder_tree ft ON vf.parent_id = ft.id
+                    )
+                    SELECT DISTINCT
+                           a.id,
+                           a.hash,
+                           a.file_name,
+                           a.file_size,
+                           a.mime_type,
+                           a.width,
+                           a.height,
+                           a.modified_at,
+                           a.created_at,
+                           a.updated_at
+                    FROM asset a
+                    INNER JOIN asset_virtual_folder avf ON avf.asset_id = a.id
+                    WHERE avf.virtual_folder_id IN (SELECT id FROM folder_tree)
+                    ORDER BY a.updated_at DESC, a.created_at DESC
+                    "#,
+                    folder_id
+                )
+                .fetch_all(&self.pool)
+                .await?
+            }
         };
 
         Ok(rows.into_iter().map(asset_from_row).collect())
@@ -175,6 +209,7 @@ impl AssetRepository {
                    vf.name,
                    vf.full_path,
                    vf.alias,
+                   vf.kind,
                    vf.sort_order,
                    vf.created_at,
                    vf.updated_at
@@ -262,6 +297,39 @@ impl AssetRepository {
             assets.push(self.get_summary(asset_id).await?);
         }
         Ok(assets)
+    }
+
+    pub async fn load_assigned_folders_in_tx(
+        &self,
+        tx: &mut Transaction<'_, Sqlite>,
+        asset_id: &str,
+    ) -> Result<Vec<VirtualFolder>> {
+        let folder_rows = sqlx::query_as!(
+            VirtualFolderRow,
+            r#"
+            SELECT vf.id,
+                   vf.parent_id,
+                   vf.name,
+                   vf.full_path,
+                   vf.alias,
+                   vf.kind,
+                   vf.sort_order,
+                   vf.created_at,
+                   vf.updated_at
+            FROM virtual_folder vf
+            INNER JOIN asset_virtual_folder avf ON avf.virtual_folder_id = vf.id
+            WHERE avf.asset_id = ?1
+            ORDER BY vf.full_path ASC
+            "#,
+            asset_id
+        )
+        .fetch_all(&mut **tx)
+        .await?;
+
+        Ok(folder_rows
+            .into_iter()
+            .map(folder_from_row)
+            .collect::<Vec<VirtualFolder>>())
     }
 
     pub async fn insert_imported_in_tx(

@@ -36,10 +36,13 @@ export interface VirtualFolder {
   name: string;
   fullPath: string;
   alias?: string | null;
+  kind: VirtualFolderKind;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
 }
+
+export type VirtualFolderKind = 'user' | 'system_uncategorized';
 
 export type ExplorerSection =
   | 'virtualFolders'
@@ -124,7 +127,15 @@ export interface CroquisRecordDetail {
 export type AssetListSource =
   | { kind: 'allAssets' }
   | { kind: 'uncategorized' }
-  | { kind: 'folder'; folderId: string };
+  | { kind: 'folder'; folderId: string }
+  | { kind: 'folderDescendants'; folderId: string };
+
+export interface FolderStats {
+  folderId: string;
+  directAssetCount: number;
+  descendantAssetCount: number;
+  childCount: number;
+}
 
 export interface ImportRequest {
   filePaths: string[];
@@ -276,10 +287,10 @@ export interface SessionDetail {
 
 export interface ExplorerSnapshot {
   virtualFolders: VirtualFolder[];
+  folderStats: FolderStats[];
   allAssetsCount: number;
-  uncategorizedCount: number;
+  unassignedAssetsCount: number;
   recentRecords: CroquisRecordSummary[];
-  recentSessions: SessionSummary[];
 }
 
 export interface LibrarySnapshot {

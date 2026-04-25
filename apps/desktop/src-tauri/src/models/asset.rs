@@ -38,6 +38,7 @@ pub enum AssetListSource {
     AllAssets,
     Uncategorized,
     Folder { folder_id: String },
+    FolderDescendants { folder_id: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

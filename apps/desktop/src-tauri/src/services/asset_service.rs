@@ -1,6 +1,10 @@
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{anyhow, Context, Result};
+use sqlx::{Sqlite, Transaction};
 use tokio::fs;
 
 use crate::{
@@ -8,7 +12,7 @@ use crate::{
         AssetDetail, AssetListSource, AssetSummary, ImportRequest,
         ImportResult, UpdateAssetFoldersPayload,
     },
-    repositories::{AssetRepository, NewImportedAssetInput},
+    repositories::{AssetRepository, FolderRepository, NewImportedAssetInput},
     services::LibraryStorage,
     utils::{
         date::get_now_date, file_ops::ensure_unique_path,
@@ -19,30 +23,38 @@ use crate::{
 #[derive(Clone)]
 pub struct AssetService {
     asset_repository: AssetRepository,
+    folder_repository: FolderRepository,
     library_storage: LibraryStorage,
+}
+
+#[derive(Clone, Copy)]
+enum AssetFolderAssignmentMode {
+    Replace,
+    Append,
 }
 
 impl AssetService {
     pub fn new(
         asset_repository: AssetRepository,
+        folder_repository: FolderRepository,
         library_storage: LibraryStorage,
     ) -> Self {
-        Self { asset_repository, library_storage }
+        Self { asset_repository, folder_repository, library_storage }
     }
 
     pub async fn count_all_assets(&self) -> Result<i64> {
         self.asset_repository.count_all().await
     }
 
-    pub async fn count_uncategorized_assets(&self) -> Result<i64> {
-        self.asset_repository.count_uncategorized().await
+    pub async fn count_unassigned_assets(&self) -> Result<i64> {
+        self.asset_repository.count_unassigned_assets().await
     }
 
     pub async fn list_assets(
         &self,
         source: AssetListSource,
     ) -> Result<Vec<AssetSummary>> {
-        self.asset_repository.list(source).await
+        self.asset_repository.list_by_source(source).await
     }
 
     pub async fn get_asset(&self, asset_id: &str) -> Result<AssetDetail> {
@@ -54,16 +66,82 @@ impl AssetService {
         payload: UpdateAssetFoldersPayload,
     ) -> Result<AssetDetail> {
         let asset_id = payload.asset_id.clone();
+        self.apply_asset_folder_assignments(
+            &asset_id,
+            &payload.virtual_folder_ids,
+            AssetFolderAssignmentMode::Replace,
+        )
+        .await?;
+        self.asset_repository.get_detail(&asset_id).await
+    }
+
+    async fn apply_asset_folder_assignments(
+        &self,
+        asset_id: &str,
+        virtual_folder_ids: &[String],
+        mode: AssetFolderAssignmentMode,
+    ) -> Result<()> {
         let mut tx = self.asset_repository.begin().await?;
-        self.asset_repository
-            .replace_folders_in_tx(
-                &mut tx,
-                &asset_id,
-                &payload.virtual_folder_ids,
+        self.apply_asset_folder_assignments_in_tx(
+            &mut tx,
+            asset_id,
+            virtual_folder_ids,
+            mode,
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    async fn apply_asset_folder_assignments_in_tx(
+        &self,
+        tx: &mut Transaction<'_, Sqlite>,
+        asset_id: &str,
+        virtual_folder_ids: &[String],
+        mode: AssetFolderAssignmentMode,
+    ) -> Result<()> {
+        let old_folders = self
+            .asset_repository
+            .load_assigned_folders_in_tx(tx, asset_id)
+            .await?;
+        self.folder_repository
+            .validate_assignable_folders_in_tx(tx, virtual_folder_ids)
+            .await?;
+
+        match mode {
+            AssetFolderAssignmentMode::Replace => {
+                self.asset_repository
+                    .replace_folders_in_tx(tx, asset_id, virtual_folder_ids)
+                    .await?;
+            }
+            AssetFolderAssignmentMode::Append => {
+                self.asset_repository
+                    .assign_folders_in_tx(tx, asset_id, virtual_folder_ids)
+                    .await?;
+            }
+        }
+
+        let cleanup_folders = match mode {
+            AssetFolderAssignmentMode::Replace => {
+                let target_ids = virtual_folder_ids
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<HashSet<_>>();
+                old_folders
+                    .into_iter()
+                    .filter(|folder| !target_ids.contains(folder.id.as_str()))
+                    .collect::<Vec<_>>()
+            }
+            AssetFolderAssignmentMode::Append => Vec::new(),
+        };
+        self.folder_repository
+            .cleanup_empty_system_uncategorized_parents_in_tx(
+                tx,
+                &cleanup_folders,
             )
             .await?;
-        tx.commit().await?;
-        self.asset_repository.get_detail(&asset_id).await
+
+        Ok(())
     }
 
     pub async fn reveal_path(&self, path: &Path) -> Result<()> {
@@ -201,15 +279,12 @@ impl AssetService {
         if let Some(existing) =
             self.asset_repository.load_by_hash(&hash).await?
         {
-            let mut tx = self.asset_repository.begin().await?;
-            self.asset_repository
-                .assign_folders_in_tx(
-                    &mut tx,
-                    &existing.id,
-                    &request.virtual_folder_ids,
-                )
-                .await?;
-            tx.commit().await?;
+            self.apply_asset_folder_assignments(
+                &existing.id,
+                &request.virtual_folder_ids,
+                AssetFolderAssignmentMode::Append,
+            )
+            .await?;
             return Ok(Some((
                 self.asset_repository.get_summary(&existing.id).await?,
                 true,
@@ -255,13 +330,13 @@ impl AssetService {
                     },
                 )
                 .await?;
-            self.asset_repository
-                .assign_folders_in_tx(
-                    &mut tx,
-                    &asset_id,
-                    &request.virtual_folder_ids,
-                )
-                .await?;
+            self.apply_asset_folder_assignments_in_tx(
+                &mut tx,
+                &asset_id,
+                &request.virtual_folder_ids,
+                AssetFolderAssignmentMode::Append,
+            )
+            .await?;
             tx.commit().await?;
 
             Ok::<_, anyhow::Error>(asset_id)
@@ -283,5 +358,365 @@ impl AssetService {
                 Err(error)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        fs,
+        path::{Path, PathBuf},
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    use crate::{
+        models::{
+            asset::{ImportRequest, UpdateAssetFoldersPayload},
+            folder::{
+                DeleteVirtualFolderPayload, SaveVirtualFolderPayload,
+                VirtualFolderKind,
+            },
+        },
+        repositories::{AssetRepository, FolderRepository},
+        services::{AssetService, FolderService, LibraryStorage},
+        state::{
+            bootstrap::{ensure_schema, open_or_create_db, seed_defaults},
+            LibraryPaths,
+        },
+        utils::media,
+    };
+
+    const BMP_1X1: &[u8] = &[
+        66, 77, 58, 0, 0, 0, 0, 0, 0, 0, 54, 0, 0, 0, 40, 0, 0, 0, 1, 0, 0, 0,
+        1, 0, 0, 0, 1, 0, 24, 0, 0, 0, 0, 0, 4, 0, 0, 0, 19, 11, 0, 0, 19, 11,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 0, 0, 0,
+    ];
+
+    fn make_temp_dir(prefix: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock should be after unix epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "grim-asset-service-{prefix}-{}-{nanos}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&dir).expect("failed to create temp dir");
+        dir
+    }
+
+    fn storage_for(dir: &Path) -> LibraryStorage {
+        LibraryStorage::new(LibraryPaths {
+            asset_dir: dir.join("assets"),
+            thumb_dir: dir.join("thumbs"),
+            tmp_dir: dir.join("tmp"),
+        })
+    }
+
+    fn path_string(path: &Path) -> String {
+        path.to_string_lossy().into_owned()
+    }
+
+    #[tokio::test]
+    async fn folder_assignment_requires_leaf_folder() {
+        let dir = make_temp_dir("leaf-assignment");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let folder_service =
+            FolderService::new(FolderRepository::new(pool.clone()));
+        let parent = folder_service
+            .save_virtual_folder(SaveVirtualFolderPayload {
+                id: None,
+                name: "Anatomy".to_string(),
+                parent_id: None,
+                alias: None,
+            })
+            .await
+            .expect("failed to save parent folder");
+        let child = folder_service
+            .save_virtual_folder(SaveVirtualFolderPayload {
+                id: None,
+                name: "Musculature".to_string(),
+                parent_id: Some(parent.saved_folder_id.clone()),
+                alias: None,
+            })
+            .await
+            .expect("failed to save child folder");
+
+        let asset_id = "asset-1";
+        sqlx::query!(
+            r#"
+            INSERT INTO asset
+            (id, hash, file_name, file_size, mime_type, width, height, modified_at, created_at, updated_at)
+            VALUES (?1, 'hash-1', 'asset.png', 1, 'image/png', 1, 1, NULL, 'now', 'now')
+            "#,
+            asset_id
+        )
+        .execute(&pool)
+        .await
+        .expect("failed to insert asset");
+
+        let service = AssetService::new(
+            AssetRepository::new(pool.clone()),
+            FolderRepository::new(pool),
+            storage_for(&dir),
+        );
+
+        let parent_result = service
+            .update_asset_folders(UpdateAssetFoldersPayload {
+                asset_id: asset_id.to_string(),
+                virtual_folder_ids: vec![parent.saved_folder_id],
+            })
+            .await;
+        assert!(parent_result.is_err());
+
+        let child_result = service
+            .update_asset_folders(UpdateAssetFoldersPayload {
+                asset_id: asset_id.to_string(),
+                virtual_folder_ids: vec![child.saved_folder_id],
+            })
+            .await;
+        assert!(child_result.is_ok());
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn moving_last_asset_out_of_system_uncategorized_cleans_up_folder() {
+        let dir = make_temp_dir("cleanup-system-child");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let folder_service =
+            FolderService::new(FolderRepository::new(pool.clone()));
+        let parent = folder_service
+            .save_virtual_folder(SaveVirtualFolderPayload {
+                id: None,
+                name: "Anatomy".to_string(),
+                parent_id: None,
+                alias: None,
+            })
+            .await
+            .expect("failed to save parent folder");
+
+        let asset_id = "asset-1";
+        sqlx::query!(
+            r#"
+            INSERT INTO asset
+            (id, hash, file_name, file_size, mime_type, width, height, modified_at, created_at, updated_at)
+            VALUES (?1, 'hash-1', 'asset.png', 1, 'image/png', 1, 1, NULL, 'now', 'now')
+            "#,
+            asset_id
+        )
+        .execute(&pool)
+        .await
+        .expect("failed to insert asset");
+        let parent_folder_id = parent.saved_folder_id.as_str();
+        sqlx::query!(
+            r#"
+            INSERT INTO asset_virtual_folder
+            (asset_id, virtual_folder_id, source_type, created_at)
+            VALUES (?1, ?2, 'manual', 'now')
+            "#,
+            asset_id,
+            parent_folder_id
+        )
+        .execute(&pool)
+        .await
+        .expect("failed to assign asset to parent");
+
+        let child = folder_service
+            .save_virtual_folder(SaveVirtualFolderPayload {
+                id: None,
+                name: "Musculature".to_string(),
+                parent_id: Some(parent.saved_folder_id.clone()),
+                alias: None,
+            })
+            .await
+            .expect("failed to save child folder");
+        folder_service
+            .delete_virtual_folder(DeleteVirtualFolderPayload {
+                folder_id: child.saved_folder_id,
+            })
+            .await
+            .expect("failed to delete child folder");
+
+        let target = folder_service
+            .save_virtual_folder(SaveVirtualFolderPayload {
+                id: None,
+                name: "References".to_string(),
+                parent_id: None,
+                alias: None,
+            })
+            .await
+            .expect("failed to save target folder");
+        let service = AssetService::new(
+            AssetRepository::new(pool.clone()),
+            FolderRepository::new(pool.clone()),
+            storage_for(&dir),
+        );
+        service
+            .update_asset_folders(UpdateAssetFoldersPayload {
+                asset_id: asset_id.to_string(),
+                virtual_folder_ids: vec![target.saved_folder_id],
+            })
+            .await
+            .expect("failed to move asset out of system folder");
+
+        let folders = folder_service
+            .load_virtual_folders()
+            .await
+            .expect("failed to reload folders");
+        assert!(!folders.iter().any(|folder| {
+            folder.parent_id.as_deref() == Some(parent.saved_folder_id.as_str())
+                && folder.kind == VirtualFolderKind::SystemUncategorized
+        }));
+
+        folder_service
+            .delete_virtual_folder(DeleteVirtualFolderPayload {
+                folder_id: parent.saved_folder_id,
+            })
+            .await
+            .expect("failed to delete reverted leaf parent");
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn existing_asset_import_reuse_validates_target_in_assignment_tx() {
+        let dir = make_temp_dir("reuse-import-assignment");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let source_path = dir.join("source.bmp");
+        fs::write(&source_path, BMP_1X1).expect("failed to write test image");
+        let hash = media::hash_file(&source_path)
+            .await
+            .expect("failed to hash test image");
+        let asset_id = "asset-1";
+        sqlx::query!(
+            r#"
+            INSERT INTO asset
+            (id, hash, file_name, file_size, mime_type, width, height, modified_at, created_at, updated_at)
+            VALUES (?1, ?2, 'source.bmp', 1, 'image/bmp', 1, 1, NULL, 'now', 'now')
+            "#,
+            asset_id,
+            hash
+        )
+        .execute(&pool)
+        .await
+        .expect("failed to insert existing asset");
+
+        let folder_service =
+            FolderService::new(FolderRepository::new(pool.clone()));
+        let parent = folder_service
+            .save_virtual_folder(SaveVirtualFolderPayload {
+                id: None,
+                name: "Anatomy".to_string(),
+                parent_id: None,
+                alias: None,
+            })
+            .await
+            .expect("failed to save parent folder");
+        let child = folder_service
+            .save_virtual_folder(SaveVirtualFolderPayload {
+                id: None,
+                name: "Musculature".to_string(),
+                parent_id: Some(parent.saved_folder_id.clone()),
+                alias: None,
+            })
+            .await
+            .expect("failed to save child folder");
+
+        let service = AssetService::new(
+            AssetRepository::new(pool.clone()),
+            FolderRepository::new(pool.clone()),
+            storage_for(&dir),
+        );
+        let parent_result = service
+            .import_images(ImportRequest {
+                file_paths: vec![path_string(&source_path)],
+                virtual_folder_ids: vec![parent.saved_folder_id],
+            })
+            .await;
+        assert!(parent_result.is_err());
+
+        let child_result = service
+            .import_images(ImportRequest {
+                file_paths: vec![path_string(&source_path)],
+                virtual_folder_ids: vec![child.saved_folder_id.clone()],
+            })
+            .await
+            .expect("failed to reuse existing asset");
+        assert_eq!(child_result.imported, 0);
+        assert_eq!(child_result.reused, 1);
+
+        let detail = service.get_asset(asset_id).await.expect("missing asset");
+        assert!(detail
+            .virtual_folders
+            .iter()
+            .any(|folder| folder.id == child.saved_folder_id));
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn new_import_assigns_leaf_folder_through_assignment_helper() {
+        let dir = make_temp_dir("new-import-assignment");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let source_path = dir.join("source.bmp");
+        fs::write(&source_path, BMP_1X1).expect("failed to write test image");
+
+        let folder_service =
+            FolderService::new(FolderRepository::new(pool.clone()));
+        let leaf = folder_service
+            .save_virtual_folder(SaveVirtualFolderPayload {
+                id: None,
+                name: "References".to_string(),
+                parent_id: None,
+                alias: None,
+            })
+            .await
+            .expect("failed to save leaf folder");
+
+        let service = AssetService::new(
+            AssetRepository::new(pool.clone()),
+            FolderRepository::new(pool),
+            storage_for(&dir),
+        );
+        let result = service
+            .import_images(ImportRequest {
+                file_paths: vec![path_string(&source_path)],
+                virtual_folder_ids: vec![leaf.saved_folder_id.clone()],
+            })
+            .await
+            .expect("failed to import new asset");
+
+        assert_eq!(result.imported, 1);
+        assert_eq!(result.reused, 0);
+        let asset = result.assets.first().expect("missing imported asset");
+        let detail =
+            service.get_asset(&asset.id).await.expect("missing asset detail");
+        assert!(detail
+            .virtual_folders
+            .iter()
+            .any(|folder| folder.id == leaf.saved_folder_id));
+
+        let _ = fs::remove_dir_all(dir);
     }
 }

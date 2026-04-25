@@ -19,6 +19,7 @@
     "prepreview": "node scripts/build-theme.mjs",
     "preview": "vite preview",
     "ui:demo": "node scripts/build-theme.mjs && vite --open /ui-demo/",
+    "db:prepare": "node ../../scripts/backend-sqlx-prepare.mjs",
     "tauri": "tauri"
   },
   "dependencies": {

@@ -45,9 +45,10 @@ pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             commands::library_commands::load_library_snapshot,
-            commands::library_commands::load_library_settings,
+            commands::library_commands::load_explorer_snapshot,
+            commands::library_commands::load_settings_snapshot,
             commands::library_commands::save_library_settings,
-            commands::library_commands::load_croquis_preferences,
+            commands::library_commands::load_croquis_preferences_snapshot,
             commands::library_commands::save_croquis_preferences,
             commands::folder_commands::save_virtual_folder,
             commands::folder_commands::delete_virtual_folder,
@@ -105,6 +106,7 @@ pub fn run() {
                 SettingsService::new(settings_repository.clone());
             let asset_service = AssetService::new(
                 asset_repository.clone(),
+                folder_repository.clone(),
                 library_storage.clone(),
             );
             let folder_service = FolderService::new(folder_repository);

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id\n            FROM virtual_folder\n            WHERE parent_id = ?1 AND kind = ?2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "46db3ac2d5e4d9f2d7f9c3a9d10164cca82a4d4ee5840cf2e6519e2368566373"
+}

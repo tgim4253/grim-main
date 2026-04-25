@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS virtual_folder (
   parent_id  TEXT REFERENCES virtual_folder(id) ON DELETE CASCADE,
   full_path  TEXT NOT NULL,
   alias      TEXT,
+  kind       TEXT NOT NULL DEFAULT 'user' CHECK (kind IN ('user', 'system_uncategorized')),
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -37,6 +38,9 @@ CREATE TABLE IF NOT EXISTS virtual_folder (
 
 CREATE INDEX IF NOT EXISTS idx_virtual_folder_parent ON virtual_folder(parent_id);
 CREATE INDEX IF NOT EXISTS idx_virtual_folder_full_path ON virtual_folder(full_path);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_virtual_folder_system_uncategorized_parent
+  ON virtual_folder(parent_id)
+  WHERE kind = 'system_uncategorized';
 
 CREATE TABLE IF NOT EXISTS asset_virtual_folder (
   asset_id          TEXT NOT NULL REFERENCES asset(id) ON DELETE CASCADE,

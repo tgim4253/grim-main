@@ -1,5 +1,33 @@
 use serde::{Deserialize, Serialize};
 
+pub const SYSTEM_UNCATEGORIZED_FOLDER_NAME: &str = "Uncategorized";
+
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum VirtualFolderKind {
+    #[default]
+    User,
+    SystemUncategorized,
+}
+
+impl VirtualFolderKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::User => "user",
+            Self::SystemUncategorized => "system_uncategorized",
+        }
+    }
+
+    pub fn from_db(value: &str) -> Self {
+        match value {
+            "system_uncategorized" => Self::SystemUncategorized,
+            _ => Self::User,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct VirtualFolder {
@@ -10,6 +38,8 @@ pub struct VirtualFolder {
     pub full_path: String,
     #[serde(default)]
     pub alias: Option<String>,
+    #[serde(default)]
+    pub kind: VirtualFolderKind,
     pub sort_order: i64,
     pub created_at: String,
     pub updated_at: String,

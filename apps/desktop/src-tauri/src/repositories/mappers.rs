@@ -1,6 +1,6 @@
 use crate::models::{
     asset::AssetSummary,
-    folder::VirtualFolder,
+    folder::{VirtualFolder, VirtualFolderKind},
     record::CroquisRecordSummary,
     tag::{Tag, TagGroup},
 };
@@ -24,6 +24,7 @@ pub(crate) struct VirtualFolderRow {
     pub name: String,
     pub full_path: String,
     pub alias: Option<String>,
+    pub kind: String,
     pub sort_order: i64,
     pub created_at: String,
     pub updated_at: String,
@@ -124,6 +125,7 @@ pub(crate) fn folder_from_row(row: VirtualFolderRow) -> VirtualFolder {
         name: row.name,
         full_path: row.full_path,
         alias: row.alias,
+        kind: VirtualFolderKind::from_db(&row.kind),
         sort_order: row.sort_order,
         created_at: row.created_at,
         updated_at: row.updated_at,
