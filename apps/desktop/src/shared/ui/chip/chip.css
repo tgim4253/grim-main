@@ -9,9 +9,10 @@
     --_chip-padding-x: 9px;
     --_chip-padding-y: 3px;
     --_chip-gap: 0;
-    --_chip-font-size: var(--primitives-typography-font-size-2xs);
-    --_chip-font-weight: var(--primitives-typography-font-weight-medium);
-    --_chip-line-height: 15px;
+    --_chip-font-family: var(--components-typography-chip-rounded-font-family);
+    --_chip-font-size: var(--components-typography-chip-rounded-font-size);
+    --_chip-font-weight: var(--components-typography-chip-rounded-font-weight);
+    --_chip-line-height: var(--components-typography-chip-rounded-line-height);
     --_chip-letter-spacing: 0;
     --_chip-text-transform: none;
     --_chip-icon-size: 7px;
@@ -53,9 +54,6 @@
     --_chip-padding-y: 5px;
     --_chip-gap: 6px;
     --_chip-text-color: var(--semantic-colors-text-primary);
-    --_chip-font-size: var(--primitives-typography-font-size-2xs);
-    --_chip-font-weight: var(--primitives-typography-font-weight-medium);
-    --_chip-line-height: 15px;
     --_chip-action-size: var(--semantic-size-icon-button-xs);
     --_chip-action-icon-size: var(--semantic-size-icon-2xs);
     --_chip-button-background-hover: var(--semantic-colors-surface-tertiary);
@@ -69,9 +67,10 @@
     --_chip-padding-x: 9px;
     --_chip-padding-y: 3px;
     --_chip-text-color: var(--components-croquis-meta-chip-text);
-    --_chip-font-size: var(--primitives-typography-font-size-3xs);
-    --_chip-font-weight: var(--primitives-typography-font-weight-semibold);
-    --_chip-line-height: 13.5px;
+    --_chip-font-family: var(--components-typography-chip-accent-font-family);
+    --_chip-font-size: var(--components-typography-chip-accent-font-size);
+    --_chip-font-weight: var(--components-typography-chip-accent-font-weight);
+    --_chip-line-height: var(--components-typography-chip-accent-line-height);
     --_chip-letter-spacing: 0.225px;
     --_chip-text-transform: uppercase;
     --_chip-button-background-hover: var(--components-croquis-duration-chip-active-background);
@@ -87,9 +86,10 @@
     --_chip-padding-x: 9px;
     --_chip-padding-y: 3px;
     --_chip-text-color: var(--semantic-colors-text-on-brand);
-    --_chip-font-size: var(--primitives-typography-font-size-3xs);
-    --_chip-font-weight: var(--primitives-typography-font-weight-semibold);
-    --_chip-line-height: 13.5px;
+    --_chip-font-family: var(--components-typography-chip-accent-font-family);
+    --_chip-font-size: var(--components-typography-chip-accent-font-size);
+    --_chip-font-weight: var(--components-typography-chip-accent-font-weight);
+    --_chip-line-height: var(--components-typography-chip-accent-line-height);
     --_chip-letter-spacing: 0.225px;
     --_chip-text-transform: uppercase;
     --_chip-button-background-hover: var(--semantic-colors-brand-secondary);
@@ -104,9 +104,10 @@
     --_chip-padding-y: 5px;
     --_chip-gap: 4px;
     --_chip-text-color: var(--semantic-colors-text-secondary);
-    --_chip-font-size: var(--primitives-typography-font-size-2xs);
-    --_chip-font-weight: var(--primitives-typography-font-weight-semibold);
-    --_chip-line-height: 15px;
+    --_chip-font-family: var(--components-typography-chip-pill-font-family);
+    --_chip-font-size: var(--components-typography-chip-pill-font-size);
+    --_chip-font-weight: var(--components-typography-chip-pill-font-weight);
+    --_chip-line-height: var(--components-typography-chip-pill-line-height);
     --_chip-icon-size: var(--semantic-size-icon-2xs);
     --_chip-button-background-hover: var(--semantic-colors-surface-tertiary);
     --_chip-button-background-active: var(--semantic-colors-surface-elevated);
@@ -121,9 +122,10 @@
     --_chip-padding-x: 11px;
     --_chip-padding-y: 5px;
     --_chip-text-color: var(--semantic-colors-brand-primary);
-    --_chip-font-size: var(--primitives-typography-font-size-2xs);
-    --_chip-font-weight: var(--primitives-typography-font-weight-semibold);
-    --_chip-line-height: 15px;
+    --_chip-font-family: var(--components-typography-chip-pill-font-family);
+    --_chip-font-size: var(--components-typography-chip-pill-font-size);
+    --_chip-font-weight: var(--components-typography-chip-pill-font-weight);
+    --_chip-line-height: var(--components-typography-chip-pill-line-height);
     --_chip-button-background-hover: var(--semantic-colors-surface-tertiary);
     --_chip-button-background-active: var(--components-croquis-duration-chip-active-background);
     --_chip-button-border-active: var(--components-croquis-duration-chip-active-border);
@@ -136,9 +138,10 @@
     --_chip-padding-x: 11px;
     --_chip-padding-y: 5px;
     --_chip-text-color: var(--semantic-colors-brand-primary);
-    --_chip-font-size: var(--primitives-typography-font-size-2xs);
-    --_chip-font-weight: var(--primitives-typography-font-weight-semibold);
-    --_chip-line-height: 15px;
+    --_chip-font-family: var(--components-typography-chip-pill-font-family);
+    --_chip-font-size: var(--components-typography-chip-pill-font-size);
+    --_chip-font-weight: var(--components-typography-chip-pill-font-weight);
+    --_chip-line-height: var(--components-typography-chip-pill-line-height);
     --_chip-button-background-hover: var(--components-croquis-duration-chip-active-background);
     --_chip-button-background-active: var(--components-croquis-duration-chip-active-background);
     --_chip-button-border-hover: var(--components-croquis-duration-chip-active-border);
@@ -156,7 +159,7 @@
 
   .c-chip__text {
     display: block;
-    font-family: var(--primitives-typography-font-family-ui);
+    font-family: var(--_chip-font-family);
     font-size: var(--_chip-font-size);
     font-weight: var(--_chip-font-weight);
     line-height: var(--_chip-line-height);

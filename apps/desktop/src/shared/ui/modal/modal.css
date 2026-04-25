@@ -71,10 +71,10 @@
     flex: 1 1 auto;
     min-width: 0;
     color: var(--primitives-colors-white);
-    font-family: var(--primitives-typography-font-family-ui);
-    font-size: var(--primitives-typography-font-size-lg-plus);
-    font-weight: var(--primitives-typography-font-weight-medium);
-    line-height: 28px;
+    font-family: var(--components-typography-modal-title-font-family);
+    font-size: var(--components-typography-modal-title-font-size);
+    font-weight: var(--components-typography-modal-title-font-weight);
+    line-height: var(--components-typography-modal-title-line-height);
   }
 
   .c-modal-body {

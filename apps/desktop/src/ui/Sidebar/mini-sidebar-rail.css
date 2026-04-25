@@ -1,0 +1,39 @@
+@layer app {
+  .mini-sidebar-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 48px;
+    height: 100%;
+    min-height: 0;
+    padding-right: 1px;
+    box-sizing: border-box;
+    border-right: 1px solid var(--semantic-colors-border-subtle);
+    background: var(--semantic-colors-surface-sidebar);
+  }
+
+  .mini-sidebar-rail__primary {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .mini-sidebar-rail__primary .c-icon-button--sidebar {
+    width: 100%;
+  }
+
+  .mini-sidebar-rail__spacer {
+    flex: 1 0 0;
+    min-height: 0;
+    width: 100%;
+  }
+
+  .mini-sidebar-rail__secondary {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding-bottom: 8px;
+  }
+}

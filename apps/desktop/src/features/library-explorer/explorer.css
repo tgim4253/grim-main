@@ -1,0 +1,99 @@
+@layer app {
+  .library-explorer {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 100%;
+    padding: 4px 12px;
+    overflow-y: auto;
+  }
+
+  .explorer-tree-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .explorer-tree-group__nested {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    padding-left: 16px;
+    min-width: 0;
+  }
+
+  .explorer-tree-group__divider {
+    width: 1px;
+    flex: none;
+    background: var(--semantic-colors-border-subtle);
+  }
+
+  .explorer-tree-group__stack {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .explorer-tree-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 28px;
+    padding: 4px 12px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--semantic-colors-text-primary);
+    box-sizing: border-box;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .explorer-tree-row:focus-visible {
+    outline: 2px solid var(--semantic-colors-border-focus);
+    outline-offset: -2px;
+  }
+
+  .explorer-tree-row__leading {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: none;
+  }
+
+  .explorer-tree-row__arrow-slot {
+    width: var(--semantic-size-icon-xs);
+    height: var(--semantic-size-icon-xs);
+    flex: none;
+  }
+
+  .explorer-tree-row__label {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding-left: 4px;
+    overflow: hidden;
+    color: var(--semantic-colors-text-primary);
+    font-size: var(--type-text-sm-size);
+    line-height: var(--type-text-sm-line-height);
+    font-weight: var(--font-weight-bold);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .explorer-tree-row__meta {
+    flex: none;
+    padding-left: 8px;
+    color: var(--semantic-colors-text-teritary);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 15px;
+    letter-spacing: -0.3px;
+    white-space: nowrap;
+  }
+
+  .explorer-tree-row--active .explorer-tree-row__label {
+    color: var(--semantic-colors-brand-primary);
+  }
+}

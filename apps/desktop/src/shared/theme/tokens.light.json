@@ -11,107 +11,107 @@
       },
       "Error": {
         "100": {
-          "$value": "#fee4e2",
+          "$value": "#feebec",
           "$type": "color"
         },
         "500": {
-          "$value": "#f04438",
+          "$value": "#e5484d",
           "$type": "color"
         },
         "700": {
-          "$value": "#b42318",
+          "$value": "#dc3e42",
           "$type": "color"
         },
         "800": {
-          "$value": "#912018",
+          "$value": "#ce2c31",
           "$type": "color"
         }
       },
       "Warning": {
         "100": {
-          "$value": "#fef0c7",
+          "$value": "#fefbe9",
           "$type": "color"
         },
         "400": {
-          "$value": "#f59e0b",
+          "$value": "#ab6400",
           "$type": "color"
         },
         "500": {
-          "$value": "#fbbf24",
+          "$value": "#e2a336",
           "$type": "color"
         },
         "700": {
-          "$value": "#b54708",
+          "$value": "#4f3422",
           "$type": "color"
         }
       },
       "legacy": {
         "WarningSemantic": {
           "Light": {
-            "$value": "#f59e0b",
+            "$value": "#ab6400",
             "$type": "color"
           },
           "Dark": {
-            "$value": "#fbbf24",
+            "$value": "#e2a336",
             "$type": "color"
           }
         }
       },
       "Charcoal": {
         "0": {
-          "$value": "#0e0e0e",
+          "$value": "#fcfbf8",
           "$type": "color"
         },
         "100": {
-          "$value": "#131313",
+          "$value": "#f6f4ef",
           "$type": "color"
         },
         "200": {
-          "$value": "#1f2020",
+          "$value": "#efebe3",
           "$type": "color"
         },
         "300": {
-          "$value": "#252626",
+          "$value": "#e6e1d7",
           "$type": "color"
         },
         "400": {
-          "$value": "#2d2d2d",
+          "$value": "#d2cdc1",
           "$type": "color"
         },
         "500": {
-          "$value": "#767575",
+          "$value": "#9b958a",
           "$type": "color"
         },
         "600": {
-          "$value": "#acabaa",
+          "$value": "#5f6563",
           "$type": "color"
         },
         "700": {
-          "$value": "#e7e5e4",
+          "$value": "#1a211e",
           "$type": "color"
         }
       },
       "Emerald": {
         "300": {
-          "$value": "#4edea3",
+          "$value": "#26997b",
           "$type": "color"
         },
         "700": {
-          "$value": "#005236",
+          "$value": "#208368",
           "$type": "color"
         },
         "800": {
-          "$value": "#004a31",
+          "$value": "#1d3b31",
           "$type": "color"
         }
       },
       "Info": {
         "400": {
-          "$value": "#36bffa",
+          "$value": "#00749e",
           "$type": "color"
         },
         "500": {
-          "$value": "#0ba5ec",
+          "$value": "#1d3e56",
           "$type": "color"
         }
       }
@@ -303,11 +303,11 @@
           "$type": "color"
         },
         "secondary": {
-          "$value": "{primitives.colors.Charcoal.100}",
+          "$value": "{primitives.colors.White}",
           "$type": "color"
         },
         "tertiary": {
-          "$value": "{primitives.colors.Charcoal.200}",
+          "$value": "{primitives.colors.Charcoal.100}",
           "$type": "color"
         },
         "canvas": {
@@ -315,7 +315,7 @@
           "$type": "color"
         },
         "elevated": {
-          "$value": "{primitives.colors.Charcoal.300}",
+          "$value": "{primitives.colors.White}",
           "$type": "color"
         },
         "sidebar": {
@@ -323,7 +323,7 @@
           "$type": "color"
         },
         "toolbar": {
-          "$value": "{primitives.colors.Charcoal.0}",
+          "$value": "{primitives.colors.White}",
           "$type": "color"
         },
         "workspace": {
@@ -331,15 +331,15 @@
           "$type": "color"
         },
         "panel": {
-          "$value": "{primitives.colors.Charcoal.100}",
+          "$value": "{primitives.colors.White}",
           "$type": "color"
         },
         "high": {
-          "$value": "{primitives.colors.Charcoal.200}",
+          "$value": "{primitives.colors.Charcoal.100}",
           "$type": "color"
         },
         "floating": {
-          "$value": "{primitives.colors.Charcoal.300}",
+          "$value": "{primitives.colors.White}",
           "$type": "color"
         },
         "pressed": {
@@ -347,7 +347,7 @@
           "$type": "color"
         },
         "low": {
-          "$value": "#191a1a",
+          "$value": "#f3f0e8",
           "$type": "color"
         }
       },
@@ -369,7 +369,7 @@
           "$type": "color"
         },
         "inverse": {
-          "$value": "{primitives.colors.Charcoal.0}",
+          "$value": "{primitives.colors.White}",
           "$type": "color"
         },
         "error": {
@@ -377,7 +377,7 @@
           "$type": "color"
         },
         "on-brand": {
-          "$value": "{primitives.colors.Emerald.800}",
+          "$value": "{primitives.colors.White}",
           "$type": "color"
         }
       },
@@ -391,7 +391,7 @@
           "$type": "color"
         },
         "primary-container": {
-          "$value": "{primitives.colors.Emerald.700}",
+          "$value": "#e6f7ed",
           "$type": "color"
         },
         "teritary": {
@@ -407,7 +407,7 @@
       },
       "status": {
         "success": {
-          "$value": "{primitives.colors.Emerald.300}",
+          "$value": "{primitives.colors.Emerald.700}",
           "$type": "color"
         },
         "warning": {
@@ -425,7 +425,7 @@
       },
       "border": {
         "primary": {
-          "$value": "#484848",
+          "$value": "#d4d0c7",
           "$type": "color"
         },
         "secondary": {
@@ -441,7 +441,7 @@
           "$type": "color"
         },
         "layout": {
-          "$value": "#484848",
+          "$value": "#d4d0c7",
           "$type": "color"
         },
         "error": {
@@ -457,13 +457,13 @@
           "$type": "color"
         },
         "soft": {
-          "$value": "rgba(72, 72, 72, 0.102)",
+          "$value": "rgba(95, 101, 99, 0.14)",
           "$type": "color"
         }
       },
       "overlay": {
         "scrim": {
-          "$value": "rgba(0, 0, 0, 0.6)",
+          "$value": "rgba(16, 20, 18, 0.32)",
           "$type": "color"
         }
       }
@@ -1011,7 +1011,7 @@
           "$type": "color"
         },
         "background-hover": {
-          "$value": "{semantic.colors.surface.elevated}",
+          "$value": "{semantic.colors.surface.secondary}",
           "$type": "color"
         },
         "text": {
@@ -1023,7 +1023,7 @@
           "$type": "color"
         },
         "background-active": {
-          "$value": "{semantic.colors.surface.panel}",
+          "$value": "{semantic.colors.surface.pressed}",
           "$type": "color"
         }
       },
@@ -1033,11 +1033,11 @@
           "$type": "color"
         },
         "background-hover": {
-          "$value": "{semantic.colors.surface.tertiary}",
+          "$value": "{semantic.colors.surface.secondary}",
           "$type": "color"
         },
         "background-active": {
-          "$value": "{semantic.colors.surface.secondary}",
+          "$value": "{semantic.colors.surface.tertiary}",
           "$type": "color"
         },
         "text": {
@@ -1059,7 +1059,7 @@
           "$type": "color"
         },
         "text": {
-          "$value": "{semantic.colors.text.primary}",
+          "$value": "{primitives.colors.White}",
           "$type": "color"
         },
         "border": {
@@ -1109,21 +1109,21 @@
     "badge": {
       "success": {
         "background": {
-          "$value": "{primitives.colors.Emerald.700}",
+          "$value": "{semantic.colors.brand.primary-container}",
           "$type": "color"
         },
         "text": {
-          "$value": "{semantic.colors.text.primary}",
+          "$value": "{primitives.colors.Emerald.800}",
           "$type": "color"
         }
       },
       "error": {
         "background": {
-          "$value": "{primitives.colors.Error.700}",
+          "$value": "{primitives.colors.Error.100}",
           "$type": "color"
         },
         "text": {
-          "$value": "{semantic.colors.text.primary}",
+          "$value": "{primitives.colors.Error.800}",
           "$type": "color"
         }
       },
@@ -1157,29 +1157,29 @@
     "icon-button": {
       "background": {
         "hover": {
-          "$value": "{semantic.colors.surface.tertiary}",
+          "$value": "{semantic.colors.surface.secondary}",
           "$type": "color"
         },
         "active": {
-          "$value": "{semantic.colors.surface.elevated}",
+          "$value": "{semantic.colors.surface.pressed}",
           "$type": "color"
         },
         "focus": {
-          "$value": "{semantic.colors.surface.elevated}",
+          "$value": "{semantic.colors.surface.pressed}",
           "$type": "color"
         }
       },
       "sidebar": {
         "background-hover": {
-          "$value": "rgba(0, 82, 54, 0.16)",
+          "$value": "rgba(38, 153, 123, 0.08)",
           "$type": "color"
         },
         "background-click": {
-          "$value": "rgba(0, 82, 54, 0.22)",
+          "$value": "rgba(38, 153, 123, 0.12)",
           "$type": "color"
         },
         "background-active": {
-          "$value": "rgba(0, 82, 54, 0.3)",
+          "$value": "rgba(38, 153, 123, 0.16)",
           "$type": "color"
         }
       }
@@ -1465,7 +1465,7 @@
       },
       "scrollbar": {
         "bar": {
-          "$value": "#e9eaeb",
+          "$value": "#d8d3c8",
           "$type": "color"
         }
       }
@@ -1575,21 +1575,21 @@
       },
       "meta-chip": {
         "background": {
-          "$value": "rgba(78, 222, 163, 0.102)",
+          "$value": "rgba(38, 153, 123, 0.10)",
           "$type": "color"
         },
         "border": {
-          "$value": "rgba(78, 222, 163, 0.302)",
+          "$value": "rgba(38, 153, 123, 0.24)",
           "$type": "color"
         },
         "text": {
-          "$value": "{primitives.colors.Emerald.300}",
+          "$value": "{primitives.colors.Emerald.800}",
           "$type": "color"
         }
       },
       "duration-chip": {
         "active-background": {
-          "$value": "rgba(78, 222, 163, 0.2)",
+          "$value": "rgba(38, 153, 123, 0.14)",
           "$type": "color"
         },
         "active-border": {
@@ -1599,7 +1599,7 @@
       },
       "step-list": {
         "overlay": {
-          "$value": "rgba(0, 0, 0, 0.5)",
+          "$value": "rgba(16, 20, 18, 0.38)",
           "$type": "color"
         }
       },

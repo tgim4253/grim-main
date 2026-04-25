@@ -5,8 +5,12 @@
   "type": "module",
   "scripts": {
     "theme:build": "node scripts/build-theme.mjs",
+    "dev:db": "node ../../scripts/backend-export-dburl.mjs",
+    "db:dev": "pnpm run dev:db",
+    "dev:reset-db": "node scripts/reset-dev-db.mjs && pnpm run dev",
     "predev": "node scripts/build-theme.mjs",
     "dev": "tauri dev",
+    "db:prepare": "node ../../scripts/backend-sqlx-prepare.mjs",
     "previte": "node scripts/build-theme.mjs",
     "vite": "vite",
     "demo:library": "node scripts/build-theme.mjs && vite --open /library-demo/",

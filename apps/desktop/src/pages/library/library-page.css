@@ -1,0 +1,85 @@
+@layer app {
+  .library-page {
+    background: var(--semantic-colors-surface-primary);
+  }
+
+  .library-page__layout {
+    min-height: 0;
+    background: var(--semantic-colors-surface-primary);
+  }
+
+  .library-page__sidebar {
+    width: 343px;
+    min-width: 343px;
+    border-right: 0;
+    background: transparent;
+  }
+
+  .library-page__sidebar--collapsed {
+    width: 48px;
+    min-width: 48px;
+  }
+
+  .library-page__workspace {
+    background: var(--semantic-colors-surface-workspace);
+  }
+
+  .library-page__main-container {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .library-page__splitter {
+    position: relative;
+    flex: none;
+    width: 10px;
+    min-width: 10px;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    cursor: col-resize;
+    touch-action: none;
+    box-sizing: border-box;
+  }
+
+  .library-page__splitter::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    transform: translateX(-50%);
+    background: var(--semantic-colors-border-layout);
+  }
+
+  .library-page__splitter::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 4px;
+    height: 36px;
+    border-radius: 999px;
+    transform: translate(-50%, -50%);
+    background: color-mix(in srgb, var(--semantic-colors-text-teritary) 24%, transparent);
+    transition: background-color 120ms ease;
+  }
+
+  .library-page__splitter:hover::after,
+  .library-page__splitter:focus-visible::after,
+  .library-page__splitter[data-dragging='true']::after {
+    background: color-mix(in srgb, var(--semantic-colors-brand-primary) 48%, transparent);
+  }
+
+  .library-page__splitter:focus-visible {
+    outline: 2px solid var(--semantic-colors-border-focus);
+    outline-offset: -2px;
+  }
+
+  @media (max-width: 960px) {
+    .library-page__sidebar {
+      max-width: calc(100vw - 160px);
+    }
+  }
+}
