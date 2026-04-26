@@ -1,11 +1,36 @@
 @layer app {
   .library-explorer {
     display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .library-explorer__import-action {
+    display: flex;
+    flex: none;
+    justify-content: center;
+    padding: 0 24px;
+  }
+
+  .library-explorer__import-button {
+    --_button-font-size: var(--type-text-sm-size);
+    --_button-font-weight: var(--font-weight-semibold);
+    --_button-line-height: var(--type-text-sm-line-height);
+    max-width: 295px;
+  }
+
+  .library-explorer__tree {
+    display: flex;
+    flex: 1 1 auto;
     flex-direction: column;
     gap: 4px;
-    min-height: 100%;
+    min-height: 0;
     padding: 4px 12px;
     overflow-y: auto;
+    scrollbar-gutter: stable;
   }
 
   .explorer-tree-group {

@@ -12,6 +12,7 @@ export const ICON_NAMES = [
   'chevron-up',
   'close',
   'file',
+  'filter',
   'folder',
   'folder-open',
   'gesture',
@@ -21,6 +22,7 @@ export const ICON_NAMES = [
   'link-2',
   'link-2-off',
   'link-to',
+  'masonry-item',
   'minus',
   'plus',
   'reload',
@@ -30,6 +32,8 @@ export const ICON_NAMES = [
   'tree',
   'user',
   'user-round-plus',
+  'view-grid',
+  'view-list',
 ] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];
@@ -57,6 +61,14 @@ const gridGlyph = (
     <rect x="14" y="4" width="6" height="6" rx="1" />
     <rect x="4" y="14" width="6" height="6" rx="1" />
     <rect x="14" y="14" width="6" height="6" rx="1" />
+  </>
+);
+
+const filterGlyph = (
+  <>
+    <path d="M4 6h16" />
+    <path d="M7 12h10" />
+    <path d="M10 18h4" />
   </>
 );
 
@@ -99,6 +111,26 @@ const treeGlyph = (
   </>
 );
 
+const viewListGlyph = (
+  <>
+    <path d="M8 6h12" />
+    <path d="M8 12h12" />
+    <path d="M8 18h12" />
+    <path d="M4 6h.01" />
+    <path d="M4 12h.01" />
+    <path d="M4 18h.01" />
+  </>
+);
+
+const masonryItemGlyph = (
+  <>
+    <rect x="4" y="4" width="7" height="9" rx="1.25" />
+    <rect x="14" y="4" width="6" height="6" rx="1.25" />
+    <rect x="4" y="16" width="7" height="4" rx="1.25" />
+    <rect x="14" y="13" width="6" height="7" rx="1.25" />
+  </>
+);
+
 export const ICON_GLYPHS = {
   anatomy: anatomyGlyph,
   camera: (
@@ -126,6 +158,7 @@ export const ICON_GLYPHS = {
       <path d="M16 17H8" />
     </>
   ),
+  filter: filterGlyph,
   folder: (
     <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
   ),
@@ -164,6 +197,7 @@ export const ICON_GLYPHS = {
       <path d="M15 3h6v6" />
     </>
   ),
+  'masonry-item': masonryItemGlyph,
   minus: <path d="M5 12h14" />,
   plus: (
     <path
@@ -203,4 +237,6 @@ export const ICON_GLYPHS = {
       <path d="M22 19h-6" />
     </>
   ),
+  'view-grid': gridGlyph,
+  'view-list': viewListGlyph,
 } satisfies Record<IconName, ReactNode>;

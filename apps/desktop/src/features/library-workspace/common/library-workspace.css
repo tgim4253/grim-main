@@ -1,0 +1,186 @@
+@layer app {
+  .library-workspace {
+    position: relative;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--semantic-colors-surface-canvas);
+    color: var(--semantic-colors-text-primary);
+  }
+
+  .library-workspace__explorer {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: var(--semantic-colors-surface-canvas);
+  }
+
+  .library-workspace__grid-region {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .library-workspace__preview-shell {
+    display: flex;
+    flex: none;
+    width: 320px;
+    max-width: 320px;
+    min-width: 0;
+    opacity: 1;
+    overflow: hidden;
+    transform: translateX(0);
+    transition:
+      width 160ms ease,
+      max-width 160ms ease,
+      opacity 160ms ease,
+      transform 160ms ease,
+      visibility 160ms ease;
+  }
+
+  .library-workspace__preview-shell[data-state='closed'] {
+    width: 0;
+    max-width: 0;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(16px);
+  }
+
+  .masonry-grid {
+    --masonry-item-width: 280px;
+    --masonry-gap-x: 16px;
+    --masonry-gap-y: 16px;
+    container: masonry-grid / inline-size;
+    width: 100%;
+    min-height: 100%;
+    padding: 32px 24px;
+  }
+
+  .masonry-grid[data-layout='masonry'] {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  .masonry-grid__content {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .masonry-grid[data-layout='masonry'] .masonry-grid__content {
+    width: min(100%, var(--masonry-item-width));
+    column-count: 1;
+    column-fill: balance;
+    column-gap: var(--masonry-gap-x);
+  }
+
+  .masonry-grid[data-layout='grid'] .masonry-grid__content {
+    display: grid;
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(min(100%, var(--masonry-item-width)), var(--masonry-item-width))
+    );
+    align-content: flex-start;
+    justify-content: center;
+    gap: var(--masonry-gap-y) var(--masonry-gap-x);
+  }
+
+  .masonry-grid__item {
+    display: block;
+    min-width: 0;
+  }
+
+  .masonry-grid[data-layout='masonry'] .masonry-grid__item {
+    display: inline-block;
+    width: min(100%, var(--masonry-item-width));
+    margin-bottom: var(--masonry-gap-y);
+    break-inside: avoid;
+    text-align: left;
+  }
+
+  @container masonry-grid (min-width: 576px) {
+    .masonry-grid[data-layout='masonry'] .masonry-grid__content {
+      width: calc(var(--masonry-item-width) * 2 + var(--masonry-gap-x));
+      column-count: 2;
+    }
+  }
+
+  @container masonry-grid (min-width: 872px) {
+    .masonry-grid[data-layout='masonry'] .masonry-grid__content {
+      width: calc(var(--masonry-item-width) * 3 + var(--masonry-gap-x) * 2);
+      column-count: 3;
+    }
+  }
+
+  @container masonry-grid (min-width: 1168px) {
+    .masonry-grid[data-layout='masonry'] .masonry-grid__content {
+      width: calc(var(--masonry-item-width) * 4 + var(--masonry-gap-x) * 3);
+      column-count: 4;
+    }
+  }
+
+  @container masonry-grid (min-width: 1464px) {
+    .masonry-grid[data-layout='masonry'] .masonry-grid__content {
+      width: calc(var(--masonry-item-width) * 5 + var(--masonry-gap-x) * 4);
+      column-count: 5;
+    }
+  }
+
+  .masonry-image-placeholder {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    border: 1px solid var(--semantic-colors-border-primary);
+    background: var(--semantic-colors-surface-high);
+    overflow: hidden;
+  }
+
+  .masonry-image-placeholder[data-ratio='2:5'] {
+    aspect-ratio: 2 / 5;
+  }
+
+  .masonry-image-placeholder[data-ratio='3:5'] {
+    aspect-ratio: 3 / 5;
+  }
+
+  .masonry-image-placeholder[data-ratio='4:5'] {
+    aspect-ratio: 4 / 5;
+  }
+
+  .masonry-image-placeholder[data-ratio='3:4'] {
+    aspect-ratio: 3 / 4;
+  }
+
+  .masonry-image-placeholder[data-state='hover'] {
+    border-color: var(--semantic-colors-brand-primary);
+    background: var(--semantic-colors-surface-elevated);
+  }
+
+  .masonry-image-placeholder[data-state='active'] {
+    border-width: 2px;
+    border-color: var(--semantic-colors-border-focus);
+    background: var(--semantic-colors-surface-high);
+  }
+
+  @media (max-width: 760px) {
+    .library-workspace__preview-shell {
+      display: none;
+    }
+
+    .masonry-grid {
+      padding-right: 16px;
+      padding-left: 16px;
+    }
+  }
+}

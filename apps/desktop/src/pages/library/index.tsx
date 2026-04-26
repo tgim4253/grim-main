@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { cx } from '../../shared/lib/cx';
 import { ExplorerPanel } from '../../features/library-explorer';
+import { ReferencesDummyView } from '../../features/library-workspace';
 import { AppTopBar } from '../../ui/Header/AppTopBar';
 import {
   MiniSidebarRail,
@@ -185,8 +186,8 @@ export function LibraryPage() {
     : SIDEBAR_COLLAPSED_WIDTH;
   const sidebarMaxWidth = getSidebarMaxWidth();
   const sidebarStyle = {
-    width: `${resolvedSidebarWidth}px`,
-    minWidth: `${resolvedSidebarWidth}px`,
+    width: `${String(resolvedSidebarWidth)}px`,
+    minWidth: `${String(resolvedSidebarWidth)}px`,
   };
 
   return (
@@ -232,7 +233,9 @@ export function LibraryPage() {
           />
         ) : null}
 
-        <main className="app-workspace library-page__workspace library-page__main-container" />
+        <main className="app-workspace library-page__workspace library-page__main-container">
+          <ReferencesDummyView />
+        </main>
       </div>
     </div>
   );

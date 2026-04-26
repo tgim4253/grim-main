@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { Button } from '../../shared/ui';
 import { ExplorerTreeGroup } from './ExplorerTreeGroup';
 import {
   EXPLORER_DUMMY_NODES,
@@ -34,16 +35,24 @@ export function ExplorerPanel() {
   }, []);
 
   return (
-    <div className="library-explorer" role="tree" aria-label="Explorer">
-      {EXPLORER_DUMMY_NODES.map(node => (
-        <ExplorerTreeGroup
-          key={node.id}
-          node={node}
-          activeNodeId={activeNodeId}
-          expandedById={expandedById}
-          onNodeSelect={handleNodeSelect}
-        />
-      ))}
+    <div className="library-explorer">
+      <div className="library-explorer__import-action">
+        <Button className="library-explorer__import-button" size="sm" width="fill">
+          Import
+        </Button>
+      </div>
+
+      <div className="library-explorer__tree" role="tree" aria-label="Explorer">
+        {EXPLORER_DUMMY_NODES.map(node => (
+          <ExplorerTreeGroup
+            key={node.id}
+            node={node}
+            activeNodeId={activeNodeId}
+            expandedById={expandedById}
+            onNodeSelect={handleNodeSelect}
+          />
+        ))}
+      </div>
     </div>
   );
 }
