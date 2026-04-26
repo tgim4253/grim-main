@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT id,\n                   title,\n                   note,\n                   source_asset_id,\n                   result_asset_id,\n                   target_duration_seconds,\n                   actual_duration_seconds,\n                   started_at,\n                   finished_at,\n                   finalized_at,\n                   created_at,\n                   updated_at\n            FROM croquis_record\n            WHERE id = ?1\n            ",
+  "query": "\n            SELECT id,\n                   title,\n                   note,\n                   source_asset_id,\n                   result_asset_id,\n                   target_duration_seconds,\n                   actual_duration_seconds,\n                   finished_at,\n                   created_at,\n                   updated_at\n            FROM croquis_record\n            WHERE id = ?1\n            ",
   "describe": {
     "columns": [
       {
@@ -39,28 +39,18 @@
         "type_info": "Float"
       },
       {
-        "name": "started_at",
+        "name": "finished_at",
         "ordinal": 7,
         "type_info": "Text"
       },
       {
-        "name": "finished_at",
+        "name": "created_at",
         "ordinal": 8,
         "type_info": "Text"
       },
       {
-        "name": "finalized_at",
-        "ordinal": 9,
-        "type_info": "Text"
-      },
-      {
-        "name": "created_at",
-        "ordinal": 10,
-        "type_info": "Text"
-      },
-      {
         "name": "updated_at",
-        "ordinal": 11,
+        "ordinal": 9,
         "type_info": "Text"
       }
     ],
@@ -76,11 +66,9 @@
       true,
       true,
       true,
-      true,
-      true,
       false,
       false
     ]
   },
-  "hash": "db4a37052ad0edd84817c072f10a3c09a41088d99ca0ee7beb930a4306243364"
+  "hash": "22120489e69ecd1d3e288cd2ed4daf025ca8990786badbc584bb8b9d0fbd9498"
 }

@@ -1,7 +1,5 @@
 import type { CroquisPreferences } from './croquis';
 
-export type AssetType = 'imported_image' | 'linked_external';
-
 export interface LibrarySettings {
   activeSessionPresetId?: string | null;
   croquisPreferences?: CroquisPreferences | null;
@@ -53,10 +51,8 @@ export type ExplorerSection =
 
 export interface AssetSummary {
   id: string;
-  type: AssetType;
-  hash?: string | null;
+  hash: string;
   storagePath?: string | null;
-  externalPath?: string | null;
   thumbnailPath?: string | null;
   fileName: string;
   fileSize: number;
@@ -77,19 +73,16 @@ export interface CroquisRecordSummary {
   stepIndex?: number | null;
   stepName?: string | null;
   targetDurationSeconds?: number | null;
-  startedAt?: string | null;
+  actualDurationSeconds?: number | null;
   finishedAt?: string | null;
-  finalizedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface AssetDetail {
   id: string;
-  type: AssetType;
-  hash?: string | null;
+  hash: string;
   storagePath?: string | null;
-  externalPath?: string | null;
   thumbnailPath?: string | null;
   fileName: string;
   fileSize: number;
@@ -100,8 +93,8 @@ export interface AssetDetail {
   createdAt: string;
   updatedAt: string;
   virtualFolders: VirtualFolder[];
-  tags: Tag[];
   relatedRecords: CroquisRecordSummary[];
+  lastCroquisAt?: string | null;
 }
 
 export interface CroquisRecordDetail {
@@ -113,9 +106,8 @@ export interface CroquisRecordDetail {
   stepIndex?: number | null;
   stepName?: string | null;
   targetDurationSeconds?: number | null;
-  startedAt?: string | null;
+  actualDurationSeconds?: number | null;
   finishedAt?: string | null;
-  finalizedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   note: string;
@@ -189,11 +181,13 @@ export interface SaveCroquisRecordPayload {
   tagIds?: string[];
 }
 
-export interface FinalizeCroquisRecordPayload {
-  recordId: string;
-  finishedAt?: string | null;
-  finalizedAt?: string | null;
-  actualDurationSeconds?: number | null;
+export interface FinishCroquisRecordPayload {
+  sourceAssetId: string;
+  title: string;
+  targetDurationSeconds?: number | null;
+  actualDurationSeconds: number;
+  finishedAt: string;
+  tagIds?: string[];
 }
 
 export interface DeleteCroquisRecordPayload {

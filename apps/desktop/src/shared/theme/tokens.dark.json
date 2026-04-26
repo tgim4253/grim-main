@@ -207,15 +207,15 @@
     "typography": {
       "font-family": {
         "mono": {
-          "$value": "JetBrains Mono",
+          "$value": "'Liberation Mono', 'SFMono-Regular', Consolas, monospace",
           "$type": "fontFamily"
         },
         "display": {
-          "$value": "Manrope",
+          "$value": "'Inter', 'Segoe UI', system-ui, sans-serif",
           "$type": "fontFamily"
         },
         "ui": {
-          "$value": "Inter",
+          "$value": "'Inter', 'Segoe UI', system-ui, sans-serif",
           "$type": "fontFamily"
         }
       },

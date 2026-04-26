@@ -4,7 +4,7 @@ use crate::{
     errors::{CommandResult, IntoCommandResult},
     models::record::{
         CroquisRecordDetail, CroquisRecordSummary, DeleteCroquisRecordPayload,
-        FinalizeCroquisRecordPayload, SaveCroquisRecordPayload,
+        FinishCroquisRecordPayload, SaveCroquisRecordPayload,
         UpdateCroquisRecordTagsPayload,
     },
     services::RecordService,
@@ -43,19 +43,11 @@ pub async fn delete_croquis_record(
 }
 
 #[tauri::command]
-pub async fn start_croquis_record(
-    record_id: String,
+pub async fn finish_croquis_record(
+    payload: FinishCroquisRecordPayload,
     record_service: State<'_, RecordService>,
 ) -> CommandResult<CroquisRecordDetail> {
-    record_service.mark_record_started(&record_id).await.into_command()
-}
-
-#[tauri::command]
-pub async fn finalize_croquis_record(
-    payload: FinalizeCroquisRecordPayload,
-    record_service: State<'_, RecordService>,
-) -> CommandResult<CroquisRecordDetail> {
-    record_service.finalize_record(payload).await.into_command()
+    record_service.finish_record(payload).await.into_command()
 }
 
 #[tauri::command]

@@ -91,7 +91,7 @@ export function CroquisStartModal({
 
       await ipc.session.start({
         assetIds,
-        presetId: selectedPreset.id,
+        preset: selectedPreset,
         option,
         saveOption: rememberOption,
         preferences: preferencesPayload,

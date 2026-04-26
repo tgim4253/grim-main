@@ -3,12 +3,9 @@ use tauri::Emitter;
 
 use crate::{
     app_launcher,
-    models::{
-        capture::{
-            CaptureContext, CaptureMonitor, CaptureOverlayPayload,
-            CapturePreview, CaptureRect,
-        },
-        record::SaveCroquisRecordPayload,
+    models::capture::{
+        CaptureContext, CaptureMonitor, CaptureOverlayPayload, CapturePreview,
+        CaptureRect,
     },
     services::{AssetService, RecordService},
     utils::{file_ops::decode_data_url, screen_capture},
@@ -65,50 +62,29 @@ impl CaptureService {
 
         let (bytes, extension) = decode_data_url(&base_url)?;
         let extension = extension.unwrap_or_else(|| "png".to_string());
-        if let Some(record_id) = context.record_id.as_deref() {
-            let _ = self.record_service.get_record(record_id).await?;
-        }
-        let file_name = context
+        let record_id = context
             .record_id
-            .as_ref()
-            .map(|record_id| format!("capture-{record_id}.{extension}"))
-            .unwrap_or_else(|| {
-                format!(
-                    "capture-{}.{}",
-                    chrono::Local::now().format("%Y%m%d-%H%M%S"),
-                    extension
-                )
-            });
+            .as_deref()
+            .ok_or_else(|| anyhow!("Capture requires a record id"))?;
+        let existing_record = self.record_service.get_record(record_id).await?;
+        if existing_record.record.finished_at.is_none() {
+            bail!("Capture requires a finished record");
+        }
+        let file_name = format!("capture-{record_id}.{extension}");
 
         let result_asset = self
             .asset_service
             .import_capture_result(&bytes, &file_name)
             .await?;
 
-        let record = match context.record_id.as_deref() {
-            Some(record_id) => {
-                self.record_service
-                    .attach_result_asset(
-                        record_id,
-                        &result_asset.id,
-                        context.actual_seconds,
-                    )
-                    .await?
-            }
-            None => {
-                self.record_service
-                    .save_record(SaveCroquisRecordPayload {
-                        id: None,
-                        source_asset_id: context.asset_id.clone(),
-                        result_asset_id: Some(result_asset.id.clone()),
-                        title: Some("Captured Result".to_string()),
-                        note: None,
-                        target_duration_seconds: context.target_seconds,
-                        tag_ids: Vec::new(),
-                    })
-                    .await?
-            }
-        };
+        let record = self
+            .record_service
+            .attach_result_asset(
+                record_id,
+                &result_asset.id,
+                context.actual_seconds,
+            )
+            .await?;
 
         #[derive(serde::Serialize, Clone)]
         #[serde(rename_all = "camelCase")]

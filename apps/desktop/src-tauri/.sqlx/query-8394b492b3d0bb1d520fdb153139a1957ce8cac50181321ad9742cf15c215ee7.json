@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT MAX(finished_at) AS \"last_croquis_at?: String\"\n            FROM croquis_record\n            WHERE (source_asset_id = ?1 OR result_asset_id = ?1)\n              AND finished_at IS NOT NULL\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "last_croquis_at?: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "8394b492b3d0bb1d520fdb153139a1957ce8cac50181321ad9742cf15c215ee7"
+}

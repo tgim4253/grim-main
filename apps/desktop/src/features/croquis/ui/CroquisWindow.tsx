@@ -24,12 +24,18 @@ export function CroquisWindow() {
         hasNext={controller.hasNext}
         hasPrevious={controller.hasPrevious}
         isCaptureEnabled={controller.session.option.isCapture}
+        isCurrentSaved={controller.isCurrentSaved}
         isPlaying={controller.isPlaying}
         queueLength={controller.queue.length}
         session={controller.session}
         onCapture={controller.handleCapture}
-        onMoveNext={() => controller.moveToIndex(controller.currentIndex + 1)}
-        onMovePrevious={() => controller.moveToIndex(controller.currentIndex - 1)}
+        onSave={controller.handleSave}
+        onMoveNext={() => {
+          controller.moveToIndex(controller.currentIndex + 1);
+        }}
+        onMovePrevious={() => {
+          controller.moveToIndex(controller.currentIndex - 1);
+        }}
         onTogglePlayback={() => {
           controller.setIsPlaying(value => !value);
         }}

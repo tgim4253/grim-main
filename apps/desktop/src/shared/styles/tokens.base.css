@@ -1,8 +1,56 @@
 @layer tokens-base {
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../assets/fonts/Inter-Regular.ttf') format('truetype');
+  }
+
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../assets/fonts/Inter-Medium.ttf') format('truetype');
+  }
+
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('../assets/fonts/Inter-SemiBold.ttf') format('truetype');
+  }
+
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../assets/fonts/Inter-Bold.ttf') format('truetype');
+  }
+
+  @font-face {
+    font-family: 'Liberation Mono';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../assets/fonts/LiberationMono-Regular.ttf') format('truetype');
+  }
+
+  @font-face {
+    font-family: 'Liberation Mono';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../assets/fonts/LiberationMono-Bold.ttf') format('truetype');
+  }
+
   :root {
     --font-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
-    --font-display: 'Manrope', 'Segoe UI', system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+    --font-display: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    --font-mono: 'Liberation Mono', 'SFMono-Regular', Consolas, monospace;
 
     --font-weight-regular: 400;
     --font-weight-medium: 500;

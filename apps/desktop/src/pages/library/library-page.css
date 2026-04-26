@@ -1,9 +1,13 @@
 @layer app {
   .library-page {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
     background: var(--semantic-colors-surface-primary);
   }
 
   .library-page__layout {
+    flex: 1 1 auto;
     min-height: 0;
     background: var(--semantic-colors-surface-primary);
   }
@@ -26,6 +30,7 @@
 
   .library-page__main-container {
     min-width: 0;
+    height: 100%;
     flex: 1 1 auto;
   }
 

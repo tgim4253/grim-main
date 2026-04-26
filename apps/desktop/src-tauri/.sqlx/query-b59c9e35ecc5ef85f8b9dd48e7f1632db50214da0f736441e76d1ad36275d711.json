@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT id,\n                   title,\n                   source_asset_id,\n                   result_asset_id,\n                   target_duration_seconds,\n                   actual_duration_seconds,\n                   started_at,\n                   finished_at,\n                   finalized_at,\n                   created_at,\n                   updated_at\n            FROM croquis_record\n            ORDER BY created_at DESC\n            LIMIT ?1\n            ",
+  "query": "\n            SELECT id,\n                   title,\n                   source_asset_id,\n                   result_asset_id,\n                   target_duration_seconds,\n                   actual_duration_seconds,\n                   finished_at,\n                   created_at,\n                   updated_at\n            FROM croquis_record\n            WHERE (source_asset_id = ?1 OR result_asset_id = ?1)\n              AND finished_at IS NOT NULL\n            ORDER BY finished_at DESC, created_at DESC\n            LIMIT 24\n            ",
   "describe": {
     "columns": [
       {
@@ -34,28 +34,18 @@
         "type_info": "Float"
       },
       {
-        "name": "started_at",
+        "name": "finished_at",
         "ordinal": 6,
         "type_info": "Text"
       },
       {
-        "name": "finished_at",
+        "name": "created_at",
         "ordinal": 7,
         "type_info": "Text"
       },
       {
-        "name": "finalized_at",
-        "ordinal": 8,
-        "type_info": "Text"
-      },
-      {
-        "name": "created_at",
-        "ordinal": 9,
-        "type_info": "Text"
-      },
-      {
         "name": "updated_at",
-        "ordinal": 10,
+        "ordinal": 8,
         "type_info": "Text"
       }
     ],
@@ -70,11 +60,9 @@
       true,
       true,
       true,
-      true,
-      true,
       false,
       false
     ]
   },
-  "hash": "f9addf8825a24ccd2f60cd1a66514481de57a3bbf31d460c837947de18b7643e"
+  "hash": "b59c9e35ecc5ef85f8b9dd48e7f1632db50214da0f736441e76d1ad36275d711"
 }

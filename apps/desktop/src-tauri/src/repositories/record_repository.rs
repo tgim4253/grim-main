@@ -5,7 +5,7 @@ use crate::{
     models::{
         record::{
             CroquisRecordDetail, CroquisRecordSummary,
-            DeleteCroquisRecordPayload, FinalizeCroquisRecordPayload,
+            DeleteCroquisRecordPayload, FinishCroquisRecordPayload,
             SaveCroquisRecordPayload, UpdateCroquisRecordTagsPayload,
         },
         tag::Tag,
@@ -41,13 +41,12 @@ impl RecordRepository {
                    result_asset_id,
                    target_duration_seconds,
                    actual_duration_seconds,
-                   started_at,
                    finished_at,
-                   finalized_at,
                    created_at,
                    updated_at
             FROM croquis_record
-            ORDER BY created_at DESC
+            WHERE finished_at IS NOT NULL
+            ORDER BY finished_at DESC, created_at DESC
             LIMIT ?1
             "#,
             limit
@@ -56,6 +55,51 @@ impl RecordRepository {
         .await?;
 
         Ok(rows.into_iter().map(record_summary_from_row).collect())
+    }
+
+    pub async fn finish(
+        &self,
+        payload: FinishCroquisRecordPayload,
+    ) -> Result<String> {
+        let now = get_now_date();
+        let now_ref = now.as_str();
+        let record_id = get_unique_id();
+        let record_id_ref = record_id.as_str();
+        let source_asset_id = payload.source_asset_id.as_str();
+        let title = payload.title.as_str();
+        let finished_at = payload.finished_at.as_str();
+
+        let mut tx = self.pool.begin().await?;
+        sqlx::query!(
+            r#"
+            INSERT INTO croquis_record
+            (id, source_asset_id, title, target_duration_seconds, actual_duration_seconds, finished_at, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
+            "#,
+            record_id_ref,
+            source_asset_id,
+            title,
+            payload.target_duration_seconds,
+            payload.actual_duration_seconds,
+            finished_at,
+            now_ref
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        for tag_id in &payload.tag_ids {
+            sqlx::query!(
+                "INSERT OR IGNORE INTO croquis_record_tag (record_id, tag_id, created_at) VALUES (?1, ?2, ?3)",
+                record_id_ref,
+                tag_id,
+                now_ref
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        tx.commit().await?;
+        Ok(record_id)
     }
 
     pub async fn get_detail(
@@ -72,9 +116,7 @@ impl RecordRepository {
                    result_asset_id,
                    target_duration_seconds,
                    actual_duration_seconds,
-                   started_at,
                    finished_at,
-                   finalized_at,
                    created_at,
                    updated_at
             FROM croquis_record
@@ -236,59 +278,6 @@ impl RecordRepository {
         Ok(())
     }
 
-    pub async fn mark_started(&self, record_id: &str) -> Result<()> {
-        let now = get_now_date();
-        let now_ref = now.as_str();
-        sqlx::query!(
-            r#"
-            UPDATE croquis_record
-            SET started_at = COALESCE(started_at, ?2),
-                updated_at = ?2
-            WHERE id = ?1
-            "#,
-            record_id,
-            now_ref
-        )
-        .execute(&self.pool)
-        .await?;
-        Ok(())
-    }
-
-    pub async fn finalize(
-        &self,
-        payload: FinalizeCroquisRecordPayload,
-    ) -> Result<()> {
-        let now = get_now_date();
-        let now_ref = now.as_str();
-        let finished_at = payload.finished_at.unwrap_or_else(|| now.clone());
-        let finalized_at = payload.finalized_at.unwrap_or_else(|| now.clone());
-        let record_id = payload.record_id.as_str();
-        let finished_at_ref = finished_at.as_str();
-        let finalized_at_ref = finalized_at.as_str();
-        let finished_at_value = Some(finished_at_ref);
-        let finalized_at_value = Some(finalized_at_ref);
-
-        sqlx::query!(
-            r#"
-            UPDATE croquis_record
-            SET finished_at = COALESCE(?2, finished_at),
-                finalized_at = COALESCE(?3, finalized_at),
-                actual_duration_seconds = COALESCE(?4, actual_duration_seconds),
-                updated_at = ?5
-            WHERE id = ?1
-            "#,
-            record_id,
-            finished_at_value,
-            finalized_at_value,
-            payload.actual_duration_seconds,
-            now_ref
-        )
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
-    }
-
     pub async fn attach_result_asset(
         &self,
         record_id: &str,
@@ -302,8 +291,6 @@ impl RecordRepository {
             UPDATE croquis_record
             SET result_asset_id = ?2,
                 actual_duration_seconds = COALESCE(?3, actual_duration_seconds),
-                finished_at = COALESCE(finished_at, ?4),
-                finalized_at = ?4,
                 updated_at = ?4
             WHERE id = ?1
             "#,

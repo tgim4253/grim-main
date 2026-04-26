@@ -1,8 +1,9 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
+use tokio::fs;
 
-use crate::{state::LibraryPaths, utils::media};
+use crate::{models::asset::AssetSummary, state::LibraryPaths, utils::media};
 
 #[derive(Clone)]
 pub struct LibraryStorage {
@@ -26,8 +27,26 @@ impl LibraryStorage {
         )
     }
 
+    pub fn asset_source_path(&self, asset: &AssetSummary) -> PathBuf {
+        self.asset_path(&asset.hash, &asset.file_name)
+    }
+
     pub fn thumbnail_path(&self, hash: &str) -> PathBuf {
         media::thumbnail_path(&self.paths.thumb_dir, hash)
+    }
+
+    pub async fn hydrate_asset_paths(&self, asset: &mut AssetSummary) {
+        asset.storage_path =
+            Self::existing_path_string(self.asset_source_path(asset)).await;
+        asset.thumbnail_path =
+            Self::existing_path_string(self.thumbnail_path(&asset.hash)).await;
+    }
+
+    async fn existing_path_string(path: PathBuf) -> Option<String> {
+        fs::metadata(&path)
+            .await
+            .is_ok()
+            .then(|| path.to_string_lossy().into_owned())
     }
 
     pub fn temp_file(&self, file_name: &str) -> PathBuf {

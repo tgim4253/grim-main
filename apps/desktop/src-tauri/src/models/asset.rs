@@ -7,6 +7,10 @@ use crate::models::{folder::VirtualFolder, record::CroquisRecordSummary};
 pub struct AssetSummary {
     pub id: String,
     pub hash: String,
+    #[serde(default)]
+    pub storage_path: Option<String>,
+    #[serde(default)]
+    pub thumbnail_path: Option<String>,
     pub file_name: String,
     pub file_size: i64,
     #[serde(default)]
@@ -30,6 +34,8 @@ pub struct AssetDetail {
     pub virtual_folders: Vec<VirtualFolder>,
     #[serde(default)]
     pub related_records: Vec<CroquisRecordSummary>,
+    #[serde(default)]
+    pub last_croquis_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

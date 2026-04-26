@@ -55,9 +55,7 @@ pub(crate) struct CroquisRecordSummaryRow {
     pub result_asset_id: Option<String>,
     pub target_duration_seconds: Option<i64>,
     pub actual_duration_seconds: Option<f64>,
-    pub started_at: Option<String>,
     pub finished_at: Option<String>,
-    pub finalized_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -70,9 +68,7 @@ pub(crate) struct CroquisRecordDetailRow {
     pub result_asset_id: Option<String>,
     pub target_duration_seconds: Option<i64>,
     pub actual_duration_seconds: Option<f64>,
-    pub started_at: Option<String>,
     pub finished_at: Option<String>,
-    pub finalized_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -107,6 +103,8 @@ pub(crate) fn asset_from_row(row: AssetRow) -> AssetSummary {
     AssetSummary {
         id: row.id,
         hash: row.hash,
+        storage_path: None,
+        thumbnail_path: None,
         file_name: row.file_name,
         file_size: row.file_size,
         mime_type: row.mime_type,
@@ -164,9 +162,7 @@ pub(crate) fn record_summary_from_row(
         result_asset_id: row.result_asset_id,
         target_duration_seconds: row.target_duration_seconds,
         actual_duration_seconds: row.actual_duration_seconds,
-        started_at: row.started_at,
         finished_at: row.finished_at,
-        finalized_at: row.finalized_at,
         created_at: row.created_at,
         updated_at: row.updated_at,
     }
@@ -182,9 +178,7 @@ pub(crate) fn record_detail_row_into_summary(
         result_asset_id: row.result_asset_id.clone(),
         target_duration_seconds: row.target_duration_seconds,
         actual_duration_seconds: row.actual_duration_seconds,
-        started_at: row.started_at.clone(),
         finished_at: row.finished_at.clone(),
-        finalized_at: row.finalized_at.clone(),
         created_at: row.created_at.clone(),
         updated_at: row.updated_at.clone(),
     }
