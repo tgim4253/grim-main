@@ -76,8 +76,7 @@ pub struct CroquisPreferences {
 pub struct CroquisStartPayload {
     #[serde(default)]
     pub asset_ids: Vec<String>,
-    #[serde(default)]
-    pub preset_id: Option<String>,
+    pub preset: SessionPreset,
     #[serde(default)]
     pub option: CroquisOption,
     #[serde(default)]
@@ -90,8 +89,13 @@ pub struct CroquisStartPayload {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CroquisSessionItem {
-    pub record_id: String,
+    pub item_id: String,
+    #[serde(default)]
+    pub record_id: Option<String>,
     pub asset_id: String,
+    pub title: String,
+    #[serde(default)]
+    pub tag_ids: Vec<String>,
     pub file_name: String,
     pub hash: String,
     pub base_path: String,

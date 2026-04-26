@@ -10,11 +10,7 @@ use crate::{
         CroquisPreferences, CroquisSession, CroquisSessionItem,
         CroquisStartPayload, CroquisStartResponse,
     },
-    models::record::SaveCroquisRecordPayload,
-    services::{
-        AssetService, LibraryStorage, RecordService, SessionService,
-        SettingsService,
-    },
+    services::{AssetService, LibraryStorage, SettingsService},
     utils::{date::get_now_date, identifier::get_unique_id, media},
 };
 
@@ -38,8 +34,6 @@ struct PreparedCroquisItem {
 
 #[derive(Clone)]
 pub struct CroquisService {
-    session_service: SessionService,
-    record_service: RecordService,
     asset_service: AssetService,
     settings_service: SettingsService,
     library_storage: LibraryStorage,
@@ -47,19 +41,11 @@ pub struct CroquisService {
 
 impl CroquisService {
     pub fn new(
-        session_service: SessionService,
-        record_service: RecordService,
         asset_service: AssetService,
         settings_service: SettingsService,
         library_storage: LibraryStorage,
     ) -> Self {
-        Self {
-            session_service,
-            record_service,
-            asset_service,
-            settings_service,
-            library_storage,
-        }
+        Self { asset_service, settings_service, library_storage }
     }
 
     pub async fn start_session(
@@ -90,6 +76,7 @@ impl CroquisService {
         let saved = self.settings_service.save_settings(settings).await?;
         Ok(saved.croquis_preferences.unwrap_or_else(|| preferences.clone()))
     }
+
     async fn start_session_inner(
         &self,
         app_handle: &tauri::AppHandle,
@@ -97,7 +84,7 @@ impl CroquisService {
     ) -> Result<CroquisStartResponse> {
         let CroquisStartPayload {
             asset_ids,
-            preset_id,
+            preset,
             option,
             save_option,
             preferences,
@@ -107,10 +94,6 @@ impl CroquisService {
             bail!("At least one asset must be selected to start Croquis");
         }
 
-        let preset = self
-            .session_service
-            .load_session_preset(preset_id.as_deref())
-            .await?;
         if preset.steps.is_empty() {
             bail!("Selected session preset does not have any steps");
         }
@@ -171,38 +154,19 @@ impl CroquisService {
 
         let session_title = build_session_title(&preset.name);
         let session_id = get_unique_id();
-        let mut created_record_ids = Vec::with_capacity(prepared_items.len());
 
         let mut items = Vec::with_capacity(prepared_items.len());
         for prepared_item in prepared_items {
-            let record_title = format!(
+            let title = format!(
                 "{} · {}",
                 prepared_item.file_name, prepared_item.step_name
             );
-            let record = match self
-                .record_service
-                .save_record(SaveCroquisRecordPayload {
-                    id: None,
-                    source_asset_id: Some(prepared_item.asset_id.clone()),
-                    result_asset_id: None,
-                    title: Some(record_title),
-                    note: None,
-                    target_duration_seconds: prepared_item
-                        .target_duration_seconds,
-                    tag_ids: prepared_item.tag_ids.clone(),
-                })
-                .await
-            {
-                Ok(record) => record,
-                Err(error) => {
-                    self.cleanup_failed_records(&created_record_ids).await;
-                    return Err(error);
-                }
-            };
-            created_record_ids.push(record.record.id.clone());
             items.push(CroquisSessionItem {
-                record_id: record.record.id,
+                item_id: get_unique_id(),
+                record_id: None,
                 asset_id: prepared_item.asset_id,
+                title,
+                tag_ids: prepared_item.tag_ids,
                 file_name: prepared_item.file_name,
                 hash: prepared_item.hash,
                 base_path: prepared_item.base_path,
@@ -224,34 +188,22 @@ impl CroquisService {
             created_at: get_now_date(),
         };
 
+        {
+            let mut sessions = CROQUIS_SESSIONS.write().await;
+            sessions.insert(session_id.clone(), session.clone());
+        }
+
         let window_label =
             match app_launcher::croquis::launch_croquis(app_handle, &session) {
                 Ok(window_label) => window_label,
                 Err(error) => {
-                    self.cleanup_failed_records(&created_record_ids).await;
+                    let mut sessions = CROQUIS_SESSIONS.write().await;
+                    sessions.remove(&session_id);
                     return Err(anyhow::Error::msg(error));
                 }
             };
 
-        {
-            let mut sessions = CROQUIS_SESSIONS.write().await;
-            sessions.insert(session_id.clone(), session);
-        }
-
         Ok(CroquisStartResponse { session_id, window_label })
-    }
-
-    async fn cleanup_failed_records(&self, record_ids: &[String]) {
-        for record_id in record_ids {
-            let _ = self
-                .record_service
-                .delete_record(
-                    crate::models::record::DeleteCroquisRecordPayload {
-                        record_id: record_id.clone(),
-                    },
-                )
-                .await;
-        }
     }
 }
 

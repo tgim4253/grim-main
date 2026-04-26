@@ -36,15 +36,18 @@ export interface CroquisPreferences {
 
 export interface CroquisStartPayload {
   assetIds: string[];
-  presetId?: string | null;
+  preset: SessionPreset;
   option: CroquisOption;
   saveOption?: boolean;
   preferences?: CroquisPreferences | null;
 }
 
 export interface CroquisSessionItem {
-  recordId: string;
+  itemId: string;
+  recordId?: string | null;
   assetId: string;
+  title: string;
+  tagIds: string[];
   fileName: string;
   hash?: string | null;
   basePath: string;

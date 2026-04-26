@@ -3,7 +3,11 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { LogicalSize, getCurrentWindow } from '@tauri-apps/api/window';
 import { ipc } from '../../../shared/lib/ipc';
-import type { CroquisSession, CroquisSessionItem } from '../../../shared/types';
+import type {
+  CroquisRecordDetail,
+  CroquisSession,
+  CroquisSessionItem,
+} from '../../../shared/types';
 import { formatSeconds, shuffleItems, timestampNow } from './sessionUtils';
 
 const sessionLoadCache = new Map<string, Promise<CroquisSession | null>>();
@@ -22,10 +26,9 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
 
   const intervalRef = useRef<number | null>(null);
   const recordStartRef = useRef<number>(Date.now());
-  const startedIdsRef = useRef<Set<string>>(new Set());
-  const finalizedIdsRef = useRef<Set<string>>(new Set());
+  const finishPromisesRef = useRef<Map<string, Promise<CroquisRecordDetail>>>(new Map());
   const currentItemRef = useRef<CroquisSessionItem | null>(null);
-  const elapsedSecondsRef = useRef(0);
+  const currentRecordIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!sessionId) {
@@ -52,6 +55,8 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
       }
 
       const ordered = payload.option.isShuffle ? shuffleItems(payload.items) : payload.items;
+      finishPromisesRef.current.clear();
+      currentRecordIdRef.current = null;
       setSession(payload);
       setQueue(ordered);
       setCurrentIndex(0);
@@ -76,29 +81,58 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
 
   useEffect(() => {
     currentItemRef.current = currentItem;
+    currentRecordIdRef.current = currentItem?.recordId ?? null;
   }, [currentItem]);
 
-  useEffect(() => {
-    elapsedSecondsRef.current = elapsedSeconds;
-  }, [elapsedSeconds]);
-
-  const finalizeItem = useCallback(
+  const finishItem = useCallback(
     async (
       item: CroquisSessionItem | null,
       durationSeconds: number,
-      finalizedAt = timestampNow(),
+      finishedAt = timestampNow(),
     ) => {
-      if (item === null || finalizedIdsRef.current.has(item.recordId)) {
-        return;
+      if (item === null) {
+        return null;
       }
 
-      finalizedIdsRef.current.add(item.recordId);
-      await ipc.record.finalize({
-        recordId: item.recordId,
-        finishedAt: finalizedAt,
-        finalizedAt,
-        actualDurationSeconds: durationSeconds,
+      if (item.recordId) {
+        return item.recordId;
+      }
+
+      const existingPromise = finishPromisesRef.current.get(item.itemId);
+      if (existingPromise) {
+        const existingRecord = await existingPromise;
+        return existingRecord.id;
+      }
+
+      const finishPromise = ipc.record.finish({
+        sourceAssetId: item.assetId,
+        title: item.title,
+        targetDurationSeconds: item.targetDurationSeconds ?? null,
+        actualDurationSeconds: Math.max(0, durationSeconds),
+        finishedAt,
+        tagIds: item.tagIds,
       });
+
+      finishPromisesRef.current.set(item.itemId, finishPromise);
+
+      try {
+        const record = await finishPromise;
+        setQueue(items =>
+          items.map(queueItem =>
+            queueItem.itemId === item.itemId ? { ...queueItem, recordId: record.id } : queueItem,
+          ),
+        );
+
+        if (currentItemRef.current?.itemId === item.itemId) {
+          currentItemRef.current = { ...currentItemRef.current, recordId: record.id };
+          currentRecordIdRef.current = record.id;
+        }
+
+        return record.id;
+      } catch (error) {
+        finishPromisesRef.current.delete(item.itemId);
+        throw error;
+      }
     },
     [],
   );
@@ -108,19 +142,9 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
       return;
     }
 
-    const applyRecordStart = async () => {
-      if (startedIdsRef.current.has(currentItem.recordId)) {
-        return;
-      }
-
-      startedIdsRef.current.add(currentItem.recordId);
-      await ipc.record.start(currentItem.recordId);
-    };
-
     recordStartRef.current = Date.now();
     setElapsedSeconds(0);
-    void applyRecordStart();
-  }, [currentItem]);
+  }, [currentItem?.itemId]);
 
   useEffect(() => {
     if (!isPlaying || currentItem === null) {
@@ -145,7 +169,7 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
   }, [currentItem, isPlaying]);
 
   useEffect(() => {
-    if (currentItem === null || session === null || currentTargetSeconds <= 0) {
+    if (!isPlaying || currentItem === null || session === null || currentTargetSeconds <= 0) {
       return;
     }
 
@@ -155,10 +179,18 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
 
     setIsPlaying(false);
     const run = async () => {
-      await finalizeItem(currentItem, currentTargetSeconds);
-      if (session.option.auto.isSkip && currentIndex < queue.length - 1) {
-        setCurrentIndex(index => index + 1);
-        setIsPlaying(true);
+      setStatus('Saving completed record...');
+      try {
+        await finishItem(currentItem, currentTargetSeconds);
+        if (session.option.auto.isSkip && currentIndex < queue.length - 1) {
+          setCurrentIndex(index => index + 1);
+          setIsPlaying(true);
+          setStatus(null);
+          return;
+        }
+        setStatus('Record saved.');
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : 'Failed to save record.');
       }
     };
 
@@ -168,7 +200,8 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
     currentItem,
     currentTargetSeconds,
     elapsedSeconds,
-    finalizeItem,
+    finishItem,
+    isPlaying,
     queue.length,
     session,
   ]);
@@ -212,7 +245,7 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
     void (async () => {
       try {
         unlisten = await listen<{ recordId: string }>('capture://completed', event => {
-          if (currentItem !== null && event.payload.recordId === currentItem.recordId) {
+          if (event.payload.recordId === currentRecordIdRef.current) {
             setStatus('Capture saved to the current record.');
           }
         });
@@ -224,45 +257,73 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
     return () => {
       unlisten?.();
     };
-  }, [currentItem === null ? null : currentItem.recordId]);
+  }, []);
 
   useEffect(() => {
     return () => {
       if (intervalRef.current) {
         window.clearInterval(intervalRef.current);
       }
-
-      void finalizeItem(currentItemRef.current, elapsedSecondsRef.current, timestampNow());
     };
-  }, [finalizeItem]);
+  }, []);
 
   const moveToIndex = useCallback(
-    async (nextIndex: number) => {
-      if (currentItem === null) {
+    (nextIndex: number) => {
+      if (nextIndex < 0 || nextIndex >= queue.length) {
         return;
       }
 
-      await finalizeItem(currentItem, elapsedSeconds);
       setCurrentIndex(nextIndex);
       setIsPlaying(true);
       setStatus(null);
     },
-    [currentItem, elapsedSeconds, finalizeItem],
+    [queue.length],
   );
+
+  const handleSave = useCallback(async () => {
+    if (currentItem === null) {
+      return;
+    }
+
+    if (currentItem.recordId) {
+      setStatus('Record already saved.');
+      return;
+    }
+
+    setStatus('Saving record...');
+    try {
+      await finishItem(currentItem, elapsedSeconds);
+      setStatus('Record saved.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Failed to save record.');
+    }
+  }, [currentItem, elapsedSeconds, finishItem]);
 
   const handleCapture = useCallback(async () => {
     if (currentItem === null || session === null) {
       return;
     }
 
-    await ipc.capture.openOverlay({
-      sessionId: session.sessionId,
-      recordId: currentItem.recordId,
-      assetId: currentItem.assetId,
-      targetSeconds: currentTargetSeconds || null,
-      actualSeconds: elapsedSeconds,
-    });
-  }, [currentItem, currentTargetSeconds, elapsedSeconds, session]);
+    setIsPlaying(false);
+    setStatus('Saving record for capture...');
+    try {
+      const recordId = await finishItem(currentItem, elapsedSeconds);
+      if (!recordId) {
+        setStatus('Failed to save record for capture.');
+        return;
+      }
+
+      await ipc.capture.openOverlay({
+        sessionId: session.sessionId,
+        recordId,
+        targetSeconds: currentTargetSeconds || null,
+        actualSeconds: elapsedSeconds,
+      });
+      setStatus(null);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Failed to open capture.');
+    }
+  }, [currentItem, currentTargetSeconds, elapsedSeconds, finishItem, session]);
 
   return {
     currentImageSrc,
@@ -272,8 +333,10 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
     elapsedSeconds,
     formatSeconds,
     handleCapture,
+    handleSave,
     hasNext: currentIndex < queue.length - 1,
     hasPrevious: currentIndex > 0,
+    isCurrentSaved: Boolean(currentItem?.recordId),
     isPlaying,
     moveToIndex,
     queue,

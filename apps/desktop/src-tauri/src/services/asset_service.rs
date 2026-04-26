@@ -416,9 +416,12 @@ mod tests {
                 DeleteVirtualFolderPayload, SaveVirtualFolderPayload,
                 VirtualFolderKind,
             },
-            record::{FinalizeCroquisRecordPayload, SaveCroquisRecordPayload},
+            record::{FinishCroquisRecordPayload, SaveCroquisRecordPayload},
         },
-        repositories::{AssetRepository, FolderRepository, RecordRepository},
+        repositories::{
+            AssetRepository, FolderRepository, NewImportedAssetInput,
+            RecordRepository,
+        },
         services::{AssetService, FolderService, LibraryStorage},
         state::{
             bootstrap::{ensure_schema, open_or_create_db, seed_defaults},
@@ -538,8 +541,9 @@ mod tests {
         let asset_id =
             result.assets.first().expect("missing imported asset").id.clone();
 
+        let asset_repository = AssetRepository::new(pool.clone());
         let record_repository = RecordRepository::new(pool);
-        let created_record_id = record_repository
+        let _created_record_id = record_repository
             .save(SaveCroquisRecordPayload {
                 source_asset_id: Some(asset_id.clone()),
                 title: Some("Created only".to_string()),
@@ -547,40 +551,62 @@ mod tests {
             })
             .await
             .expect("failed to save created record");
-        record_repository
-            .mark_started(&created_record_id)
-            .await
-            .expect("failed to mark record started");
 
-        let finished_record_id = record_repository
-            .save(SaveCroquisRecordPayload {
-                result_asset_id: Some(asset_id.clone()),
-                title: Some("Finished".to_string()),
-                ..Default::default()
-            })
-            .await
-            .expect("failed to save finished record");
         record_repository
-            .finalize(FinalizeCroquisRecordPayload {
-                record_id: finished_record_id,
-                finished_at: Some("2030-01-05T00:00:00Z".to_string()),
-                actual_duration_seconds: None,
+            .finish(FinishCroquisRecordPayload {
+                source_asset_id: asset_id.clone(),
+                title: "Finished".to_string(),
+                target_duration_seconds: Some(180),
+                actual_duration_seconds: 180.0,
+                finished_at: "2030-01-05T00:00:00Z".to_string(),
+                tag_ids: Vec::new(),
             })
             .await
             .expect("failed to finish record");
 
-        let unrelated_record_id = record_repository
-            .save(SaveCroquisRecordPayload {
-                title: Some("Unrelated".to_string()),
-                ..Default::default()
+        record_repository
+            .finish(FinishCroquisRecordPayload {
+                source_asset_id: asset_id.clone(),
+                title: "Later related".to_string(),
+                target_duration_seconds: None,
+                actual_duration_seconds: 1.0,
+                finished_at: "2031-01-01T00:00:00Z".to_string(),
+                tag_ids: Vec::new(),
             })
             .await
-            .expect("failed to save unrelated record");
+            .expect("failed to finish later related record");
+
+        let unrelated_asset_id = "asset-unrelated";
+        let mut tx = asset_repository
+            .begin()
+            .await
+            .expect("failed to begin unrelated asset tx");
+        asset_repository
+            .insert_imported_in_tx(
+                &mut tx,
+                &NewImportedAssetInput {
+                    id: unrelated_asset_id,
+                    hash: "unrelatedassethash",
+                    file_name: "unrelated.bmp",
+                    file_size: BMP_1X1.len() as i64,
+                    mime_type: "image/bmp",
+                    width: 1,
+                    height: 1,
+                    modified_at: None,
+                    created_at: "2026-01-01T00:00:00Z",
+                },
+            )
+            .await
+            .expect("failed to insert unrelated asset");
+        tx.commit().await.expect("failed to commit unrelated asset");
         record_repository
-            .finalize(FinalizeCroquisRecordPayload {
-                record_id: unrelated_record_id,
-                finished_at: Some("2099-01-01T00:00:00Z".to_string()),
-                actual_duration_seconds: None,
+            .finish(FinishCroquisRecordPayload {
+                source_asset_id: unrelated_asset_id.to_string(),
+                title: "Unrelated".to_string(),
+                target_duration_seconds: None,
+                actual_duration_seconds: 1.0,
+                finished_at: "2099-01-01T00:00:00Z".to_string(),
+                tag_ids: Vec::new(),
             })
             .await
             .expect("failed to finish unrelated record");
@@ -588,9 +614,13 @@ mod tests {
         let detail = service.get_asset(&asset_id).await.expect("missing asset");
         assert_eq!(
             detail.last_croquis_at.as_deref(),
-            Some("2030-01-05T00:00:00Z")
+            Some("2031-01-01T00:00:00Z")
         );
         assert_eq!(detail.related_records.len(), 2);
+        assert!(detail
+            .related_records
+            .iter()
+            .all(|record| record.finished_at.is_some()));
 
         let _ = fs::remove_dir_all(dir);
     }

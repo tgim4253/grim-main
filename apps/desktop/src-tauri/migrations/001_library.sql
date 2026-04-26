@@ -109,7 +109,6 @@ CREATE TABLE IF NOT EXISTS croquis_record (
   note                     TEXT NOT NULL DEFAULT '',
   target_duration_seconds  INTEGER,
   actual_duration_seconds  REAL,
-  started_at               TEXT,
   finished_at              TEXT,
   finalized_at             TEXT,
   created_at               TEXT NOT NULL DEFAULT (datetime('now')),

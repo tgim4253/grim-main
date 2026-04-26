@@ -17,8 +17,6 @@ pub struct CroquisRecordSummary {
     #[serde(default)]
     pub actual_duration_seconds: Option<f64>,
     #[serde(default)]
-    pub started_at: Option<String>,
-    #[serde(default)]
     pub finished_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
@@ -60,12 +58,15 @@ pub struct SaveCroquisRecordPayload {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FinalizeCroquisRecordPayload {
-    pub record_id: String,
+pub struct FinishCroquisRecordPayload {
+    pub source_asset_id: String,
+    pub title: String,
     #[serde(default)]
-    pub finished_at: Option<String>,
+    pub target_duration_seconds: Option<i64>,
+    pub actual_duration_seconds: f64,
+    pub finished_at: String,
     #[serde(default)]
-    pub actual_duration_seconds: Option<f64>,
+    pub tag_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

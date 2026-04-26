@@ -62,8 +62,7 @@ pub fn run() {
             commands::record_commands::get_record_detail,
             commands::record_commands::save_croquis_record,
             commands::record_commands::delete_croquis_record,
-            commands::record_commands::start_croquis_record,
-            commands::record_commands::finalize_croquis_record,
+            commands::record_commands::finish_croquis_record,
             commands::record_commands::update_croquis_record_tags,
             commands::session_commands::list_session_presets,
             commands::session_commands::save_session_preset,
@@ -131,8 +130,6 @@ pub fn run() {
                 record_service.clone(),
             );
             let croquis_service = CroquisService::new(
-                session_service.clone(),
-                record_service.clone(),
                 asset_service.clone(),
                 settings_service.clone(),
                 library_storage,

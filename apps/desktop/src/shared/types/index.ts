@@ -32,7 +32,7 @@ export type {
   ExplorerSection,
   ExplorerSnapshot,
   FolderStats,
-  FinalizeCroquisRecordPayload,
+  FinishCroquisRecordPayload,
   ImportRequest,
   ImportResult,
   LibrarySettings,

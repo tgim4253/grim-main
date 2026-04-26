@@ -232,13 +232,13 @@ impl AssetRepository {
                    result_asset_id,
                    target_duration_seconds,
                    actual_duration_seconds,
-                   started_at,
                    finished_at,
                    created_at,
                    updated_at
             FROM croquis_record
-            WHERE source_asset_id = ?1 OR result_asset_id = ?1
-            ORDER BY created_at DESC
+            WHERE (source_asset_id = ?1 OR result_asset_id = ?1)
+              AND finished_at IS NOT NULL
+            ORDER BY finished_at DESC, created_at DESC
             LIMIT 24
             "#,
             asset_id
@@ -250,7 +250,8 @@ impl AssetRepository {
             r#"
             SELECT MAX(finished_at) AS "last_croquis_at?: String"
             FROM croquis_record
-            WHERE source_asset_id = ?1 OR result_asset_id = ?1
+            WHERE (source_asset_id = ?1 OR result_asset_id = ?1)
+              AND finished_at IS NOT NULL
             "#,
             asset_id
         )
