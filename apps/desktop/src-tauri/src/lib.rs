@@ -111,8 +111,11 @@ pub fn run() {
             );
             let folder_service = FolderService::new(folder_repository);
             let tag_service = TagService::new(tag_repository.clone());
-            let record_service =
-                RecordService::new(record_repository, asset_repository);
+            let record_service = RecordService::new(
+                record_repository,
+                asset_repository,
+                library_storage.clone(),
+            );
             let session_service = SessionService::new(
                 session_repository,
                 settings_repository,

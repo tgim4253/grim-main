@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE croquis_record\n            SET finished_at = COALESCE(?2, finished_at),\n                actual_duration_seconds = COALESCE(?3, actual_duration_seconds),\n                updated_at = ?4\n            WHERE id = ?1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "7a3570d82b20841f470cbf0f468d822a77fbe20d375568ed1177d7f42cdae4ee"
+}

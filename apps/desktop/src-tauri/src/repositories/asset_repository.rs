@@ -234,7 +234,6 @@ impl AssetRepository {
                    actual_duration_seconds,
                    started_at,
                    finished_at,
-                   finalized_at,
                    created_at,
                    updated_at
             FROM croquis_record
@@ -247,6 +246,18 @@ impl AssetRepository {
         .fetch_all(&self.pool)
         .await?;
 
+        let last_croquis_at = sqlx::query!(
+            r#"
+            SELECT MAX(finished_at) AS "last_croquis_at?: String"
+            FROM croquis_record
+            WHERE source_asset_id = ?1 OR result_asset_id = ?1
+            "#,
+            asset_id
+        )
+        .fetch_one(&self.pool)
+        .await?
+        .last_croquis_at;
+
         Ok(AssetDetail {
             asset,
             virtual_folders: folder_rows
@@ -257,7 +268,7 @@ impl AssetRepository {
                 .into_iter()
                 .map(record_summary_from_row)
                 .collect::<Vec<CroquisRecordSummary>>(),
-            last_croquis_at: None,
+            last_croquis_at,
         })
     }
 

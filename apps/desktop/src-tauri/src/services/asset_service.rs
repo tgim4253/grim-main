@@ -54,11 +54,13 @@ impl AssetService {
         &self,
         source: AssetListSource,
     ) -> Result<Vec<AssetSummary>> {
-        self.asset_repository.list_by_source(source).await
+        let assets = self.asset_repository.list_by_source(source).await?;
+        Ok(self.hydrate_asset_summaries(assets).await)
     }
 
     pub async fn get_asset(&self, asset_id: &str) -> Result<AssetDetail> {
-        self.asset_repository.get_detail(asset_id).await
+        let detail = self.asset_repository.get_detail(asset_id).await?;
+        Ok(self.hydrate_asset_detail(detail).await)
     }
 
     pub async fn update_asset_folders(
@@ -72,7 +74,8 @@ impl AssetService {
             AssetFolderAssignmentMode::Replace,
         )
         .await?;
-        self.asset_repository.get_detail(&asset_id).await
+        let detail = self.asset_repository.get_detail(&asset_id).await?;
+        Ok(self.hydrate_asset_detail(detail).await)
     }
 
     async fn apply_asset_folder_assignments(
@@ -169,6 +172,8 @@ impl AssetService {
             }
         }
 
+        let assets = self.hydrate_asset_summaries(assets).await;
+
         Ok(ImportResult { imported, reused, assets })
     }
 
@@ -181,7 +186,7 @@ impl AssetService {
         if let Some(existing) =
             self.asset_repository.load_by_hash(&hash).await?
         {
-            return Ok(existing);
+            return Ok(self.hydrate_asset_summary(existing).await);
         }
 
         let tmp_file =
@@ -231,7 +236,11 @@ impl AssetService {
 
         let _ = fs::remove_file(&tmp_file).await;
         match result {
-            Ok(asset_id) => self.asset_repository.get_summary(&asset_id).await,
+            Ok(asset_id) => {
+                let asset =
+                    self.asset_repository.get_summary(&asset_id).await?;
+                Ok(self.hydrate_asset_summary(asset).await)
+            }
             Err(error) => {
                 if !destination_existed {
                     let _ = fs::remove_file(&destination).await;
@@ -248,14 +257,43 @@ impl AssetService {
         &self,
         asset_ids: &[String],
     ) -> Result<Vec<AssetSummary>> {
-        self.asset_repository.load_many_summaries(asset_ids).await
+        let assets =
+            self.asset_repository.load_many_summaries(asset_ids).await?;
+        Ok(self.hydrate_asset_summaries(assets).await)
     }
 
     pub fn resolve_asset_source_path(
         &self,
         asset: &AssetSummary,
     ) -> Option<PathBuf> {
-        Some(self.library_storage.asset_path(&asset.hash, &asset.file_name))
+        Some(self.library_storage.asset_source_path(asset))
+    }
+
+    async fn hydrate_asset_detail(
+        &self,
+        mut detail: AssetDetail,
+    ) -> AssetDetail {
+        self.library_storage.hydrate_asset_paths(&mut detail.asset).await;
+        detail
+    }
+
+    async fn hydrate_asset_summaries(
+        &self,
+        assets: Vec<AssetSummary>,
+    ) -> Vec<AssetSummary> {
+        let mut hydrated = Vec::with_capacity(assets.len());
+        for asset in assets {
+            hydrated.push(self.hydrate_asset_summary(asset).await);
+        }
+        hydrated
+    }
+
+    async fn hydrate_asset_summary(
+        &self,
+        mut asset: AssetSummary,
+    ) -> AssetSummary {
+        self.library_storage.hydrate_asset_paths(&mut asset).await;
+        asset
     }
 
     async fn import_image_asset(
@@ -371,13 +409,16 @@ mod tests {
 
     use crate::{
         models::{
-            asset::{ImportRequest, UpdateAssetFoldersPayload},
+            asset::{
+                AssetListSource, ImportRequest, UpdateAssetFoldersPayload,
+            },
             folder::{
                 DeleteVirtualFolderPayload, SaveVirtualFolderPayload,
                 VirtualFolderKind,
             },
+            record::{FinalizeCroquisRecordPayload, SaveCroquisRecordPayload},
         },
-        repositories::{AssetRepository, FolderRepository},
+        repositories::{AssetRepository, FolderRepository, RecordRepository},
         services::{AssetService, FolderService, LibraryStorage},
         state::{
             bootstrap::{ensure_schema, open_or_create_db, seed_defaults},
@@ -415,6 +456,188 @@ mod tests {
 
     fn path_string(path: &Path) -> String {
         path.to_string_lossy().into_owned()
+    }
+
+    #[tokio::test]
+    async fn asset_reads_hydrate_storage_and_thumbnail_paths() {
+        let dir = make_temp_dir("hydrate-paths");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let source_path = dir.join("source.bmp");
+        fs::write(&source_path, BMP_1X1).expect("failed to write test image");
+
+        let service = AssetService::new(
+            AssetRepository::new(pool.clone()),
+            FolderRepository::new(pool),
+            storage_for(&dir),
+        );
+        let result = service
+            .import_images(ImportRequest {
+                file_paths: vec![path_string(&source_path)],
+                virtual_folder_ids: Vec::new(),
+            })
+            .await
+            .expect("failed to import asset");
+        let imported = result.assets.first().expect("missing imported asset");
+        assert!(imported.storage_path.is_some());
+        assert!(imported.thumbnail_path.is_some());
+
+        let listed = service
+            .list_assets(AssetListSource::AllAssets)
+            .await
+            .expect("failed to list assets");
+        let listed_asset = listed.first().expect("missing listed asset");
+        assert_eq!(listed_asset.id, imported.id);
+        assert!(listed_asset.storage_path.is_some());
+        assert!(listed_asset.thumbnail_path.is_some());
+
+        let detail =
+            service.get_asset(&imported.id).await.expect("missing detail");
+        assert!(detail.asset.storage_path.is_some());
+        assert!(detail.asset.thumbnail_path.is_some());
+        assert_eq!(detail.last_croquis_at, None);
+
+        let loaded = service
+            .load_assets_by_ids(std::slice::from_ref(&imported.id))
+            .await
+            .expect("failed to load assets by id");
+        let loaded_asset = loaded.first().expect("missing loaded asset");
+        assert!(loaded_asset.storage_path.is_some());
+        assert!(loaded_asset.thumbnail_path.is_some());
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn asset_detail_reports_last_croquis_at_from_related_records() {
+        let dir = make_temp_dir("last-croquis");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let service = AssetService::new(
+            AssetRepository::new(pool.clone()),
+            FolderRepository::new(pool.clone()),
+            storage_for(&dir),
+        );
+        let source_path = dir.join("source.bmp");
+        fs::write(&source_path, BMP_1X1).expect("failed to write test image");
+        let result = service
+            .import_images(ImportRequest {
+                file_paths: vec![path_string(&source_path)],
+                virtual_folder_ids: Vec::new(),
+            })
+            .await
+            .expect("failed to import asset");
+        let asset_id =
+            result.assets.first().expect("missing imported asset").id.clone();
+
+        let record_repository = RecordRepository::new(pool);
+        let created_record_id = record_repository
+            .save(SaveCroquisRecordPayload {
+                source_asset_id: Some(asset_id.clone()),
+                title: Some("Created only".to_string()),
+                ..Default::default()
+            })
+            .await
+            .expect("failed to save created record");
+        record_repository
+            .mark_started(&created_record_id)
+            .await
+            .expect("failed to mark record started");
+
+        let finished_record_id = record_repository
+            .save(SaveCroquisRecordPayload {
+                result_asset_id: Some(asset_id.clone()),
+                title: Some("Finished".to_string()),
+                ..Default::default()
+            })
+            .await
+            .expect("failed to save finished record");
+        record_repository
+            .finalize(FinalizeCroquisRecordPayload {
+                record_id: finished_record_id,
+                finished_at: Some("2030-01-05T00:00:00Z".to_string()),
+                actual_duration_seconds: None,
+            })
+            .await
+            .expect("failed to finish record");
+
+        let unrelated_record_id = record_repository
+            .save(SaveCroquisRecordPayload {
+                title: Some("Unrelated".to_string()),
+                ..Default::default()
+            })
+            .await
+            .expect("failed to save unrelated record");
+        record_repository
+            .finalize(FinalizeCroquisRecordPayload {
+                record_id: unrelated_record_id,
+                finished_at: Some("2099-01-01T00:00:00Z".to_string()),
+                actual_duration_seconds: None,
+            })
+            .await
+            .expect("failed to finish unrelated record");
+
+        let detail = service.get_asset(&asset_id).await.expect("missing asset");
+        assert_eq!(
+            detail.last_croquis_at.as_deref(),
+            Some("2030-01-05T00:00:00Z")
+        );
+        assert_eq!(detail.related_records.len(), 2);
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn missing_thumbnail_path_is_none_without_failing_read() {
+        let dir = make_temp_dir("missing-thumb");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let service = AssetService::new(
+            AssetRepository::new(pool.clone()),
+            FolderRepository::new(pool),
+            storage_for(&dir),
+        );
+        let source_path = dir.join("source.bmp");
+        fs::write(&source_path, BMP_1X1).expect("failed to write test image");
+        let result = service
+            .import_images(ImportRequest {
+                file_paths: vec![path_string(&source_path)],
+                virtual_folder_ids: Vec::new(),
+            })
+            .await
+            .expect("failed to import asset");
+        let imported = result.assets.first().expect("missing imported asset");
+        let asset_id = imported.id.clone();
+        let expected_asset_path = imported
+            .storage_path
+            .clone()
+            .expect("missing hydrated storage path");
+        let thumbnail_path = imported
+            .thumbnail_path
+            .clone()
+            .expect("missing hydrated thumbnail path");
+        fs::remove_file(thumbnail_path).expect("failed to remove thumbnail");
+
+        let detail = service.get_asset(&asset_id).await.expect("missing asset");
+        assert_eq!(
+            detail.asset.storage_path.as_deref(),
+            Some(expected_asset_path.as_str())
+        );
+        assert_eq!(detail.asset.thumbnail_path, None);
+
+        let _ = fs::remove_dir_all(dir);
     }
 
     #[tokio::test]

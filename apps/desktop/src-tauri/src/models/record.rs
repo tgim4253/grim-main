@@ -20,8 +20,6 @@ pub struct CroquisRecordSummary {
     pub started_at: Option<String>,
     #[serde(default)]
     pub finished_at: Option<String>,
-    #[serde(default)]
-    pub finalized_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -66,8 +64,6 @@ pub struct FinalizeCroquisRecordPayload {
     pub record_id: String,
     #[serde(default)]
     pub finished_at: Option<String>,
-    #[serde(default)]
-    pub finalized_at: Option<String>,
     #[serde(default)]
     pub actual_duration_seconds: Option<f64>,
 }

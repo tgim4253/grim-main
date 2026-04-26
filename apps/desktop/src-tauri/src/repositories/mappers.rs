@@ -57,7 +57,6 @@ pub(crate) struct CroquisRecordSummaryRow {
     pub actual_duration_seconds: Option<f64>,
     pub started_at: Option<String>,
     pub finished_at: Option<String>,
-    pub finalized_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -72,7 +71,6 @@ pub(crate) struct CroquisRecordDetailRow {
     pub actual_duration_seconds: Option<f64>,
     pub started_at: Option<String>,
     pub finished_at: Option<String>,
-    pub finalized_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -168,7 +166,6 @@ pub(crate) fn record_summary_from_row(
         actual_duration_seconds: row.actual_duration_seconds,
         started_at: row.started_at,
         finished_at: row.finished_at,
-        finalized_at: row.finalized_at,
         created_at: row.created_at,
         updated_at: row.updated_at,
     }
@@ -186,7 +183,6 @@ pub(crate) fn record_detail_row_into_summary(
         actual_duration_seconds: row.actual_duration_seconds,
         started_at: row.started_at.clone(),
         finished_at: row.finished_at.clone(),
-        finalized_at: row.finalized_at.clone(),
         created_at: row.created_at.clone(),
         updated_at: row.updated_at.clone(),
     }

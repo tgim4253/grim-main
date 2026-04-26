@@ -43,7 +43,6 @@ impl RecordRepository {
                    actual_duration_seconds,
                    started_at,
                    finished_at,
-                   finalized_at,
                    created_at,
                    updated_at
             FROM croquis_record
@@ -74,7 +73,6 @@ impl RecordRepository {
                    actual_duration_seconds,
                    started_at,
                    finished_at,
-                   finalized_at,
                    created_at,
                    updated_at
             FROM croquis_record
@@ -261,25 +259,20 @@ impl RecordRepository {
         let now = get_now_date();
         let now_ref = now.as_str();
         let finished_at = payload.finished_at.unwrap_or_else(|| now.clone());
-        let finalized_at = payload.finalized_at.unwrap_or_else(|| now.clone());
         let record_id = payload.record_id.as_str();
         let finished_at_ref = finished_at.as_str();
-        let finalized_at_ref = finalized_at.as_str();
         let finished_at_value = Some(finished_at_ref);
-        let finalized_at_value = Some(finalized_at_ref);
 
         sqlx::query!(
             r#"
             UPDATE croquis_record
             SET finished_at = COALESCE(?2, finished_at),
-                finalized_at = COALESCE(?3, finalized_at),
-                actual_duration_seconds = COALESCE(?4, actual_duration_seconds),
-                updated_at = ?5
+                actual_duration_seconds = COALESCE(?3, actual_duration_seconds),
+                updated_at = ?4
             WHERE id = ?1
             "#,
             record_id,
             finished_at_value,
-            finalized_at_value,
             payload.actual_duration_seconds,
             now_ref
         )
@@ -303,7 +296,6 @@ impl RecordRepository {
             SET result_asset_id = ?2,
                 actual_duration_seconds = COALESCE(?3, actual_duration_seconds),
                 finished_at = COALESCE(finished_at, ?4),
-                finalized_at = ?4,
                 updated_at = ?4
             WHERE id = ?1
             "#,
