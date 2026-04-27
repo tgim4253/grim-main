@@ -11,7 +11,11 @@ type ExplorerTreeRowProps = {
   expanded: boolean;
   hasChildren: boolean;
   showActions?: boolean;
+  actionsDisabled?: boolean;
   onClick: () => void;
+  onFocus: () => void;
+  onAddFolder?: () => void;
+  onRefresh?: () => void;
 };
 
 export function ExplorerTreeRow({
@@ -23,7 +27,11 @@ export function ExplorerTreeRow({
   expanded,
   hasChildren,
   showActions = false,
+  actionsDisabled = false,
   onClick,
+  onFocus,
+  onAddFolder,
+  onRefresh,
 }: ExplorerTreeRowProps) {
   const chevronName = expanded ? 'chevron-down' : 'chevron-right';
   const chevronHierarchy = expanded ? 'primary' : 'tertiary';
@@ -49,6 +57,7 @@ export function ExplorerTreeRow({
         aria-expanded={hasChildren ? expanded : undefined}
         className="explorer-tree-row__main"
         onClick={onClick}
+        onFocus={onFocus}
       >
         <span className="explorer-tree-row__leading" aria-hidden="true">
           {hasChildren ? (
@@ -65,8 +74,20 @@ export function ExplorerTreeRow({
 
       {showActions ? (
         <span className="explorer-tree-row__actions" aria-label="Folder actions">
-          <IconButton icon="folder-plus" size="sm" aria-label="Add folder" />
-          <IconButton icon="reload" size="sm" aria-label="Refresh folders" />
+          <IconButton
+            icon="folder-plus"
+            size="sm"
+            aria-label="Add folder"
+            disabled={actionsDisabled || !onAddFolder}
+            onClick={onAddFolder}
+          />
+          <IconButton
+            icon="reload"
+            size="sm"
+            aria-label="Refresh folders"
+            disabled={actionsDisabled || !onRefresh}
+            onClick={onRefresh}
+          />
         </span>
       ) : null}
     </div>

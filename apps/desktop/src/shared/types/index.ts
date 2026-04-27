@@ -33,6 +33,8 @@ export type {
   ExplorerSnapshot,
   FolderStats,
   FinishCroquisRecordPayload,
+  ImportFailure,
+  ImportPreviewResult,
   ImportRequest,
   ImportResult,
   LibrarySettings,

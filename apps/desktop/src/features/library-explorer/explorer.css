@@ -104,6 +104,10 @@
     text-align: left;
   }
 
+  .explorer-tree-row__draft-main {
+    cursor: text;
+  }
+
   .explorer-tree-row--with-actions .explorer-tree-row__main {
     padding-right: 4px;
   }
@@ -147,6 +151,46 @@
     font-size: 10px;
     line-height: 15px;
     letter-spacing: -0.3px;
+    white-space: nowrap;
+  }
+
+  .explorer-tree-row__draft-content {
+    display: grid;
+    flex: 1 1 auto;
+    gap: 2px;
+    min-width: 0;
+    padding-left: 4px;
+  }
+
+  .explorer-tree-row__draft-input {
+    min-width: 0;
+    width: 100%;
+    height: 20px;
+    box-sizing: border-box;
+    border: 1px solid var(--semantic-colors-border-focus);
+    border-radius: 3px;
+    background: var(--semantic-colors-surface-primary);
+    color: var(--semantic-colors-text-primary);
+    font: inherit;
+    font-size: var(--type-text-sm-size);
+    font-weight: var(--font-weight-bold);
+    line-height: var(--type-text-sm-line-height);
+    outline: none;
+    padding: 1px 6px;
+  }
+
+  .explorer-tree-row__draft-input:disabled {
+    color: var(--semantic-colors-text-secondary);
+    opacity: 0.72;
+  }
+
+  .explorer-tree-row__draft-error {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--components-input-text-error);
+    font-size: 10px;
+    line-height: 14px;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 

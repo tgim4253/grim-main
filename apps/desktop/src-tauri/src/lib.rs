@@ -57,6 +57,7 @@ pub fn run() {
             commands::asset_commands::get_asset_detail,
             commands::asset_commands::update_asset_folders,
             commands::asset_commands::reveal_path,
+            commands::import_commands::preview_import_images,
             commands::import_commands::import_images,
             commands::import_commands::import_remote_images,
             commands::record_commands::list_recent_records,

@@ -132,13 +132,24 @@ export interface FolderStats {
 export interface ImportRequest {
   filePaths: string[];
   virtualFolderIds: string[];
-  tagIds: string[];
+}
+
+export interface ImportPreviewResult {
+  assetCount: number;
+  totalSize: number;
+  filePaths: string[];
+  failed: ImportFailure[];
+}
+
+export interface ImportFailure {
+  filePath: string;
+  error: string;
 }
 
 export interface ImportResult {
   imported: number;
   reused: number;
-  linked: number;
+  failed: ImportFailure[];
   assets: AssetSummary[];
 }
 

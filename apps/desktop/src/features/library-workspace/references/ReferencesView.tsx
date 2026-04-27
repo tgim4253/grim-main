@@ -12,6 +12,7 @@ import './reference-workspace.css';
 
 type ReferencesViewProps = {
   source: AssetListSource;
+  refreshKey?: number;
 };
 
 type ReferenceGridStateProps = {
@@ -44,7 +45,7 @@ function ReferenceGridState({ title, description, action }: ReferenceGridStatePr
   );
 }
 
-export function ReferencesView({ source }: ReferencesViewProps) {
+export function ReferencesView({ source, refreshKey = 0 }: ReferencesViewProps) {
   const [layout, setLayout] = useState<LibraryWorkspaceLayout>('masonry');
   const [assets, setAssets] = useState<AssetSummary[]>([]);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
@@ -92,7 +93,7 @@ export function ReferencesView({ source }: ReferencesViewProps) {
 
   useEffect(() => {
     void loadAssets();
-  }, [loadAssets]);
+  }, [loadAssets, refreshKey]);
 
   useEffect(() => {
     if (!selectedAssetId) {

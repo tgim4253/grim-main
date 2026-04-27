@@ -35,6 +35,89 @@
     line-height: var(--semantic-typography-body-small-line-height);
   }
 
+  .library-import-modal__error {
+    margin: 0;
+    color: var(--components-input-text-error);
+    font-family: var(--semantic-typography-body-small-font-family);
+    font-size: var(--semantic-typography-body-small-font-size);
+    font-weight: var(--semantic-typography-body-small-font-weight);
+    line-height: var(--semantic-typography-body-small-line-height);
+  }
+
+  .library-import-modal__preview {
+    display: grid;
+    gap: var(--semantic-spacing-component-md);
+    box-sizing: border-box;
+    width: 100%;
+    padding: var(--semantic-spacing-component-lg);
+    border: 1px solid var(--semantic-colors-border-primary);
+    border-radius: var(--primitives-radius-1);
+    background: var(--semantic-colors-surface-low);
+  }
+
+  .library-import-modal__preview-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--semantic-spacing-component-lg);
+  }
+
+  .library-import-modal__preview-metric {
+    display: grid;
+    gap: var(--semantic-spacing-component-xs);
+    min-width: 0;
+  }
+
+  .library-import-modal__preview-label {
+    color: var(--semantic-colors-text-secondary);
+    font-family: var(--semantic-typography-body-small-font-family);
+    font-size: var(--semantic-typography-body-small-font-size);
+    font-weight: var(--semantic-typography-body-small-font-weight);
+    line-height: var(--semantic-typography-body-small-line-height);
+  }
+
+  .library-import-modal__preview-value {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--semantic-colors-text-primary);
+    font-family: var(--components-typography-control-label-font-family);
+    font-size: var(--components-typography-control-label-font-size);
+    font-weight: var(--components-typography-control-label-font-weight);
+    line-height: var(--components-typography-control-label-line-height);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .library-import-modal__progress {
+    display: grid;
+    gap: var(--semantic-spacing-component-xs);
+  }
+
+  .library-import-modal__progress-copy {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--semantic-spacing-component-md);
+    color: var(--semantic-colors-text-secondary);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 15px;
+  }
+
+  .library-import-modal__progress-track {
+    overflow: hidden;
+    width: 100%;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--semantic-colors-surface-pressed);
+  }
+
+  .library-import-modal__progress-fill {
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--semantic-colors-brand-primary);
+    transition: width 160ms ease;
+  }
+
   .library-import-modal__folder-select {
     z-index: 1;
   }
@@ -67,6 +150,16 @@
     outline: none;
   }
 
+  .library-import-modal__drop-zone--active {
+    border-color: var(--semantic-colors-border-focus);
+    background: var(--semantic-colors-surface-elevated);
+  }
+
+  .library-import-modal__drop-zone:disabled {
+    cursor: default;
+    opacity: 0.72;
+  }
+
   .library-import-modal__drop-title {
     color: var(--semantic-colors-text-primary);
     font-family: var(--primitives-typography-font-family-display);
@@ -85,7 +178,7 @@
 
   .library-import-modal__summary {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     gap: var(--semantic-spacing-component-lg);
     box-sizing: border-box;
     width: 100%;
@@ -139,6 +232,14 @@
     flex: none;
   }
 
+  .library-import-modal__status-dot--warning {
+    background: var(--semantic-colors-status-warning);
+  }
+
+  .library-import-modal__status-dot--error {
+    background: var(--semantic-colors-status-error);
+  }
+
   .library-import-modal__destination {
     display: grid;
     gap: var(--semantic-spacing-component-lg);
@@ -166,6 +267,10 @@
   }
 
   @media (max-width: 640px) {
+    .library-import-modal__preview-metrics {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
     .library-import-modal__summary {
       grid-template-columns: minmax(0, 1fr);
     }
