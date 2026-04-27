@@ -10,6 +10,8 @@ type ReferenceMasonryTileProps = {
   asset: ReferenceAsset;
   layout: LibraryWorkspaceLayout;
   selected: boolean;
+  selectionIndex?: number;
+  selectionMode?: boolean;
   onSelect: () => void;
 };
 
@@ -17,6 +19,8 @@ export function ReferenceMasonryTile({
   asset,
   layout,
   selected,
+  selectionIndex,
+  selectionMode = false,
   onSelect,
 }: ReferenceMasonryTileProps) {
   const style = {
@@ -30,7 +34,12 @@ export function ReferenceMasonryTile({
       aria-label={asset.title}
       aria-pressed={selected}
       data-selected={selected ? 'true' : undefined}
-      className={cx('reference-masonry-tile', selected && 'reference-masonry-tile--selected')}
+      data-selection-mode={selectionMode ? 'true' : undefined}
+      className={cx(
+        'reference-masonry-tile',
+        selected && 'reference-masonry-tile--selected',
+        selectionMode && 'reference-masonry-tile--selectable',
+      )}
       style={style}
       onClick={onSelect}
     >
@@ -48,6 +57,20 @@ export function ReferenceMasonryTile({
           className="reference-masonry-tile__image"
         />
       )}
+      {selectionMode ? (
+        <span
+          className={cx(
+            'reference-masonry-tile__selection-control',
+            selected && 'reference-masonry-tile__selection-control--selected',
+          )}
+          aria-hidden="true"
+        >
+          <span className="reference-masonry-tile__selection-box" />
+          {selected && selectionIndex ? (
+            <span className="reference-masonry-tile__selection-index">{selectionIndex}</span>
+          ) : null}
+        </span>
+      ) : null}
     </button>
   );
 }

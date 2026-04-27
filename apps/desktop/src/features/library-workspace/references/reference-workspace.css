@@ -71,7 +71,67 @@
     gap: 8px;
   }
 
+  .reference-selection-toolbar {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 44px;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--semantic-colors-border-secondary);
+    background: var(--semantic-colors-surface-panel);
+  }
+
+  .reference-selection-toolbar__left,
+  .reference-selection-toolbar__actions {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .reference-selection-toolbar__left {
+    gap: 16px;
+  }
+
+  .reference-selection-toolbar__actions {
+    gap: 8px;
+  }
+
+  .reference-selection-toolbar .reference-selection-toolbar__button {
+    align-self: center;
+    min-width: 60px;
+  }
+
+  .reference-selection-toolbar__select-all {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    color: var(--semantic-colors-text-primary);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: var(--font-weight-medium);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .reference-selection-toolbar__divider {
+    width: 1px;
+    height: 16px;
+    background: var(--semantic-colors-border-subtle);
+  }
+
+  .reference-selection-toolbar__count {
+    color: var(--semantic-colors-text-teritary);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: var(--font-weight-medium);
+    white-space: nowrap;
+  }
+
   .reference-masonry-tile {
+    position: relative;
     display: block;
     width: 100%;
     height: var(--masonry-tile-height);
@@ -80,6 +140,10 @@
     background: transparent;
     overflow: hidden;
     cursor: pointer;
+  }
+
+  .reference-masonry-tile--selectable {
+    cursor: default;
   }
 
   .reference-masonry-tile:focus-visible {
@@ -124,6 +188,47 @@
     border-color: var(--semantic-colors-border-focus);
   }
 
+  .reference-masonry-tile__selection-control {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 16px;
+    height: 20px;
+    pointer-events: none;
+  }
+
+  .reference-masonry-tile__selection-box {
+    display: inline-flex;
+    width: var(--semantic-size-checkbox-sm);
+    height: var(--semantic-size-checkbox-sm);
+    border: 1.2px solid var(--semantic-colors-border-primary);
+    border-radius: var(--primitives-radius-05);
+    background: var(--semantic-colors-surface-elevated);
+    box-sizing: border-box;
+  }
+
+  .reference-masonry-tile__selection-control--selected .reference-masonry-tile__selection-box {
+    border-color: transparent;
+    background: var(--semantic-colors-brand-primary);
+  }
+
+  .reference-masonry-tile__selection-index {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: var(--primitives-radius-full);
+    background: var(--semantic-colors-surface-panel);
+    color: var(--semantic-colors-text-primary);
+    font-size: 10px;
+    line-height: 14px;
+    font-weight: var(--font-weight-medium);
+  }
+
   .reference-grid-state {
     display: flex;
     max-width: 360px;
@@ -153,6 +258,22 @@
 
   .reference-grid-state__action {
     padding-top: 4px;
+  }
+
+  .reference-croquis-config-error {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 40;
+    max-width: 360px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--components-input-text-error) 40%, transparent);
+    border-radius: var(--primitives-radius-100);
+    background: color-mix(in srgb, var(--components-input-text-error) 12%, transparent);
+    color: var(--components-input-text-error);
+    font-size: 12px;
+    line-height: 16px;
+    box-shadow: var(--effects-shadow-xs);
   }
 
   .asset-preview-panel {

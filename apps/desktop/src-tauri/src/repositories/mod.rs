@@ -6,7 +6,10 @@ mod session_repository;
 mod settings_repository;
 mod tag_repository;
 
-pub use asset_repository::{AssetRepository, NewImportedAssetInput};
+pub use asset_repository::{
+    AssetRepository, NewImportedAssetInput, CROQUIS_RESULT_ASSET_SOURCE,
+    IMPORTED_ASSET_SOURCE,
+};
 pub use folder_repository::FolderRepository;
 pub use record_repository::RecordRepository;
 pub use session_repository::{

@@ -15,6 +15,8 @@ export type LibraryWorkspaceItem = {
 export type LibraryWorkspaceRenderTileState = {
   layout: LibraryWorkspaceLayout;
   selected: boolean;
+  selectionIndex?: number;
+  selectionMode?: boolean;
   onSelect: () => void;
 };
 

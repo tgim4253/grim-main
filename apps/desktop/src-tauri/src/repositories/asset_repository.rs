@@ -15,6 +15,9 @@ use super::mappers::{
     CroquisRecordSummaryRow, VirtualFolderRow,
 };
 
+const ASSET_SOURCE_IMPORT: &str = "import";
+const ASSET_SOURCE_CROQUIS_RESULT: &str = "capture_result";
+
 #[derive(Clone)]
 pub struct AssetRepository {
     pool: SqlitePool,
@@ -29,6 +32,7 @@ pub struct NewImportedAssetInput<'a> {
     pub width: i64,
     pub height: i64,
     pub modified_at: Option<i64>,
+    pub source_type: &'a str,
     pub created_at: &'a str,
 }
 
@@ -42,10 +46,16 @@ impl AssetRepository {
     }
 
     pub async fn count_all(&self) -> Result<i64> {
-        let row =
-            sqlx::query!(r#"SELECT COUNT(*) AS "count!: i64" FROM asset"#)
-                .fetch_one(&self.pool)
-                .await?;
+        let row = sqlx::query!(
+            r#"
+                SELECT COUNT(*) AS "count!: i64"
+                FROM asset a
+                WHERE a.source_type != ?1
+                "#,
+            ASSET_SOURCE_CROQUIS_RESULT
+        )
+        .fetch_one(&self.pool)
+        .await?;
         Ok(row.count)
     }
 
@@ -53,9 +63,11 @@ impl AssetRepository {
         let row = sqlx::query!(
             r#"
             SELECT COUNT(*) AS "count!: i64"
-            FROM asset
-            WHERE id NOT IN (SELECT asset_id FROM asset_virtual_folder)
+            FROM asset a
+            WHERE a.id NOT IN (SELECT asset_id FROM asset_virtual_folder)
+              AND a.source_type != ?1
             "#,
+            ASSET_SOURCE_CROQUIS_RESULT
         )
         .fetch_one(&self.pool)
         .await?;
@@ -81,9 +93,11 @@ impl AssetRepository {
                            modified_at,
                            created_at,
                            updated_at
-                    FROM asset
+                    FROM asset a
+                    WHERE a.source_type != ?1
                     ORDER BY updated_at DESC, created_at DESC
                     "#,
+                    ASSET_SOURCE_CROQUIS_RESULT
                 )
                 .fetch_all(&self.pool)
                 .await?
@@ -102,10 +116,12 @@ impl AssetRepository {
                            modified_at,
                            created_at,
                            updated_at
-                    FROM asset
-                    WHERE id NOT IN (SELECT asset_id FROM asset_virtual_folder)
+                    FROM asset a
+                    WHERE a.id NOT IN (SELECT asset_id FROM asset_virtual_folder)
+                      AND a.source_type != ?1
                     ORDER BY updated_at DESC, created_at DESC
                     "#,
+                    ASSET_SOURCE_CROQUIS_RESULT
                 )
                 .fetch_all(&self.pool)
                 .await?
@@ -127,9 +143,11 @@ impl AssetRepository {
                     FROM asset a
                     INNER JOIN asset_virtual_folder avf ON avf.asset_id = a.id
                     WHERE avf.virtual_folder_id = ?1
+                      AND a.source_type != ?2
                     ORDER BY a.updated_at DESC, a.created_at DESC
                     "#,
-                    folder_id
+                    folder_id,
+                    ASSET_SOURCE_CROQUIS_RESULT
                 )
                 .fetch_all(&self.pool)
                 .await?
@@ -161,9 +179,11 @@ impl AssetRepository {
                     FROM asset a
                     INNER JOIN asset_virtual_folder avf ON avf.asset_id = a.id
                     WHERE avf.virtual_folder_id IN (SELECT id FROM folder_tree)
+                      AND a.source_type != ?2
                     ORDER BY a.updated_at DESC, a.created_at DESC
                     "#,
-                    folder_id
+                    folder_id,
+                    ASSET_SOURCE_CROQUIS_RESULT
                 )
                 .fetch_all(&self.pool)
                 .await?
@@ -301,6 +321,27 @@ impl AssetRepository {
         Ok(row.map(asset_from_row))
     }
 
+    pub async fn mark_as_import_source(&self, asset_id: &str) -> Result<()> {
+        let now = get_now_date();
+        let now_ref = now.as_str();
+        sqlx::query!(
+            r#"
+            UPDATE asset
+            SET source_type = ?2,
+                updated_at = ?3
+            WHERE id = ?1
+              AND source_type != ?2
+            "#,
+            asset_id,
+            ASSET_SOURCE_IMPORT,
+            now_ref
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
     pub async fn load_many_summaries(
         &self,
         asset_ids: &[String],
@@ -354,8 +395,8 @@ impl AssetRepository {
             r#"
             INSERT INTO asset
             (id, hash, file_name, file_size, mime_type, width, height,
-             modified_at, created_at, updated_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)
+             modified_at, source_type, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)
             "#,
             input.id,
             input.hash,
@@ -365,6 +406,7 @@ impl AssetRepository {
             input.width,
             input.height,
             input.modified_at,
+            input.source_type,
             input.created_at
         )
         .execute(&mut **tx)
@@ -414,3 +456,6 @@ impl AssetRepository {
         self.assign_folders_in_tx(tx, asset_id, virtual_folder_ids).await
     }
 }
+
+pub const IMPORTED_ASSET_SOURCE: &str = ASSET_SOURCE_IMPORT;
+pub const CROQUIS_RESULT_ASSET_SOURCE: &str = ASSET_SOURCE_CROQUIS_RESULT;

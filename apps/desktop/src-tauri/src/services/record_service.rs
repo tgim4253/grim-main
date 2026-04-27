@@ -123,6 +123,7 @@ mod tests {
         },
         repositories::{
             AssetRepository, NewImportedAssetInput, RecordRepository,
+            IMPORTED_ASSET_SOURCE,
         },
         services::LibraryStorage,
         state::{
@@ -185,6 +186,7 @@ mod tests {
                     width: 1,
                     height: 1,
                     modified_at: None,
+                    source_type: IMPORTED_ASSET_SOURCE,
                     created_at: "2026-01-01T00:00:00Z",
                 },
             )
@@ -297,6 +299,7 @@ mod tests {
                     width: 1,
                     height: 1,
                     modified_at: None,
+                    source_type: IMPORTED_ASSET_SOURCE,
                     created_at: "2026-01-01T00:00:00Z",
                 },
             )

@@ -14,6 +14,7 @@ use crate::{
     utils::{date::get_now_date, identifier::get_unique_id},
 };
 
+use super::asset_repository::CROQUIS_RESULT_ASSET_SOURCE;
 use super::mappers::{folder_from_row, VirtualFolderRow};
 
 #[derive(Clone)]
@@ -293,11 +294,14 @@ impl FolderRepository {
                 OR EXISTS (
                     SELECT 1
                     FROM asset_virtual_folder avf
+                    INNER JOIN asset a ON a.id = avf.asset_id
                     WHERE avf.virtual_folder_id = child.id
+                      AND a.source_type != ?2
                 )
               )
             "#,
-            folder_id
+            folder_id,
+            CROQUIS_RESULT_ASSET_SOURCE
         )
         .fetch_one(&mut *tx)
         .await?
@@ -309,10 +313,13 @@ impl FolderRepository {
         let direct_asset_count = sqlx::query!(
             r#"
             SELECT COUNT(*) AS "count!: i64"
-            FROM asset_virtual_folder
-            WHERE virtual_folder_id = ?1
+            FROM asset_virtual_folder avf
+            INNER JOIN asset a ON a.id = avf.asset_id
+            WHERE avf.virtual_folder_id = ?1
+              AND a.source_type != ?2
             "#,
-            folder_id
+            folder_id,
+            CROQUIS_RESULT_ASSET_SOURCE
         )
         .fetch_one(&mut *tx)
         .await?
@@ -348,11 +355,14 @@ impl FolderRepository {
                 OR EXISTS (
                     SELECT 1
                     FROM asset_virtual_folder avf
+                    INNER JOIN asset a ON a.id = avf.asset_id
                     WHERE avf.virtual_folder_id = child.id
+                      AND a.source_type != ?2
                 )
               )
             "#,
-            folder_id
+            folder_id,
+            CROQUIS_RESULT_ASSET_SOURCE
         )
         .fetch_one(&self.pool)
         .await?;
@@ -388,11 +398,14 @@ impl FolderRepository {
                     OR EXISTS (
                         SELECT 1
                         FROM asset_virtual_folder avf
+                        INNER JOIN asset a ON a.id = avf.asset_id
                         WHERE avf.virtual_folder_id = child.id
+                          AND a.source_type != ?2
                     )
                   )
                 "#,
-                folder_id
+                folder_id,
+                CROQUIS_RESULT_ASSET_SOURCE
             )
             .fetch_one(&mut **tx)
             .await?
@@ -415,10 +428,13 @@ impl FolderRepository {
         let row = sqlx::query!(
             r#"
             SELECT COUNT(*) AS "count!: i64"
-            FROM asset_virtual_folder
-            WHERE virtual_folder_id = ?1
+            FROM asset_virtual_folder avf
+            INNER JOIN asset a ON a.id = avf.asset_id
+            WHERE avf.virtual_folder_id = ?1
+              AND a.source_type != ?2
             "#,
-            folder_id
+            folder_id,
+            CROQUIS_RESULT_ASSET_SOURCE
         )
         .fetch_one(&self.pool)
         .await?;
@@ -430,10 +446,13 @@ impl FolderRepository {
         let folders = self.load_all().await?;
         let assignment_rows = sqlx::query!(
             r#"
-            SELECT virtual_folder_id AS "folder_id!: String",
-                   asset_id AS "asset_id!: String"
-            FROM asset_virtual_folder
-            "#
+            SELECT avf.virtual_folder_id AS "folder_id!: String",
+                   avf.asset_id AS "asset_id!: String"
+            FROM asset_virtual_folder avf
+            INNER JOIN asset a ON a.id = avf.asset_id
+            WHERE a.source_type != ?1
+            "#,
+            CROQUIS_RESULT_ASSET_SOURCE
         )
         .fetch_all(&self.pool)
         .await?;
@@ -677,10 +696,13 @@ impl FolderRepository {
         let system_asset_count = sqlx::query!(
             r#"
             SELECT COUNT(*) AS "count!: i64"
-            FROM asset_virtual_folder
-            WHERE virtual_folder_id = ?1
+            FROM asset_virtual_folder avf
+            INNER JOIN asset a ON a.id = avf.asset_id
+            WHERE avf.virtual_folder_id = ?1
+              AND a.source_type != ?2
             "#,
-            system_child.id
+            system_child.id,
+            CROQUIS_RESULT_ASSET_SOURCE
         )
         .fetch_one(&mut **tx)
         .await?

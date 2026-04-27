@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS asset (
   file_name      TEXT NOT NULL,
   file_size      INTEGER NOT NULL DEFAULT 0,
   mime_type      TEXT,
+  source_type    TEXT NOT NULL DEFAULT 'import' CHECK (source_type IN ('import', 'capture_result')),
   width          INTEGER,
   height         INTEGER,
   modified_at    INTEGER,
@@ -23,6 +24,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_asset_import_hash
   ON asset(hash);
 
 CREATE INDEX IF NOT EXISTS idx_asset_created_at ON asset(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_asset_source_type ON asset(source_type);
 
 CREATE TABLE IF NOT EXISTS virtual_folder (
   id         TEXT PRIMARY KEY NOT NULL,

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE asset\n            SET source_type = ?2,\n                updated_at = ?3\n            WHERE id = ?1\n              AND source_type != ?2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "5c4980ca8dc943a4d92434faeec484899b552d7666e7c19b095482826ec8c4fc"
+}

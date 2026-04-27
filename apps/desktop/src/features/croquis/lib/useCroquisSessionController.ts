@@ -11,6 +11,12 @@ import type {
 import { formatSeconds, shuffleItems, timestampNow } from './sessionUtils';
 
 const sessionLoadCache = new Map<string, Promise<CroquisSession | null>>();
+const AUTO_DISMISS_STATUS_MESSAGES = new Set([
+  'Capture saved to the current record.',
+  'Record saved.',
+  'Step complete.',
+]);
+const STATUS_AUTO_DISMISS_MS = 2200;
 
 type UseCroquisSessionControllerParams = {
   sessionId: string | null;
@@ -25,10 +31,12 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
   const [status, setStatus] = useState<string | null>(null);
 
   const intervalRef = useRef<number | null>(null);
+  const elapsedSecondsRef = useRef(0);
   const recordStartRef = useRef<number>(Date.now());
   const finishPromisesRef = useRef<Map<string, Promise<CroquisRecordDetail>>>(new Map());
   const currentItemRef = useRef<CroquisSessionItem | null>(null);
   const currentRecordIdRef = useRef<string | null>(null);
+  const appliedWindowSizeKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!sessionId) {
@@ -57,6 +65,8 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
       const ordered = payload.option.isShuffle ? shuffleItems(payload.items) : payload.items;
       finishPromisesRef.current.clear();
       currentRecordIdRef.current = null;
+      appliedWindowSizeKeyRef.current = null;
+      elapsedSecondsRef.current = 0;
       setSession(payload);
       setQueue(ordered);
       setCurrentIndex(0);
@@ -79,6 +89,20 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
   const currentTargetSeconds =
     currentItem?.targetDurationSeconds ?? (session === null ? 0 : session.option.timer.maxTime);
   const isRecordSaveEnabled = session?.option.isRecordSave ?? true;
+
+  useEffect(() => {
+    if (status === null || !AUTO_DISMISS_STATUS_MESSAGES.has(status)) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setStatus(currentStatus => (currentStatus === status ? null : currentStatus));
+    }, STATUS_AUTO_DISMISS_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [status]);
 
   useEffect(() => {
     currentItemRef.current = currentItem;
@@ -144,6 +168,7 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
     }
 
     recordStartRef.current = Date.now();
+    elapsedSecondsRef.current = 0;
     setElapsedSeconds(0);
   }, [currentItem?.itemId]);
 
@@ -156,8 +181,10 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
       return;
     }
 
+    recordStartRef.current = Date.now() - elapsedSecondsRef.current * 1000;
     intervalRef.current = window.setInterval(() => {
       const nextSeconds = (Date.now() - recordStartRef.current) / 1000;
+      elapsedSecondsRef.current = nextSeconds;
       setElapsedSeconds(nextSeconds);
     }, 100);
 
@@ -218,32 +245,45 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
     }
 
     void (async () => {
-      const width = Number(session === null ? '0' : (session.option.window.width ?? '0'));
-      const height = Number(session === null ? '0' : (session.option.window.height ?? '0'));
+      if (session === null) {
+        return;
+      }
+
+      const width = Number(session.option.window.width ?? '0');
+      const height = Number(session.option.window.height ?? '0');
       if (!Number.isFinite(width) || width <= 0) {
         return;
       }
 
+      const windowSizeKey = [
+        session.sessionId,
+        session.option.window.width ?? '',
+        session.option.window.height ?? '',
+        queue
+          .map(item => `${item.itemId}:${String(item.baseWidth)}x${String(item.baseHeight)}`)
+          .join('|'),
+      ].join(':');
+
+      if (appliedWindowSizeKeyRef.current === windowSizeKey) {
+        return;
+      }
+
+      appliedWindowSizeKeyRef.current = windowSizeKey;
+
+      const validItems = queue.filter(item => item.baseWidth > 0 && item.baseHeight > 0);
+      const averageScaledHeight =
+        validItems.length > 0
+          ? validItems.reduce((sum, item) => sum + item.baseHeight * (width / item.baseWidth), 0) /
+            validItems.length
+          : width;
       const nextHeight =
         Number.isFinite(height) && height > 0
           ? height
-          : Math.max(
-              width,
-              Math.round(
-                (currentItem === null ? width : currentItem.baseHeight) *
-                  (width / (currentItem === null ? width : currentItem.baseWidth || width)),
-              ),
-            );
+          : Math.max(width, Math.ceil(averageScaledHeight));
 
       await getCurrentWindow().setSize(new LogicalSize(width, nextHeight));
     })();
-  }, [
-    currentItem === null ? null : currentItem.baseHeight,
-    currentItem === null ? null : currentItem.baseWidth,
-    queue.length,
-    session === null ? null : session.option.window.height,
-    session === null ? null : session.option.window.width,
-  ]);
+  }, [queue, session]);
 
   useEffect(() => {
     let unlisten: (() => void) | null = null;

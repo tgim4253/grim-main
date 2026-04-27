@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT COUNT(*) AS \"count!: i64\"\n            FROM asset_virtual_folder avf\n            INNER JOIN asset a ON a.id = avf.asset_id\n            WHERE avf.virtual_folder_id = ?1\n              AND a.source_type != ?2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "968ca00c1476ed123dab24a530217a1e5e557578891fbd6922ce82b727168d69"
+}
