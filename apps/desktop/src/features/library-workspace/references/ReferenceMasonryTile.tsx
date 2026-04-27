@@ -22,6 +22,7 @@ export function ReferenceMasonryTile({
   const style = {
     '--masonry-tile-height': `${String(layout === 'grid' ? GRID_TILE_HEIGHT : asset.height)}px`,
   } as CSSProperties;
+  const imageSrc = asset.thumbnailSrc ?? asset.imageSrc;
 
   return (
     <button
@@ -33,11 +34,20 @@ export function ReferenceMasonryTile({
       style={style}
       onClick={onSelect}
     >
-      <ImagePlaceholder
-        ratio={asset.ratio}
-        state={selected ? 'active' : 'default'}
-        className="reference-masonry-tile__image"
-      />
+      {imageSrc ? (
+        <img
+          src={imageSrc}
+          alt=""
+          draggable={false}
+          className="reference-masonry-tile__asset-image"
+        />
+      ) : (
+        <ImagePlaceholder
+          ratio={asset.ratio}
+          state={selected ? 'active' : 'default'}
+          className="reference-masonry-tile__image"
+        />
+      )}
     </button>
   );
 }

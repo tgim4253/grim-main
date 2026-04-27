@@ -31,12 +31,12 @@ function PreviewMetadataField({ label, value }: PreviewMetadataFieldProps) {
   );
 }
 
-function FolderPathRow({ path }: { path: string }) {
+function FolderPathRow({ path, removable = true }: { path: string; removable?: boolean }) {
   return (
     <div className="asset-preview-panel__folder-row">
       <Icon name="folder" size="xs" hierarchy="tertiary" aria-hidden />
       <span>{path}</span>
-      <Icon name="close" size="xs" hierarchy="tertiary" aria-hidden />
+      {removable ? <Icon name="close" size="xs" hierarchy="tertiary" aria-hidden /> : null}
     </div>
   );
 }
@@ -66,6 +66,8 @@ function ConnectedImageThumb({ image }: { image: ConnectedImageItem }) {
 }
 
 export function AssetPreviewPanel({ asset, onClose }: AssetPreviewPanelProps) {
+  const previewSrc = asset.imageSrc ?? asset.thumbnailSrc;
+
   return (
     <aside className="asset-preview-panel" aria-label="Asset preview">
       <header className="asset-preview-panel__header">
@@ -75,7 +77,16 @@ export function AssetPreviewPanel({ asset, onClose }: AssetPreviewPanelProps) {
 
       <div className="asset-preview-panel__content">
         <div className="asset-preview-panel__preview-frame">
-          <ImagePlaceholder ratio={asset.ratio} className="asset-preview-panel__preview-image" />
+          {previewSrc ? (
+            <img
+              src={previewSrc}
+              alt={asset.title}
+              className="asset-preview-panel__preview-image asset-preview-panel__preview-asset-image"
+              draggable={false}
+            />
+          ) : (
+            <ImagePlaceholder ratio={asset.ratio} className="asset-preview-panel__preview-image" />
+          )}
         </div>
 
         <div className="asset-preview-panel__sections">
@@ -94,9 +105,11 @@ export function AssetPreviewPanel({ asset, onClose }: AssetPreviewPanelProps) {
           <section className="asset-preview-panel__section">
             <PreviewSectionHeading>Folders</PreviewSectionHeading>
             <div className="asset-preview-panel__folder-list">
-              {asset.folders.map(path => (
-                <FolderPathRow key={path} path={path} />
-              ))}
+              {asset.folders.length > 0 ? (
+                asset.folders.map(path => <FolderPathRow key={path} path={path} />)
+              ) : (
+                <FolderPathRow path="Unassigned" removable={false} />
+              )}
               <button type="button" className="asset-preview-panel__add-folder">
                 + Add Folder
               </button>

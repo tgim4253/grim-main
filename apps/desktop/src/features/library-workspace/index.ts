@@ -1,5 +1,6 @@
 export { LibraryWorkspace } from './common/LibraryWorkspace';
 export { ReferencesDummyView } from './references/ReferencesDummyView';
+export { ReferencesView } from './references/ReferencesView';
 export type {
   ImagePlaceholderState,
   LibraryWorkspaceHeaderProps,

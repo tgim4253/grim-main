@@ -1,2 +1,9 @@
 export { ExplorerPanel } from './ExplorerPanel';
-export type { ExplorerNode } from './explorerDummyData';
+export {
+  ALL_ASSETS_NODE_ID,
+  DEFAULT_ASSET_SOURCE,
+  FOLDERS_NODE_ID,
+  UNCATEGORIZED_NODE_ID,
+  buildExplorerNodes,
+} from './explorerTree';
+export type { ExplorerNode } from './types';

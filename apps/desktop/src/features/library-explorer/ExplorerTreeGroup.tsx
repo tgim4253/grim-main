@@ -1,5 +1,5 @@
 import { ExplorerTreeRow } from './ExplorerTreeRow';
-import type { ExplorerNode } from './explorerDummyData';
+import type { ExplorerNode } from './types';
 
 type ExplorerTreeGroupProps = {
   node: ExplorerNode;
@@ -29,6 +29,7 @@ export function ExplorerTreeGroup({
         active={activeNodeId === node.id}
         expanded={isExpanded}
         hasChildren={hasChildren}
+        showActions={node.showActions}
         onClick={() => {
           onNodeSelect(node);
         }}
