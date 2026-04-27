@@ -62,6 +62,7 @@ export default [
       'scripts/translator.mjs',
       '*.d.ts',
       '**/*.js',
+      '**/*.mjs',
       '.config/**',
       'scripts/dev.ts',
       'apps/desktop/src-tauri/**',

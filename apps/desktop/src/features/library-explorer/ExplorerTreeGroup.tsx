@@ -1,12 +1,20 @@
 import { ExplorerTreeRow } from './ExplorerTreeRow';
-import type { ExplorerNode } from './types';
+import { ExplorerTreeDraftRow } from './ExplorerTreeDraftRow';
+import type { ExplorerFolderDraft, ExplorerNode } from './types';
 
 type ExplorerTreeGroupProps = {
   node: ExplorerNode;
   level?: number;
   activeNodeId: string;
   expandedById: Readonly<Record<string, boolean>>;
+  draft?: ExplorerFolderDraft | null;
+  actionsDisabled?: boolean;
   onNodeSelect: (node: ExplorerNode) => void;
+  onNodeFocus: (node: ExplorerNode) => void;
+  onAddFolder?: () => void;
+  onRefresh?: () => void;
+  onDraftCommit: (name: string) => void;
+  onDraftCancel: () => void;
 };
 
 export function ExplorerTreeGroup({
@@ -14,10 +22,18 @@ export function ExplorerTreeGroup({
   level = 1,
   activeNodeId,
   expandedById,
+  draft = null,
+  actionsDisabled = false,
   onNodeSelect,
+  onNodeFocus,
+  onAddFolder,
+  onRefresh,
+  onDraftCommit,
+  onDraftCancel,
 }: ExplorerTreeGroupProps) {
-  const hasChildren = Boolean(node.children?.length);
-  const isExpanded = hasChildren && expandedById[node.id];
+  const isDraftParent = draft?.parentNodeId === node.id;
+  const hasChildren = Boolean(node.children?.length) || isDraftParent;
+  const isExpanded = hasChildren && (expandedById[node.id] || isDraftParent);
 
   return (
     <div className="explorer-tree-group">
@@ -30,9 +46,15 @@ export function ExplorerTreeGroup({
         expanded={isExpanded}
         hasChildren={hasChildren}
         showActions={node.showActions}
+        actionsDisabled={actionsDisabled}
         onClick={() => {
           onNodeSelect(node);
         }}
+        onFocus={() => {
+          onNodeFocus(node);
+        }}
+        onAddFolder={onAddFolder}
+        onRefresh={onRefresh}
       />
 
       {isExpanded ? (
@@ -47,9 +69,25 @@ export function ExplorerTreeGroup({
                 level={level + 1}
                 activeNodeId={activeNodeId}
                 expandedById={expandedById}
+                draft={draft}
+                actionsDisabled={actionsDisabled}
                 onNodeSelect={onNodeSelect}
+                onNodeFocus={onNodeFocus}
+                onAddFolder={onAddFolder}
+                onRefresh={onRefresh}
+                onDraftCommit={onDraftCommit}
+                onDraftCancel={onDraftCancel}
               />
             ))}
+            {isDraftParent ? (
+              <ExplorerTreeDraftRow
+                level={level + 1}
+                pending={draft.pending}
+                error={draft.error}
+                onCommit={onDraftCommit}
+                onCancel={onDraftCancel}
+              />
+            ) : null}
           </div>
         </div>
       ) : null}

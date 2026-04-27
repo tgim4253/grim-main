@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '../../shared/ui';
 import { ExplorerTreeGroup } from './ExplorerTreeGroup';
-import type { ExplorerNode } from './types';
+import { FOLDERS_NODE_ID } from './explorerTree';
+import type { ExplorerCreateFolderRequest, ExplorerFolderDraft, ExplorerNode } from './types';
 import './explorer.css';
 
 function buildDefaultExpandedState(nodes: ExplorerNode[]): Record<string, boolean> {
@@ -15,12 +16,48 @@ function buildDefaultExpandedState(nodes: ExplorerNode[]): Record<string, boolea
   }, {});
 }
 
+const FOLDER_NODE_ID_PREFIX = 'folder:';
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  return fallback;
+}
+
+function getFolderIdFromNodeId(nodeId: string) {
+  return nodeId.startsWith(FOLDER_NODE_ID_PREFIX)
+    ? nodeId.slice(FOLDER_NODE_ID_PREFIX.length)
+    : null;
+}
+
+function resolveCreateFolderParentNodeId(focusedNodeId: string) {
+  if (focusedNodeId === FOLDERS_NODE_ID) {
+    return FOLDERS_NODE_ID;
+  }
+
+  if (!focusedNodeId.startsWith(FOLDER_NODE_ID_PREFIX)) {
+    return FOLDERS_NODE_ID;
+  }
+
+  return focusedNodeId;
+}
+
 type ExplorerPanelProps = {
   nodes: ExplorerNode[];
   activeNodeId: string;
   loading?: boolean;
   error?: string | null;
+  importDisabled?: boolean;
+  createFolderDisabled?: boolean;
   onNodeSelect: (node: ExplorerNode) => void;
+  onImport?: () => void;
+  onCreateFolder?: (request: ExplorerCreateFolderRequest) => Promise<void> | void;
   onRetry?: () => void;
 };
 
@@ -29,19 +66,31 @@ export function ExplorerPanel({
   activeNodeId,
   loading = false,
   error = null,
+  importDisabled = false,
+  createFolderDisabled = false,
   onNodeSelect,
+  onImport,
+  onCreateFolder,
   onRetry,
 }: ExplorerPanelProps) {
   const [expandedById, setExpandedById] = useState<Record<string, boolean>>(() =>
     buildDefaultExpandedState(nodes),
   );
+  const [focusedNodeId, setFocusedNodeId] = useState(activeNodeId);
+  const [folderDraft, setFolderDraft] = useState<ExplorerFolderDraft | null>(null);
 
   useEffect(() => {
-    setExpandedById(buildDefaultExpandedState(nodes));
+    setExpandedById(current => ({ ...buildDefaultExpandedState(nodes), ...current }));
   }, [nodes]);
+
+  useEffect(() => {
+    setFocusedNodeId(activeNodeId);
+  }, [activeNodeId]);
 
   const handleNodeSelect = useCallback(
     (node: ExplorerNode) => {
+      setFocusedNodeId(node.id);
+
       if (node.source) {
         onNodeSelect(node);
       }
@@ -53,10 +102,70 @@ export function ExplorerPanel({
     [onNodeSelect],
   );
 
+  const handleNodeFocus = useCallback((node: ExplorerNode) => {
+    setFocusedNodeId(node.id);
+  }, []);
+
+  const handleAddFolder = useCallback(() => {
+    if (!onCreateFolder || loading || createFolderDisabled) {
+      return;
+    }
+
+    const parentNodeId = resolveCreateFolderParentNodeId(focusedNodeId);
+
+    setFolderDraft({ parentNodeId });
+    setExpandedById(current => ({ ...current, [parentNodeId]: true }));
+  }, [createFolderDisabled, focusedNodeId, loading, onCreateFolder]);
+
+  const handleDraftCancel = useCallback(() => {
+    setFolderDraft(current => (current?.pending ? current : null));
+  }, []);
+
+  const handleDraftCommit = useCallback(
+    (name: string) => {
+      const parentNodeId = folderDraft?.parentNodeId;
+      if (!parentNodeId || !onCreateFolder) {
+        setFolderDraft(null);
+        return;
+      }
+
+      setFolderDraft(current => (current ? { ...current, pending: true, error: null } : current));
+
+      void (async () => {
+        try {
+          await onCreateFolder({
+            parentId: getFolderIdFromNodeId(parentNodeId),
+            name,
+          });
+          setFolderDraft(null);
+        } catch (nextError) {
+          setFolderDraft(current =>
+            current
+              ? {
+                  ...current,
+                  pending: false,
+                  error: getErrorMessage(nextError, 'Failed to create folder.'),
+                }
+              : current,
+          );
+        }
+      })();
+    },
+    [folderDraft?.parentNodeId, onCreateFolder],
+  );
+
+  const folderActionsDisabled = loading || createFolderDisabled || Boolean(folderDraft);
+
   return (
     <div className="library-explorer">
       <div className="library-explorer__import-action">
-        <Button className="library-explorer__import-button" size="sm" width="fill">
+        <Button
+          className="library-explorer__import-button"
+          size="sm"
+          width="fill"
+          onClick={onImport}
+          disabled={importDisabled}
+        >
           Import
         </Button>
       </div>
@@ -82,7 +191,14 @@ export function ExplorerPanel({
               node={node}
               activeNodeId={activeNodeId}
               expandedById={expandedById}
+              draft={folderDraft}
+              actionsDisabled={folderActionsDisabled}
               onNodeSelect={handleNodeSelect}
+              onNodeFocus={handleNodeFocus}
+              onAddFolder={handleAddFolder}
+              onRefresh={onRetry}
+              onDraftCommit={handleDraftCommit}
+              onDraftCancel={handleDraftCancel}
             />
           ))
         )}

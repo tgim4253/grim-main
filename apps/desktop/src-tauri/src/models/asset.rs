@@ -62,6 +62,17 @@ pub struct ImportRequest {
     pub virtual_folder_ids: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportPreviewResult {
+    pub asset_count: usize,
+    pub total_size: i64,
+    #[serde(default)]
+    pub file_paths: Vec<String>,
+    #[serde(default)]
+    pub failed: Vec<ImportFailure>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportRemoteImagesRequest {
@@ -73,9 +84,18 @@ pub struct ImportRemoteImagesRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ImportFailure {
+    pub file_path: String,
+    pub error: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ImportResult {
     pub imported: usize,
     pub reused: usize,
+    #[serde(default)]
+    pub failed: Vec<ImportFailure>,
     #[serde(default)]
     pub assets: Vec<AssetSummary>,
 }

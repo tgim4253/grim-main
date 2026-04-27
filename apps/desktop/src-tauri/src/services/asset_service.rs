@@ -9,8 +9,9 @@ use tokio::fs;
 
 use crate::{
     models::asset::{
-        AssetDetail, AssetListSource, AssetSummary, ImportRemoteImagesRequest,
-        ImportRequest, ImportResult, UpdateAssetFoldersPayload,
+        AssetDetail, AssetListSource, AssetSummary, ImportFailure,
+        ImportPreviewResult, ImportRemoteImagesRequest, ImportRequest,
+        ImportResult, UpdateAssetFoldersPayload,
     },
     repositories::{AssetRepository, FolderRepository, NewImportedAssetInput},
     services::LibraryStorage,
@@ -32,6 +33,11 @@ pub struct AssetService {
 enum AssetFolderAssignmentMode {
     Replace,
     Append,
+}
+
+struct ImportPreviewScan {
+    file_paths: Vec<(String, i64)>,
+    failed: Vec<ImportFailure>,
 }
 
 impl AssetService {
@@ -148,40 +154,208 @@ impl AssetService {
         Ok(())
     }
 
+    async fn validate_import_folders(
+        &self,
+        virtual_folder_ids: &[String],
+    ) -> Result<()> {
+        if virtual_folder_ids.is_empty() {
+            return Ok(());
+        }
+
+        let mut tx = self.asset_repository.begin().await?;
+        self.folder_repository
+            .validate_assignable_folders_in_tx(&mut tx, virtual_folder_ids)
+            .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
     pub async fn reveal_path(&self, path: &Path) -> Result<()> {
         self.library_storage.reveal_path(path).await
+    }
+
+    async fn expand_import_file_paths(
+        &self,
+        file_paths: &[String],
+    ) -> ImportPreviewScan {
+        let mut seen_file_paths = HashSet::new();
+        let mut expanded_file_paths = Vec::new();
+        let mut failed = Vec::new();
+
+        for file_path in file_paths {
+            let file_path = file_path.trim();
+            if file_path.is_empty() {
+                continue;
+            }
+
+            let source = PathBuf::from(file_path);
+            let metadata = match fs::symlink_metadata(&source).await {
+                Ok(metadata) => metadata,
+                Err(error) => {
+                    failed.push(ImportFailure {
+                        file_path: file_path.to_string(),
+                        error: format!(
+                            "Failed to read metadata for {}: {error}",
+                            source.display()
+                        ),
+                    });
+                    continue;
+                }
+            };
+            let file_type = metadata.file_type();
+            if file_type.is_symlink() {
+                continue;
+            }
+
+            if metadata.is_file() {
+                if media::is_supported_image(&source)
+                    && seen_file_paths.insert(file_path.to_string())
+                {
+                    expanded_file_paths
+                        .push((file_path.to_string(), metadata.len() as i64));
+                }
+                continue;
+            }
+
+            if !metadata.is_dir() {
+                continue;
+            }
+
+            let mut pending_dirs = vec![source];
+            while let Some(directory) = pending_dirs.pop() {
+                let mut entries = match fs::read_dir(&directory).await {
+                    Ok(entries) => entries,
+                    Err(error) => {
+                        failed.push(ImportFailure {
+                            file_path: directory.to_string_lossy().into_owned(),
+                            error: format!(
+                                "Failed to read directory {}: {error}",
+                                directory.display()
+                            ),
+                        });
+                        continue;
+                    }
+                };
+
+                loop {
+                    let entry = match entries.next_entry().await {
+                        Ok(Some(entry)) => entry,
+                        Ok(None) => break,
+                        Err(error) => {
+                            // Reading the next entry can fail after the directory is opened.
+                            failed.push(ImportFailure {
+                                file_path: directory
+                                    .to_string_lossy()
+                                    .into_owned(),
+                                error: format!(
+                                    "Failed to read directory {}: {error}",
+                                    directory.display()
+                                ),
+                            });
+                            break;
+                        }
+                    };
+                    let path = entry.path();
+                    let metadata = match entry.metadata().await {
+                        Ok(metadata) => metadata,
+                        Err(error) => {
+                            failed.push(ImportFailure {
+                                file_path: path.to_string_lossy().into_owned(),
+                                error: format!(
+                                    "Failed to read metadata for {}: {error}",
+                                    path.display()
+                                ),
+                            });
+                            continue;
+                        }
+                    };
+                    let file_type = metadata.file_type();
+                    if file_type.is_symlink() {
+                        continue;
+                    }
+
+                    if metadata.is_dir() {
+                        pending_dirs.push(path);
+                        continue;
+                    }
+
+                    if metadata.is_file() && media::is_supported_image(&path) {
+                        let path_string = path.to_string_lossy().into_owned();
+                        if seen_file_paths.insert(path_string.clone()) {
+                            expanded_file_paths
+                                .push((path_string, metadata.len() as i64));
+                        }
+                    }
+                }
+            }
+        }
+
+        ImportPreviewScan { file_paths: expanded_file_paths, failed }
+    }
+
+    pub async fn preview_import_images(
+        &self,
+        request: ImportRequest,
+    ) -> Result<ImportPreviewResult> {
+        let scan = self.expand_import_file_paths(&request.file_paths).await;
+        let total_size =
+            scan.file_paths.iter().map(|(_, file_size)| *file_size).sum();
+        let file_paths = scan
+            .file_paths
+            .into_iter()
+            .map(|(file_path, _)| file_path)
+            .collect::<Vec<_>>();
+
+        Ok(ImportPreviewResult {
+            asset_count: file_paths.len(),
+            total_size,
+            file_paths,
+            failed: scan.failed,
+        })
     }
 
     pub async fn import_images(
         &self,
         request: ImportRequest,
     ) -> Result<ImportResult> {
+        self.validate_import_folders(&request.virtual_folder_ids).await?;
+
         let mut imported = 0_usize;
         let mut reused = 0_usize;
+        let mut failed = Vec::new();
         let mut assets = Vec::new();
 
         for file_path in &request.file_paths {
-            if let Some((asset, is_reused)) =
-                self.import_image_asset(&request, file_path).await?
-            {
-                if is_reused {
-                    reused += 1;
-                } else {
-                    imported += 1;
+            match self.import_image_asset(&request, file_path).await {
+                Ok(Some((asset, is_reused))) => {
+                    if is_reused {
+                        reused += 1;
+                    } else {
+                        imported += 1;
+                    }
+                    assets.push(asset);
                 }
-                assets.push(asset);
+                Ok(None) => {}
+                Err(error) => {
+                    failed.push(ImportFailure {
+                        file_path: file_path.clone(),
+                        error: error.to_string(),
+                    });
+                }
             }
         }
 
         let assets = self.hydrate_asset_summaries(assets).await;
 
-        Ok(ImportResult { imported, reused, assets })
+        Ok(ImportResult { imported, reused, failed, assets })
     }
 
     pub async fn import_remote_images(
         &self,
         request: ImportRemoteImagesRequest,
     ) -> Result<ImportResult> {
+        self.validate_import_folders(&request.virtual_folder_ids).await?;
+
         let mut remote_sources = Vec::new();
         let mut seen_sources = HashSet::new();
         for payload in &request.sources {
@@ -198,31 +372,44 @@ impl AssetService {
         };
         let mut imported = 0_usize;
         let mut reused = 0_usize;
+        let mut failed = Vec::new();
         let mut assets = Vec::new();
 
         for source in remote_sources {
-            let downloaded =
-                remote_image::download_remote_image(&source).await?;
-            if let Some((asset, is_reused)) = self
-                .import_image_bytes_as_temp(
+            let import_result = async {
+                let downloaded =
+                    remote_image::download_remote_image(&source).await?;
+                self.import_image_bytes_as_temp(
                     &import_request,
                     &downloaded.bytes,
                     &downloaded.file_name,
                 )
-                .await?
-            {
-                if is_reused {
-                    reused += 1;
-                } else {
-                    imported += 1;
+                .await
+            }
+            .await;
+
+            match import_result {
+                Ok(Some((asset, is_reused))) => {
+                    if is_reused {
+                        reused += 1;
+                    } else {
+                        imported += 1;
+                    }
+                    assets.push(asset);
                 }
-                assets.push(asset);
+                Ok(None) => {}
+                Err(error) => {
+                    failed.push(ImportFailure {
+                        file_path: source,
+                        error: error.to_string(),
+                    });
+                }
             }
         }
 
         let assets = self.hydrate_asset_summaries(assets).await;
 
-        Ok(ImportResult { imported, reused, assets })
+        Ok(ImportResult { imported, reused, failed, assets })
     }
 
     pub async fn import_capture_result(
@@ -582,6 +769,84 @@ mod tests {
         let loaded_asset = loaded.first().expect("missing loaded asset");
         assert!(loaded_asset.storage_path.is_some());
         assert!(loaded_asset.thumbnail_path.is_some());
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn import_images_keeps_successful_files_when_one_fails() {
+        let dir = make_temp_dir("partial-import");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let source_path = dir.join("source.bmp");
+        let missing_path = dir.join("missing.bmp");
+        fs::write(&source_path, BMP_1X1).expect("failed to write test image");
+
+        let service = AssetService::new(
+            AssetRepository::new(pool.clone()),
+            FolderRepository::new(pool),
+            storage_for(&dir),
+        );
+        let result = service
+            .import_images(ImportRequest {
+                file_paths: vec![
+                    path_string(&source_path),
+                    path_string(&missing_path),
+                ],
+                virtual_folder_ids: Vec::new(),
+            })
+            .await
+            .expect("partial import should not fail the whole request");
+
+        assert_eq!(result.imported, 1);
+        assert_eq!(result.reused, 0);
+        assert_eq!(result.assets.len(), 1);
+        assert_eq!(result.failed.len(), 1);
+        assert_eq!(result.failed[0].file_path, path_string(&missing_path));
+        assert!(result.failed[0].error.contains("Failed to read metadata"));
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn preview_import_images_keeps_supported_files_when_one_path_fails() {
+        let dir = make_temp_dir("partial-preview");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let source_path = dir.join("source.bmp");
+        let missing_path = dir.join("missing.bmp");
+        fs::write(&source_path, BMP_1X1).expect("failed to write test image");
+
+        let service = AssetService::new(
+            AssetRepository::new(pool.clone()),
+            FolderRepository::new(pool),
+            storage_for(&dir),
+        );
+        let result = service
+            .preview_import_images(ImportRequest {
+                file_paths: vec![
+                    path_string(&source_path),
+                    path_string(&missing_path),
+                ],
+                virtual_folder_ids: Vec::new(),
+            })
+            .await
+            .expect("partial preview should not fail the whole request");
+
+        assert_eq!(result.asset_count, 1);
+        assert_eq!(result.file_paths, vec![path_string(&source_path)]);
+        assert_eq!(result.total_size, BMP_1X1.len() as i64);
+        assert_eq!(result.failed.len(), 1);
+        assert_eq!(result.failed[0].file_path, path_string(&missing_path));
+        assert!(result.failed[0].error.contains("Failed to read metadata"));
 
         let _ = fs::remove_dir_all(dir);
     }

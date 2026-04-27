@@ -766,6 +766,9 @@ function ImportModalDemo() {
         open={openPreview === 'import-completed'}
         summary={{
           importedCount: 14,
+          reusedCount: 2,
+          processedCount: 16,
+          failedCount: 0,
           totalSize: '128.4 MB',
           destinationFolder: selectedImportFolder?.fullPath ?? 'Search directories...',
         }}

@@ -6,4 +6,4 @@ export {
   UNCATEGORIZED_NODE_ID,
   buildExplorerNodes,
 } from './explorerTree';
-export type { ExplorerNode } from './types';
+export type { ExplorerCreateFolderRequest, ExplorerNode } from './types';

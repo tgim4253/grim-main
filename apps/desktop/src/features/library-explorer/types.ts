@@ -12,3 +12,14 @@ export type ExplorerNode = {
   defaultExpanded?: boolean;
   showActions?: boolean;
 };
+
+export type ExplorerCreateFolderRequest = {
+  parentId: string | null;
+  name: string;
+};
+
+export type ExplorerFolderDraft = {
+  parentNodeId: string;
+  pending?: boolean;
+  error?: string | null;
+};
