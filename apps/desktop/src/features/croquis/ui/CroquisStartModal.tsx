@@ -386,6 +386,11 @@ export function CroquisStartModal({
       return;
     }
 
+    if (assetIds.length === 0) {
+      setError('Select at least one asset to start a Croquis session.');
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
@@ -434,7 +439,7 @@ export function CroquisStartModal({
           </Button>
           <Button
             size="lg"
-            disabled={busy || selectedPreset === null}
+            disabled={busy || selectedPreset === null || assetIds.length === 0}
             onClick={() => {
               void handleStart();
             }}

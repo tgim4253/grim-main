@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                    WITH RECURSIVE folder_tree(id) AS (\n                        SELECT id\n                        FROM virtual_folder\n                        WHERE id = ?1\n                        UNION ALL\n                        SELECT vf.id\n                        FROM virtual_folder vf\n                        INNER JOIN folder_tree ft ON vf.parent_id = ft.id\n                    )\n                    SELECT DISTINCT\n                           a.id,\n                           a.hash,\n                           a.file_name,\n                           a.file_size,\n                           a.mime_type,\n                           a.width,\n                           a.height,\n                           a.modified_at,\n                           a.created_at,\n                           a.updated_at\n                    FROM asset a\n                    INNER JOIN asset_virtual_folder avf ON avf.asset_id = a.id\n                    WHERE avf.virtual_folder_id IN (SELECT id FROM folder_tree)\n                      AND a.source_type != ?2\n                    ORDER BY a.updated_at DESC, a.created_at DESC\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "hash",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "file_name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "file_size",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "mime_type",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "width",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "height",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "modified_at",
+        "ordinal": 7,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 9,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "1918c529daacacb5d2ee929a5b84e7e0709f28e60f6292fe2fc3fd2a919a0e4b"
+}

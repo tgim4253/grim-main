@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { CroquisStartModal } from '../../croquis/ui/CroquisStartModal';
 import { ipc } from '../../../shared/lib/ipc';
-import type { AssetDetail, AssetListSource, AssetSummary } from '../../../shared/types';
+import type {
+  AssetDetail,
+  AssetListSource,
+  AssetSummary,
+  LibrarySettings,
+  SessionPreset,
+} from '../../../shared/types';
 import { Button } from '../../../shared/ui';
 import { LibraryWorkspace } from '../common/LibraryWorkspace';
 import type { LibraryWorkspaceLayout } from '../common/types';
@@ -8,6 +15,7 @@ import { AssetPreviewPanel } from './AssetPreviewPanel';
 import { createReferenceAsset } from './referenceAssets';
 import { ReferenceExplorerHeader } from './ReferenceExplorerHeader';
 import { ReferenceMasonryTile } from './ReferenceMasonryTile';
+import { ReferenceSelectionToolbar } from './ReferenceSelectionToolbar';
 import './reference-workspace.css';
 
 type ReferencesViewProps = {
@@ -49,11 +57,19 @@ export function ReferencesView({ source, refreshKey = 0 }: ReferencesViewProps) 
   const [layout, setLayout] = useState<LibraryWorkspaceLayout>('masonry');
   const [assets, setAssets] = useState<AssetSummary[]>([]);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [selectedAssetDetail, setSelectedAssetDetail] = useState<AssetDetail | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [croquisModalOpen, setCroquisModalOpen] = useState(false);
+  const [sessionPresets, setSessionPresets] = useState<SessionPreset[]>([]);
+  const [librarySettings, setLibrarySettings] = useState<LibrarySettings>({});
+  const [isCroquisConfigLoading, setIsCroquisConfigLoading] = useState(false);
+  const [croquisConfigError, setCroquisConfigError] = useState<string | null>(null);
   const loadSequenceRef = useRef(0);
+  const croquisConfigLoadSequenceRef = useRef(0);
 
   const loadAssets = useCallback(async () => {
     const loadSequence = loadSequenceRef.current + 1;
@@ -94,6 +110,11 @@ export function ReferencesView({ source, refreshKey = 0 }: ReferencesViewProps) 
   useEffect(() => {
     void loadAssets();
   }, [loadAssets, refreshKey]);
+
+  useEffect(() => {
+    const assetIds = new Set(assets.map(asset => asset.id));
+    setSelectedAssetIds(current => current.filter(assetId => assetIds.has(assetId)));
+  }, [assets]);
 
   useEffect(() => {
     if (!selectedAssetId) {
@@ -152,39 +173,166 @@ export function ReferencesView({ source, refreshKey = 0 }: ReferencesViewProps) 
   );
 
   const handleSelectedAssetChange = (assetId: string) => {
+    if (selectionMode) {
+      setSelectedAssetIds(current => {
+        if (current.includes(assetId)) {
+          return current.filter(selectedAssetId => selectedAssetId !== assetId);
+        }
+
+        return [...current, assetId];
+      });
+      return;
+    }
+
     setSelectedAssetId(assetId);
     setPreviewOpen(true);
   };
 
+  const loadCroquisConfiguration = useCallback(async () => {
+    const loadSequence = croquisConfigLoadSequenceRef.current + 1;
+    croquisConfigLoadSequenceRef.current = loadSequence;
+    setIsCroquisConfigLoading(true);
+    setCroquisConfigError(null);
+
+    try {
+      const [nextPresets, nextSettings] = await Promise.all([
+        ipc.session.listPresets(),
+        ipc.library.loadSettingsSnapshot(),
+      ]);
+
+      if (croquisConfigLoadSequenceRef.current !== loadSequence) {
+        return false;
+      }
+
+      setSessionPresets(nextPresets);
+      setLibrarySettings(nextSettings);
+      return true;
+    } catch (nextError) {
+      if (croquisConfigLoadSequenceRef.current !== loadSequence) {
+        return false;
+      }
+
+      setSessionPresets([]);
+      setCroquisConfigError(
+        getErrorMessage(nextError, 'Failed to load Croquis session configuration.'),
+      );
+      return false;
+    } finally {
+      if (croquisConfigLoadSequenceRef.current === loadSequence) {
+        setIsCroquisConfigLoading(false);
+      }
+    }
+  }, []);
+
+  const handleSelectionModeChange = useCallback(
+    (nextSelectionMode: boolean) => {
+      setSelectionMode(nextSelectionMode);
+      if (!nextSelectionMode) {
+        setSelectedAssetIds([]);
+        return;
+      }
+
+      setSelectedAssetIds(current => {
+        if (current.length > 0) {
+          return current;
+        }
+
+        return selectedAssetId && assets.some(asset => asset.id === selectedAssetId)
+          ? [selectedAssetId]
+          : [];
+      });
+    },
+    [assets, selectedAssetId],
+  );
+
+  const handleSelectAllChange = useCallback(
+    (selected: boolean) => {
+      setSelectedAssetIds(selected ? assets.map(asset => asset.id) : []);
+    },
+    [assets],
+  );
+
+  const handleStartCroquis = useCallback(() => {
+    if (selectedAssetIds.length === 0 || isCroquisConfigLoading) {
+      return;
+    }
+
+    void loadCroquisConfiguration().then(configurationLoaded => {
+      if (configurationLoaded) {
+        setCroquisModalOpen(true);
+      }
+    });
+  }, [isCroquisConfigLoading, loadCroquisConfiguration, selectedAssetIds.length]);
+
+  const handleCloseCroquisModal = useCallback(() => {
+    setCroquisModalOpen(false);
+  }, []);
+
+  const handleCroquisStarted = useCallback(() => {
+    setCroquisModalOpen(false);
+    setSelectionMode(false);
+    setSelectedAssetIds([]);
+  }, []);
+
   return (
-    <LibraryWorkspace
-      mode="references"
-      items={items}
-      layout={layout}
-      selectedItemId={selectedAssetId ?? undefined}
-      gridAriaLabel="References"
-      previewOpen={previewOpen}
-      gridBusy={isLoading}
-      gridEmptyState={gridEmptyState}
-      onLayoutChange={setLayout}
-      onSelectedItemChange={handleSelectedAssetChange}
-      renderHeader={headerProps => <ReferenceExplorerHeader {...headerProps} />}
-      renderTile={(asset, tileState) => (
-        <ReferenceMasonryTile
-          asset={asset}
-          layout={tileState.layout}
-          selected={tileState.selected}
-          onSelect={tileState.onSelect}
-        />
-      )}
-      renderPreview={asset => (
-        <AssetPreviewPanel
-          asset={asset}
-          onClose={() => {
-            setPreviewOpen(false);
-          }}
-        />
-      )}
-    />
+    <>
+      <LibraryWorkspace
+        mode="references"
+        items={items}
+        layout={layout}
+        selectedItemId={selectedAssetId ?? undefined}
+        selectedItemIds={selectedAssetIds}
+        selectionMode={selectionMode}
+        gridAriaLabel="References"
+        previewOpen={previewOpen}
+        gridBusy={isLoading}
+        gridEmptyState={gridEmptyState}
+        onLayoutChange={setLayout}
+        onSelectedItemChange={handleSelectedAssetChange}
+        renderHeader={headerProps => <ReferenceExplorerHeader {...headerProps} />}
+        renderToolbar={
+          <ReferenceSelectionToolbar
+            selectionMode={selectionMode}
+            selectedCount={selectedAssetIds.length}
+            totalCount={assets.length}
+            croquisDisabled={isCroquisConfigLoading}
+            onSelectionModeChange={handleSelectionModeChange}
+            onSelectAllChange={handleSelectAllChange}
+            onStartCroquis={handleStartCroquis}
+          />
+        }
+        renderTile={(asset, tileState) => (
+          <ReferenceMasonryTile
+            asset={asset}
+            layout={tileState.layout}
+            selected={tileState.selected}
+            selectionIndex={tileState.selectionIndex}
+            selectionMode={tileState.selectionMode}
+            onSelect={tileState.onSelect}
+          />
+        )}
+        renderPreview={asset => (
+          <AssetPreviewPanel
+            asset={asset}
+            onClose={() => {
+              setPreviewOpen(false);
+            }}
+          />
+        )}
+      />
+      <CroquisStartModal
+        open={croquisModalOpen}
+        assetIds={selectedAssetIds}
+        sessionPresets={sessionPresets}
+        librarySettings={librarySettings}
+        onClose={handleCloseCroquisModal}
+        onStarted={handleCroquisStarted}
+      />
+      {croquisConfigError ? (
+        <div className="reference-croquis-config-error" role="status">
+          {croquisConfigError}
+        </div>
+      ) : null}
+    </>
   );
 }

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import type {
   LibraryWorkspaceItem,
   LibraryWorkspaceLayout,
@@ -10,6 +10,8 @@ type MasonryGridProps<TItem extends LibraryWorkspaceItem> = {
   layout: LibraryWorkspaceLayout;
   ariaLabel: string;
   selectedItemId?: string;
+  selectedItemIds?: readonly string[];
+  selectionMode?: boolean;
   busy?: boolean;
   emptyState?: ReactNode;
   onSelectedItemChange?: (itemId: string) => void;
@@ -21,20 +23,40 @@ export function MasonryGrid<TItem extends LibraryWorkspaceItem>({
   layout,
   ariaLabel,
   selectedItemId,
+  selectedItemIds = [],
+  selectionMode = false,
   busy = false,
   emptyState = null,
   onSelectedItemChange,
   renderTile,
 }: MasonryGridProps<TItem>) {
+  const selectedItemOrder = useMemo(() => {
+    const orderByItemId = new Map<string, number>();
+    selectedItemIds.forEach((itemId, index) => {
+      if (!orderByItemId.has(itemId)) {
+        orderByItemId.set(itemId, index + 1);
+      }
+    });
+
+    return orderByItemId;
+  }, [selectedItemIds]);
+
   const renderItem = (item: TItem) => {
-    const selected = item.id === selectedItemId;
+    const selectionIndex = selectedItemOrder.get(item.id);
+    const selected = selectionMode ? selectionIndex !== undefined : item.id === selectedItemId;
     const onSelect = () => {
       onSelectedItemChange?.(item.id);
     };
 
     return (
       <div className="masonry-grid__item" role="listitem" key={item.id}>
-        {renderTile(item, { layout, selected, onSelect })}
+        {renderTile(item, {
+          layout,
+          selected,
+          selectionIndex,
+          selectionMode,
+          onSelect,
+        })}
       </div>
     );
   };

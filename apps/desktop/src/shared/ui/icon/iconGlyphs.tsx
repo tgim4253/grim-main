@@ -25,10 +25,14 @@ export const ICON_NAMES = [
   'link-to',
   'masonry-item',
   'minus',
+  'pause',
+  'play',
   'plus',
   'reload',
   'search',
   'setting',
+  'skip-back',
+  'skip-forward',
   'star',
   'tree',
   'user',
@@ -207,6 +211,13 @@ export const ICON_GLYPHS = {
   ),
   'masonry-item': masonryItemGlyph,
   minus: <path d="M5 12h14" />,
+  pause: (
+    <>
+      <rect x="6" y="4" width="4" height="16" rx="1" />
+      <rect x="14" y="4" width="4" height="16" rx="1" />
+    </>
+  ),
+  play: <polygon points="6 3 20 12 6 21 6 3" />,
   plus: (
     <path
       fill="currentColor"
@@ -225,6 +236,18 @@ export const ICON_GLYPHS = {
     <>
       <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" />
       <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  'skip-back': (
+    <>
+      <path d="M5 19V5" />
+      <path d="m19 20-10-8 10-8z" />
+    </>
+  ),
+  'skip-forward': (
+    <>
+      <path d="M19 5v14" />
+      <path d="m5 4 10 8-10 8z" />
     </>
   ),
   star: (

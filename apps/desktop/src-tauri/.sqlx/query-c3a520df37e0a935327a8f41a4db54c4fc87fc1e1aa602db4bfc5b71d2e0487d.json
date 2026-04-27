@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n                    SELECT id,\n                           hash,\n                           file_name,\n                           file_size,\n                           mime_type,\n                           width,\n                           height,\n                           modified_at,\n                           created_at,\n                           updated_at\n                    FROM asset\n                    WHERE id NOT IN (SELECT asset_id FROM asset_virtual_folder)\n                    ORDER BY updated_at DESC, created_at DESC\n                    ",
+  "query": "\n                    SELECT id,\n                           hash,\n                           file_name,\n                           file_size,\n                           mime_type,\n                           width,\n                           height,\n                           modified_at,\n                           created_at,\n                           updated_at\n                    FROM asset a\n                    WHERE a.id NOT IN (SELECT asset_id FROM asset_virtual_folder)\n                      AND a.source_type != ?1\n                    ORDER BY updated_at DESC, created_at DESC\n                    ",
   "describe": {
     "columns": [
       {
@@ -55,7 +55,7 @@
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 1
     },
     "nullable": [
       false,
@@ -70,5 +70,5 @@
       false
     ]
   },
-  "hash": "3b9cc63a686fe610a46f2de3ebfc29baf695a292d79cd9aeacf3865961cb7a79"
+  "hash": "c3a520df37e0a935327a8f41a4db54c4fc87fc1e1aa602db4bfc5b71d2e0487d"
 }

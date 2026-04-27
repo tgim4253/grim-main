@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT avf.virtual_folder_id AS \"folder_id!: String\",\n                   avf.asset_id AS \"asset_id!: String\"\n            FROM asset_virtual_folder avf\n            INNER JOIN asset a ON a.id = avf.asset_id\n            WHERE a.source_type != ?1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "folder_id!: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "asset_id!: String",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "02c33ccafd6d29c5931e39a1a3b5ea5674b243f6826cd068a32c7b586739bad2"
+}

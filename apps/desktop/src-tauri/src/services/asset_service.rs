@@ -13,7 +13,10 @@ use crate::{
         ImportPreviewResult, ImportRemoteImagesRequest, ImportRequest,
         ImportResult, UpdateAssetFoldersPayload,
     },
-    repositories::{AssetRepository, FolderRepository, NewImportedAssetInput},
+    repositories::{
+        AssetRepository, FolderRepository, NewImportedAssetInput,
+        CROQUIS_RESULT_ASSET_SOURCE, IMPORTED_ASSET_SOURCE,
+    },
     services::LibraryStorage,
     utils::{
         date::get_now_date, file_ops::ensure_unique_path,
@@ -459,6 +462,7 @@ impl AssetService {
                         width: width as i64,
                         height: height as i64,
                         modified_at: None,
+                        source_type: CROQUIS_RESULT_ASSET_SOURCE,
                         created_at: &now,
                     },
                 )
@@ -570,6 +574,7 @@ impl AssetService {
         if let Some(existing) =
             self.asset_repository.load_by_hash(&hash).await?
         {
+            self.asset_repository.mark_as_import_source(&existing.id).await?;
             self.apply_asset_folder_assignments(
                 &existing.id,
                 &request.virtual_folder_ids,
@@ -617,6 +622,7 @@ impl AssetService {
                         width: width as i64,
                         height: height as i64,
                         modified_at,
+                        source_type: IMPORTED_ASSET_SOURCE,
                         created_at: &now,
                     },
                 )
@@ -678,7 +684,7 @@ mod tests {
         },
         repositories::{
             AssetRepository, FolderRepository, NewImportedAssetInput,
-            RecordRepository,
+            RecordRepository, IMPORTED_ASSET_SOURCE,
         },
         services::{AssetService, FolderService, LibraryStorage},
         state::{
@@ -813,6 +819,133 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn capture_result_assets_stay_hidden_after_record_delete() {
+        let dir = make_temp_dir("capture-result-hidden-delete");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let service = AssetService::new(
+            AssetRepository::new(pool.clone()),
+            FolderRepository::new(pool.clone()),
+            storage_for(&dir),
+        );
+        let source_path = dir.join("source.bmp");
+        fs::write(&source_path, BMP_1X1).expect("failed to write test image");
+        let import_result = service
+            .import_images(ImportRequest {
+                file_paths: vec![path_string(&source_path)],
+                virtual_folder_ids: Vec::new(),
+            })
+            .await
+            .expect("failed to import source asset");
+        let source_asset_id = import_result
+            .assets
+            .first()
+            .expect("missing source asset")
+            .id
+            .clone();
+
+        let record_repository = RecordRepository::new(pool);
+        let record_id = record_repository
+            .finish(FinishCroquisRecordPayload {
+                source_asset_id,
+                title: "Capture source".to_string(),
+                target_duration_seconds: None,
+                actual_duration_seconds: 1.0,
+                finished_at: "2030-01-05T00:00:00Z".to_string(),
+                tag_ids: Vec::new(),
+            })
+            .await
+            .expect("failed to finish record");
+
+        let mut capture_bytes = BMP_1X1.to_vec();
+        capture_bytes[54] = 0;
+        capture_bytes[55] = 255;
+        let capture_asset = service
+            .import_capture_result(&capture_bytes, "capture.bmp")
+            .await
+            .expect("failed to import capture result");
+        record_repository
+            .attach_result_asset(&record_id, &capture_asset.id, None)
+            .await
+            .expect("failed to attach capture result");
+
+        let listed_before_delete = service
+            .list_assets(AssetListSource::AllAssets)
+            .await
+            .expect("failed to list assets");
+        assert!(!listed_before_delete
+            .iter()
+            .any(|asset| asset.id == capture_asset.id));
+
+        record_repository
+            .delete(crate::models::record::DeleteCroquisRecordPayload {
+                record_id,
+            })
+            .await
+            .expect("failed to delete record");
+
+        let listed_after_delete = service
+            .list_assets(AssetListSource::AllAssets)
+            .await
+            .expect("failed to list assets after delete");
+        assert!(!listed_after_delete
+            .iter()
+            .any(|asset| asset.id == capture_asset.id));
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn manual_import_promotes_matching_capture_result_asset() {
+        let dir = make_temp_dir("capture-result-promote");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let service = AssetService::new(
+            AssetRepository::new(pool.clone()),
+            FolderRepository::new(pool),
+            storage_for(&dir),
+        );
+        let capture_asset = service
+            .import_capture_result(BMP_1X1, "capture.bmp")
+            .await
+            .expect("failed to import capture result");
+        let hidden_assets = service
+            .list_assets(AssetListSource::AllAssets)
+            .await
+            .expect("failed to list hidden capture result");
+        assert!(hidden_assets.is_empty());
+
+        let source_path = dir.join("source.bmp");
+        fs::write(&source_path, BMP_1X1).expect("failed to write test image");
+        let import_result = service
+            .import_images(ImportRequest {
+                file_paths: vec![path_string(&source_path)],
+                virtual_folder_ids: Vec::new(),
+            })
+            .await
+            .expect("failed to import matching asset");
+        assert_eq!(import_result.imported, 0);
+        assert_eq!(import_result.reused, 1);
+
+        let listed_assets = service
+            .list_assets(AssetListSource::AllAssets)
+            .await
+            .expect("failed to list promoted asset");
+        assert_eq!(listed_assets.len(), 1);
+        assert_eq!(listed_assets[0].id, capture_asset.id);
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
     async fn preview_import_images_keeps_supported_files_when_one_path_fails() {
         let dir = make_temp_dir("partial-preview");
         let db_path = dir.join("grim.db");
@@ -929,6 +1062,7 @@ mod tests {
                     width: 1,
                     height: 1,
                     modified_at: None,
+                    source_type: IMPORTED_ASSET_SOURCE,
                     created_at: "2026-01-01T00:00:00Z",
                 },
             )

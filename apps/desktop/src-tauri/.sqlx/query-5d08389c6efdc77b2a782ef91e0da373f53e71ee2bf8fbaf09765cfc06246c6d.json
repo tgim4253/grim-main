@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n                    SELECT a.id,\n                           a.hash,\n                           a.file_name,\n                           a.file_size,\n                           a.mime_type,\n                           a.width,\n                           a.height,\n                           a.modified_at,\n                           a.created_at,\n                           a.updated_at\n                    FROM asset a\n                    INNER JOIN asset_virtual_folder avf ON avf.asset_id = a.id\n                    WHERE avf.virtual_folder_id = ?1\n                    ORDER BY a.updated_at DESC, a.created_at DESC\n                    ",
+  "query": "\n                    SELECT a.id,\n                           a.hash,\n                           a.file_name,\n                           a.file_size,\n                           a.mime_type,\n                           a.width,\n                           a.height,\n                           a.modified_at,\n                           a.created_at,\n                           a.updated_at\n                    FROM asset a\n                    INNER JOIN asset_virtual_folder avf ON avf.asset_id = a.id\n                    WHERE avf.virtual_folder_id = ?1\n                      AND a.source_type != ?2\n                    ORDER BY a.updated_at DESC, a.created_at DESC\n                    ",
   "describe": {
     "columns": [
       {
@@ -55,7 +55,7 @@
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 2
     },
     "nullable": [
       false,
@@ -70,5 +70,5 @@
       false
     ]
   },
-  "hash": "d8fc6aadeff32d9b9ca0c56a93c005eacfcd16525245ea6f329cde4a13a3bc26"
+  "hash": "5d08389c6efdc77b2a782ef91e0da373f53e71ee2bf8fbaf09765cfc06246c6d"
 }

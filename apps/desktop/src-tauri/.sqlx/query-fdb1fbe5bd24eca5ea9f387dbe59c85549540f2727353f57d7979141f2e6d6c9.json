@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT COUNT(*) AS \"count!: i64\"\n                FROM virtual_folder child\n                WHERE child.parent_id = ?1\n                  AND (\n                    child.kind != 'system_uncategorized'\n                    OR EXISTS (\n                        SELECT 1\n                        FROM asset_virtual_folder avf\n                        INNER JOIN asset a ON a.id = avf.asset_id\n                        WHERE avf.virtual_folder_id = child.id\n                          AND a.source_type != ?2\n                    )\n                  )\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "fdb1fbe5bd24eca5ea9f387dbe59c85549540f2727353f57d7979141f2e6d6c9"
+}

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT COUNT(*) AS \"count!: i64\"\n            FROM asset a\n            WHERE a.id NOT IN (SELECT asset_id FROM asset_virtual_folder)\n              AND a.source_type != ?1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "68a22b6e8fbcaabd38ab786dcbbf4246654076ae1992da70a74230c3bf9f8156"
+}

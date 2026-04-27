@@ -15,6 +15,8 @@ type LibraryWorkspaceProps<TItem extends LibraryWorkspaceItem> = {
   items: readonly TItem[];
   layout: LibraryWorkspaceLayout;
   selectedItemId?: string;
+  selectedItemIds?: readonly string[];
+  selectionMode?: boolean;
   gridAriaLabel: string;
   previewOpen?: boolean;
   gridBusy?: boolean;
@@ -22,6 +24,7 @@ type LibraryWorkspaceProps<TItem extends LibraryWorkspaceItem> = {
   onLayoutChange: (layout: LibraryWorkspaceLayout) => void;
   onSelectedItemChange?: (itemId: string) => void;
   renderHeader: LibraryWorkspaceRenderHeader;
+  renderToolbar?: ReactNode;
   renderPreview?: LibraryWorkspaceRenderPreview<TItem>;
   renderTile: LibraryWorkspaceRenderTile<TItem>;
 };
@@ -31,6 +34,8 @@ export function LibraryWorkspace<TItem extends LibraryWorkspaceItem>({
   items,
   layout,
   selectedItemId,
+  selectedItemIds = [],
+  selectionMode = false,
   gridAriaLabel,
   previewOpen = true,
   gridBusy = false,
@@ -38,6 +43,7 @@ export function LibraryWorkspace<TItem extends LibraryWorkspaceItem>({
   onLayoutChange,
   onSelectedItemChange,
   renderHeader,
+  renderToolbar = null,
   renderPreview,
   renderTile,
 }: LibraryWorkspaceProps<TItem>) {
@@ -61,12 +67,15 @@ export function LibraryWorkspace<TItem extends LibraryWorkspaceItem>({
           layout,
           onLayoutChange,
         })}
+        {renderToolbar}
         <div className="library-workspace__grid-region">
           <MasonryGrid
             items={items}
             layout={layout}
             ariaLabel={gridAriaLabel}
             selectedItemId={selectedItem?.id}
+            selectedItemIds={selectedItemIds}
+            selectionMode={selectionMode}
             busy={gridBusy}
             emptyState={gridEmptyState}
             onSelectedItemChange={onSelectedItemChange}

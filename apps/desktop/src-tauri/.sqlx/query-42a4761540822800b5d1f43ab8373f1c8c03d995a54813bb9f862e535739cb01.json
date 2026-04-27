@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT COUNT(*) AS \"count!: i64\"\n            FROM asset_virtual_folder\n            WHERE virtual_folder_id = ?1\n            ",
+  "query": "\n                SELECT COUNT(*) AS \"count!: i64\"\n                FROM asset a\n                WHERE a.source_type != ?1\n                ",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "e2f8f22f1eb14268bc0267300c77054a9660dacb4c6c794503b37f0ab69e4d6e"
+  "hash": "42a4761540822800b5d1f43ab8373f1c8c03d995a54813bb9f862e535739cb01"
 }
