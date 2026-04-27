@@ -1,14 +1,23 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { cx } from '../../shared/lib/cx';
-import { ExplorerPanel } from '../../features/library-explorer';
-import { ReferencesDummyView } from '../../features/library-workspace';
+import { ipc } from '../../shared/lib/ipc';
+import type { AssetListSource, ExplorerSnapshot } from '../../shared/types';
+import {
+  ALL_ASSETS_NODE_ID,
+  DEFAULT_ASSET_SOURCE,
+  ExplorerPanel,
+  buildExplorerNodes,
+  type ExplorerNode,
+} from '../../features/library-explorer';
+import { ReferencesView } from '../../features/library-workspace';
 import { AppTopBar } from '../../ui/Header/AppTopBar';
 import {
   MiniSidebarRail,
@@ -23,6 +32,18 @@ const SIDEBAR_DEFAULT_WIDTH = 343;
 const SIDEBAR_MIN_WIDTH = 240;
 const SIDEBAR_RESIZE_STEP = 24;
 const MAIN_CONTAINER_MIN_WIDTH = 320;
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  return fallback;
+}
 
 function getSidebarMaxWidth() {
   if (typeof window === 'undefined') {
@@ -40,9 +61,33 @@ export function LibraryPage() {
   const [isSidebarPanelOpen, setIsSidebarPanelOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const [explorerSnapshot, setExplorerSnapshot] = useState<ExplorerSnapshot | null>(null);
+  const [explorerError, setExplorerError] = useState<string | null>(null);
+  const [isExplorerLoading, setIsExplorerLoading] = useState(true);
+  const [activeExplorerNodeId, setActiveExplorerNodeId] = useState(ALL_ASSETS_NODE_ID);
+  const [assetSource, setAssetSource] = useState<AssetListSource>(DEFAULT_ASSET_SOURCE);
   const resizeSessionRef = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(
     null,
   );
+  const explorerNodes = useMemo(() => buildExplorerNodes(explorerSnapshot), [explorerSnapshot]);
+
+  const loadExplorerSnapshot = useCallback(async () => {
+    setIsExplorerLoading(true);
+    setExplorerError(null);
+
+    try {
+      const snapshot = await ipc.library.loadExplorerSnapshot();
+      setExplorerSnapshot(snapshot);
+    } catch (error) {
+      setExplorerError(getErrorMessage(error, 'Failed to load explorer.'));
+    } finally {
+      setIsExplorerLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadExplorerSnapshot();
+  }, [loadExplorerSnapshot]);
 
   const primaryItems: readonly PrimaryRailItem[] = [
     {
@@ -73,6 +118,15 @@ export function LibraryPage() {
       setIsSidebarPanelOpen(open => !open);
     }
   };
+
+  const handleExplorerNodeSelect = useCallback((node: ExplorerNode) => {
+    if (!node.source) {
+      return;
+    }
+
+    setActiveExplorerNodeId(node.id);
+    setAssetSource(node.source);
+  }, []);
 
   const handleSplitterPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -210,7 +264,14 @@ export function LibraryPage() {
             title="Explorer"
             collapsed={!isSidebarPanelOpen}
           >
-            <ExplorerPanel />
+            <ExplorerPanel
+              nodes={explorerNodes}
+              activeNodeId={activeExplorerNodeId}
+              loading={isExplorerLoading}
+              error={explorerError}
+              onNodeSelect={handleExplorerNodeSelect}
+              onRetry={() => void loadExplorerSnapshot()}
+            />
           </SidebarPanel>
         </div>
 
@@ -234,7 +295,7 @@ export function LibraryPage() {
         ) : null}
 
         <main className="app-workspace library-page__workspace library-page__main-container">
-          <ReferencesDummyView />
+          <ReferencesView source={assetSource} />
         </main>
       </div>
     </div>

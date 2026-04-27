@@ -1,11 +1,7 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '../../shared/ui';
 import { ExplorerTreeGroup } from './ExplorerTreeGroup';
-import {
-  EXPLORER_DUMMY_NODES,
-  EXPLORER_INITIAL_ACTIVE_NODE_ID,
-  type ExplorerNode,
-} from './explorerDummyData';
+import type { ExplorerNode } from './types';
 import './explorer.css';
 
 function buildDefaultExpandedState(nodes: ExplorerNode[]): Record<string, boolean> {
@@ -19,20 +15,43 @@ function buildDefaultExpandedState(nodes: ExplorerNode[]): Record<string, boolea
   }, {});
 }
 
-const DEFAULT_EXPANDED_STATE = buildDefaultExpandedState(EXPLORER_DUMMY_NODES);
+type ExplorerPanelProps = {
+  nodes: ExplorerNode[];
+  activeNodeId: string;
+  loading?: boolean;
+  error?: string | null;
+  onNodeSelect: (node: ExplorerNode) => void;
+  onRetry?: () => void;
+};
 
-export function ExplorerPanel() {
-  const [activeNodeId, setActiveNodeId] = useState(EXPLORER_INITIAL_ACTIVE_NODE_ID);
-  const [expandedById, setExpandedById] = useState<Record<string, boolean>>(DEFAULT_EXPANDED_STATE);
+export function ExplorerPanel({
+  nodes,
+  activeNodeId,
+  loading = false,
+  error = null,
+  onNodeSelect,
+  onRetry,
+}: ExplorerPanelProps) {
+  const [expandedById, setExpandedById] = useState<Record<string, boolean>>(() =>
+    buildDefaultExpandedState(nodes),
+  );
 
-  const handleNodeSelect = useCallback((node: ExplorerNode) => {
-    if (node.children?.length) {
-      setExpandedById(current => ({ ...current, [node.id]: !current[node.id] }));
-      return;
-    }
+  useEffect(() => {
+    setExpandedById(buildDefaultExpandedState(nodes));
+  }, [nodes]);
 
-    setActiveNodeId(current => (current === node.id ? current : node.id));
-  }, []);
+  const handleNodeSelect = useCallback(
+    (node: ExplorerNode) => {
+      if (node.source) {
+        onNodeSelect(node);
+      }
+
+      if (node.children?.length) {
+        setExpandedById(current => ({ ...current, [node.id]: !current[node.id] }));
+      }
+    },
+    [onNodeSelect],
+  );
 
   return (
     <div className="library-explorer">
@@ -43,15 +62,30 @@ export function ExplorerPanel() {
       </div>
 
       <div className="library-explorer__tree" role="tree" aria-label="Explorer">
-        {EXPLORER_DUMMY_NODES.map(node => (
-          <ExplorerTreeGroup
-            key={node.id}
-            node={node}
-            activeNodeId={activeNodeId}
-            expandedById={expandedById}
-            onNodeSelect={handleNodeSelect}
-          />
-        ))}
+        {error ? (
+          <div className="library-explorer__state" role="status">
+            <p>{error}</p>
+            {onRetry ? (
+              <Button size="sm" onClick={onRetry}>
+                Retry
+              </Button>
+            ) : null}
+          </div>
+        ) : loading && nodes.length === 0 ? (
+          <div className="library-explorer__state" role="status">
+            <p>Loading library...</p>
+          </div>
+        ) : (
+          nodes.map(node => (
+            <ExplorerTreeGroup
+              key={node.id}
+              node={node}
+              activeNodeId={activeNodeId}
+              expandedById={expandedById}
+              onNodeSelect={handleNodeSelect}
+            />
+          ))
+        )}
       </div>
     </div>
   );

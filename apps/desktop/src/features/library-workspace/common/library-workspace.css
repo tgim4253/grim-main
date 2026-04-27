@@ -99,6 +99,14 @@
     min-width: 0;
   }
 
+  .masonry-grid__empty {
+    display: flex;
+    min-height: calc(100vh - 160px);
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
   .masonry-grid[data-layout='masonry'] .masonry-grid__item {
     display: inline-block;
     width: min(100%, var(--masonry-item-width));

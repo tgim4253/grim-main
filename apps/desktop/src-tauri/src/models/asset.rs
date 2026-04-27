@@ -43,8 +43,14 @@ pub struct AssetDetail {
 pub enum AssetListSource {
     AllAssets,
     Uncategorized,
-    Folder { folder_id: String },
-    FolderDescendants { folder_id: String },
+    Folder {
+        #[serde(rename = "folderId", alias = "folder_id")]
+        folder_id: String,
+    },
+    FolderDescendants {
+        #[serde(rename = "folderId", alias = "folder_id")]
+        folder_id: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,4 +77,26 @@ pub struct UpdateAssetFoldersPayload {
     pub asset_id: String,
     #[serde(default)]
     pub virtual_folder_ids: Vec<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AssetListSource;
+
+    #[test]
+    fn asset_list_source_accepts_camel_case_folder_id() {
+        let source: AssetListSource =
+            serde_json::from_value(serde_json::json!({
+                "kind": "folderDescendants",
+                "folderId": "folder-1",
+            }))
+            .expect("source should deserialize");
+
+        match source {
+            AssetListSource::FolderDescendants { folder_id } => {
+                assert_eq!(folder_id, "folder-1");
+            }
+            _ => panic!("unexpected asset list source"),
+        }
+    }
 }

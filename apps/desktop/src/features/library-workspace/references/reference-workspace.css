@@ -91,10 +91,24 @@
     height: 100%;
   }
 
+  .reference-masonry-tile__asset-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 1px solid var(--semantic-colors-border-primary);
+    background: var(--semantic-colors-surface-high);
+    box-sizing: border-box;
+    object-fit: cover;
+  }
+
   .reference-masonry-tile:hover .masonry-image-placeholder[data-state='default'],
   .asset-preview-panel__related-thumb:hover .masonry-image-placeholder[data-state='default'] {
     border-color: var(--semantic-colors-brand-primary);
     background: var(--semantic-colors-surface-elevated);
+  }
+
+  .reference-masonry-tile:hover .reference-masonry-tile__asset-image {
+    border-color: var(--semantic-colors-brand-primary);
   }
 
   .reference-masonry-tile:focus-visible .masonry-image-placeholder,
@@ -102,6 +116,43 @@
     border-width: 2px;
     border-color: var(--semantic-colors-border-focus);
     background: var(--semantic-colors-surface-high);
+  }
+
+  .reference-masonry-tile:focus-visible .reference-masonry-tile__asset-image,
+  .reference-masonry-tile--selected .reference-masonry-tile__asset-image {
+    border-width: 2px;
+    border-color: var(--semantic-colors-border-focus);
+  }
+
+  .reference-grid-state {
+    display: flex;
+    max-width: 360px;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    text-align: center;
+  }
+
+  .reference-grid-state__title,
+  .reference-grid-state__description {
+    margin: 0;
+  }
+
+  .reference-grid-state__title {
+    color: var(--semantic-colors-text-primary);
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .reference-grid-state__description {
+    color: var(--semantic-colors-text-secondary);
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  .reference-grid-state__action {
+    padding-top: 4px;
   }
 
   .asset-preview-panel {
@@ -161,6 +212,11 @@
   .asset-preview-panel__preview-image {
     width: 100%;
     height: 100%;
+  }
+
+  .asset-preview-panel__preview-asset-image {
+    display: block;
+    object-fit: contain;
   }
 
   .asset-preview-panel__sections {

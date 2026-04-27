@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type {
   LibraryWorkspaceItem,
   LibraryWorkspaceLayout,
@@ -9,6 +10,8 @@ type MasonryGridProps<TItem extends LibraryWorkspaceItem> = {
   layout: LibraryWorkspaceLayout;
   ariaLabel: string;
   selectedItemId?: string;
+  busy?: boolean;
+  emptyState?: ReactNode;
   onSelectedItemChange?: (itemId: string) => void;
   renderTile: LibraryWorkspaceRenderTile<TItem>;
 };
@@ -18,6 +21,8 @@ export function MasonryGrid<TItem extends LibraryWorkspaceItem>({
   layout,
   ariaLabel,
   selectedItemId,
+  busy = false,
+  emptyState = null,
   onSelectedItemChange,
   renderTile,
 }: MasonryGridProps<TItem>) {
@@ -36,8 +41,13 @@ export function MasonryGrid<TItem extends LibraryWorkspaceItem>({
 
   return (
     <div className="masonry-grid" data-layout={layout}>
-      <div className="masonry-grid__content" role="list" aria-label={ariaLabel}>
-        {items.map(renderItem)}
+      <div
+        className="masonry-grid__content"
+        role={items.length > 0 ? 'list' : undefined}
+        aria-label={ariaLabel}
+        aria-busy={busy}
+      >
+        {items.length > 0 ? items.map(renderItem) : emptyState}
       </div>
     </div>
   );

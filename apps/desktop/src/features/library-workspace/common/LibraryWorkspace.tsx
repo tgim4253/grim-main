@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { MasonryGrid } from './MasonryGrid';
 import type {
   LibraryWorkspaceItem,
@@ -16,6 +17,8 @@ type LibraryWorkspaceProps<TItem extends LibraryWorkspaceItem> = {
   selectedItemId?: string;
   gridAriaLabel: string;
   previewOpen?: boolean;
+  gridBusy?: boolean;
+  gridEmptyState?: ReactNode;
   onLayoutChange: (layout: LibraryWorkspaceLayout) => void;
   onSelectedItemChange?: (itemId: string) => void;
   renderHeader: LibraryWorkspaceRenderHeader;
@@ -30,6 +33,8 @@ export function LibraryWorkspace<TItem extends LibraryWorkspaceItem>({
   selectedItemId,
   gridAriaLabel,
   previewOpen = true,
+  gridBusy = false,
+  gridEmptyState = null,
   onLayoutChange,
   onSelectedItemChange,
   renderHeader,
@@ -38,8 +43,8 @@ export function LibraryWorkspace<TItem extends LibraryWorkspaceItem>({
 }: LibraryWorkspaceProps<TItem>) {
   let selectedItem: TItem | null = null;
 
-  if (items.length > 0) {
-    selectedItem = items.find(item => item.id === selectedItemId) ?? items[0];
+  if (selectedItemId && items.length > 0) {
+    selectedItem = items.find(item => item.id === selectedItemId) ?? null;
   }
 
   const previewNode = selectedItem !== null && renderPreview ? renderPreview(selectedItem) : null;
@@ -62,6 +67,8 @@ export function LibraryWorkspace<TItem extends LibraryWorkspaceItem>({
             layout={layout}
             ariaLabel={gridAriaLabel}
             selectedItemId={selectedItem?.id}
+            busy={gridBusy}
+            emptyState={gridEmptyState}
             onSelectedItemChange={onSelectedItemChange}
             renderTile={renderTile}
           />

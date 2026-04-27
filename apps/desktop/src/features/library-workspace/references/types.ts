@@ -10,6 +10,8 @@ export type ConnectedImageItem = {
 
 export type ReferenceAsset = LibraryWorkspaceItem & {
   title: string;
+  imageSrc?: string | null;
+  thumbnailSrc?: string | null;
   ratio: MasonryImageRatio;
   height: number;
   metadata: {
