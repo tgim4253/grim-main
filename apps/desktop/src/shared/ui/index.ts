@@ -82,6 +82,7 @@ export {
 export {
   SELECT_TYPES,
   Select,
+  type SelectFilterOptions,
   type SelectOption,
   type SelectProps,
   type SelectType,

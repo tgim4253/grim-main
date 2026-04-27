@@ -16,6 +16,7 @@ export const DEFAULT_OPTION: CroquisOption = {
   timer: {
     maxTime: 180,
   },
+  isRecordSave: true,
   isCapture: false,
   savePath: '',
   isGray: false,
@@ -33,6 +34,7 @@ export const cloneOption = (option?: CroquisOption | null): CroquisOption => ({
   timer: {
     maxTime: option?.timer.maxTime ?? DEFAULT_OPTION.timer.maxTime,
   },
+  isRecordSave: option?.isRecordSave ?? DEFAULT_OPTION.isRecordSave,
   isCapture: option?.isCapture ?? DEFAULT_OPTION.isCapture,
   savePath: option?.savePath ?? DEFAULT_OPTION.savePath,
   isGray: option?.isGray ?? DEFAULT_OPTION.isGray,

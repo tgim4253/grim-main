@@ -17,6 +17,7 @@ export interface CroquisOption {
   window: CroquisWindowOption;
   auto: CroquisAutoOption;
   timer: CroquisTimerOption;
+  isRecordSave: boolean;
   isCapture: boolean;
   savePath: string;
   isGray: boolean;
@@ -57,6 +58,7 @@ export interface CroquisSessionItem {
   stepName: string;
   stepIndex: number;
   targetDurationSeconds?: number | null;
+  resultRequired: boolean;
 }
 
 export interface CroquisSession {
