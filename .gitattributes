@@ -3,3 +3,7 @@
 *.ico binary
 *.icns binary
 *.gif binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary

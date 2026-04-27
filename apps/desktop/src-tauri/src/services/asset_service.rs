@@ -9,14 +9,15 @@ use tokio::fs;
 
 use crate::{
     models::asset::{
-        AssetDetail, AssetListSource, AssetSummary, ImportRequest,
-        ImportResult, UpdateAssetFoldersPayload,
+        AssetDetail, AssetListSource, AssetSummary, ImportRemoteImagesRequest,
+        ImportRequest, ImportResult, UpdateAssetFoldersPayload,
     },
     repositories::{AssetRepository, FolderRepository, NewImportedAssetInput},
     services::LibraryStorage,
     utils::{
         date::get_now_date, file_ops::ensure_unique_path,
         file_utils::file_mtime_epoch, identifier::get_unique_id, media,
+        remote_image,
     },
 };
 
@@ -177,6 +178,53 @@ impl AssetService {
         Ok(ImportResult { imported, reused, assets })
     }
 
+    pub async fn import_remote_images(
+        &self,
+        request: ImportRemoteImagesRequest,
+    ) -> Result<ImportResult> {
+        let mut remote_sources = Vec::new();
+        let mut seen_sources = HashSet::new();
+        for payload in &request.sources {
+            for source in remote_image::extract_remote_image_sources(payload) {
+                if seen_sources.insert(source.clone()) {
+                    remote_sources.push(source);
+                }
+            }
+        }
+
+        let import_request = ImportRequest {
+            file_paths: Vec::new(),
+            virtual_folder_ids: request.virtual_folder_ids,
+        };
+        let mut imported = 0_usize;
+        let mut reused = 0_usize;
+        let mut assets = Vec::new();
+
+        for source in remote_sources {
+            let downloaded =
+                remote_image::download_remote_image(&source).await?;
+            if let Some((asset, is_reused)) = self
+                .import_image_bytes_as_temp(
+                    &import_request,
+                    &downloaded.bytes,
+                    &downloaded.file_name,
+                )
+                .await?
+            {
+                if is_reused {
+                    reused += 1;
+                } else {
+                    imported += 1;
+                }
+                assets.push(asset);
+            }
+        }
+
+        let assets = self.hydrate_asset_summaries(assets).await;
+
+        Ok(ImportResult { imported, reused, assets })
+    }
+
     pub async fn import_capture_result(
         &self,
         bytes: &[u8],
@@ -251,6 +299,24 @@ impl AssetService {
                 Err(error)
             }
         }
+    }
+
+    async fn import_image_bytes_as_temp(
+        &self,
+        request: &ImportRequest,
+        bytes: &[u8],
+        file_name: &str,
+    ) -> Result<Option<(AssetSummary, bool)>> {
+        let tmp_file =
+            ensure_unique_path(self.library_storage.temp_file(file_name))
+                .await?;
+        media::persist_bytes(&tmp_file, bytes).await?;
+
+        let tmp_file_path = tmp_file.to_string_lossy().into_owned();
+        let result = self.import_image_asset(request, &tmp_file_path).await;
+        let _ = fs::remove_file(&tmp_file).await;
+
+        result
     }
 
     pub async fn load_assets_by_ids(
@@ -407,10 +473,15 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
+    use base64::{
+        engine::general_purpose::STANDARD as BASE64_STANDARD, Engine,
+    };
+
     use crate::{
         models::{
             asset::{
-                AssetListSource, ImportRequest, UpdateAssetFoldersPayload,
+                AssetListSource, ImportRemoteImagesRequest, ImportRequest,
+                UpdateAssetFoldersPayload,
             },
             folder::{
                 DeleteVirtualFolderPayload, SaveVirtualFolderPayload,
@@ -963,6 +1034,63 @@ mod tests {
         assert_eq!(result.imported, 1);
         assert_eq!(result.reused, 0);
         let asset = result.assets.first().expect("missing imported asset");
+        let detail =
+            service.get_asset(&asset.id).await.expect("missing asset detail");
+        assert!(detail
+            .virtual_folders
+            .iter()
+            .any(|folder| folder.id == leaf.saved_folder_id));
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn remote_image_import_accepts_dragged_data_src_and_assigns_folder() {
+        let dir = make_temp_dir("remote-import");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let folder_service =
+            FolderService::new(FolderRepository::new(pool.clone()));
+        let leaf = folder_service
+            .save_virtual_folder(SaveVirtualFolderPayload {
+                id: None,
+                name: "Web References".to_string(),
+                parent_id: None,
+                alias: None,
+            })
+            .await
+            .expect("failed to save leaf folder");
+
+        let data_url = format!(
+            "data:image/bmp;base64,{}",
+            BASE64_STANDARD.encode(BMP_1X1)
+        );
+        let service = AssetService::new(
+            AssetRepository::new(pool.clone()),
+            FolderRepository::new(pool),
+            storage_for(&dir),
+        );
+        let result = service
+            .import_remote_images(ImportRemoteImagesRequest {
+                sources: vec![format!(
+                    r#"<a href="https://example.test/page"><img src="{data_url}" /></a>"#
+                )],
+                virtual_folder_ids: vec![leaf.saved_folder_id.clone()],
+            })
+            .await
+            .expect("failed to import remote image");
+
+        assert_eq!(result.imported, 1);
+        assert_eq!(result.reused, 0);
+        let asset = result.assets.first().expect("missing imported asset");
+        assert_eq!(asset.file_name, "remote-image.bmp");
+        assert!(asset.storage_path.is_some());
+        assert!(asset.thumbnail_path.is_some());
+
         let detail =
             service.get_asset(&asset.id).await.expect("missing asset detail");
         assert!(detail
