@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::{
     errors::{CommandResult, IntoCommandResult},
-    models::asset::{ImportRequest, ImportResult},
+    models::asset::{ImportRemoteImagesRequest, ImportRequest, ImportResult},
     services::AssetService,
 };
 
@@ -12,4 +12,12 @@ pub async fn import_images(
     asset_service: State<'_, AssetService>,
 ) -> CommandResult<ImportResult> {
     asset_service.import_images(payload).await.into_command()
+}
+
+#[tauri::command]
+pub async fn import_remote_images(
+    payload: ImportRemoteImagesRequest,
+    asset_service: State<'_, AssetService>,
+) -> CommandResult<ImportResult> {
+    asset_service.import_remote_images(payload).await.into_command()
 }

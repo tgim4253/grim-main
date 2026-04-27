@@ -62,6 +62,15 @@ pub struct ImportRequest {
     pub virtual_folder_ids: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportRemoteImagesRequest {
+    #[serde(default)]
+    pub sources: Vec<String>,
+    #[serde(default)]
+    pub virtual_folder_ids: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportResult {
