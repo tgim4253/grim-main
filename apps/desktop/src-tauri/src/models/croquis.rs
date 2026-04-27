@@ -2,6 +2,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::session::SessionPreset;
 
+fn default_true() -> bool {
+    true
+}
+
 /// Window sizing preferences supplied by the renderer when launching Croquis.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -29,7 +33,7 @@ pub struct CroquisTimerOption {
 }
 
 /// Aggregate Croquis options selected in the renderer.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CroquisOption {
     #[serde(default)]
@@ -38,6 +42,8 @@ pub struct CroquisOption {
     pub auto: CroquisAutoOption,
     #[serde(default)]
     pub timer: CroquisTimerOption,
+    #[serde(default = "default_true")]
+    pub is_record_save: bool,
     #[serde(default)]
     pub is_capture: bool,
     #[serde(default)]
@@ -46,6 +52,21 @@ pub struct CroquisOption {
     pub is_gray: bool,
     #[serde(default)]
     pub is_shuffle: bool,
+}
+
+impl Default for CroquisOption {
+    fn default() -> Self {
+        Self {
+            window: CroquisWindowOption::default(),
+            auto: CroquisAutoOption::default(),
+            timer: CroquisTimerOption::default(),
+            is_record_save: default_true(),
+            is_capture: bool::default(),
+            save_path: String::default(),
+            is_gray: bool::default(),
+            is_shuffle: bool::default(),
+        }
+    }
 }
 
 /// Named preset that stores a single Croquis option payload.
@@ -105,6 +126,8 @@ pub struct CroquisSessionItem {
     pub step_name: String,
     pub step_index: i64,
     pub target_duration_seconds: Option<i64>,
+    #[serde(default)]
+    pub result_required: bool,
 }
 
 /// Persisted Croquis session information shared with the Croquis window.

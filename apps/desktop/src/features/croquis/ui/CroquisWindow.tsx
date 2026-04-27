@@ -23,9 +23,10 @@ export function CroquisWindow() {
         currentStepName={controller.currentItem.stepName}
         hasNext={controller.hasNext}
         hasPrevious={controller.hasPrevious}
-        isCaptureEnabled={controller.session.option.isCapture}
+        isCaptureEnabled={controller.session.option.isCapture && controller.isRecordSaveEnabled}
         isCurrentSaved={controller.isCurrentSaved}
         isPlaying={controller.isPlaying}
+        isRecordSaveEnabled={controller.isRecordSaveEnabled}
         queueLength={controller.queue.length}
         session={controller.session}
         onCapture={controller.handleCapture}

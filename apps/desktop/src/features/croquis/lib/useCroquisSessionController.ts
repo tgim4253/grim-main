@@ -78,6 +78,7 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
   );
   const currentTargetSeconds =
     currentItem?.targetDurationSeconds ?? (session === null ? 0 : session.option.timer.maxTime);
+  const isRecordSaveEnabled = session?.option.isRecordSave ?? true;
 
   useEffect(() => {
     currentItemRef.current = currentItem;
@@ -179,16 +180,21 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
 
     setIsPlaying(false);
     const run = async () => {
-      setStatus('Saving completed record...');
       try {
-        await finishItem(currentItem, currentTargetSeconds);
+        const shouldSaveRequiredResult = session.option.isRecordSave && currentItem.resultRequired;
+        if (shouldSaveRequiredResult) {
+          setStatus('Saving completed record...');
+          await finishItem(currentItem, currentTargetSeconds);
+        }
+
         if (session.option.auto.isSkip && currentIndex < queue.length - 1) {
           setCurrentIndex(index => index + 1);
           setIsPlaying(true);
           setStatus(null);
           return;
         }
-        setStatus('Record saved.');
+
+        setStatus(shouldSaveRequiredResult ? 'Record saved.' : 'Step complete.');
       } catch (error) {
         setStatus(error instanceof Error ? error.message : 'Failed to save record.');
       }
@@ -285,6 +291,11 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
       return;
     }
 
+    if (!isRecordSaveEnabled) {
+      setStatus('Record saving is disabled for this session.');
+      return;
+    }
+
     if (currentItem.recordId) {
       setStatus('Record already saved.');
       return;
@@ -297,10 +308,20 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Failed to save record.');
     }
-  }, [currentItem, elapsedSeconds, finishItem]);
+  }, [currentItem, elapsedSeconds, finishItem, isRecordSaveEnabled]);
 
   const handleCapture = useCallback(async () => {
     if (currentItem === null || session === null) {
+      return;
+    }
+
+    if (!session.option.isRecordSave) {
+      setStatus('Record saving is disabled for this session.');
+      return;
+    }
+
+    if (!session.option.isCapture) {
+      setStatus('Capture is disabled for this session.');
       return;
     }
 
@@ -337,6 +358,7 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
     hasNext: currentIndex < queue.length - 1,
     hasPrevious: currentIndex > 0,
     isCurrentSaved: Boolean(currentItem?.recordId),
+    isRecordSaveEnabled,
     isPlaying,
     moveToIndex,
     queue,

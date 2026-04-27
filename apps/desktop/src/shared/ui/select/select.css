@@ -37,12 +37,22 @@
   }
 
   .c-select__trigger:focus-visible,
+  .c-select__trigger--search:focus-within,
   .c-select[data-open='true'] .c-select__trigger {
     border-color: var(--components-select-trigger-border-focus);
     outline: none;
   }
 
   .c-select__trigger:disabled {
+    cursor: not-allowed;
+  }
+
+  .c-select__trigger--search {
+    justify-content: flex-start;
+    cursor: text;
+  }
+
+  .c-select__trigger--disabled {
     cursor: not-allowed;
   }
 
@@ -109,6 +119,25 @@
 
   .c-select__value--placeholder {
     color: var(--components-select-trigger-placeholder);
+  }
+
+  .c-select__search-input {
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--components-select-trigger-text-primary);
+    font-family: var(--components-typography-control-value-font-family);
+    font-size: var(--components-typography-control-value-font-size);
+    font-weight: var(--components-typography-control-value-font-weight);
+    line-height: var(--components-typography-control-value-line-height);
+  }
+
+  .c-select__search-input::placeholder {
+    color: var(--components-select-trigger-placeholder);
+    opacity: 1;
   }
 
   .c-select__supporting,
@@ -203,10 +232,21 @@
     --_icon-color: var(--primitives-colors-white);
   }
 
+  .c-select__empty {
+    padding: 10px 14px;
+    color: var(--components-select-item-text-secondary);
+    font-family: var(--components-typography-control-supporting-font-family);
+    font-size: var(--components-typography-control-supporting-font-size);
+    font-weight: var(--components-typography-control-supporting-font-weight);
+    line-height: var(--components-typography-control-supporting-line-height);
+  }
+
   .c-select__trigger:disabled .c-select__value,
   .c-select__trigger:disabled .c-select__supporting,
   .c-select__trigger:disabled .c-select__leading,
-  .c-select__trigger:disabled .c-select__trailing {
+  .c-select__trigger:disabled .c-select__trailing,
+  .c-select__trigger--disabled .c-select__search-input,
+  .c-select__trigger--disabled .c-select__leading {
     color: var(--components-select-trigger-placeholder);
     --_icon-color: var(--components-select-trigger-placeholder);
   }

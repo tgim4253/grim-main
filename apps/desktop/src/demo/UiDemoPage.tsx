@@ -40,9 +40,19 @@ import {
   type IconHierarchy,
   type IconName,
   type IconSize,
+  type SelectFilterOptions,
 } from '../shared/ui';
+import {
+  FolderSearchModal,
+  ImportAssetsModal,
+  ImportCompletedModal,
+} from '../features/library-workspace/import';
+import { FolderSearchSelect } from '../features/library/components';
+import { CroquisStartModal } from '../features/croquis/ui/CroquisStartModal';
+import type { LibrarySettings, SessionPreset, VirtualFolder } from '../shared/types';
 import './uiDemo.css';
 
+const DEMO_TIMESTAMP = '2024-01-01T00:00:00.000Z';
 const FEATURED_ICONS: IconName[] = ['folder-open', 'anatomy', 'file', 'check', 'close'];
 const SIZE_VARIANTS: IconSize[] = ['xs', 'sm', 'md', 'lg', 'xl'];
 const COLOR_VARIANTS: IconColor[] = ['text', 'brand'];
@@ -82,6 +92,200 @@ const SIDEBAR_ICON_BUTTON_ROWS: IconName[] = [
   'setting',
   'user',
   'tree',
+];
+const IMPORT_MODAL_PREVIEWS = [
+  {
+    id: 'folder-search',
+    title: 'Folder Search',
+    action: 'Open Folder Search',
+    note: 'Select Folder header, search-style folder field, and two action footer.',
+  },
+  {
+    id: 'import-assets',
+    title: 'Import Assets',
+    action: 'Open Import Assets',
+    note: 'Drag-and-drop body with file affordance and Select Files action.',
+  },
+  {
+    id: 'import-completed',
+    title: 'Import Completed',
+    action: 'Open Completed',
+    note: 'Import summary, destination folder field, and Done action.',
+  },
+] as const;
+
+type ImportModalPreview = (typeof IMPORT_MODAL_PREVIEWS)[number]['id'];
+const CROQUIS_MODAL_ASSET_IDS = ['demo-asset-01', 'demo-asset-02', 'demo-asset-03'];
+const CROQUIS_MODAL_SESSION_PRESETS: SessionPreset[] = [
+  {
+    id: 'gesture-study',
+    name: 'Gesture Study',
+    description: 'Short pose warm-up with required result capture.',
+    isDefault: true,
+    createdAt: DEMO_TIMESTAMP,
+    updatedAt: DEMO_TIMESTAMP,
+    steps: [
+      {
+        id: 'gesture-warmup',
+        stepOrder: 0,
+        name: 'Warm-up Gestures',
+        defaultDurationSeconds: 30,
+        resultRequired: true,
+        autoTags: [
+          {
+            id: 'tag-gesture',
+            groupId: 'group-study',
+            name: 'GESTURE',
+            color: '#26997b',
+            sortOrder: 0,
+            createdAt: DEMO_TIMESTAMP,
+            updatedAt: DEMO_TIMESTAMP,
+          },
+        ],
+      },
+      {
+        id: 'figure-study',
+        stepOrder: 1,
+        name: 'Figure Study',
+        defaultDurationSeconds: 90,
+        resultRequired: true,
+        autoTags: [
+          {
+            id: 'tag-pose',
+            groupId: 'group-study',
+            name: 'POSE',
+            color: '#667085',
+            sortOrder: 1,
+            createdAt: DEMO_TIMESTAMP,
+            updatedAt: DEMO_TIMESTAMP,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'long-pose',
+    name: 'Long Pose',
+    description: 'Longer study preset for anatomy passes.',
+    isDefault: false,
+    createdAt: DEMO_TIMESTAMP,
+    updatedAt: DEMO_TIMESTAMP,
+    steps: [
+      {
+        id: 'silhouette',
+        stepOrder: 0,
+        name: 'Silhouette',
+        defaultDurationSeconds: 120,
+        resultRequired: false,
+        autoTags: [],
+      },
+      {
+        id: 'anatomy-pass',
+        stepOrder: 1,
+        name: 'Anatomy Pass',
+        defaultDurationSeconds: 300,
+        resultRequired: true,
+        autoTags: [
+          {
+            id: 'tag-anatomy',
+            groupId: 'group-study',
+            name: 'ANATOMY',
+            color: '#7f56d9',
+            sortOrder: 2,
+            createdAt: DEMO_TIMESTAMP,
+            updatedAt: DEMO_TIMESTAMP,
+          },
+        ],
+      },
+    ],
+  },
+];
+const CROQUIS_MODAL_LIBRARY_SETTINGS: LibrarySettings = {
+  activeSessionPresetId: 'gesture-study',
+  croquisPreferences: {
+    activePresetId: 'ui-demo',
+    presets: [
+      {
+        id: 'ui-demo',
+        name: 'UI Demo',
+        option: {
+          window: {
+            width: '1080',
+            height: '180',
+          },
+          auto: {
+            isSkip: true,
+          },
+          timer: {
+            maxTime: 60,
+          },
+          isRecordSave: true,
+          isCapture: true,
+          savePath: '',
+          isGray: false,
+          isShuffle: true,
+        },
+      },
+    ],
+  },
+};
+
+const DEMO_VIRTUAL_FOLDERS: VirtualFolder[] = [
+  {
+    id: 'folder-references',
+    parentId: null,
+    name: 'References',
+    fullPath: '/References',
+    alias: null,
+    kind: 'user',
+    sortOrder: 0,
+    createdAt: DEMO_TIMESTAMP,
+    updatedAt: DEMO_TIMESTAMP,
+  },
+  {
+    id: 'folder-figure-study',
+    parentId: 'folder-references',
+    name: 'Figure Study',
+    fullPath: '/References/Figure Study',
+    alias: 'poses',
+    kind: 'user',
+    sortOrder: 1,
+    createdAt: DEMO_TIMESTAMP,
+    updatedAt: DEMO_TIMESTAMP,
+  },
+  {
+    id: 'folder-anatomy',
+    parentId: 'folder-references',
+    name: 'Anatomy',
+    fullPath: '/References/Anatomy',
+    alias: null,
+    kind: 'user',
+    sortOrder: 2,
+    createdAt: DEMO_TIMESTAMP,
+    updatedAt: DEMO_TIMESTAMP,
+  },
+  {
+    id: 'folder-croquis',
+    parentId: null,
+    name: 'Croquis Results',
+    fullPath: '/Croquis Results',
+    alias: 'practice',
+    kind: 'user',
+    sortOrder: 3,
+    createdAt: DEMO_TIMESTAMP,
+    updatedAt: DEMO_TIMESTAMP,
+  },
+  {
+    id: 'folder-uncategorized',
+    parentId: null,
+    name: 'Uncategorized',
+    fullPath: '/Uncategorized',
+    alias: null,
+    kind: 'system_uncategorized',
+    sortOrder: 4,
+    createdAt: DEMO_TIMESTAMP,
+    updatedAt: DEMO_TIMESTAMP,
+  },
 ];
 
 const BASIC_SELECT_OPTIONS: SelectOption[] = [
@@ -130,6 +334,23 @@ const MEMBER_SELECT_OPTIONS: SelectOption[] = [
     disabled: true,
   },
 ];
+
+const filterSelectOptions: SelectFilterOptions = (query, options) => {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  if (!normalizedQuery) {
+    return options;
+  }
+
+  return options.filter(option => {
+    const label = typeof option.label === 'string' ? option.label : option.value;
+    const supportingText =
+      typeof option.supportingText === 'string' ? option.supportingText : undefined;
+
+    return [option.value, label, supportingText].some(text =>
+      text?.toLocaleLowerCase().includes(normalizedQuery),
+    );
+  });
+};
 
 function DemoSection({
   title,
@@ -185,7 +406,8 @@ function ToggleableChipButtonDemo() {
 
 function SelectDemo() {
   const [member, setMember] = useState('olivia');
-  const [searchValue, setSearchValue] = useState('olivia');
+  const [searchValue, setSearchValue] = useState('');
+  const [folderId, setFolderId] = useState<string | undefined>();
 
   return (
     <>
@@ -219,10 +441,12 @@ function SelectDemo() {
             <Select
               label="Search"
               type="search"
-              placeholder="Search"
+              placeholder="Search team member"
               options={BASIC_SELECT_OPTIONS}
               value={searchValue}
               onValueChange={setSearchValue}
+              filterOptions={filterSelectOptions}
+              emptyMessage="No team members found"
             />
           </div>
         </div>
@@ -254,6 +478,22 @@ function SelectDemo() {
               onValueChange={setMember}
             />
           </div>
+        </div>
+      </DemoCard>
+
+      <DemoCard title="Folder Search Select">
+        <div className="ui-demo__select-card">
+          <div className="ui-demo__input-card-title">virtual folder</div>
+          <FolderSearchSelect
+            label="Folder"
+            placeholder="Search folders"
+            folders={DEMO_VIRTUAL_FOLDERS}
+            value={folderId}
+            onValueChange={nextFolderId => {
+              setFolderId(nextFolderId);
+            }}
+            emptyMessage="No folders found"
+          />
         </div>
       </DemoCard>
     </>
@@ -460,6 +700,137 @@ function ModalDemo() {
         }
         footer={openSize ? footer : undefined}
         onClose={handleClose}
+      />
+    </>
+  );
+}
+
+function ImportModalDemo() {
+  const [openPreview, setOpenPreview] = useState<ImportModalPreview | null>(null);
+  const [importFolderId, setImportFolderId] = useState<string | undefined>();
+  const selectedImportFolder = DEMO_VIRTUAL_FOLDERS.find(folder => folder.id === importFolderId);
+
+  const handleClose = () => {
+    setOpenPreview(null);
+  };
+
+  return (
+    <>
+      <DemoCard title="Library Import Modals">
+        <div className="ui-demo__modal-launch-grid">
+          {IMPORT_MODAL_PREVIEWS.map(preview => (
+            <div key={preview.id} className="ui-demo__modal-launch-card">
+              <div className="ui-demo__input-card-title">{preview.title}</div>
+              <div className="ui-demo__modal-launch-stack">
+                <Button
+                  size="lg"
+                  variant="secondary"
+                  onClick={() => {
+                    setOpenPreview(preview.id);
+                  }}
+                >
+                  {preview.action}
+                </Button>
+                <p className="ui-demo__modal-note">{preview.note}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </DemoCard>
+
+      <FolderSearchModal
+        open={openPreview === 'folder-search'}
+        folders={DEMO_VIRTUAL_FOLDERS}
+        folderId={importFolderId}
+        onFolderChange={nextFolderId => {
+          setImportFolderId(nextFolderId);
+        }}
+        onClose={handleClose}
+        onSelectFolder={() => {
+          setOpenPreview('import-assets');
+        }}
+      />
+      <ImportAssetsModal
+        open={openPreview === 'import-assets'}
+        folders={DEMO_VIRTUAL_FOLDERS}
+        folderId={importFolderId}
+        onFolderChange={nextFolderId => {
+          setImportFolderId(nextFolderId);
+        }}
+        onClose={handleClose}
+        onSelectFiles={() => {
+          setOpenPreview('import-completed');
+        }}
+      />
+      <ImportCompletedModal
+        open={openPreview === 'import-completed'}
+        summary={{
+          importedCount: 14,
+          totalSize: '128.4 MB',
+          destinationFolder: selectedImportFolder?.fullPath ?? 'Search directories...',
+        }}
+        folders={DEMO_VIRTUAL_FOLDERS}
+        folderId={importFolderId}
+        onFolderChange={nextFolderId => {
+          setImportFolderId(nextFolderId);
+        }}
+        onClose={handleClose}
+        onDone={handleClose}
+      />
+    </>
+  );
+}
+
+function CroquisModalDemo() {
+  const [open, setOpen] = useState(false);
+  const [started, setStarted] = useState(false);
+
+  const handleClose = () => {
+    setOpen(false);
+  };
+
+  const handleStarted = () => {
+    setStarted(true);
+    setOpen(false);
+  };
+
+  return (
+    <>
+      <DemoCard title="Croquis Start Modal">
+        <div className="ui-demo__modal-launch-grid">
+          <div className="ui-demo__modal-launch-card">
+            <div className="ui-demo__input-card-title">start croquis</div>
+            <div className="ui-demo__modal-launch-stack">
+              <Button
+                size="lg"
+                variant="secondary"
+                onClick={() => {
+                  setStarted(false);
+                  setOpen(true);
+                }}
+              >
+                Open Start Croquis
+              </Button>
+              <p className="ui-demo__modal-note">
+                Real croquis composition with mock assets, presets, and library settings.
+              </p>
+              {started ? (
+                <p className="ui-demo__modal-note">Mock session started from the demo modal.</p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </DemoCard>
+
+      <CroquisStartModal
+        open={open}
+        assetIds={CROQUIS_MODAL_ASSET_IDS}
+        sessionPresets={CROQUIS_MODAL_SESSION_PRESETS}
+        librarySettings={CROQUIS_MODAL_LIBRARY_SETTINGS}
+        onClose={handleClose}
+        onStarted={handleStarted}
+        saveCroquisPreferences={() => Promise.resolve()}
+        startCroquisSession={() => Promise.resolve()}
       />
     </>
   );
@@ -724,9 +1095,11 @@ export function UiDemoPage() {
 
         <DemoSection
           title="Modal"
-          description="Shared modal shell primitives with size options and footer layout variants. The preview keeps feature content generic and focuses on shared structure."
+          description="Shared modal shell primitives with size options, footer layout variants, library import compositions, and the croquis start flow from the modal board."
         >
           <ModalDemo />
+          <ImportModalDemo />
+          <CroquisModalDemo />
         </DemoSection>
 
         <DemoSection

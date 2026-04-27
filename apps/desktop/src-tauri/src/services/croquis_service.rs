@@ -29,6 +29,7 @@ struct PreparedCroquisItem {
     step_name: String,
     step_index: i64,
     target_duration_seconds: Option<i64>,
+    result_required: bool,
     tag_ids: Vec<String>,
 }
 
@@ -137,6 +138,7 @@ impl CroquisService {
                     step_name: step.name.clone(),
                     step_index: step.step_order,
                     target_duration_seconds: step.default_duration_seconds,
+                    result_required: step.result_required,
                     tag_ids: step
                         .auto_tags
                         .iter()
@@ -176,6 +178,7 @@ impl CroquisService {
                 step_name: prepared_item.step_name,
                 step_index: prepared_item.step_index,
                 target_duration_seconds: prepared_item.target_duration_seconds,
+                result_required: prepared_item.result_required,
             });
         }
 

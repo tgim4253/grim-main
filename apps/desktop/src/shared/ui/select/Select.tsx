@@ -1,12 +1,13 @@
 import {
   forwardRef,
+  type ChangeEvent,
   useEffect,
   useId,
   useMemo,
   useRef,
   useState,
   type ButtonHTMLAttributes,
-  type KeyboardEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
   type Ref,
@@ -18,6 +19,7 @@ import './select.css';
 export const SELECT_TYPES = ['default', 'icon-leading', 'search'] as const;
 
 export type SelectType = (typeof SELECT_TYPES)[number];
+export type SelectFilterOptions = (query: string, options: SelectOption[]) => SelectOption[];
 
 export type SelectOption = {
   value: string;
@@ -46,6 +48,11 @@ export type SelectProps = Omit<
   triggerClassName?: string;
   menuClassName?: string;
   listClassName?: string;
+  searchValue?: string;
+  defaultSearchValue?: string;
+  onSearchValueChange?: (value: string) => void;
+  filterOptions?: SelectFilterOptions;
+  emptyMessage?: ReactNode;
 };
 
 const assignRef = <T,>(ref: Ref<T> | undefined, value: T) => {
@@ -57,6 +64,14 @@ const assignRef = <T,>(ref: Ref<T> | undefined, value: T) => {
   if (ref && 'current' in ref) {
     (ref as { current: T }).current = value;
   }
+};
+
+const getOptionDisplayText = (option: SelectOption) => {
+  if (typeof option.label === 'string' || typeof option.label === 'number') {
+    return String(option.label);
+  }
+
+  return option.value;
 };
 
 const getFirstEnabledIndex = (options: SelectOption[]) =>
@@ -78,7 +93,7 @@ const getNextEnabledIndex = (options: SelectOption[], currentIndex: number, dire
   return -1;
 };
 
-export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select(
+export const Select = forwardRef<HTMLButtonElement | HTMLInputElement, SelectProps>(function Select(
   {
     id,
     options,
@@ -96,6 +111,11 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
     triggerClassName,
     menuClassName,
     listClassName,
+    searchValue,
+    defaultSearchValue = '',
+    onSearchValueChange,
+    filterOptions,
+    emptyMessage = 'No results found',
     disabled = false,
     onClick,
     onKeyDown,
@@ -108,27 +128,40 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
   const triggerId = useId();
   const listboxId = useId();
   const labelId = useId();
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | HTMLInputElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const isValueControlled = value !== undefined;
   const [internalValue, setInternalValue] = useState(defaultValue);
   const resolvedValue = isValueControlled ? value : internalValue;
+  const isSearch = type === 'search';
 
   const isOpenControlled = open !== undefined;
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const resolvedOpen = isOpenControlled ? open : internalOpen;
 
+  const isSearchValueControlled = searchValue !== undefined;
+  const [internalSearchValue, setInternalSearchValue] = useState(defaultSearchValue);
+  const resolvedSearchValue = isSearchValueControlled ? searchValue : internalSearchValue;
+
+  const displayedOptions = useMemo(
+    () => (isSearch && filterOptions ? filterOptions(resolvedSearchValue, options) : options),
+    [filterOptions, isSearch, options, resolvedSearchValue],
+  );
+
   const selectedIndex = useMemo(
-    () => options.findIndex(option => option.value === resolvedValue),
+    () => displayedOptions.findIndex(option => option.value === resolvedValue),
+    [displayedOptions, resolvedValue],
+  );
+  const selectedOption = useMemo(
+    () => options.find(option => option.value === resolvedValue) ?? null,
     [options, resolvedValue],
   );
-  const selectedOption = selectedIndex >= 0 ? options[selectedIndex] : null;
 
   const [highlightedIndex, setHighlightedIndex] = useState(() =>
-    selectedIndex >= 0 && !options[selectedIndex]?.disabled
+    selectedIndex >= 0 && !displayedOptions[selectedIndex]?.disabled
       ? selectedIndex
-      : getFirstEnabledIndex(options),
+      : getFirstEnabledIndex(displayedOptions),
   );
 
   const triggerLeading = useMemo(() => {
@@ -186,12 +219,24 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
     onValueChange?.(nextValue);
   };
 
+  const setResolvedSearchValue = (nextValue: string) => {
+    if (!isSearchValueControlled) {
+      setInternalSearchValue(nextValue);
+    }
+
+    onSearchValueChange?.(nextValue);
+  };
+
   const closeMenu = () => {
     setResolvedOpen(false);
   };
 
-  const commitSelection = (nextValue: string) => {
-    setResolvedValue(nextValue);
+  const commitSelection = (option: SelectOption) => {
+    setResolvedValue(option.value);
+    if (isSearch) {
+      setResolvedSearchValue(getOptionDisplayText(option));
+    }
+
     closeMenu();
     triggerRef.current?.focus();
   };
@@ -202,11 +247,11 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
     }
 
     setHighlightedIndex(
-      selectedIndex >= 0 && !options[selectedIndex]?.disabled
+      selectedIndex >= 0 && !displayedOptions[selectedIndex]?.disabled
         ? selectedIndex
-        : getFirstEnabledIndex(options),
+        : getFirstEnabledIndex(displayedOptions),
     );
-  }, [options, resolvedOpen, selectedIndex]);
+  }, [displayedOptions, resolvedOpen, selectedIndex]);
 
   useEffect(() => {
     if (!resolvedOpen) {
@@ -255,7 +300,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
     setResolvedOpen(!resolvedOpen);
   };
 
-  const handleTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+  const handleTriggerKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
     onKeyDown?.(event);
     if (event.defaultPrevented || disabled) {
       return;
@@ -269,7 +314,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
           return;
         }
 
-        setHighlightedIndex(current => getNextEnabledIndex(options, current, 1));
+        setHighlightedIndex(current => getNextEnabledIndex(displayedOptions, current, 1));
         return;
       }
       case 'ArrowUp': {
@@ -279,7 +324,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
           return;
         }
 
-        setHighlightedIndex(current => getNextEnabledIndex(options, current, -1));
+        setHighlightedIndex(current => getNextEnabledIndex(displayedOptions, current, -1));
         return;
       }
       case 'Home': {
@@ -288,7 +333,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
         }
 
         event.preventDefault();
-        setHighlightedIndex(getFirstEnabledIndex(options));
+        setHighlightedIndex(getFirstEnabledIndex(displayedOptions));
         return;
       }
       case 'End': {
@@ -297,7 +342,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
         }
 
         event.preventDefault();
-        setHighlightedIndex(getNextEnabledIndex(options, 0, -1));
+        setHighlightedIndex(getNextEnabledIndex(displayedOptions, 0, -1));
         return;
       }
       case 'Enter':
@@ -308,8 +353,81 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
           return;
         }
 
-        if (highlightedIndex >= 0 && !options[highlightedIndex]?.disabled) {
-          commitSelection(options[highlightedIndex].value);
+        if (highlightedIndex < 0 || highlightedIndex >= displayedOptions.length) {
+          return;
+        }
+
+        const highlightedOption = displayedOptions[highlightedIndex];
+        if (!highlightedOption.disabled) {
+          commitSelection(highlightedOption);
+        }
+        return;
+      }
+      case 'Escape': {
+        if (!resolvedOpen) {
+          return;
+        }
+
+        event.preventDefault();
+        closeMenu();
+        return;
+      }
+      default:
+        return;
+    }
+  };
+
+  const handleSearchChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setResolvedSearchValue(event.target.value);
+    setResolvedOpen(true);
+  };
+
+  const handleSearchFocus = () => {
+    if (!disabled) {
+      setResolvedOpen(true);
+    }
+  };
+
+  const handleSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (disabled) {
+      return;
+    }
+
+    switch (event.key) {
+      case 'ArrowDown': {
+        event.preventDefault();
+        if (!resolvedOpen) {
+          setResolvedOpen(true);
+          return;
+        }
+
+        setHighlightedIndex(current => getNextEnabledIndex(displayedOptions, current, 1));
+        return;
+      }
+      case 'ArrowUp': {
+        event.preventDefault();
+        if (!resolvedOpen) {
+          setResolvedOpen(true);
+          return;
+        }
+
+        setHighlightedIndex(current => getNextEnabledIndex(displayedOptions, current, -1));
+        return;
+      }
+      case 'Enter': {
+        if (!resolvedOpen) {
+          setResolvedOpen(true);
+          return;
+        }
+
+        if (highlightedIndex < 0 || highlightedIndex >= displayedOptions.length) {
+          return;
+        }
+
+        const highlightedOption = displayedOptions[highlightedIndex];
+        if (!highlightedOption.disabled) {
+          event.preventDefault();
+          commitSelection(highlightedOption);
         }
         return;
       }
@@ -331,9 +449,10 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
     .filter(Boolean)
     .join(' ');
   const activeDescendantId =
-    resolvedOpen && highlightedIndex >= 0
+    resolvedOpen && highlightedIndex >= 0 && displayedOptions[highlightedIndex]
       ? `${listboxId}-option-${String(highlightedIndex)}`
       : undefined;
+  const searchPlaceholder = typeof placeholder === 'string' ? placeholder : undefined;
 
   return (
     <div
@@ -348,48 +467,83 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
         </div>
       ) : null}
 
-      <button
-        {...props}
-        id={id ?? triggerId}
-        ref={node => {
-          triggerRef.current = node;
-          assignRef(ref, node);
-        }}
-        type="button"
-        disabled={disabled}
-        className={cx(
-          'c-select__trigger',
-          `c-select__trigger--${type}`,
-          !selectedOption && 'c-select__trigger--placeholder',
-          triggerClassName,
-        )}
-        role="combobox"
-        aria-label={ariaLabel}
-        aria-labelledby={resolvedAriaLabelledBy || undefined}
-        aria-haspopup="listbox"
-        aria-expanded={resolvedOpen}
-        aria-controls={resolvedOpen ? listboxId : undefined}
-        aria-activedescendant={activeDescendantId}
-        onClick={handleTriggerClick}
-        onKeyDown={handleTriggerKeyDown}
-      >
-        <span className="c-select__content">
-          {triggerLeading ? <span className="c-select__leading">{triggerLeading}</span> : null}
+      {isSearch ? (
+        <div
+          className={cx(
+            'c-select__trigger',
+            'c-select__trigger--search',
+            disabled && 'c-select__trigger--disabled',
+            triggerClassName,
+          )}
+        >
+          <span className="c-select__leading">{triggerLeading}</span>
+          <input
+            id={id ?? triggerId}
+            ref={node => {
+              triggerRef.current = node;
+              assignRef(ref, node);
+            }}
+            type="text"
+            disabled={disabled}
+            className="c-select__search-input"
+            value={resolvedSearchValue}
+            placeholder={searchPlaceholder}
+            role="combobox"
+            aria-label={ariaLabel}
+            aria-labelledby={resolvedAriaLabelledBy || undefined}
+            aria-haspopup="listbox"
+            aria-expanded={resolvedOpen}
+            aria-controls={resolvedOpen ? listboxId : undefined}
+            aria-activedescendant={activeDescendantId}
+            aria-autocomplete="list"
+            autoComplete="off"
+            onChange={handleSearchChange}
+            onFocus={handleSearchFocus}
+            onKeyDown={handleSearchKeyDown}
+          />
+        </div>
+      ) : (
+        <button
+          {...props}
+          id={id ?? triggerId}
+          ref={node => {
+            triggerRef.current = node;
+            assignRef(ref, node);
+          }}
+          type="button"
+          disabled={disabled}
+          className={cx(
+            'c-select__trigger',
+            `c-select__trigger--${type}`,
+            !selectedOption && 'c-select__trigger--placeholder',
+            triggerClassName,
+          )}
+          role="combobox"
+          aria-label={ariaLabel}
+          aria-labelledby={resolvedAriaLabelledBy || undefined}
+          aria-haspopup="listbox"
+          aria-expanded={resolvedOpen}
+          aria-controls={resolvedOpen ? listboxId : undefined}
+          aria-activedescendant={activeDescendantId}
+          onClick={handleTriggerClick}
+          onKeyDown={handleTriggerKeyDown}
+        >
+          <span className="c-select__content">
+            {triggerLeading ? <span className="c-select__leading">{triggerLeading}</span> : null}
 
-          <span className="c-select__text-group">
-            <span
-              className={cx('c-select__value', !selectedOption && 'c-select__value--placeholder')}
-            >
-              {selectedOption ? selectedOption.label : placeholder}
+            <span className="c-select__text-group">
+              <span
+                className={cx('c-select__value', !selectedOption && 'c-select__value--placeholder')}
+              >
+                {selectedOption ? selectedOption.label : placeholder}
+              </span>
+
+              {selectedOption?.supportingText ? (
+                <span className="c-select__supporting">{selectedOption.supportingText}</span>
+              ) : null}
             </span>
-
-            {selectedOption?.supportingText ? (
-              <span className="c-select__supporting">{selectedOption.supportingText}</span>
-            ) : null}
           </span>
-        </span>
 
-        {type !== 'search' ? (
           <span className="c-select__trailing">
             <Icon
               name={resolvedOpen ? 'chevron-up' : 'chevron-down'}
@@ -399,8 +553,8 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
               className="c-select__glyph"
             />
           </span>
-        ) : null}
-      </button>
+        </button>
+      )}
 
       {resolvedOpen ? (
         <div className={cx('c-select__menu', menuClassName)}>
@@ -410,75 +564,83 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
             aria-labelledby={label ? labelId : undefined}
             className={cx('c-select__list', listClassName)}
           >
-            {options.map((option, index) => {
-              const isSelected = option.value === resolvedValue;
-              const isHighlighted = highlightedIndex === index && !option.disabled;
-              const leading =
-                option.menuLeading ??
-                (type === 'icon-leading' ? (
-                  <Icon
-                    name="user"
-                    size="md"
-                    hierarchy="tertiary"
-                    aria-hidden
-                    className="c-select__glyph"
-                  />
-                ) : null);
+            {displayedOptions.length > 0 ? (
+              displayedOptions.map((option, index) => {
+                const isSelected = option.value === resolvedValue;
+                const isHighlighted = highlightedIndex === index && !option.disabled;
+                const leading =
+                  option.menuLeading ??
+                  (type === 'icon-leading' ? (
+                    <Icon
+                      name="user"
+                      size="md"
+                      hierarchy="tertiary"
+                      aria-hidden
+                      className="c-select__glyph"
+                    />
+                  ) : null);
 
-              return (
-                <div
-                  key={option.value}
-                  id={`${listboxId}-option-${String(index)}`}
-                  role="option"
-                  aria-selected={isSelected}
-                  aria-disabled={option.disabled || undefined}
-                  className={cx(
-                    'c-select__option',
-                    Boolean(leading) && 'c-select__option--with-leading',
-                    Boolean(option.supportingText) && 'c-select__option--with-supporting',
-                  )}
-                  data-selected={isSelected ? 'true' : undefined}
-                  data-highlighted={isHighlighted ? 'true' : undefined}
-                  data-disabled={option.disabled ? 'true' : undefined}
-                  onMouseEnter={() => {
-                    if (!option.disabled) {
-                      setHighlightedIndex(index);
-                    }
-                  }}
-                  onMouseDown={event => {
-                    event.preventDefault();
-                  }}
-                  onClick={() => {
-                    if (!option.disabled) {
-                      commitSelection(option.value);
-                    }
-                  }}
-                >
-                  <span className="c-select__option-content">
-                    {leading ? <span className="c-select__option-leading">{leading}</span> : null}
+                return (
+                  <div
+                    key={option.value}
+                    id={`${listboxId}-option-${String(index)}`}
+                    role="option"
+                    aria-selected={isSelected}
+                    aria-disabled={option.disabled || undefined}
+                    className={cx(
+                      'c-select__option',
+                      Boolean(leading) && 'c-select__option--with-leading',
+                      Boolean(option.supportingText) && 'c-select__option--with-supporting',
+                    )}
+                    data-selected={isSelected ? 'true' : undefined}
+                    data-highlighted={isHighlighted ? 'true' : undefined}
+                    data-disabled={option.disabled ? 'true' : undefined}
+                    onMouseEnter={() => {
+                      if (!option.disabled) {
+                        setHighlightedIndex(index);
+                      }
+                    }}
+                    onMouseDown={event => {
+                      event.preventDefault();
+                    }}
+                    onClick={() => {
+                      if (!option.disabled) {
+                        commitSelection(option);
+                      }
+                    }}
+                  >
+                    <span className="c-select__option-content">
+                      {leading ? <span className="c-select__option-leading">{leading}</span> : null}
 
-                    <span className="c-select__option-text-group">
-                      <span className="c-select__option-label">{option.label}</span>
-                      {option.supportingText ? (
-                        <span className="c-select__option-supporting">{option.supportingText}</span>
-                      ) : null}
+                      <span className="c-select__option-text-group">
+                        <span className="c-select__option-label">{option.label}</span>
+                        {option.supportingText ? (
+                          <span className="c-select__option-supporting">
+                            {option.supportingText}
+                          </span>
+                        ) : null}
+                      </span>
                     </span>
-                  </span>
 
-                  {isSelected ? (
-                    <span className="c-select__option-check">
-                      <Icon
-                        name="check"
-                        size="md"
-                        hierarchy="primary"
-                        aria-hidden
-                        className="c-select__glyph"
-                      />
-                    </span>
-                  ) : null}
-                </div>
-              );
-            })}
+                    {isSelected ? (
+                      <span className="c-select__option-check">
+                        <Icon
+                          name="check"
+                          size="md"
+                          hierarchy="primary"
+                          aria-hidden
+                          className="c-select__glyph"
+                        />
+                      </span>
+                    ) : null}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="c-select__empty" role="status">
+                {emptyMessage}
+              </div>
+            )}
           </div>
         </div>
       ) : null}

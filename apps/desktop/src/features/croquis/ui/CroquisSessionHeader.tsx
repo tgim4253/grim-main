@@ -9,6 +9,7 @@ type CroquisSessionHeaderProps = {
   isCaptureEnabled: boolean;
   isCurrentSaved: boolean;
   isPlaying: boolean;
+  isRecordSaveEnabled: boolean;
   queueLength: number;
   session: CroquisSession;
   onCapture: () => Promise<void>;
@@ -26,6 +27,7 @@ export function CroquisSessionHeader({
   isCaptureEnabled,
   isCurrentSaved,
   isPlaying,
+  isRecordSaveEnabled,
   queueLength,
   session,
   onCapture,
@@ -62,8 +64,8 @@ export function CroquisSessionHeader({
         >
           Next
         </Button>
-        <Button disabled={isCurrentSaved} onClick={() => void onSave()}>
-          {isCurrentSaved ? 'Saved' : 'Save'}
+        <Button disabled={!isRecordSaveEnabled || isCurrentSaved} onClick={() => void onSave()}>
+          {!isRecordSaveEnabled ? 'Save Off' : isCurrentSaved ? 'Saved' : 'Save'}
         </Button>
         <Button disabled={!isCaptureEnabled} onClick={() => void onCapture()}>
           Capture
