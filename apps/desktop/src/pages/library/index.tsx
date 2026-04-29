@@ -746,7 +746,11 @@ export function LibraryPage() {
         ) : null}
 
         <main className="app-workspace library-page__workspace library-page__main-container">
-          <ReferencesView source={assetSource} refreshKey={workspaceRefreshKey} />
+          <ReferencesView
+            source={assetSource}
+            refreshKey={workspaceRefreshKey}
+            onExplorerRefresh={loadExplorerSnapshot}
+          />
         </main>
       </div>
 

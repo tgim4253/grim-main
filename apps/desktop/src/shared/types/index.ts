@@ -22,6 +22,8 @@ export type {
   AssetDetail,
   AssetListSource,
   AssetSummary,
+  BatchUpdateAssetFoldersMode,
+  BatchUpdateAssetFoldersPayload,
   CroquisRecordDetail,
   CroquisRecordSummary,
   DeleteCroquisRecordPayload,

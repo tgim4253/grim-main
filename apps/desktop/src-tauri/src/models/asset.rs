@@ -108,6 +108,23 @@ pub struct UpdateAssetFoldersPayload {
     pub virtual_folder_ids: Vec<String>,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BatchUpdateAssetFoldersMode {
+    Append,
+    Replace,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchUpdateAssetFoldersPayload {
+    #[serde(default)]
+    pub asset_ids: Vec<String>,
+    #[serde(default)]
+    pub virtual_folder_ids: Vec<String>,
+    pub mode: BatchUpdateAssetFoldersMode,
+}
+
 #[cfg(test)]
 mod tests {
     use super::AssetListSource;

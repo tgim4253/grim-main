@@ -99,6 +99,11 @@ export function createReferenceAsset(asset: AssetSummary, detail?: AssetDetail):
       lastCroquisAt: formatDate(detail?.lastCroquisAt),
     },
     folders: detail?.virtualFolders.map(folder => folder.fullPath || folder.name) ?? [],
+    folderItems:
+      detail?.virtualFolders.map(folder => ({
+        id: folder.id,
+        path: folder.fullPath || folder.name,
+      })) ?? [],
     croquisResult: {
       label: 'Croquis Records',
       status: relatedRecordCount > 0 ? `${relatedRecordCount.toLocaleString()} linked` : 'None',

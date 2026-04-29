@@ -9,9 +9,10 @@ use tokio::fs;
 
 use crate::{
     models::asset::{
-        AssetDetail, AssetListSource, AssetSummary, ImportFailure,
-        ImportPreviewResult, ImportRemoteImagesRequest, ImportRequest,
-        ImportResult, UpdateAssetFoldersPayload,
+        AssetDetail, AssetListSource, AssetSummary,
+        BatchUpdateAssetFoldersMode, BatchUpdateAssetFoldersPayload,
+        ImportFailure, ImportPreviewResult, ImportRemoteImagesRequest,
+        ImportRequest, ImportResult, UpdateAssetFoldersPayload,
     },
     repositories::{
         AssetRepository, FolderRepository, NewImportedAssetInput,
@@ -86,6 +87,48 @@ impl AssetService {
         .await?;
         let detail = self.asset_repository.get_detail(&asset_id).await?;
         Ok(self.hydrate_asset_detail(detail).await)
+    }
+
+    pub async fn batch_update_asset_folders(
+        &self,
+        payload: BatchUpdateAssetFoldersPayload,
+    ) -> Result<Vec<AssetDetail>> {
+        if payload.asset_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        for asset_id in &payload.asset_ids {
+            let _ = self.asset_repository.get_summary(asset_id).await?;
+        }
+
+        let mode = match payload.mode {
+            BatchUpdateAssetFoldersMode::Append => {
+                AssetFolderAssignmentMode::Append
+            }
+            BatchUpdateAssetFoldersMode::Replace => {
+                AssetFolderAssignmentMode::Replace
+            }
+        };
+
+        let mut tx = self.asset_repository.begin().await?;
+        for asset_id in &payload.asset_ids {
+            self.apply_asset_folder_assignments_in_tx(
+                &mut tx,
+                asset_id,
+                &payload.virtual_folder_ids,
+                mode,
+            )
+            .await?;
+        }
+        tx.commit().await?;
+
+        let mut details = Vec::with_capacity(payload.asset_ids.len());
+        for asset_id in payload.asset_ids {
+            let detail = self.asset_repository.get_detail(&asset_id).await?;
+            details.push(self.hydrate_asset_detail(detail).await);
+        }
+
+        Ok(details)
     }
 
     async fn apply_asset_folder_assignments(
@@ -673,8 +716,9 @@ mod tests {
     use crate::{
         models::{
             asset::{
-                AssetListSource, ImportRemoteImagesRequest, ImportRequest,
-                UpdateAssetFoldersPayload,
+                AssetListSource, BatchUpdateAssetFoldersMode,
+                BatchUpdateAssetFoldersPayload, ImportRemoteImagesRequest,
+                ImportRequest, UpdateAssetFoldersPayload,
             },
             folder::{
                 DeleteVirtualFolderPayload, SaveVirtualFolderPayload,
@@ -723,6 +767,37 @@ mod tests {
 
     fn path_string(path: &Path) -> String {
         path.to_string_lossy().into_owned()
+    }
+
+    async fn insert_test_asset(
+        asset_repository: &AssetRepository,
+        id: &str,
+        hash: &str,
+        file_name: &str,
+    ) {
+        let mut tx = asset_repository
+            .begin()
+            .await
+            .expect("failed to begin asset insert tx");
+        asset_repository
+            .insert_imported_in_tx(
+                &mut tx,
+                &NewImportedAssetInput {
+                    id,
+                    hash,
+                    file_name,
+                    file_size: BMP_1X1.len() as i64,
+                    mime_type: "image/bmp",
+                    width: 1,
+                    height: 1,
+                    modified_at: None,
+                    source_type: IMPORTED_ASSET_SOURCE,
+                    created_at: "2026-01-01T00:00:00Z",
+                },
+            )
+            .await
+            .expect("failed to insert asset");
+        tx.commit().await.expect("failed to commit asset insert");
     }
 
     #[tokio::test]
@@ -1204,6 +1279,244 @@ mod tests {
             })
             .await;
         assert!(child_result.is_ok());
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn batch_update_asset_folders_appends_target_folder_to_assets() {
+        let dir = make_temp_dir("batch-append-folders");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let folder_service =
+            FolderService::new(FolderRepository::new(pool.clone()));
+        let initial = folder_service
+            .save_virtual_folder(SaveVirtualFolderPayload {
+                id: None,
+                name: "Initial".to_string(),
+                parent_id: None,
+                alias: None,
+            })
+            .await
+            .expect("failed to save initial folder");
+        let target = folder_service
+            .save_virtual_folder(SaveVirtualFolderPayload {
+                id: None,
+                name: "Target".to_string(),
+                parent_id: None,
+                alias: None,
+            })
+            .await
+            .expect("failed to save target folder");
+
+        let asset_repository = AssetRepository::new(pool.clone());
+        insert_test_asset(
+            &asset_repository,
+            "asset-1",
+            "hash-batch-append-1",
+            "asset-1.bmp",
+        )
+        .await;
+        insert_test_asset(
+            &asset_repository,
+            "asset-2",
+            "hash-batch-append-2",
+            "asset-2.bmp",
+        )
+        .await;
+
+        let service = AssetService::new(
+            AssetRepository::new(pool.clone()),
+            FolderRepository::new(pool),
+            storage_for(&dir),
+        );
+        service
+            .update_asset_folders(UpdateAssetFoldersPayload {
+                asset_id: "asset-1".to_string(),
+                virtual_folder_ids: vec![initial.saved_folder_id.clone()],
+            })
+            .await
+            .expect("failed to assign initial folder");
+
+        let details = service
+            .batch_update_asset_folders(BatchUpdateAssetFoldersPayload {
+                asset_ids: vec!["asset-1".to_string(), "asset-2".to_string()],
+                virtual_folder_ids: vec![target.saved_folder_id.clone()],
+                mode: BatchUpdateAssetFoldersMode::Append,
+            })
+            .await
+            .expect("failed to batch append folders");
+
+        assert_eq!(details.len(), 2);
+        let asset_one = details
+            .iter()
+            .find(|detail| detail.asset.id == "asset-1")
+            .expect("missing first asset detail");
+        assert!(asset_one
+            .virtual_folders
+            .iter()
+            .any(|folder| folder.id == initial.saved_folder_id));
+        assert!(asset_one
+            .virtual_folders
+            .iter()
+            .any(|folder| folder.id == target.saved_folder_id));
+        let asset_two = details
+            .iter()
+            .find(|detail| detail.asset.id == "asset-2")
+            .expect("missing second asset detail");
+        assert_eq!(asset_two.virtual_folders.len(), 1);
+        assert_eq!(asset_two.virtual_folders[0].id, target.saved_folder_id);
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn batch_update_asset_folders_replaces_target_folders() {
+        let dir = make_temp_dir("batch-replace-folders");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let folder_service =
+            FolderService::new(FolderRepository::new(pool.clone()));
+        let old_folder = folder_service
+            .save_virtual_folder(SaveVirtualFolderPayload {
+                id: None,
+                name: "Old".to_string(),
+                parent_id: None,
+                alias: None,
+            })
+            .await
+            .expect("failed to save old folder");
+        let replacement = folder_service
+            .save_virtual_folder(SaveVirtualFolderPayload {
+                id: None,
+                name: "Replacement".to_string(),
+                parent_id: None,
+                alias: None,
+            })
+            .await
+            .expect("failed to save replacement folder");
+
+        let asset_repository = AssetRepository::new(pool.clone());
+        insert_test_asset(
+            &asset_repository,
+            "asset-1",
+            "hash-batch-replace-1",
+            "asset-1.bmp",
+        )
+        .await;
+        insert_test_asset(
+            &asset_repository,
+            "asset-2",
+            "hash-batch-replace-2",
+            "asset-2.bmp",
+        )
+        .await;
+
+        let service = AssetService::new(
+            AssetRepository::new(pool.clone()),
+            FolderRepository::new(pool),
+            storage_for(&dir),
+        );
+        for asset_id in ["asset-1", "asset-2"] {
+            service
+                .update_asset_folders(UpdateAssetFoldersPayload {
+                    asset_id: asset_id.to_string(),
+                    virtual_folder_ids: vec![old_folder
+                        .saved_folder_id
+                        .clone()],
+                })
+                .await
+                .expect("failed to assign old folder");
+        }
+
+        let details = service
+            .batch_update_asset_folders(BatchUpdateAssetFoldersPayload {
+                asset_ids: vec!["asset-1".to_string(), "asset-2".to_string()],
+                virtual_folder_ids: vec![replacement.saved_folder_id.clone()],
+                mode: BatchUpdateAssetFoldersMode::Replace,
+            })
+            .await
+            .expect("failed to batch replace folders");
+
+        assert_eq!(details.len(), 2);
+        for detail in details {
+            assert_eq!(detail.virtual_folders.len(), 1);
+            assert_eq!(
+                detail.virtual_folders[0].id,
+                replacement.saved_folder_id
+            );
+        }
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn batch_update_asset_folders_rejects_missing_asset_before_mutating()
+    {
+        let dir = make_temp_dir("batch-missing-asset");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let folder_service =
+            FolderService::new(FolderRepository::new(pool.clone()));
+        let old_folder = folder_service
+            .save_virtual_folder(SaveVirtualFolderPayload {
+                id: None,
+                name: "Old".to_string(),
+                parent_id: None,
+                alias: None,
+            })
+            .await
+            .expect("failed to save old folder");
+
+        let asset_repository = AssetRepository::new(pool.clone());
+        insert_test_asset(
+            &asset_repository,
+            "asset-1",
+            "hash-batch-missing-1",
+            "asset-1.bmp",
+        )
+        .await;
+
+        let service = AssetService::new(
+            AssetRepository::new(pool.clone()),
+            FolderRepository::new(pool),
+            storage_for(&dir),
+        );
+        service
+            .update_asset_folders(UpdateAssetFoldersPayload {
+                asset_id: "asset-1".to_string(),
+                virtual_folder_ids: vec![old_folder.saved_folder_id.clone()],
+            })
+            .await
+            .expect("failed to assign old folder");
+
+        let result = service
+            .batch_update_asset_folders(BatchUpdateAssetFoldersPayload {
+                asset_ids: vec![
+                    "asset-1".to_string(),
+                    "missing-asset".to_string(),
+                ],
+                virtual_folder_ids: Vec::new(),
+                mode: BatchUpdateAssetFoldersMode::Replace,
+            })
+            .await;
+
+        assert!(result.is_err());
+        let detail = service.get_asset("asset-1").await.expect("missing asset");
+        assert_eq!(detail.virtual_folders.len(), 1);
+        assert_eq!(detail.virtual_folders[0].id, old_folder.saved_folder_id);
 
         let _ = fs::remove_dir_all(dir);
     }

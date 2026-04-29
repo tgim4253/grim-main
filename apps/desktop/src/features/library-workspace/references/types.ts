@@ -8,6 +8,11 @@ export type ConnectedImageItem = {
   active?: boolean;
 };
 
+export type ReferenceFolderItem = {
+  id: string;
+  path: string;
+};
+
 export type ReferenceAsset = LibraryWorkspaceItem & {
   title: string;
   imageSrc?: string | null;
@@ -20,6 +25,7 @@ export type ReferenceAsset = LibraryWorkspaceItem & {
     lastCroquisAt: string;
   };
   folders: readonly string[];
+  folderItems?: readonly ReferenceFolderItem[];
   croquisResult: {
     label: string;
     status: string;

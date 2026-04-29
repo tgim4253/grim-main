@@ -174,6 +174,14 @@ export interface UpdateAssetFoldersPayload {
   virtualFolderIds: string[];
 }
 
+export type BatchUpdateAssetFoldersMode = 'append' | 'replace';
+
+export interface BatchUpdateAssetFoldersPayload {
+  assetIds: string[];
+  virtualFolderIds: string[];
+  mode: BatchUpdateAssetFoldersMode;
+}
+
 export interface UpdateAssetTagsPayload {
   assetId: string;
   tagIds: string[];
