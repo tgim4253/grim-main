@@ -5,8 +5,11 @@ type ReferenceSelectionToolbarProps = {
   selectedCount: number;
   totalCount: number;
   croquisDisabled?: boolean;
+  folderActionsDisabled?: boolean;
   onSelectionModeChange: (selectionMode: boolean) => void;
   onSelectAllChange: (selected: boolean) => void;
+  onAddToFolder: () => void;
+  onMoveToFolder: () => void;
   onStartCroquis: () => void;
 };
 
@@ -15,12 +18,16 @@ export function ReferenceSelectionToolbar({
   selectedCount,
   totalCount,
   croquisDisabled = false,
+  folderActionsDisabled = false,
   onSelectionModeChange,
   onSelectAllChange,
+  onAddToFolder,
+  onMoveToFolder,
   onStartCroquis,
 }: ReferenceSelectionToolbarProps) {
   const allSelected = totalCount > 0 && selectedCount === totalCount;
   const selectedLabel = `${selectedCount.toLocaleString()} selected`;
+  const selectionActionsDisabled = folderActionsDisabled || selectedCount === 0;
 
   if (!selectionMode) {
     return (
@@ -66,10 +73,20 @@ export function ReferenceSelectionToolbar({
       </div>
 
       <div className="reference-selection-toolbar__actions">
-        <Button size="sm" variant="secondary" disabled>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={selectionActionsDisabled}
+          onClick={onAddToFolder}
+        >
           Add to Folder
         </Button>
-        <Button size="sm" variant="secondary" disabled>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={selectionActionsDisabled}
+          onClick={onMoveToFolder}
+        >
           Move
         </Button>
         <Button size="sm" variant="secondary" disabled>

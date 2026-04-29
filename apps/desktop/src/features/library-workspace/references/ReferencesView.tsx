@@ -5,12 +5,16 @@ import type {
   AssetDetail,
   AssetListSource,
   AssetSummary,
+  BatchUpdateAssetFoldersMode,
+  ExplorerSnapshot,
   LibrarySettings,
   SessionPreset,
+  VirtualFolder,
 } from '../../../shared/types';
 import { Button } from '../../../shared/ui';
 import { LibraryWorkspace } from '../common/LibraryWorkspace';
 import type { LibraryWorkspaceLayout } from '../common/types';
+import { FolderSearchModal } from '../import';
 import { AssetPreviewPanel } from './AssetPreviewPanel';
 import { createReferenceAsset } from './referenceAssets';
 import { ReferenceExplorerHeader } from './ReferenceExplorerHeader';
@@ -21,12 +25,18 @@ import './reference-workspace.css';
 type ReferencesViewProps = {
   source: AssetListSource;
   refreshKey?: number;
+  onExplorerRefresh?: () => Promise<void> | void;
 };
 
 type ReferenceGridStateProps = {
   title: string;
   description?: string;
   action?: ReactNode;
+};
+
+type FolderAction = {
+  assetIds: string[];
+  mode: BatchUpdateAssetFoldersMode;
 };
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -41,6 +51,15 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
+function getSelectableFolders(snapshot: ExplorerSnapshot) {
+  const statsByFolderId = new Map(snapshot.folderStats.map(stats => [stats.folderId, stats]));
+
+  return snapshot.virtualFolders.filter(folder => {
+    const stats = statsByFolderId.get(folder.id);
+    return folder.kind === 'user' && (stats?.childCount ?? 0) === 0;
+  });
+}
+
 function ReferenceGridState({ title, description, action }: ReferenceGridStateProps) {
   return (
     <div className="masonry-grid__empty">
@@ -53,7 +72,7 @@ function ReferenceGridState({ title, description, action }: ReferenceGridStatePr
   );
 }
 
-export function ReferencesView({ source, refreshKey = 0 }: ReferencesViewProps) {
+export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: ReferencesViewProps) {
   const [layout, setLayout] = useState<LibraryWorkspaceLayout>('masonry');
   const [assets, setAssets] = useState<AssetSummary[]>([]);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
@@ -64,12 +83,22 @@ export function ReferencesView({ source, refreshKey = 0 }: ReferencesViewProps) 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [croquisModalOpen, setCroquisModalOpen] = useState(false);
+  const [croquisAssetIds, setCroquisAssetIds] = useState<string[]>([]);
   const [sessionPresets, setSessionPresets] = useState<SessionPreset[]>([]);
   const [librarySettings, setLibrarySettings] = useState<LibrarySettings>({});
   const [isCroquisConfigLoading, setIsCroquisConfigLoading] = useState(false);
   const [croquisConfigError, setCroquisConfigError] = useState<string | null>(null);
+  const [folderAction, setFolderAction] = useState<FolderAction | null>(null);
+  const [folderActionFolders, setFolderActionFolders] = useState<VirtualFolder[]>([]);
+  const [folderActionFolderId, setFolderActionFolderId] = useState('');
+  const [folderActionBusy, setFolderActionBusy] = useState(false);
+  const [folderActionLoading, setFolderActionLoading] = useState(false);
+  const [folderActionError, setFolderActionError] = useState<string | null>(null);
+  const [assetActionBusy, setAssetActionBusy] = useState(false);
+  const [assetActionError, setAssetActionError] = useState<string | null>(null);
   const loadSequenceRef = useRef(0);
   const croquisConfigLoadSequenceRef = useRef(0);
+  const folderActionLoadSequenceRef = useRef(0);
 
   const loadAssets = useCallback(async () => {
     const loadSequence = loadSequenceRef.current + 1;
@@ -252,27 +281,186 @@ export function ReferencesView({ source, refreshKey = 0 }: ReferencesViewProps) 
     [assets],
   );
 
-  const handleStartCroquis = useCallback(() => {
-    if (selectedAssetIds.length === 0 || isCroquisConfigLoading) {
+  const applyAssetFolderUpdate = useCallback(
+    async (assetIds: string[], virtualFolderIds: string[], mode: BatchUpdateAssetFoldersMode) => {
+      setAssetActionBusy(true);
+      setAssetActionError(null);
+
+      try {
+        const updatedDetails = await ipc.asset.batchUpdateFolders({
+          assetIds,
+          virtualFolderIds,
+          mode,
+        });
+
+        setSelectedAssetDetail(current => {
+          if (!selectedAssetId && !current) {
+            return current;
+          }
+
+          const targetId = current?.id ?? selectedAssetId;
+          const updatedDetail = updatedDetails.find(detail => detail.id === targetId);
+          return updatedDetail ?? current;
+        });
+        await loadAssets();
+        try {
+          await onExplorerRefresh?.();
+        } catch (refreshError) {
+          setAssetActionError(getErrorMessage(refreshError, 'Failed to refresh explorer.'));
+        }
+        return true;
+      } catch (nextError) {
+        setAssetActionError(getErrorMessage(nextError, 'Failed to update asset folders.'));
+        return false;
+      } finally {
+        setAssetActionBusy(false);
+      }
+    },
+    [loadAssets, onExplorerRefresh, selectedAssetId],
+  );
+
+  const openFolderAction = useCallback((action: FolderAction) => {
+    const loadSequence = folderActionLoadSequenceRef.current + 1;
+    folderActionLoadSequenceRef.current = loadSequence;
+
+    setFolderAction(action);
+    setFolderActionFolderId('');
+    setFolderActionFolders([]);
+    setFolderActionError(null);
+    setFolderActionLoading(true);
+
+    void ipc.library
+      .loadExplorerSnapshot()
+      .then(snapshot => {
+        if (folderActionLoadSequenceRef.current !== loadSequence) {
+          return;
+        }
+
+        setFolderActionFolders(getSelectableFolders(snapshot));
+      })
+      .catch((nextError: unknown) => {
+        if (folderActionLoadSequenceRef.current !== loadSequence) {
+          return;
+        }
+
+        setFolderActionError(getErrorMessage(nextError, 'Failed to load folders.'));
+      })
+      .finally(() => {
+        if (folderActionLoadSequenceRef.current === loadSequence) {
+          setFolderActionLoading(false);
+        }
+      });
+  }, []);
+
+  const handleCloseFolderAction = useCallback(() => {
+    folderActionLoadSequenceRef.current += 1;
+    setFolderAction(null);
+    setFolderActionFolderId('');
+    setFolderActionError(null);
+    setFolderActionBusy(false);
+    setFolderActionLoading(false);
+  }, []);
+
+  const handleApplyFolderAction = useCallback(() => {
+    if (!folderAction || !folderActionFolderId) {
       return;
     }
 
-    void loadCroquisConfiguration().then(configurationLoaded => {
-      if (configurationLoaded) {
-        setCroquisModalOpen(true);
+    setFolderActionBusy(true);
+    setFolderActionError(null);
+
+    void applyAssetFolderUpdate(
+      folderAction.assetIds,
+      [folderActionFolderId],
+      folderAction.mode,
+    ).then(updated => {
+      setFolderActionBusy(false);
+      if (updated) {
+        handleCloseFolderAction();
+        return;
       }
+
+      setFolderActionError('Failed to update asset folders.');
     });
-  }, [isCroquisConfigLoading, loadCroquisConfiguration, selectedAssetIds.length]);
+  }, [applyAssetFolderUpdate, folderAction, folderActionFolderId, handleCloseFolderAction]);
+
+  const handlePreviewAddFolder = useCallback(
+    (assetId: string) => {
+      openFolderAction({ assetIds: [assetId], mode: 'append' });
+    },
+    [openFolderAction],
+  );
+
+  const handlePreviewRemoveFolder = useCallback(
+    (assetId: string, folderId: string) => {
+      const nextFolderIds =
+        selectedAssetDetail?.id === assetId
+          ? selectedAssetDetail.virtualFolders
+              .filter(folder => folder.id !== folderId)
+              .map(folder => folder.id)
+          : [];
+
+      void applyAssetFolderUpdate([assetId], nextFolderIds, 'replace');
+    },
+    [applyAssetFolderUpdate, selectedAssetDetail],
+  );
+
+  const handleAddSelectedToFolder = useCallback(() => {
+    if (selectedAssetIds.length === 0) {
+      return;
+    }
+
+    openFolderAction({ assetIds: selectedAssetIds, mode: 'append' });
+  }, [openFolderAction, selectedAssetIds]);
+
+  const handleMoveSelectedToFolder = useCallback(() => {
+    if (selectedAssetIds.length === 0) {
+      return;
+    }
+
+    openFolderAction({ assetIds: selectedAssetIds, mode: 'replace' });
+  }, [openFolderAction, selectedAssetIds]);
+
+  const openCroquisForAssets = useCallback(
+    (assetIds: string[]) => {
+      if (assetIds.length === 0 || isCroquisConfigLoading) {
+        return;
+      }
+
+      void loadCroquisConfiguration().then(configurationLoaded => {
+        if (configurationLoaded) {
+          setCroquisAssetIds(assetIds);
+          setCroquisModalOpen(true);
+        }
+      });
+    },
+    [isCroquisConfigLoading, loadCroquisConfiguration],
+  );
+
+  const handleStartCroquis = useCallback(() => {
+    if (selectedAssetIds.length === 0) {
+      return;
+    }
+
+    openCroquisForAssets(selectedAssetIds);
+  }, [openCroquisForAssets, selectedAssetIds]);
 
   const handleCloseCroquisModal = useCallback(() => {
     setCroquisModalOpen(false);
+    setCroquisAssetIds([]);
   }, []);
 
   const handleCroquisStarted = useCallback(() => {
     setCroquisModalOpen(false);
+    setCroquisAssetIds([]);
     setSelectionMode(false);
     setSelectedAssetIds([]);
   }, []);
+
+  const folderActionModalBusy = folderActionBusy || folderActionLoading || assetActionBusy;
+  const folderActionSelectDisabled =
+    folderActionModalBusy || !folderActionFolderId || folderActionFolders.length === 0;
+  const statusError = assetActionError ?? croquisConfigError;
 
   return (
     <>
@@ -296,8 +484,11 @@ export function ReferencesView({ source, refreshKey = 0 }: ReferencesViewProps) 
             selectedCount={selectedAssetIds.length}
             totalCount={assets.length}
             croquisDisabled={isCroquisConfigLoading}
+            folderActionsDisabled={assetActionBusy || folderActionModalBusy}
             onSelectionModeChange={handleSelectionModeChange}
             onSelectAllChange={handleSelectAllChange}
+            onAddToFolder={handleAddSelectedToFolder}
+            onMoveToFolder={handleMoveSelectedToFolder}
             onStartCroquis={handleStartCroquis}
           />
         }
@@ -314,23 +505,41 @@ export function ReferencesView({ source, refreshKey = 0 }: ReferencesViewProps) 
         renderPreview={asset => (
           <AssetPreviewPanel
             asset={asset}
+            busy={assetActionBusy || isCroquisConfigLoading}
             onClose={() => {
               setPreviewOpen(false);
+            }}
+            onAddFolder={handlePreviewAddFolder}
+            onRemoveFolder={handlePreviewRemoveFolder}
+            onStartCroquis={assetId => {
+              openCroquisForAssets([assetId]);
             }}
           />
         )}
       />
+      <FolderSearchModal
+        open={folderAction !== null}
+        folders={folderActionFolders}
+        folderId={folderActionFolderId}
+        folderDisabled={folderActionModalBusy}
+        busy={folderActionModalBusy}
+        errorMessage={folderActionError}
+        selectFolderDisabled={folderActionSelectDisabled}
+        onClose={handleCloseFolderAction}
+        onFolderChange={setFolderActionFolderId}
+        onSelectFolder={handleApplyFolderAction}
+      />
       <CroquisStartModal
         open={croquisModalOpen}
-        assetIds={selectedAssetIds}
+        assetIds={croquisAssetIds}
         sessionPresets={sessionPresets}
         librarySettings={librarySettings}
         onClose={handleCloseCroquisModal}
         onStarted={handleCroquisStarted}
       />
-      {croquisConfigError ? (
+      {statusError ? (
         <div className="reference-croquis-config-error" role="status">
-          {croquisConfigError}
+          {statusError}
         </div>
       ) : null}
     </>

@@ -3,7 +3,8 @@ use tauri::State;
 use crate::{
     errors::{CommandResult, IntoCommandResult},
     models::asset::{
-        AssetDetail, AssetListSource, AssetSummary, UpdateAssetFoldersPayload,
+        AssetDetail, AssetListSource, AssetSummary,
+        BatchUpdateAssetFoldersPayload, UpdateAssetFoldersPayload,
     },
     services::AssetService,
 };
@@ -30,6 +31,14 @@ pub async fn update_asset_folders(
     asset_service: State<'_, AssetService>,
 ) -> CommandResult<AssetDetail> {
     asset_service.update_asset_folders(payload).await.into_command()
+}
+
+#[tauri::command]
+pub async fn batch_update_asset_folders(
+    payload: BatchUpdateAssetFoldersPayload,
+    asset_service: State<'_, AssetService>,
+) -> CommandResult<Vec<AssetDetail>> {
+    asset_service.batch_update_asset_folders(payload).await.into_command()
 }
 
 #[tauri::command]

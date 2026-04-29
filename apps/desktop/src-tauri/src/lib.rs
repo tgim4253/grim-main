@@ -56,6 +56,7 @@ pub fn run() {
             commands::asset_commands::list_assets,
             commands::asset_commands::get_asset_detail,
             commands::asset_commands::update_asset_folders,
+            commands::asset_commands::batch_update_asset_folders,
             commands::asset_commands::reveal_path,
             commands::import_commands::preview_import_images,
             commands::import_commands::import_images,
