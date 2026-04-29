@@ -69,9 +69,6 @@ export interface CroquisRecordSummary {
   title: string;
   sourceAssetId?: string | null;
   resultAssetId?: string | null;
-  sessionId?: string | null;
-  stepIndex?: number | null;
-  stepName?: string | null;
   targetDurationSeconds?: number | null;
   actualDurationSeconds?: number | null;
   finishedAt?: string | null;
@@ -102,9 +99,6 @@ export interface CroquisRecordDetail {
   title: string;
   sourceAssetId?: string | null;
   resultAssetId?: string | null;
-  sessionId?: string | null;
-  stepIndex?: number | null;
-  stepName?: string | null;
   targetDurationSeconds?: number | null;
   actualDurationSeconds?: number | null;
   finishedAt?: string | null;
@@ -191,9 +185,6 @@ export interface SaveCroquisRecordPayload {
   id?: string | null;
   sourceAssetId?: string | null;
   resultAssetId?: string | null;
-  sessionId?: string | null;
-  stepIndex?: number | null;
-  stepName?: string | null;
   title?: string | null;
   note?: string | null;
   targetDurationSeconds?: number | null;

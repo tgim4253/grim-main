@@ -1,6 +1,7 @@
 export { LibraryWorkspace } from './common/LibraryWorkspace';
 export { ReferencesDummyView } from './references/ReferencesDummyView';
 export { ReferencesView } from './references/ReferencesView';
+export { RecordsView } from './records/RecordsView';
 export type {
   ImagePlaceholderState,
   LibraryWorkspaceHeaderProps,
@@ -14,3 +15,4 @@ export type {
   MasonryImageRatio,
 } from './common/types';
 export type { ConnectedImageItem, ConnectedImageTone, ReferenceAsset } from './references/types';
+export type { RecordResultItem } from './records/types';

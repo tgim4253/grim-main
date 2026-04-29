@@ -32,15 +32,13 @@
   .library-workspace__preview-shell {
     display: flex;
     flex: none;
-    width: 320px;
-    max-width: 320px;
+    width: auto;
+    max-width: 100%;
     min-width: 0;
     opacity: 1;
     overflow: hidden;
     transform: translateX(0);
     transition:
-      width 160ms ease,
-      max-width 160ms ease,
       opacity 160ms ease,
       transform 160ms ease,
       visibility 160ms ease;

@@ -8,6 +8,7 @@ import type { ExplorerNode } from './types';
 
 export const ALL_ASSETS_NODE_ID = 'section:all-assets';
 export const UNCATEGORIZED_NODE_ID = 'section:uncategorized';
+export const RECENT_RECORDS_NODE_ID = 'section:recent-records';
 export const FOLDERS_NODE_ID = 'section:folders';
 
 export const DEFAULT_ASSET_SOURCE: AssetListSource = { kind: 'allAssets' };
@@ -90,6 +91,13 @@ export function buildExplorerNodes(snapshot: ExplorerSnapshot | null): ExplorerN
       icon: 'folder',
       meta: formatCount(unassignedAssetsCount),
       source: { kind: 'uncategorized' },
+    },
+    {
+      id: RECENT_RECORDS_NODE_ID,
+      label: 'Recent Records',
+      icon: 'gesture',
+      meta: '',
+      view: 'records',
     },
     {
       id: FOLDERS_NODE_ID,

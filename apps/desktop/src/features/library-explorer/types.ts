@@ -1,6 +1,7 @@
 import type { AssetListSource } from '../../shared/types';
 
 export type ExplorerNodeIcon = 'anatomy' | 'gesture' | 'folder' | 'folder-open' | 'grid';
+export type ExplorerNodeView = 'records';
 
 export type ExplorerNode = {
   id: string;
@@ -8,6 +9,7 @@ export type ExplorerNode = {
   icon: ExplorerNodeIcon;
   meta: string;
   source?: AssetListSource;
+  view?: ExplorerNodeView;
   children?: ExplorerNode[];
   defaultExpanded?: boolean;
   showActions?: boolean;

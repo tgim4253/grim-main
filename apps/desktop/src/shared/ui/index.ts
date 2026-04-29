@@ -79,6 +79,7 @@ export {
   type ModalProps,
   type ModalSize,
 } from './modal/Modal';
+export { PreviewPanel, type PreviewPanelProps } from './preview-panel/PreviewPanel';
 export {
   SELECT_TYPES,
   Select,
