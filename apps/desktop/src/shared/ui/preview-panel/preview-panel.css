@@ -1,0 +1,85 @@
+@layer app {
+  .preview-panel {
+    position: relative;
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    width: var(--preview-panel-width, 320px);
+    min-width: var(--preview-panel-width, 320px);
+    max-width: var(--preview-panel-width, 320px);
+    height: 100%;
+    min-height: 0;
+    border-left: 1px solid var(--semantic-colors-border-secondary);
+    background: var(--semantic-colors-surface-panel);
+    overflow: hidden;
+  }
+
+  .preview-panel__splitter {
+    position: absolute;
+    z-index: 3;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 10px;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    cursor: col-resize;
+    touch-action: none;
+  }
+
+  .preview-panel__splitter::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 5px;
+    width: 4px;
+    height: 36px;
+    border-radius: 999px;
+    transform: translate(-50%, -50%);
+    background: color-mix(in srgb, var(--semantic-colors-text-teritary) 24%, transparent);
+    transition: background-color 120ms ease;
+  }
+
+  .preview-panel__splitter:hover::after,
+  .preview-panel__splitter:focus-visible::after,
+  .preview-panel__splitter[data-dragging='true']::after {
+    background: color-mix(in srgb, var(--semantic-colors-brand-primary) 48%, transparent);
+  }
+
+  .preview-panel__splitter:focus-visible {
+    outline: 2px solid var(--semantic-colors-border-focus);
+    outline-offset: -2px;
+  }
+
+  .preview-panel__header {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 48px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--semantic-colors-border-secondary);
+    background: var(--semantic-colors-surface-panel);
+  }
+
+  .preview-panel__header h2 {
+    margin: 0;
+    color: var(--semantic-colors-text-secondary);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+  }
+
+  .preview-panel__content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 24px;
+    min-height: 0;
+    padding: 16px;
+    overflow-y: auto;
+  }
+}

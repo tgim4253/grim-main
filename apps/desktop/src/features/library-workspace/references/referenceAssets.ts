@@ -1,5 +1,5 @@
 import { convertFileSrc } from '@tauri-apps/api/core';
-import type { AssetDetail, AssetSummary } from '../../../shared/types';
+import type { AssetDetail, AssetSummary, CroquisRecordDetail } from '../../../shared/types';
 import type { ConnectedImageItem, ReferenceAsset } from './types';
 
 const MASONRY_ITEM_WIDTH = 280;
@@ -70,20 +70,35 @@ function getPlaceholderRatio(asset: AssetSummary): ReferenceAsset['ratio'] {
   return '4:5';
 }
 
-function createConnectedImages(detail?: AssetDetail): ConnectedImageItem[] {
+function createConnectedImages(
+  detail?: AssetDetail,
+  recordDetailsById?: ReadonlyMap<string, CroquisRecordDetail>,
+): ConnectedImageItem[] {
   const records = detail?.relatedRecords ?? [];
   const tones: ConnectedImageItem['tone'][] = ['portrait', 'gesture', 'shape'];
-  const connectedImages: ConnectedImageItem[] = records.slice(0, 3).map((record, index) => ({
-    id: record.id,
-    tone: tones[index] ?? 'shape',
-    active: index === 0,
-  }));
+  const connectedImages: ConnectedImageItem[] = records.slice(0, 3).map((record, index) => {
+    const recordDetail = recordDetailsById?.get(record.id);
+    const visualAsset = recordDetail?.resultAsset ?? recordDetail?.sourceAsset ?? null;
+
+    return {
+      id: record.id,
+      tone: tones[index] ?? 'shape',
+      active: index === 0,
+      title: visualAsset?.fileName ?? record.title,
+      imageSrc: toFileSrc(visualAsset?.storagePath),
+      thumbnailSrc: toFileSrc(visualAsset?.thumbnailPath),
+    };
+  });
 
   connectedImages.push({ id: `${detail?.id ?? 'asset'}-related-add`, tone: 'add' });
   return connectedImages;
 }
 
-export function createReferenceAsset(asset: AssetSummary, detail?: AssetDetail): ReferenceAsset {
+export function createReferenceAsset(
+  asset: AssetSummary,
+  detail?: AssetDetail,
+  recordDetailsById?: ReadonlyMap<string, CroquisRecordDetail>,
+): ReferenceAsset {
   const relatedRecordCount = detail?.relatedRecords.length ?? 0;
 
   return {
@@ -107,7 +122,7 @@ export function createReferenceAsset(asset: AssetSummary, detail?: AssetDetail):
     croquisResult: {
       label: 'Croquis Records',
       status: relatedRecordCount > 0 ? `${relatedRecordCount.toLocaleString()} linked` : 'None',
-      connectedImages: createConnectedImages(detail),
+      connectedImages: createConnectedImages(detail, recordDetailsById),
     },
   };
 }

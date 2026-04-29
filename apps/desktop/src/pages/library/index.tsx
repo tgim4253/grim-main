@@ -23,11 +23,12 @@ import {
   ALL_ASSETS_NODE_ID,
   DEFAULT_ASSET_SOURCE,
   ExplorerPanel,
+  RECENT_RECORDS_NODE_ID,
   buildExplorerNodes,
   type ExplorerCreateFolderRequest,
   type ExplorerNode,
 } from '../../features/library-explorer';
-import { ReferencesView } from '../../features/library-workspace';
+import { RecordsView, ReferencesView } from '../../features/library-workspace';
 import {
   FolderSearchModal,
   ImportAssetsModal,
@@ -52,6 +53,7 @@ const SUPPORTED_IMPORT_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif',
 const NO_DESTINATION_FOLDERS_ERROR = 'No destination folders are available for import.';
 
 type ImportStep = 'folder' | 'assets' | 'completed';
+type WorkspaceView = 'references' | 'records';
 
 type ImportProgressState = {
   completed: number;
@@ -132,6 +134,7 @@ export function LibraryPage() {
   const [isExplorerLoading, setIsExplorerLoading] = useState(true);
   const [activeExplorerNodeId, setActiveExplorerNodeId] = useState(ALL_ASSETS_NODE_ID);
   const [assetSource, setAssetSource] = useState<AssetListSource>(DEFAULT_ASSET_SOURCE);
+  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('references');
   const [workspaceRefreshKey, setWorkspaceRefreshKey] = useState(0);
   const [importStep, setImportStep] = useState<ImportStep | null>(null);
   const [importFolderId, setImportFolderId] = useState<string | undefined>();
@@ -198,7 +201,7 @@ export function LibraryPage() {
     },
     {
       icon: 'search',
-      label: 'Search',
+      label: 'Result Preview',
       action: 'open-search',
     },
     {
@@ -216,16 +219,29 @@ export function LibraryPage() {
   const handlePrimaryAction = (action: PrimaryRailAction) => {
     if (action === 'toggle-sidebar-panel') {
       setIsSidebarPanelOpen(open => !open);
+      return;
+    }
+
+    if (action === 'open-search') {
+      setActiveExplorerNodeId(RECENT_RECORDS_NODE_ID);
+      setWorkspaceView('records');
     }
   };
 
   const handleExplorerNodeSelect = useCallback((node: ExplorerNode) => {
+    if (node.view === 'records') {
+      setActiveExplorerNodeId(node.id);
+      setWorkspaceView('records');
+      return;
+    }
+
     if (!node.source) {
       return;
     }
 
     setActiveExplorerNodeId(node.id);
     setAssetSource(node.source);
+    setWorkspaceView('references');
   }, []);
 
   const handleCreateExplorerFolder = useCallback(
@@ -746,11 +762,18 @@ export function LibraryPage() {
         ) : null}
 
         <main className="app-workspace library-page__workspace library-page__main-container">
-          <ReferencesView
-            source={assetSource}
-            refreshKey={workspaceRefreshKey}
-            onExplorerRefresh={loadExplorerSnapshot}
-          />
+          {workspaceView === 'records' ? (
+            <RecordsView
+              refreshKey={workspaceRefreshKey}
+              onExplorerRefresh={loadExplorerSnapshot}
+            />
+          ) : (
+            <ReferencesView
+              source={assetSource}
+              refreshKey={workspaceRefreshKey}
+              onExplorerRefresh={loadExplorerSnapshot}
+            />
+          )}
         </main>
       </div>
 

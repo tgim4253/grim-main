@@ -6,6 +6,9 @@ export type ConnectedImageItem = {
   id: string;
   tone: ConnectedImageTone;
   active?: boolean;
+  title?: string;
+  imageSrc?: string | null;
+  thumbnailSrc?: string | null;
 };
 
 export type ReferenceFolderItem = {

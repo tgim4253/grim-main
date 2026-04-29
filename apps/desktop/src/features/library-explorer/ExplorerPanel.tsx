@@ -91,7 +91,7 @@ export function ExplorerPanel({
     (node: ExplorerNode) => {
       setFocusedNodeId(node.id);
 
-      if (node.source) {
+      if (node.source || node.view) {
         onNodeSelect(node);
       }
 

@@ -1,5 +1,5 @@
 import { Icon } from '../../../shared/ui/icon/Icon';
-import { IconButton } from '../../../shared/ui/icon-button/IconButton';
+import { PreviewPanel } from '../../../shared/ui/preview-panel/PreviewPanel';
 import { ImagePlaceholder } from '../common/ImagePlaceholder';
 import type { ConnectedImageItem, ReferenceAsset, ReferenceFolderItem } from './types';
 
@@ -90,15 +90,22 @@ function ConnectedImageThumb({
     );
   }
 
+  const imageSrc = image.thumbnailSrc ?? image.imageSrc;
+
   return (
     <div
       data-active={image.active ? 'true' : undefined}
       className="asset-preview-panel__related-thumb"
+      title={image.title}
     >
-      <ImagePlaceholder
-        state={image.active ? 'active' : 'default'}
-        className="asset-preview-panel__related-image"
-      />
+      {imageSrc ? (
+        <img src={imageSrc} alt="" draggable={false} className="asset-preview-panel__related-img" />
+      ) : (
+        <ImagePlaceholder
+          state={image.active ? 'active' : 'default'}
+          className="asset-preview-panel__related-image"
+        />
+      )}
     </div>
   );
 }
@@ -115,92 +122,84 @@ export function AssetPreviewPanel({
   const folderItems = asset.folderItems ?? asset.folders.map(path => ({ id: path, path }));
 
   return (
-    <aside className="asset-preview-panel" aria-label="Asset preview">
-      <header className="asset-preview-panel__header">
-        <h2>Asset Preview</h2>
-        <IconButton icon="close" size="sm" aria-label="Close asset preview" onClick={onClose} />
-      </header>
+    <PreviewPanel
+      title="Asset Preview"
+      ariaLabel="Asset preview"
+      className="asset-preview-panel"
+      onClose={onClose}
+    >
+      <div className="asset-preview-panel__preview-frame">
+        {previewSrc ? (
+          <img
+            src={previewSrc}
+            alt={asset.title}
+            className="asset-preview-panel__preview-image asset-preview-panel__preview-asset-image"
+            draggable={false}
+          />
+        ) : (
+          <ImagePlaceholder ratio={asset.ratio} className="asset-preview-panel__preview-image" />
+        )}
+      </div>
 
-      <div className="asset-preview-panel__content">
-        <div className="asset-preview-panel__preview-frame">
-          {previewSrc ? (
-            <img
-              src={previewSrc}
-              alt={asset.title}
-              className="asset-preview-panel__preview-image asset-preview-panel__preview-asset-image"
-              draggable={false}
-            />
-          ) : (
-            <ImagePlaceholder ratio={asset.ratio} className="asset-preview-panel__preview-image" />
-          )}
-        </div>
+      <div className="asset-preview-panel__sections">
+        <section className="asset-preview-panel__section">
+          <PreviewSectionHeading>Metadata</PreviewSectionHeading>
+          <dl className="asset-preview-panel__metadata-grid">
+            <PreviewMetadataField label="Resolution" value={asset.metadata.resolution} />
+            <PreviewMetadataField label="Added" value={asset.metadata.addedAt} />
+            <PreviewMetadataField label="Last Croquis Date" value={asset.metadata.lastCroquisAt} />
+          </dl>
+        </section>
 
-        <div className="asset-preview-panel__sections">
-          <section className="asset-preview-panel__section">
-            <PreviewSectionHeading>Metadata</PreviewSectionHeading>
-            <dl className="asset-preview-panel__metadata-grid">
-              <PreviewMetadataField label="Resolution" value={asset.metadata.resolution} />
-              <PreviewMetadataField label="Added" value={asset.metadata.addedAt} />
-              <PreviewMetadataField
-                label="Last Croquis Date"
-                value={asset.metadata.lastCroquisAt}
-              />
-            </dl>
-          </section>
-
-          <section className="asset-preview-panel__section">
-            <PreviewSectionHeading>Folders</PreviewSectionHeading>
-            <div className="asset-preview-panel__folder-list">
-              {folderItems.length > 0 ? (
-                folderItems.map(folder => (
-                  <FolderPathRow
-                    key={folder.id}
-                    folder={folder}
-                    busy={busy}
-                    onRemove={folderId => {
-                      onRemoveFolder?.(asset.id, folderId);
-                    }}
-                  />
-                ))
-              ) : (
+        <section className="asset-preview-panel__section">
+          <PreviewSectionHeading>Folders</PreviewSectionHeading>
+          <div className="asset-preview-panel__folder-list">
+            {folderItems.length > 0 ? (
+              folderItems.map(folder => (
                 <FolderPathRow
-                  folder={{ id: 'unassigned', path: 'Unassigned' }}
-                  removable={false}
-                />
-              )}
-              <button
-                type="button"
-                className="asset-preview-panel__add-folder"
-                disabled={busy}
-                onClick={() => {
-                  onAddFolder?.(asset.id);
-                }}
-              >
-                + Add Folder
-              </button>
-            </div>
-          </section>
-
-          <section className="asset-preview-panel__section asset-preview-panel__section--related">
-            <div className="asset-preview-panel__related-header">
-              <h3>{asset.croquisResult.label}</h3>
-              <span>{asset.croquisResult.status}</span>
-            </div>
-            <div className="asset-preview-panel__related-row">
-              {asset.croquisResult.connectedImages.map(image => (
-                <ConnectedImageThumb
-                  key={image.id}
-                  image={image}
+                  key={folder.id}
+                  folder={folder}
                   busy={busy}
-                  onAdd={() => {
-                    onStartCroquis?.(asset.id);
+                  onRemove={folderId => {
+                    onRemoveFolder?.(asset.id, folderId);
                   }}
                 />
-              ))}
-            </div>
-          </section>
-        </div>
+              ))
+            ) : (
+              <FolderPathRow folder={{ id: 'unassigned', path: 'Unassigned' }} removable={false} />
+            )}
+            <button
+              type="button"
+              className="asset-preview-panel__add-folder"
+              disabled={busy}
+              onClick={() => {
+                onAddFolder?.(asset.id);
+              }}
+            >
+              + Add Folder
+            </button>
+          </div>
+        </section>
+
+        <section className="asset-preview-panel__section asset-preview-panel__section--related">
+          <div className="asset-preview-panel__related-header">
+            <h3>{asset.croquisResult.label}</h3>
+            <span>{asset.croquisResult.status}</span>
+          </div>
+          <div className="asset-preview-panel__related-row">
+            {asset.croquisResult.connectedImages.map(image => (
+              <ConnectedImageThumb
+                key={image.id}
+                image={image}
+                busy={busy}
+                onAdd={() => {
+                  onStartCroquis?.(asset.id);
+                }}
+              />
+            ))}
+          </div>
+        </section>
       </div>
-    </aside>
+    </PreviewPanel>
   );
 }

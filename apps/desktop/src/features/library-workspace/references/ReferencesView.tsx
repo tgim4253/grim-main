@@ -6,6 +6,8 @@ import type {
   AssetListSource,
   AssetSummary,
   BatchUpdateAssetFoldersMode,
+  CroquisRecordDetail,
+  CroquisRecordSummary,
   ExplorerSnapshot,
   LibrarySettings,
   SessionPreset,
@@ -60,6 +62,21 @@ function getSelectableFolders(snapshot: ExplorerSnapshot) {
   });
 }
 
+function createRelatedRecordDetailMap(
+  records: readonly CroquisRecordSummary[],
+  results: readonly PromiseSettledResult<CroquisRecordDetail>[],
+) {
+  const detailsById = new Map<string, CroquisRecordDetail>();
+
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') {
+      detailsById.set(records[index].id, result.value);
+    }
+  });
+
+  return detailsById;
+}
+
 function ReferenceGridState({ title, description, action }: ReferenceGridStateProps) {
   return (
     <div className="masonry-grid__empty">
@@ -79,6 +96,9 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [selectedAssetDetail, setSelectedAssetDetail] = useState<AssetDetail | null>(null);
+  const [relatedRecordDetailsById, setRelatedRecordDetailsById] = useState(
+    () => new Map<string, CroquisRecordDetail>(),
+  );
   const [previewOpen, setPreviewOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +117,7 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
   const [assetActionBusy, setAssetActionBusy] = useState(false);
   const [assetActionError, setAssetActionError] = useState<string | null>(null);
   const loadSequenceRef = useRef(0);
+  const selectedAssetDetailLoadSequenceRef = useRef(0);
   const croquisConfigLoadSequenceRef = useRef(0);
   const folderActionLoadSequenceRef = useRef(0);
 
@@ -146,23 +167,43 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
   }, [assets]);
 
   useEffect(() => {
+    const detailLoadSequence = selectedAssetDetailLoadSequenceRef.current + 1;
+    selectedAssetDetailLoadSequenceRef.current = detailLoadSequence;
+    const isCurrentDetailLoad = () =>
+      selectedAssetDetailLoadSequenceRef.current === detailLoadSequence;
+
     if (!selectedAssetId) {
       setSelectedAssetDetail(null);
+      setRelatedRecordDetailsById(new Map());
       setPreviewOpen(false);
       return;
     }
 
-    let cancelled = false;
-
     const loadDetail = async () => {
       try {
         const detail = await ipc.asset.getDetail(selectedAssetId);
-        if (!cancelled) {
-          setSelectedAssetDetail(detail);
+        if (!isCurrentDetailLoad()) {
+          return;
         }
+
+        setSelectedAssetDetail(detail);
+        setRelatedRecordDetailsById(new Map());
+
+        const detailResults = await Promise.allSettled(
+          detail.relatedRecords.map(record => ipc.record.getDetail(record.id)),
+        );
+
+        if (!isCurrentDetailLoad()) {
+          return;
+        }
+
+        setRelatedRecordDetailsById(
+          createRelatedRecordDetailMap(detail.relatedRecords, detailResults),
+        );
       } catch {
-        if (!cancelled) {
+        if (isCurrentDetailLoad()) {
           setSelectedAssetDetail(null);
+          setRelatedRecordDetailsById(new Map());
         }
       }
     };
@@ -170,7 +211,7 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
     void loadDetail();
 
     return () => {
-      cancelled = true;
+      selectedAssetDetailLoadSequenceRef.current += 1;
     };
   }, [selectedAssetId]);
 
@@ -180,9 +221,10 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
         createReferenceAsset(
           asset,
           selectedAssetDetail?.id === asset.id ? selectedAssetDetail : undefined,
+          selectedAssetDetail?.id === asset.id ? relatedRecordDetailsById : undefined,
         ),
       ),
-    [assets, selectedAssetDetail],
+    [assets, relatedRecordDetailsById, selectedAssetDetail],
   );
 
   const gridEmptyState = isLoading ? (
