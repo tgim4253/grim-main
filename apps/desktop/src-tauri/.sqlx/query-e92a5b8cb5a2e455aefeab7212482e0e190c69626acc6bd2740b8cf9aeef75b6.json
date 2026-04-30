@@ -1,0 +1,104 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT ssp.id,\n                   ssp.preset_id,\n                   ssp.time_step_preset_id,\n                   ssp.step_order,\n                   ssp.name,\n                   ssp.default_duration_seconds,\n                   ssp.result_required AS \"result_required: bool\",\n                   ssp.result_external_path,\n                   t.id AS tag_id,\n                   t.group_id,\n                   t.name AS tag_name,\n                   t.color,\n                   t.sort_order,\n                   t.created_at AS tag_created_at,\n                   t.updated_at AS tag_updated_at\n            FROM session_step_preset ssp\n            LEFT JOIN session_step_preset_tag sspt ON sspt.step_preset_id = ssp.id\n            LEFT JOIN tag t ON t.id = sspt.tag_id\n            ORDER BY ssp.preset_id ASC, ssp.step_order ASC, t.name ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "preset_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "time_step_preset_id",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "step_order",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "name",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "default_duration_seconds",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "result_required: bool",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "result_external_path",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "tag_id",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "group_id",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "tag_name",
+        "ordinal": 10,
+        "type_info": "Text"
+      },
+      {
+        "name": "color",
+        "ordinal": 11,
+        "type_info": "Text"
+      },
+      {
+        "name": "sort_order",
+        "ordinal": 12,
+        "type_info": "Integer"
+      },
+      {
+        "name": "tag_created_at",
+        "ordinal": 13,
+        "type_info": "Text"
+      },
+      {
+        "name": "tag_updated_at",
+        "ordinal": 14,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "e92a5b8cb5a2e455aefeab7212482e0e190c69626acc6bd2740b8cf9aeef75b6"
+}

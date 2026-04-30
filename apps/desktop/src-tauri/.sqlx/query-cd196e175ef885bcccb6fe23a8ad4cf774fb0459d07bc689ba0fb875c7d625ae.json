@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO session_step_preset\n            (id, preset_id, time_step_preset_id, step_order, name, default_duration_seconds, result_required, result_external_path, created_at, updated_at)\n            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "cd196e175ef885bcccb6fe23a8ad4cf774fb0459d07bc689ba0fb875c7d625ae"
+}

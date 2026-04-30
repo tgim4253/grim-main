@@ -11,6 +11,7 @@ import type {
   ExplorerSnapshot,
   LibrarySettings,
   SessionPreset,
+  TimeStepPreset,
   VirtualFolder,
 } from '../../../shared/types';
 import { Button } from '../../../shared/ui';
@@ -105,6 +106,7 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
   const [croquisModalOpen, setCroquisModalOpen] = useState(false);
   const [croquisAssetIds, setCroquisAssetIds] = useState<string[]>([]);
   const [sessionPresets, setSessionPresets] = useState<SessionPreset[]>([]);
+  const [timeStepPresets, setTimeStepPresets] = useState<TimeStepPreset[]>([]);
   const [librarySettings, setLibrarySettings] = useState<LibrarySettings>({});
   const [isCroquisConfigLoading, setIsCroquisConfigLoading] = useState(false);
   const [croquisConfigError, setCroquisConfigError] = useState<string | null>(null);
@@ -266,8 +268,9 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
     setCroquisConfigError(null);
 
     try {
-      const [nextPresets, nextSettings] = await Promise.all([
+      const [nextPresets, nextTimeStepPresets, nextSettings] = await Promise.all([
         ipc.session.listPresets(),
+        ipc.session.listTimeStepPresets(),
         ipc.library.loadSettingsSnapshot(),
       ]);
 
@@ -276,6 +279,7 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
       }
 
       setSessionPresets(nextPresets);
+      setTimeStepPresets(nextTimeStepPresets);
       setLibrarySettings(nextSettings);
       return true;
     } catch (nextError) {
@@ -284,6 +288,7 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
       }
 
       setSessionPresets([]);
+      setTimeStepPresets([]);
       setCroquisConfigError(
         getErrorMessage(nextError, 'Failed to load Croquis session configuration.'),
       );
@@ -575,6 +580,7 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
         open={croquisModalOpen}
         assetIds={croquisAssetIds}
         sessionPresets={sessionPresets}
+        timeStepPresets={timeStepPresets}
         librarySettings={librarySettings}
         onClose={handleCloseCroquisModal}
         onStarted={handleCroquisStarted}

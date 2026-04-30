@@ -170,6 +170,37 @@ impl TagRepository {
 
     pub async fn delete_tag(&self, payload: DeleteTagPayload) -> Result<()> {
         let tag_id = payload.tag_id.as_str();
+        let record_usage = sqlx::query!(
+            r#"
+            SELECT COUNT(*) AS "count!: i64"
+            FROM croquis_record_tag
+            WHERE tag_id = ?1
+            "#,
+            tag_id
+        )
+        .fetch_one(&self.pool)
+        .await?
+        .count;
+        let step_usage = sqlx::query!(
+            r#"
+            SELECT COUNT(*) AS "count!: i64"
+            FROM session_step_preset_tag
+            WHERE tag_id = ?1
+            "#,
+            tag_id
+        )
+        .fetch_one(&self.pool)
+        .await?
+        .count;
+
+        if record_usage > 0 || step_usage > 0 {
+            bail!(
+                "Cannot delete tag because it is used by {} records and {} session steps.",
+                record_usage,
+                step_usage
+            );
+        }
+
         sqlx::query!("DELETE FROM tag WHERE id = ?1", tag_id)
             .execute(&self.pool)
             .await?;
@@ -282,5 +313,106 @@ impl TagRepository {
         }
 
         Ok(tags)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{env, fs, path::PathBuf};
+
+    use crate::state::bootstrap::{
+        ensure_schema, open_or_create_db, seed_defaults,
+    };
+
+    use super::*;
+
+    fn make_temp_dir(name: &str) -> PathBuf {
+        let dir = env::temp_dir()
+            .join(format!("grim-tag-repository-{name}-{}", get_unique_id()));
+        fs::create_dir_all(&dir).expect("failed to create temp dir");
+        dir
+    }
+
+    #[tokio::test]
+    async fn delete_tag_rejects_record_and_session_step_usage() {
+        let dir = make_temp_dir("delete-usage");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let tag_id = sqlx::query!(
+            r#"
+            SELECT t.id
+            FROM tag t
+            INNER JOIN tag_group tg ON tg.id = t.group_id
+            WHERE tg.name = 'Purpose'
+              AND t.name = 'Pose'
+            "#
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("failed to load tag")
+        .id;
+        let tag_id_ref = tag_id.as_str();
+
+        sqlx::query!(
+            r#"
+            INSERT INTO croquis_record
+            (id, title, created_at, updated_at)
+            VALUES ('record-tag-usage', 'Record tag usage', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')
+            "#
+        )
+        .execute(&pool)
+        .await
+        .expect("failed to insert record");
+
+        sqlx::query!(
+            r#"
+            INSERT INTO croquis_record_tag (record_id, tag_id, created_at)
+            VALUES ('record-tag-usage', ?1, '2026-01-01T00:00:00Z')
+            "#,
+            tag_id_ref
+        )
+        .execute(&pool)
+        .await
+        .expect("failed to link record tag");
+
+        sqlx::query!(
+            r#"
+            INSERT INTO session_step_preset_tag (step_preset_id, tag_id, created_at)
+            SELECT ssp.id, ?1, '2026-01-01T00:00:00Z'
+            FROM session_step_preset ssp
+            ORDER BY ssp.step_order ASC
+            LIMIT 1
+            "#,
+            tag_id_ref
+        )
+        .execute(&pool)
+        .await
+        .expect("failed to link session step tag");
+
+        let result = TagRepository::new(pool.clone())
+            .delete_tag(DeleteTagPayload { tag_id: tag_id.clone() })
+            .await;
+
+        assert!(result.is_err());
+
+        let tag_row = sqlx::query!(
+            r#"
+            SELECT COUNT(*) AS "count!: i64"
+            FROM tag
+            WHERE id = ?1
+            "#,
+            tag_id_ref
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("failed to count tag");
+
+        assert_eq!(tag_row.count, 1);
+
+        let _ = fs::remove_dir_all(dir);
     }
 }

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO tag_group\n            (id, name, sort_order, created_at, updated_at)\n            VALUES ('existing-purpose-group', 'Purpose', 999, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "28e8fa9db19d36810178906e1ab09bfa99edb0361b0237169f0950a1388e40cc"
+}

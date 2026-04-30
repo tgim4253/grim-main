@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM time_step_preset_tag WHERE time_step_preset_id = ?1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "23f7104f4452ae8e0c173dc3d5b9c5f6a1eb9b099a404bd2c714286d1c9ba791"
+}

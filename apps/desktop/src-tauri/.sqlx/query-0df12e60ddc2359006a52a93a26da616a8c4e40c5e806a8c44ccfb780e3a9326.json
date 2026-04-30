@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE session_step_preset SET time_step_preset_id = NULL WHERE time_step_preset_id = ?1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "0df12e60ddc2359006a52a93a26da616a8c4e40c5e806a8c44ccfb780e3a9326"
+}

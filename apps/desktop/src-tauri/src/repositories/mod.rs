@@ -14,6 +14,7 @@ pub use folder_repository::FolderRepository;
 pub use record_repository::RecordRepository;
 pub use session_repository::{
     SaveSessionPresetStepInput, SessionRepository, UpsertSessionPresetInput,
+    UpsertTimeStepPresetInput,
 };
 pub use settings_repository::SettingsRepository;
 pub use tag_repository::TagRepository;

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO session_step_preset_tag (step_preset_id, tag_id, created_at)\n            SELECT ssp.id, ?1, '2026-01-01T00:00:00Z'\n            FROM session_step_preset ssp\n            ORDER BY ssp.step_order ASC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "6a525d6c3af4e4874419f31b3d1c81af78c537a64d49938623166f54d3cfa3f2"
+}

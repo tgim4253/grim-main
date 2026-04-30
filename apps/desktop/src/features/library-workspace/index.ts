@@ -2,6 +2,8 @@ export { LibraryWorkspace } from './common/LibraryWorkspace';
 export { ReferencesDummyView } from './references/ReferencesDummyView';
 export { ReferencesView } from './references/ReferencesView';
 export { RecordsView } from './records/RecordsView';
+export { SessionPresetSettingsView } from './session-presets';
+export { TagSettingsView } from './tags';
 export type {
   ImagePlaceholderState,
   LibraryWorkspaceHeaderProps,

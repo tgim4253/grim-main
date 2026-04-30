@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO time_step_preset\n                (id, name, default_duration_seconds, result_required, result_external_path, created_at, updated_at)\n                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "81200d1f250910ac5bdbc0ca9210ee749927ab697d14b1cdfa7ad5332981f553"
+}

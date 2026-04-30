@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO time_step_preset_tag (time_step_preset_id, tag_id, created_at) VALUES (?1, ?2, ?3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "4931419d730e7d9532f27c3f1fd1cb82499dd82948462a6b946d803319f51fc9"
+}

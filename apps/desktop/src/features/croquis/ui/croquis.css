@@ -41,6 +41,14 @@
     text-transform: uppercase;
   }
 
+  .croquis-start-modal__pipeline-actions {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: var(--semantic-spacing-component-xs);
+    min-width: 0;
+  }
+
   .croquis-start-modal__accordion {
     background: var(--components-croquis-step-list-overlay);
   }
@@ -61,6 +69,34 @@
   .croquis-start-modal__accordion .c-accordion-item__title {
     font-size: var(--type-text-sm-size);
     line-height: var(--type-text-sm-line-height);
+  }
+
+  .croquis-start-modal__step-panel {
+    gap: var(--semantic-spacing-component-lg);
+  }
+
+  .croquis-start-modal__step-actions {
+    display: flex;
+    justify-content: flex-end;
+    min-width: 0;
+    padding-top: var(--semantic-spacing-component-sm);
+    border-top: 1px solid var(--semantic-colors-border-primary);
+  }
+
+  .croquis-start-modal__pipeline-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 96px;
+    padding: var(--semantic-spacing-component-xl);
+    border: 1px solid var(--semantic-colors-border-primary);
+    background: var(--components-croquis-step-list-overlay);
+    color: var(--semantic-colors-text-secondary);
+    font-family: var(--components-typography-control-label-font-family);
+    font-size: var(--components-typography-control-label-font-size);
+    font-weight: var(--components-typography-control-supporting-font-weight);
+    line-height: var(--components-typography-control-label-line-height);
+    text-align: center;
   }
 
   .croquis-start-modal__step-body {

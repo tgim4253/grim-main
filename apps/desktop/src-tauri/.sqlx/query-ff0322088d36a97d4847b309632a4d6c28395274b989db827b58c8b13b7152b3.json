@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                UPDATE time_step_preset\n                SET name = ?2,\n                    default_duration_seconds = ?3,\n                    result_required = ?4,\n                    result_external_path = ?5,\n                    updated_at = ?6\n                WHERE id = ?1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "ff0322088d36a97d4847b309632a4d6c28395274b989db827b58c8b13b7152b3"
+}

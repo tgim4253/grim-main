@@ -211,11 +211,13 @@ export interface UpdateCroquisRecordTagsPayload {
 
 export interface SessionStepPreset {
   id: string;
+  timeStepPresetId?: string | null;
   stepOrder: number;
   name: string;
   defaultDurationSeconds?: number | null;
   autoTags: Tag[];
   resultRequired: boolean;
+  resultExternalPath?: string | null;
 }
 
 export interface SessionPreset {
@@ -230,11 +232,13 @@ export interface SessionPreset {
 
 export interface SessionPresetStepDraft {
   id?: string | null;
+  timeStepPresetId?: string | null;
   name: string;
   stepOrder: number;
   defaultDurationSeconds?: number | null;
   autoTagNames: string[];
   resultRequired: boolean;
+  resultExternalPath?: string | null;
 }
 
 export interface SaveSessionPresetPayload {
@@ -246,6 +250,30 @@ export interface SaveSessionPresetPayload {
 }
 
 export interface DeleteSessionPresetPayload {
+  presetId: string;
+}
+
+export interface TimeStepPreset {
+  id: string;
+  name: string;
+  defaultDurationSeconds?: number | null;
+  autoTags: Tag[];
+  resultRequired: boolean;
+  resultExternalPath?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaveTimeStepPresetPayload {
+  id?: string | null;
+  name: string;
+  defaultDurationSeconds?: number | null;
+  autoTagNames: string[];
+  resultRequired: boolean;
+  resultExternalPath?: string | null;
+}
+
+export interface DeleteTimeStepPresetPayload {
   presetId: string;
 }
 

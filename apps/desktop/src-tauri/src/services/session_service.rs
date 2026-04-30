@@ -2,11 +2,13 @@ use anyhow::{anyhow, Result};
 
 use crate::{
     models::session::{
-        DeleteSessionPresetPayload, SaveSessionPresetPayload, SessionPreset,
+        DeleteSessionPresetPayload, DeleteTimeStepPresetPayload,
+        SaveSessionPresetPayload, SaveTimeStepPresetPayload, SessionPreset,
+        TimeStepPreset,
     },
     repositories::{
         SaveSessionPresetStepInput, SessionRepository, SettingsRepository,
-        TagRepository, UpsertSessionPresetInput,
+        TagRepository, UpsertSessionPresetInput, UpsertTimeStepPresetInput,
     },
     utils::{date::get_now_date, identifier::get_unique_id},
 };
@@ -29,6 +31,10 @@ impl SessionService {
 
     pub async fn list_session_presets(&self) -> Result<Vec<SessionPreset>> {
         self.session_repository.list_presets().await
+    }
+
+    pub async fn list_time_step_presets(&self) -> Result<Vec<TimeStepPreset>> {
+        self.session_repository.list_time_step_presets().await
     }
 
     pub async fn save_session_preset(
@@ -78,6 +84,9 @@ impl SessionService {
                     &SaveSessionPresetStepInput {
                         id: &step_id,
                         preset_id: &preset_id,
+                        time_step_preset_id: step
+                            .time_step_preset_id
+                            .as_deref(),
                         step_order: step.step_order,
                         name: &step.name,
                         default_duration_seconds: step.default_duration_seconds,
@@ -120,6 +129,59 @@ impl SessionService {
 
         tx.commit().await?;
         self.session_repository.list_presets().await
+    }
+
+    pub async fn save_time_step_preset(
+        &self,
+        payload: SaveTimeStepPresetPayload,
+    ) -> Result<Vec<TimeStepPreset>> {
+        let now = get_now_date();
+        let preset_id = payload.id.clone().unwrap_or_else(get_unique_id);
+        let mut tx = self.session_repository.begin().await?;
+        let tags = self
+            .tag_repository
+            .ensure_tags_by_names_in_tx(&mut tx, &payload.auto_tag_names)
+            .await?;
+
+        self.session_repository
+            .upsert_time_step_preset_in_tx(
+                &mut tx,
+                &UpsertTimeStepPresetInput {
+                    id: &preset_id,
+                    name: &payload.name,
+                    default_duration_seconds: payload.default_duration_seconds,
+                    result_required: payload.result_required,
+                    result_external_path: payload
+                        .result_external_path
+                        .as_deref(),
+                    timestamp: &now,
+                    is_update: payload.id.is_some(),
+                },
+            )
+            .await?;
+        self.session_repository
+            .replace_time_step_preset_tags_in_tx(
+                &mut tx,
+                &preset_id,
+                &tags.iter().map(|tag| tag.id.clone()).collect::<Vec<_>>(),
+                &now,
+            )
+            .await?;
+
+        tx.commit().await?;
+        self.session_repository.list_time_step_presets().await
+    }
+
+    pub async fn delete_time_step_preset(
+        &self,
+        payload: DeleteTimeStepPresetPayload,
+    ) -> Result<Vec<TimeStepPreset>> {
+        let mut tx = self.session_repository.begin().await?;
+        self.session_repository
+            .delete_time_step_preset_in_tx(&mut tx, &payload.preset_id)
+            .await?;
+        tx.commit().await?;
+        self.session_repository.list_time_step_presets().await
     }
 
     pub async fn delete_session_preset(
@@ -256,6 +318,7 @@ mod tests {
                 .iter()
                 .map(|step| SessionPresetStepDraft {
                     id: Some(step.id.clone()),
+                    time_step_preset_id: step.time_step_preset_id.clone(),
                     name: step.name.clone(),
                     step_order: step.step_order,
                     default_duration_seconds: step.default_duration_seconds,
