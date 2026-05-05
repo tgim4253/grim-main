@@ -14,8 +14,6 @@ pub(crate) mod library_storage;
 pub(crate) mod record_service;
 #[path = "session_service.rs"]
 pub(crate) mod session_service;
-#[path = "settings_service.rs"]
-pub(crate) mod settings_service;
 #[path = "tag_service.rs"]
 pub(crate) mod tag_service;
 
@@ -27,5 +25,4 @@ pub use library_service::LibraryService;
 pub use library_storage::LibraryStorage;
 pub use record_service::RecordService;
 pub use session_service::SessionService;
-pub use settings_service::SettingsService;
 pub use tag_service::TagService;

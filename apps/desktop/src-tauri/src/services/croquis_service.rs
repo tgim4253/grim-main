@@ -7,10 +7,10 @@ use tokio::sync::RwLock;
 use crate::{
     app_launcher,
     models::croquis::{
-        CroquisPreferences, CroquisSession, CroquisSessionItem,
+        CroquisRuntimeStep, CroquisSession, CroquisSessionItem,
         CroquisStartPayload, CroquisStartResponse,
     },
-    services::{AssetService, LibraryStorage, SettingsService},
+    services::{AssetService, LibraryStorage},
     utils::{date::get_now_date, identifier::get_unique_id, media},
 };
 
@@ -29,24 +29,27 @@ struct PreparedCroquisItem {
     step_name: String,
     step_index: i64,
     target_duration_seconds: Option<i64>,
+    auto_advance: bool,
+    record_save_enabled: bool,
+    capture_enabled: bool,
+    grayscale_enabled: bool,
     result_required: bool,
+    result_save_path: Option<String>,
     tag_ids: Vec<String>,
 }
 
 #[derive(Clone)]
 pub struct CroquisService {
     asset_service: AssetService,
-    settings_service: SettingsService,
     library_storage: LibraryStorage,
 }
 
 impl CroquisService {
     pub fn new(
         asset_service: AssetService,
-        settings_service: SettingsService,
         library_storage: LibraryStorage,
     ) -> Self {
-        Self { asset_service, settings_service, library_storage }
+        Self { asset_service, library_storage }
     }
 
     pub async fn start_session(
@@ -64,20 +67,6 @@ impl CroquisService {
         take_session(session_id).await
     }
 
-    pub async fn load_preferences(&self) -> Result<Option<CroquisPreferences>> {
-        Ok(self.settings_service.load_settings().await?.croquis_preferences)
-    }
-
-    pub async fn save_preferences(
-        &self,
-        preferences: &CroquisPreferences,
-    ) -> Result<CroquisPreferences> {
-        let mut settings = self.settings_service.load_settings().await?;
-        settings.croquis_preferences = Some(preferences.clone());
-        let saved = self.settings_service.save_settings(settings).await?;
-        Ok(saved.croquis_preferences.unwrap_or_else(|| preferences.clone()))
-    }
-
     async fn start_session_inner(
         &self,
         app_handle: &tauri::AppHandle,
@@ -85,30 +74,62 @@ impl CroquisService {
     ) -> Result<CroquisStartResponse> {
         let CroquisStartPayload {
             asset_ids,
-            preset,
-            option,
-            save_option,
-            preferences,
+            preset_id,
+            preset_name,
+            window_width,
+            window_height,
+            is_shuffle,
+            steps,
         } = payload;
 
+        let items = self.prepare_session_items(&asset_ids, &steps).await?;
+        let session_title = build_session_title(&preset_name);
+        let session_id = get_unique_id();
+
+        let session = CroquisSession {
+            session_id: session_id.clone(),
+            title: session_title,
+            preset_id,
+            preset_name,
+            window_width,
+            window_height,
+            is_shuffle,
+            items,
+            created_at: get_now_date(),
+        };
+
+        {
+            let mut sessions = CROQUIS_SESSIONS.write().await;
+            sessions.insert(session_id.clone(), session.clone());
+        }
+
+        let window_label =
+            match app_launcher::croquis::launch_croquis(app_handle, &session) {
+                Ok(window_label) => window_label,
+                Err(error) => {
+                    let mut sessions = CROQUIS_SESSIONS.write().await;
+                    sessions.remove(&session_id);
+                    return Err(anyhow::Error::msg(error));
+                }
+            };
+
+        Ok(CroquisStartResponse { session_id, window_label })
+    }
+
+    async fn prepare_session_items(
+        &self,
+        asset_ids: &[String],
+        steps: &[CroquisRuntimeStep],
+    ) -> Result<Vec<CroquisSessionItem>> {
         if asset_ids.is_empty() {
             bail!("At least one asset must be selected to start Croquis");
         }
 
-        if preset.steps.is_empty() {
+        if steps.is_empty() {
             bail!("Selected session preset does not have any steps");
         }
 
-        if save_option {
-            let mut settings = self.settings_service.load_settings().await?;
-            settings.active_session_preset_id = Some(preset.id.clone());
-            if let Some(next_preferences) = preferences.clone() {
-                settings.croquis_preferences = Some(next_preferences);
-            }
-            let _ = self.settings_service.save_settings(settings).await?;
-        }
-
-        let assets = self.asset_service.load_assets_by_ids(&asset_ids).await?;
+        let assets = self.asset_service.load_assets_by_ids(asset_ids).await?;
         let mut prepared_items = Vec::new();
         for asset in &assets {
             let source_path = self
@@ -126,7 +147,7 @@ impl CroquisService {
             let (thumb_width, thumb_height) =
                 media::ensure_thumbnail(&source_path, &thumb_path).await?;
 
-            for step in &preset.steps {
+            for step in steps {
                 prepared_items.push(PreparedCroquisItem {
                     asset_id: asset.id.clone(),
                     file_name: asset.file_name.clone(),
@@ -138,12 +159,13 @@ impl CroquisService {
                     step_name: step.name.clone(),
                     step_index: step.step_order,
                     target_duration_seconds: step.default_duration_seconds,
+                    auto_advance: step.auto_advance,
+                    record_save_enabled: step.record_save_enabled,
+                    capture_enabled: step.capture_enabled,
+                    grayscale_enabled: step.grayscale_enabled,
                     result_required: step.result_required,
-                    tag_ids: step
-                        .auto_tags
-                        .iter()
-                        .map(|tag| tag.id.clone())
-                        .collect(),
+                    result_save_path: step.result_save_path.clone(),
+                    tag_ids: step.tag_ids.clone(),
                 });
             }
         }
@@ -153,9 +175,6 @@ impl CroquisService {
                 "No valid image assets were available for this Croquis session"
             );
         }
-
-        let session_title = build_session_title(&preset.name);
-        let session_id = get_unique_id();
 
         let mut items = Vec::with_capacity(prepared_items.len());
         for prepared_item in prepared_items {
@@ -178,35 +197,16 @@ impl CroquisService {
                 step_name: prepared_item.step_name,
                 step_index: prepared_item.step_index,
                 target_duration_seconds: prepared_item.target_duration_seconds,
+                auto_advance: prepared_item.auto_advance,
+                record_save_enabled: prepared_item.record_save_enabled,
+                capture_enabled: prepared_item.capture_enabled,
+                grayscale_enabled: prepared_item.grayscale_enabled,
                 result_required: prepared_item.result_required,
+                result_save_path: prepared_item.result_save_path,
             });
         }
 
-        let session = CroquisSession {
-            session_id: session_id.clone(),
-            title: session_title,
-            option,
-            preset,
-            items,
-            created_at: get_now_date(),
-        };
-
-        {
-            let mut sessions = CROQUIS_SESSIONS.write().await;
-            sessions.insert(session_id.clone(), session.clone());
-        }
-
-        let window_label =
-            match app_launcher::croquis::launch_croquis(app_handle, &session) {
-                Ok(window_label) => window_label,
-                Err(error) => {
-                    let mut sessions = CROQUIS_SESSIONS.write().await;
-                    sessions.remove(&session_id);
-                    return Err(anyhow::Error::msg(error));
-                }
-            };
-
-        Ok(CroquisStartResponse { session_id, window_label })
+        Ok(items)
     }
 }
 
@@ -222,8 +222,6 @@ pub async fn take_session(session_id: &str) -> Option<CroquisSession> {
 
 #[cfg(test)]
 mod tests {
-    use crate::models::{croquis::CroquisOption, session::SessionPreset};
-
     use super::{take_session, CroquisSession, CROQUIS_SESSIONS};
 
     #[tokio::test]
@@ -231,8 +229,11 @@ mod tests {
         let session = CroquisSession {
             session_id: "session-1".to_string(),
             title: "Test Session".to_string(),
-            option: CroquisOption::default(),
-            preset: SessionPreset::default(),
+            preset_id: "preset-1".to_string(),
+            preset_name: "Preset".to_string(),
+            window_width: Some("960".to_string()),
+            window_height: None,
+            is_shuffle: false,
             items: Vec::new(),
             created_at: "2026-04-11T00:00:00Z".to_string(),
         };

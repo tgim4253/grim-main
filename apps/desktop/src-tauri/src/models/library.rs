@@ -4,7 +4,6 @@ use crate::models::{
     folder::VirtualFolder,
     record::CroquisRecordSummary,
     session::SessionPreset,
-    settings::LibrarySettings,
     tag::{Tag, TagGroup},
 };
 
@@ -33,7 +32,6 @@ pub struct ExplorerSnapshot {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct LibrarySnapshot {
-    pub settings: LibrarySettings,
     pub explorer: ExplorerSnapshot,
     #[serde(default)]
     pub session_presets: Vec<SessionPreset>,

@@ -73,11 +73,25 @@ pub(crate) struct CroquisRecordDetailRow {
     pub updated_at: String,
 }
 
+pub(crate) struct CroquisRecordTagJoinRow {
+    pub record_id: String,
+    pub id: String,
+    pub group_id: Option<String>,
+    pub name: String,
+    pub color: Option<String>,
+    pub sort_order: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 pub(crate) struct SessionPresetRow {
     pub id: String,
     pub name: String,
     pub description: Option<String>,
     pub is_default: bool,
+    pub window_width: Option<String>,
+    pub window_height: Option<String>,
+    pub is_shuffle: bool,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -85,11 +99,39 @@ pub(crate) struct SessionPresetRow {
 pub(crate) struct SessionStepPresetJoinRow {
     pub id: String,
     pub preset_id: String,
+    pub time_step_preset_id: String,
     pub step_order: i64,
     pub name: String,
     pub default_duration_seconds: Option<i64>,
+    pub auto_advance: bool,
+    pub record_save_enabled: bool,
+    pub capture_enabled: bool,
+    pub grayscale_enabled: bool,
     pub result_required: bool,
-    pub result_external_path: Option<String>,
+    pub result_save_path: Option<String>,
+    pub time_step_created_at: String,
+    pub time_step_updated_at: String,
+    pub tag_id: Option<String>,
+    pub group_id: Option<String>,
+    pub tag_name: Option<String>,
+    pub color: Option<String>,
+    pub sort_order: Option<i64>,
+    pub tag_created_at: Option<String>,
+    pub tag_updated_at: Option<String>,
+}
+
+pub(crate) struct TimeStepPresetJoinRow {
+    pub id: String,
+    pub name: String,
+    pub default_duration_seconds: Option<i64>,
+    pub auto_advance: bool,
+    pub record_save_enabled: bool,
+    pub capture_enabled: bool,
+    pub grayscale_enabled: bool,
+    pub result_required: bool,
+    pub result_save_path: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
     pub tag_id: Option<String>,
     pub group_id: Option<String>,
     pub tag_name: Option<String>,

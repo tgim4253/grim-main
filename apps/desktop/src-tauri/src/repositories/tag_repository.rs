@@ -112,6 +112,7 @@ impl TagRepository {
         payload: DeleteTagGroupPayload,
     ) -> Result<()> {
         let tag_group_id = payload.tag_group_id.as_str();
+        self.ensure_tag_group_can_move_tags_to_ungrouped(tag_group_id).await?;
         sqlx::query!("DELETE FROM tag_group WHERE id = ?1", tag_group_id)
             .execute(&self.pool)
             .await?;
@@ -131,6 +132,8 @@ impl TagRepository {
         let group_id = payload.group_id.as_deref();
         let color = payload.color.as_deref();
         let sort_order = payload.sort_order.unwrap_or(0);
+        self.ensure_tag_name_available(group_id, name, payload.id.as_deref())
+            .await?;
 
         if payload.id.is_some() {
             sqlx::query!(
@@ -168,8 +171,110 @@ impl TagRepository {
         Ok(())
     }
 
+    async fn ensure_tag_name_available(
+        &self,
+        group_id: Option<&str>,
+        name: &str,
+        current_tag_id: Option<&str>,
+    ) -> Result<()> {
+        let duplicate_id = if let Some(group_id) = group_id {
+            sqlx::query_scalar!(
+                r#"
+                SELECT id
+                FROM tag
+                WHERE group_id = ?1
+                  AND name = ?2
+                LIMIT 1
+                "#,
+                group_id,
+                name
+            )
+            .fetch_optional(&self.pool)
+            .await?
+        } else {
+            sqlx::query_scalar!(
+                r#"
+                SELECT id
+                FROM tag
+                WHERE group_id IS NULL
+                  AND name = ?1
+                LIMIT 1
+                "#,
+                name
+            )
+            .fetch_optional(&self.pool)
+            .await?
+        };
+
+        if duplicate_id
+            .as_deref()
+            .is_some_and(|duplicate_id| Some(duplicate_id) != current_tag_id)
+        {
+            bail!("Tag name already exists in this group");
+        }
+
+        Ok(())
+    }
+
+    async fn ensure_tag_group_can_move_tags_to_ungrouped(
+        &self,
+        tag_group_id: &str,
+    ) -> Result<()> {
+        let collision_count = sqlx::query!(
+            r#"
+            SELECT COUNT(*) AS "count!: i64"
+            FROM tag grouped
+            INNER JOIN tag ungrouped
+                ON ungrouped.group_id IS NULL
+               AND ungrouped.name = grouped.name
+            WHERE grouped.group_id = ?1
+            "#,
+            tag_group_id
+        )
+        .fetch_one(&self.pool)
+        .await?
+        .count;
+
+        if collision_count > 0 {
+            bail!("Cannot delete tag group because one or more tags already exist in Ungrouped.");
+        }
+
+        Ok(())
+    }
+
     pub async fn delete_tag(&self, payload: DeleteTagPayload) -> Result<()> {
         let tag_id = payload.tag_id.as_str();
+        let record_usage = sqlx::query!(
+            r#"
+            SELECT COUNT(*) AS "count!: i64"
+            FROM croquis_record_tag
+            WHERE tag_id = ?1
+            "#,
+            tag_id
+        )
+        .fetch_one(&self.pool)
+        .await?
+        .count;
+        let time_step_usage = sqlx::query!(
+            r#"
+            SELECT COUNT(*) AS "count!: i64"
+            FROM time_step_preset_tag
+            WHERE tag_id = ?1
+            "#,
+            tag_id
+        )
+        .fetch_one(&self.pool)
+        .await?
+        .count;
+
+        if record_usage > 0 || time_step_usage > 0 {
+            bail!(
+                "Cannot delete tag because it is used by {} records and {} time step presets.",
+                record_usage,
+                time_step_usage
+            );
+        }
+
         sqlx::query!("DELETE FROM tag WHERE id = ?1", tag_id)
             .execute(&self.pool)
             .await?;
@@ -282,5 +387,294 @@ impl TagRepository {
         }
 
         Ok(tags)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{env, fs, path::PathBuf};
+
+    use crate::state::bootstrap::{
+        ensure_schema, open_or_create_db, seed_defaults,
+    };
+
+    use super::*;
+
+    fn make_temp_dir(name: &str) -> PathBuf {
+        let dir = env::temp_dir()
+            .join(format!("grim-tag-repository-{name}-{}", get_unique_id()));
+        fs::create_dir_all(&dir).expect("failed to create temp dir");
+        dir
+    }
+
+    #[tokio::test]
+    async fn save_tag_rejects_duplicate_ungrouped_name() {
+        let dir = make_temp_dir("duplicate-ungrouped");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let repo = TagRepository::new(pool.clone());
+        repo.save_tag(SaveTagPayload {
+            id: None,
+            group_id: None,
+            name: "Loose".to_string(),
+            color: None,
+            sort_order: None,
+        })
+        .await
+        .expect("failed to save initial tag");
+
+        let result = repo
+            .save_tag(SaveTagPayload {
+                id: None,
+                group_id: None,
+                name: "Loose".to_string(),
+                color: None,
+                sort_order: None,
+            })
+            .await;
+
+        assert!(result.is_err());
+
+        let count = sqlx::query!(
+            r#"
+            SELECT COUNT(*) AS "count!: i64"
+            FROM tag
+            WHERE group_id IS NULL
+              AND name = 'Loose'
+            "#
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("failed to count tags")
+        .count;
+
+        assert_eq!(count, 1);
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn delete_tag_group_rejects_ungrouped_name_collision() {
+        let dir = make_temp_dir("delete-group-collision");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let repo = TagRepository::new(pool.clone());
+        repo.save_tag(SaveTagPayload {
+            id: None,
+            group_id: None,
+            name: "Clash".to_string(),
+            color: None,
+            sort_order: None,
+        })
+        .await
+        .expect("failed to save ungrouped tag");
+        repo.save_tag_group(SaveTagGroupPayload {
+            id: None,
+            name: "Collision Group".to_string(),
+            sort_order: None,
+        })
+        .await
+        .expect("failed to save group");
+
+        let group_id = sqlx::query!(
+            "SELECT id FROM tag_group WHERE name = 'Collision Group'"
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("failed to load group")
+        .id;
+
+        repo.save_tag(SaveTagPayload {
+            id: None,
+            group_id: Some(group_id.clone()),
+            name: "Clash".to_string(),
+            color: None,
+            sort_order: None,
+        })
+        .await
+        .expect("failed to save grouped tag");
+
+        let result = repo
+            .delete_tag_group(DeleteTagGroupPayload {
+                tag_group_id: group_id.clone(),
+            })
+            .await;
+
+        assert!(result.is_err());
+
+        let group_count = sqlx::query!(
+            r#"
+            SELECT COUNT(*) AS "count!: i64"
+            FROM tag_group
+            WHERE id = ?1
+            "#,
+            group_id
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("failed to count group")
+        .count;
+
+        assert_eq!(group_count, 1);
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn delete_tag_rejects_record_and_session_step_usage() {
+        let dir = make_temp_dir("delete-usage");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let tag_id = sqlx::query!(
+            r#"
+            SELECT t.id
+            FROM tag t
+            INNER JOIN tag_group tg ON tg.id = t.group_id
+            WHERE tg.name = 'Purpose'
+              AND t.name = 'Pose'
+            "#
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("failed to load tag")
+        .id;
+        let tag_id_ref = tag_id.as_str();
+
+        sqlx::query!(
+            r#"
+            INSERT INTO croquis_record
+            (id, title, created_at, updated_at)
+            VALUES ('record-tag-usage', 'Record tag usage', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')
+            "#
+        )
+        .execute(&pool)
+        .await
+        .expect("failed to insert record");
+
+        sqlx::query!(
+            r#"
+            INSERT INTO croquis_record_tag (record_id, tag_id, created_at)
+            VALUES ('record-tag-usage', ?1, '2026-01-01T00:00:00Z')
+            "#,
+            tag_id_ref
+        )
+        .execute(&pool)
+        .await
+        .expect("failed to link record tag");
+
+        let result = TagRepository::new(pool.clone())
+            .delete_tag(DeleteTagPayload { tag_id: tag_id.clone() })
+            .await;
+
+        assert!(result.is_err());
+
+        let tag_row = sqlx::query!(
+            r#"
+            SELECT COUNT(*) AS "count!: i64"
+            FROM tag
+            WHERE id = ?1
+            "#,
+            tag_id_ref
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("failed to count tag");
+
+        assert_eq!(tag_row.count, 1);
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn delete_tag_rejects_time_step_preset_usage() {
+        let dir = make_temp_dir("delete-time-step-usage");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+        seed_defaults(&pool).await.expect("failed to seed defaults");
+
+        let tag_id = sqlx::query!(
+            r#"
+            SELECT t.id
+            FROM tag t
+            INNER JOIN tag_group tg ON tg.id = t.group_id
+            WHERE tg.name = 'Purpose'
+              AND t.name = 'Pose'
+            "#
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("failed to load tag")
+        .id;
+        let tag_id_ref = tag_id.as_str();
+
+        sqlx::query!(
+            r#"
+            INSERT INTO time_step_preset
+            (
+                id,
+                name,
+                default_duration_seconds,
+                auto_advance,
+                record_save_enabled,
+                capture_enabled,
+                grayscale_enabled,
+                result_required,
+                result_save_path,
+                created_at,
+                updated_at
+            )
+            VALUES ('time-step-tag-usage', 'Tag usage', 30, 1, 1, 0, 0, 0, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')
+            "#
+        )
+        .execute(&pool)
+        .await
+        .expect("failed to insert time step preset");
+
+        sqlx::query!(
+            r#"
+            INSERT INTO time_step_preset_tag (time_step_preset_id, tag_id, created_at)
+            VALUES ('time-step-tag-usage', ?1, '2026-01-01T00:00:00Z')
+            "#,
+            tag_id_ref
+        )
+        .execute(&pool)
+        .await
+        .expect("failed to link time step preset tag");
+
+        let result = TagRepository::new(pool.clone())
+            .delete_tag(DeleteTagPayload { tag_id: tag_id.clone() })
+            .await;
+
+        assert!(result.is_err());
+
+        let tag_row = sqlx::query!(
+            r#"
+            SELECT COUNT(*) AS "count!: i64"
+            FROM tag
+            WHERE id = ?1
+            "#,
+            tag_id_ref
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("failed to count tag");
+
+        assert_eq!(tag_row.count, 1);
+
+        let _ = fs::remove_dir_all(dir);
     }
 }

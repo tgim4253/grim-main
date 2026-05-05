@@ -1,11 +1,3 @@
-CREATE TABLE IF NOT EXISTS library_settings (
-  id                       TEXT PRIMARY KEY NOT NULL,
-  active_session_preset_id TEXT,
-  croquis_preferences_json TEXT,
-  created_at               TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at               TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
 CREATE TABLE IF NOT EXISTS asset (
   id             TEXT PRIMARY KEY NOT NULL,
   hash           TEXT NOT NULL,
@@ -74,33 +66,51 @@ CREATE TABLE IF NOT EXISTS tag (
   UNIQUE (group_id, name)
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_tag_ungrouped_name
+  ON tag(name)
+  WHERE group_id IS NULL;
+
+CREATE TABLE IF NOT EXISTS time_step_preset (
+  id                       TEXT PRIMARY KEY NOT NULL,
+  name                     TEXT NOT NULL UNIQUE,
+  default_duration_seconds INTEGER,
+  auto_advance             INTEGER NOT NULL DEFAULT 1 CHECK (auto_advance IN (0, 1)),
+  record_save_enabled      INTEGER NOT NULL DEFAULT 1 CHECK (record_save_enabled IN (0, 1)),
+  capture_enabled          INTEGER NOT NULL DEFAULT 0 CHECK (capture_enabled IN (0, 1)),
+  grayscale_enabled        INTEGER NOT NULL DEFAULT 0 CHECK (grayscale_enabled IN (0, 1)),
+  result_required          INTEGER NOT NULL DEFAULT 0 CHECK (result_required IN (0, 1)),
+  result_save_path         TEXT,
+  created_at               TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at               TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS time_step_preset_tag (
+  time_step_preset_id TEXT NOT NULL REFERENCES time_step_preset(id) ON DELETE CASCADE,
+  tag_id              TEXT NOT NULL REFERENCES tag(id) ON DELETE CASCADE,
+  created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (time_step_preset_id, tag_id)
+);
+
 CREATE TABLE IF NOT EXISTS session_preset (
-  id          TEXT PRIMARY KEY NOT NULL,
-  name        TEXT NOT NULL UNIQUE,
-  description TEXT,
-  is_default  INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0, 1)),
-  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  id            TEXT PRIMARY KEY NOT NULL,
+  name          TEXT NOT NULL UNIQUE,
+  description   TEXT,
+  is_default    INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0, 1)),
+  window_width  TEXT,
+  window_height TEXT,
+  is_shuffle    INTEGER NOT NULL DEFAULT 0 CHECK (is_shuffle IN (0, 1)),
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS session_step_preset (
-  id                       TEXT PRIMARY KEY NOT NULL,
-  preset_id                TEXT NOT NULL REFERENCES session_preset(id) ON DELETE CASCADE,
-  step_order               INTEGER NOT NULL,
-  name                     TEXT NOT NULL,
-  default_duration_seconds INTEGER,
-  result_required          INTEGER NOT NULL DEFAULT 0 CHECK (result_required IN (0, 1)),
-  result_external_path     TEXT,
-  created_at               TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at               TEXT NOT NULL DEFAULT (datetime('now')),
+  id                  TEXT PRIMARY KEY NOT NULL,
+  preset_id           TEXT NOT NULL REFERENCES session_preset(id) ON DELETE CASCADE,
+  time_step_preset_id TEXT NOT NULL REFERENCES time_step_preset(id) ON DELETE RESTRICT,
+  step_order          INTEGER NOT NULL,
+  created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at          TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE (preset_id, step_order)
-);
-
-CREATE TABLE IF NOT EXISTS session_step_preset_tag (
-  step_preset_id TEXT NOT NULL REFERENCES session_step_preset(id) ON DELETE CASCADE,
-  tag_id         TEXT NOT NULL REFERENCES tag(id) ON DELETE CASCADE,
-  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
-  PRIMARY KEY (step_preset_id, tag_id)
 );
 
 CREATE TABLE IF NOT EXISTS croquis_record (
