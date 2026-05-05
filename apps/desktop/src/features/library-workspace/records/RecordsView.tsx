@@ -12,8 +12,6 @@ import { createRecordResultItem } from './recordResultItems';
 import type { RecordResultItem } from './types';
 import './record-workspace.css';
 
-const RECORD_LIMIT = 48;
-
 type RecordsViewProps = {
   refreshKey?: number;
   onExplorerRefresh?: () => Promise<void> | void;
@@ -49,39 +47,42 @@ function RecordGridState({ title, description, action }: RecordGridStateProps) {
   );
 }
 
-function createDetailMap(
-  records: readonly CroquisRecordSummary[],
-  results: readonly PromiseSettledResult<CroquisRecordDetail>[],
-) {
+function createDetailMap(details: readonly CroquisRecordDetail[]) {
   const detailsById = new Map<string, CroquisRecordDetail>();
 
-  results.forEach((result, index) => {
-    if (result.status === 'fulfilled') {
-      detailsById.set(records[index].id, result.value);
-    }
+  details.forEach(detail => {
+    detailsById.set(detail.id, detail);
   });
 
   return detailsById;
 }
 
-function createRelatedRecordsById(items: readonly RecordResultItem[]) {
-  const relatedById = new Map<string, RecordResultItem[]>();
+function createRecordsBySourceAssetId(items: readonly RecordResultItem[]) {
+  const itemsBySourceAssetId = new Map<string, RecordResultItem[]>();
 
   for (const item of items) {
     if (!item.sourceAssetId) {
-      relatedById.set(item.id, []);
       continue;
     }
 
-    relatedById.set(
-      item.id,
-      items.filter(
-        candidate => candidate.id !== item.id && candidate.sourceAssetId === item.sourceAssetId,
-      ),
-    );
+    const sourceItems = itemsBySourceAssetId.get(item.sourceAssetId) ?? [];
+    sourceItems.push(item);
+    itemsBySourceAssetId.set(item.sourceAssetId, sourceItems);
   }
 
-  return relatedById;
+  return itemsBySourceAssetId;
+}
+
+function getRelatedRecords(
+  item: RecordResultItem,
+  itemsBySourceAssetId: ReadonlyMap<string, readonly RecordResultItem[]>,
+) {
+  if (!item.sourceAssetId) {
+    return [];
+  }
+
+  const sourceItems = itemsBySourceAssetId.get(item.sourceAssetId) ?? [];
+  return sourceItems.filter(candidate => candidate.id !== item.id);
 }
 
 export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewProps) {
@@ -113,7 +114,8 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
     setError(null);
 
     try {
-      const nextRecords = await ipc.record.listRecent(RECORD_LIMIT);
+      const snapshot = await ipc.record.listResults();
+      const nextRecords = snapshot.records;
 
       if (loadSequenceRef.current !== loadSequence) {
         return;
@@ -124,25 +126,12 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
       );
 
       setRecords(nextRecords);
-      setRecordDetailsById(current => {
-        const nextRecordIds = new Set(nextRecords.map(record => record.id));
-        return new Map([...current].filter(([recordId]) => nextRecordIds.has(recordId)));
-      });
+      setRecordDetailsById(createDetailMap(snapshot.details));
       if (!selectedRecordStillExists) {
         setSelectedRecordId(null);
         setPreviewOpen(false);
       }
       setIsLoading(false);
-
-      const detailResults = await Promise.allSettled(
-        nextRecords.map(record => ipc.record.getDetail(record.id)),
-      );
-
-      if (loadSequenceRef.current !== loadSequence) {
-        return;
-      }
-
-      setRecordDetailsById(createDetailMap(nextRecords, detailResults));
     } catch (nextError) {
       if (loadSequenceRef.current !== loadSequence) {
         return;
@@ -195,7 +184,7 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
     [recordDetailsById, records],
   );
 
-  const relatedRecordsById = useMemo(() => createRelatedRecordsById(items), [items]);
+  const recordsBySourceAssetId = useMemo(() => createRecordsBySourceAssetId(items), [items]);
 
   const gridEmptyState = isLoading ? (
     <RecordGridState title="Loading records..." />
@@ -334,7 +323,7 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
         renderPreview={record => (
           <RecordResultPreviewPanel
             record={record}
-            relatedRecords={relatedRecordsById.get(record.id) ?? []}
+            relatedRecords={getRelatedRecords(record, recordsBySourceAssetId)}
             tagGroupNamesById={tagGroupNamesById}
             onClose={() => {
               setPreviewOpen(false);
