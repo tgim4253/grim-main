@@ -28,7 +28,12 @@ import {
   type ExplorerCreateFolderRequest,
   type ExplorerNode,
 } from '../../features/library-explorer';
-import { RecordsView, ReferencesView } from '../../features/library-workspace';
+import {
+  RecordsView,
+  ReferencesView,
+  SessionPresetSettingsView,
+  TagSettingsView,
+} from '../../features/library-workspace';
 import {
   FolderSearchModal,
   ImportAssetsModal,
@@ -53,7 +58,7 @@ const SUPPORTED_IMPORT_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif',
 const NO_DESTINATION_FOLDERS_ERROR = 'No destination folders are available for import.';
 
 type ImportStep = 'folder' | 'assets' | 'completed';
-type WorkspaceView = 'references' | 'records';
+type WorkspaceView = 'references' | 'records' | 'tag-settings' | 'preset-settings';
 
 type ImportProgressState = {
   completed: number;
@@ -206,25 +211,33 @@ export function LibraryPage() {
     },
     {
       icon: 'grid',
-      label: 'Grid',
-      action: 'open-grid',
+      label: 'Tag Settings',
+      action: 'open-tag-settings',
+      active: workspaceView === 'tag-settings',
     },
     {
-      icon: 'star',
-      label: 'Favorites',
-      action: 'open-favorites',
+      icon: 'layers',
+      label: 'Preset Settings',
+      action: 'open-preset-settings',
+      active: workspaceView === 'preset-settings',
     },
   ];
 
   const handlePrimaryAction = (action: PrimaryRailAction) => {
-    if (action === 'toggle-sidebar-panel') {
-      setIsSidebarPanelOpen(open => !open);
-      return;
-    }
-
-    if (action === 'open-search') {
-      setActiveExplorerNodeId(RECENT_RECORDS_NODE_ID);
-      setWorkspaceView('records');
+    switch (action) {
+      case 'toggle-sidebar-panel':
+        setIsSidebarPanelOpen(open => !open);
+        break;
+      case 'open-search':
+        setActiveExplorerNodeId(RECENT_RECORDS_NODE_ID);
+        setWorkspaceView('records');
+        break;
+      case 'open-tag-settings':
+        setWorkspaceView('tag-settings');
+        break;
+      case 'open-preset-settings':
+        setWorkspaceView('preset-settings');
+        break;
     }
   };
 
@@ -767,6 +780,10 @@ export function LibraryPage() {
               refreshKey={workspaceRefreshKey}
               onExplorerRefresh={loadExplorerSnapshot}
             />
+          ) : workspaceView === 'tag-settings' ? (
+            <TagSettingsView />
+          ) : workspaceView === 'preset-settings' ? (
+            <SessionPresetSettingsView />
           ) : (
             <ReferencesView
               source={assetSource}
