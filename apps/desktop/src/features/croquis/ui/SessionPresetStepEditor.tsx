@@ -1,3 +1,5 @@
+import type { KeyboardEvent } from 'react';
+import { open } from '@tauri-apps/plugin-dialog';
 import { Chip, ChipButton, CheckboxConditionalRow, CheckboxRow, Input } from '../../../shared/ui';
 import { cx } from '../../../shared/lib/cx';
 import type { EditableSessionStep } from '../lib/sessionPresetEditor';
@@ -28,6 +30,19 @@ type SessionPresetStepEditorProps = {
   onResultSavePathChange: (path: string) => void;
 };
 
+function getDialogStringSelection(selection: unknown) {
+  if (typeof selection === 'string') {
+    return selection;
+  }
+
+  if (Array.isArray(selection)) {
+    const [firstSelection] = selection as unknown[];
+    return typeof firstSelection === 'string' ? firstSelection : null;
+  }
+
+  return null;
+}
+
 export function SessionPresetStepEditor({
   step,
   durationSeconds,
@@ -43,6 +58,38 @@ export function SessionPresetStepEditor({
   onResultSavePathChange,
 }: SessionPresetStepEditorProps) {
   const durationParts = getDurationParts(durationSeconds);
+  const resultSavePathValue = step.resultSavePath ?? '';
+
+  const handleResultSavePathPick = () => {
+    if (disabled) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        const selection = (await open({
+          multiple: false,
+          directory: true,
+        })) as unknown;
+        const selectedPath = getDialogStringSelection(selection);
+
+        if (typeof selectedPath === 'string' && selectedPath.trim()) {
+          onResultSavePathChange(selectedPath);
+        }
+      } catch (error) {
+        console.error('Failed to open result save path picker.', error);
+      }
+    })();
+  };
+
+  const handleResultSavePathKeyDown = (event: KeyboardEvent<HTMLLabelElement>) => {
+    if (disabled || (event.key !== 'Enter' && event.key !== ' ')) {
+      return;
+    }
+
+    event.preventDefault();
+    handleResultSavePathPick();
+  };
 
   return (
     <div className={cx('session-preset-step-editor', className)}>
@@ -204,15 +251,26 @@ export function SessionPresetStepEditor({
                 width="full"
                 disabled={disabled}
               />
-              <Input
-                label="Result save path"
-                value={step.resultSavePath ?? ''}
-                placeholder="Optional path"
-                disabled={disabled}
-                onChange={event => {
-                  onResultSavePathChange(event.target.value);
-                }}
-              />
+              <label
+                className="session-preset-step-editor__path-picker"
+                data-disabled={disabled ? 'true' : undefined}
+                role={disabled ? undefined : 'button'}
+                tabIndex={disabled ? undefined : 0}
+                onClick={handleResultSavePathPick}
+                onKeyDown={handleResultSavePathKeyDown}
+              >
+                <span className="session-preset-step-editor__label">Result save path</span>
+                <span className="session-preset-step-editor__path-control">
+                  <input
+                    className="session-preset-step-editor__path-input"
+                    value={resultSavePathValue}
+                    placeholder="Click to choose folder"
+                    disabled
+                    readOnly
+                    aria-label="Selected result save path"
+                  />
+                </span>
+              </label>
             </CheckboxConditionalRow>
             <CheckboxRow
               label="Grayscale"

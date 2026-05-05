@@ -82,6 +82,63 @@
     border-left: 1px solid var(--semantic-colors-surface-elevated);
   }
 
+  .session-preset-step-editor__path-picker {
+    display: grid;
+    gap: var(--primitives-spacing-15);
+    min-width: 0;
+    cursor: pointer;
+  }
+
+  .session-preset-step-editor__path-picker[data-disabled='true'] {
+    cursor: not-allowed;
+    opacity: 0.72;
+  }
+
+  .session-preset-step-editor__path-picker:focus-visible {
+    outline: 2px solid var(--semantic-colors-border-focus);
+    outline-offset: 2px;
+  }
+
+  .session-preset-step-editor__path-control {
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    padding: var(--components-input-container-size-padding-y)
+      var(--components-input-container-size-padding-x);
+    border: 1px solid var(--components-input-container-border);
+    border-radius: var(--components-input-container-size-radius);
+    background: var(--components-input-container-background);
+    box-shadow: var(--effects-shadow-xs);
+  }
+
+  .session-preset-step-editor__path-picker:not([data-disabled='true']):hover
+    .session-preset-step-editor__path-control,
+  .session-preset-step-editor__path-picker:focus-visible .session-preset-step-editor__path-control {
+    border-color: var(--components-input-container-border-focus);
+  }
+
+  .session-preset-step-editor__path-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--components-input-text-disabled);
+    font-family: var(--components-typography-control-value-font-family);
+    font-size: var(--components-typography-control-value-font-size);
+    font-weight: var(--components-typography-control-value-font-weight);
+    line-height: var(--components-typography-control-value-line-height);
+    outline: none;
+    pointer-events: none;
+  }
+
+  .session-preset-step-editor__path-input::placeholder {
+    color: var(--components-input-text-disabled);
+    opacity: 1;
+  }
+
   @media (max-width: 920px) {
     .session-preset-step-editor {
       grid-template-columns: 1fr;
