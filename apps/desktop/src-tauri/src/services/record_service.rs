@@ -1,12 +1,15 @@
+use std::collections::{HashMap, HashSet};
+
 use anyhow::Result;
 
 use crate::{
     models::{
         asset::AssetSummary,
         record::{
-            CroquisRecordDetail, CroquisRecordSummary,
-            DeleteCroquisRecordPayload, FinishCroquisRecordPayload,
-            SaveCroquisRecordPayload, UpdateCroquisRecordTagsPayload,
+            CroquisRecordDetail, CroquisRecordResultsSnapshot,
+            CroquisRecordSummary, DeleteCroquisRecordPayload,
+            FinishCroquisRecordPayload, SaveCroquisRecordPayload,
+            UpdateCroquisRecordTagsPayload,
         },
     },
     repositories::{AssetRepository, RecordRepository},
@@ -31,9 +34,22 @@ impl RecordService {
 
     pub async fn list_recent_records(
         &self,
-        limit: i64,
+        limit: Option<i64>,
     ) -> Result<Vec<CroquisRecordSummary>> {
         self.record_repository.list_recent(limit).await
+    }
+
+    pub async fn list_recent_record_results(
+        &self,
+        limit: Option<i64>,
+    ) -> Result<CroquisRecordResultsSnapshot> {
+        let mut details =
+            self.record_repository.list_recent_details(limit).await?;
+        self.hydrate_detail_assets_batch(&mut details).await?;
+        let records =
+            details.iter().map(|detail| detail.record.clone()).collect();
+
+        Ok(CroquisRecordResultsSnapshot { records, details })
     }
 
     pub async fn get_record(
@@ -58,6 +74,57 @@ impl RecordService {
         let mut asset = self.asset_repository.get_summary(asset_id).await?;
         self.library_storage.hydrate_asset_paths(&mut asset).await;
         Ok(asset)
+    }
+
+    async fn hydrate_detail_assets_batch(
+        &self,
+        details: &mut [CroquisRecordDetail],
+    ) -> Result<()> {
+        let mut asset_ids = Vec::new();
+        let mut seen_asset_ids = HashSet::new();
+
+        for detail in details.iter() {
+            for asset_id in [
+                detail.record.source_asset_id.as_deref(),
+                detail.record.result_asset_id.as_deref(),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                if seen_asset_ids.insert(asset_id.to_string()) {
+                    asset_ids.push(asset_id.to_string());
+                }
+            }
+        }
+
+        if asset_ids.is_empty() {
+            return Ok(());
+        }
+
+        let assets =
+            self.asset_repository.load_existing_summaries(&asset_ids).await?;
+        let mut assets_by_id = HashMap::with_capacity(assets.len());
+        for mut asset in assets {
+            self.library_storage.hydrate_asset_paths(&mut asset).await;
+            assets_by_id.insert(asset.id.clone(), asset);
+        }
+
+        for detail in details {
+            if let Some(source_asset_id) =
+                detail.record.source_asset_id.as_deref()
+            {
+                detail.source_asset =
+                    assets_by_id.get(source_asset_id).cloned();
+            }
+            if let Some(result_asset_id) =
+                detail.record.result_asset_id.as_deref()
+            {
+                detail.result_asset =
+                    assets_by_id.get(result_asset_id).cloned();
+            }
+        }
+
+        Ok(())
     }
 
     pub async fn save_record(
@@ -253,7 +320,7 @@ mod tests {
             .await
             .expect("failed to save unfinished record");
         let recent = service
-            .list_recent_records(24)
+            .list_recent_records(Some(24))
             .await
             .expect("failed to list recent records");
         assert_eq!(recent.len(), 1);

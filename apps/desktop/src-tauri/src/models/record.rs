@@ -39,6 +39,15 @@ pub struct CroquisRecordDetail {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
+pub struct CroquisRecordResultsSnapshot {
+    #[serde(default)]
+    pub records: Vec<CroquisRecordSummary>,
+    #[serde(default)]
+    pub details: Vec<CroquisRecordDetail>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct SaveCroquisRecordPayload {
     #[serde(default)]
     pub id: Option<String>,

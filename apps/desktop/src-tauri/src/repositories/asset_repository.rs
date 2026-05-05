@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use sqlx::{Sqlite, SqlitePool, Transaction};
 
 use crate::{
@@ -346,11 +346,49 @@ impl AssetRepository {
         &self,
         asset_ids: &[String],
     ) -> Result<Vec<AssetSummary>> {
-        let mut assets = Vec::with_capacity(asset_ids.len());
-        for asset_id in asset_ids {
-            assets.push(self.get_summary(asset_id).await?);
+        let assets = self.load_existing_summaries(asset_ids).await?;
+        if assets.len() != asset_ids.len() {
+            bail!("Asset not found");
         }
         Ok(assets)
+    }
+
+    pub async fn load_existing_summaries(
+        &self,
+        asset_ids: &[String],
+    ) -> Result<Vec<AssetSummary>> {
+        if asset_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let asset_ids_json = serde_json::to_string(asset_ids)?;
+        let rows = sqlx::query_as!(
+            AssetRow,
+            r#"
+            WITH requested_asset(id, sort_order) AS (
+              SELECT CAST(value AS TEXT), key
+              FROM json_each(?1)
+            )
+            SELECT a.id,
+                   a.hash,
+                   a.file_name,
+                   a.file_size,
+                   a.mime_type,
+                   a.width,
+                   a.height,
+                   a.modified_at,
+                   a.created_at,
+                   a.updated_at
+            FROM requested_asset requested
+            INNER JOIN asset a ON a.id = requested.id
+            ORDER BY requested.sort_order ASC
+            "#,
+            asset_ids_json
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.into_iter().map(asset_from_row).collect())
     }
 
     pub async fn load_assigned_folders_in_tx(

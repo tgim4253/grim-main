@@ -3,19 +3,19 @@ use tauri::State;
 use crate::{
     errors::{CommandResult, IntoCommandResult},
     models::record::{
-        CroquisRecordDetail, CroquisRecordSummary, DeleteCroquisRecordPayload,
-        FinishCroquisRecordPayload, SaveCroquisRecordPayload,
-        UpdateCroquisRecordTagsPayload,
+        CroquisRecordDetail, CroquisRecordResultsSnapshot,
+        DeleteCroquisRecordPayload, FinishCroquisRecordPayload,
+        SaveCroquisRecordPayload, UpdateCroquisRecordTagsPayload,
     },
     services::RecordService,
 };
 
 #[tauri::command]
-pub async fn list_recent_records(
+pub async fn list_recent_record_results(
     limit: Option<i64>,
     record_service: State<'_, RecordService>,
-) -> CommandResult<Vec<CroquisRecordSummary>> {
-    record_service.list_recent_records(limit.unwrap_or(24)).await.into_command()
+) -> CommandResult<CroquisRecordResultsSnapshot> {
+    record_service.list_recent_record_results(limit).await.into_command()
 }
 
 #[tauri::command]
