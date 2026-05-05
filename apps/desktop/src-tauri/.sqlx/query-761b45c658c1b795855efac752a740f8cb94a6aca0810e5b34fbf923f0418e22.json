@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT name, sort_order\n            FROM tag_group\n            WHERE name IN ('Time / Auto', 'Purpose', 'Format')\n            ORDER BY sort_order ASC, name ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "name",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "sort_order",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "761b45c658c1b795855efac752a740f8cb94a6aca0810e5b34fbf923f0418e22"
+}

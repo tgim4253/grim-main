@@ -1,0 +1,140 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT ssp.id,\n                   ssp.preset_id,\n                   ssp.time_step_preset_id AS \"time_step_preset_id!: String\",\n                   ssp.step_order,\n                   tsp.name,\n                   tsp.default_duration_seconds,\n                   tsp.auto_advance AS \"auto_advance: bool\",\n                   tsp.record_save_enabled AS \"record_save_enabled: bool\",\n                   tsp.capture_enabled AS \"capture_enabled: bool\",\n                   tsp.grayscale_enabled AS \"grayscale_enabled: bool\",\n                   tsp.result_required AS \"result_required: bool\",\n                   tsp.result_save_path,\n                   tsp.created_at AS time_step_created_at,\n                   tsp.updated_at AS time_step_updated_at,\n                   t.id AS tag_id,\n                   t.group_id,\n                   t.name AS tag_name,\n                   t.color,\n                   t.sort_order,\n                   t.created_at AS tag_created_at,\n                   t.updated_at AS tag_updated_at\n            FROM session_step_preset ssp\n            INNER JOIN time_step_preset tsp ON tsp.id = ssp.time_step_preset_id\n            LEFT JOIN time_step_preset_tag tspt ON tspt.time_step_preset_id = tsp.id\n            LEFT JOIN tag t ON t.id = tspt.tag_id\n            ORDER BY ssp.preset_id ASC, ssp.step_order ASC, t.name ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "preset_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "time_step_preset_id!: String",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "step_order",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "name",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "default_duration_seconds",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "auto_advance: bool",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "record_save_enabled: bool",
+        "ordinal": 7,
+        "type_info": "Integer"
+      },
+      {
+        "name": "capture_enabled: bool",
+        "ordinal": 8,
+        "type_info": "Integer"
+      },
+      {
+        "name": "grayscale_enabled: bool",
+        "ordinal": 9,
+        "type_info": "Integer"
+      },
+      {
+        "name": "result_required: bool",
+        "ordinal": 10,
+        "type_info": "Integer"
+      },
+      {
+        "name": "result_save_path",
+        "ordinal": 11,
+        "type_info": "Text"
+      },
+      {
+        "name": "time_step_created_at",
+        "ordinal": 12,
+        "type_info": "Text"
+      },
+      {
+        "name": "time_step_updated_at",
+        "ordinal": 13,
+        "type_info": "Text"
+      },
+      {
+        "name": "tag_id",
+        "ordinal": 14,
+        "type_info": "Text"
+      },
+      {
+        "name": "group_id",
+        "ordinal": 15,
+        "type_info": "Text"
+      },
+      {
+        "name": "tag_name",
+        "ordinal": 16,
+        "type_info": "Text"
+      },
+      {
+        "name": "color",
+        "ordinal": 17,
+        "type_info": "Text"
+      },
+      {
+        "name": "sort_order",
+        "ordinal": 18,
+        "type_info": "Integer"
+      },
+      {
+        "name": "tag_created_at",
+        "ordinal": 19,
+        "type_info": "Text"
+      },
+      {
+        "name": "tag_updated_at",
+        "ordinal": 20,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "37ce3914af7452cc8a80fb069cff6153626ab7672dad1769aa2f8420170220e4"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                UPDATE time_step_preset\n                SET name = ?2,\n                    default_duration_seconds = ?3,\n                    auto_advance = ?4,\n                    record_save_enabled = ?5,\n                    capture_enabled = ?6,\n                    grayscale_enabled = ?7,\n                    result_required = ?8,\n                    result_save_path = ?9,\n                    updated_at = ?10\n                WHERE id = ?1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "8cbfefe66cbcf048c4f47b005a2d6a01f41697fcf9ac3ce599afe4e33f20747d"
+}

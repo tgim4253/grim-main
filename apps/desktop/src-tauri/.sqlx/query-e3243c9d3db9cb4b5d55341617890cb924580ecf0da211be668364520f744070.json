@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT OR IGNORE INTO tag\n                (id, group_id, name, color, sort_order, created_at, updated_at)\n                VALUES (?1, ?2, ?3, NULL, ?4, ?5, ?5)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "e3243c9d3db9cb4b5d55341617890cb924580ecf0da211be668364520f744070"
+}

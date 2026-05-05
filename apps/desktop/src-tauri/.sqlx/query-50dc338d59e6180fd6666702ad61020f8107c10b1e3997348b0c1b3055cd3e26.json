@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT id,\n                   title,\n                   source_asset_id,\n                   result_asset_id,\n                   target_duration_seconds,\n                   actual_duration_seconds,\n                   finished_at,\n                   created_at,\n                   updated_at\n            FROM croquis_record\n            WHERE finished_at IS NOT NULL\n            ORDER BY finished_at DESC, created_at DESC\n            LIMIT ?1\n            ",
+  "query": "\n            SELECT id,\n                   title,\n                   note,\n                   source_asset_id,\n                   result_asset_id,\n                   target_duration_seconds,\n                   actual_duration_seconds,\n                   finished_at,\n                   created_at,\n                   updated_at\n            FROM croquis_record\n            WHERE finished_at IS NOT NULL\n            ORDER BY finished_at DESC, created_at DESC\n            LIMIT COALESCE(?1, -1)\n            ",
   "describe": {
     "columns": [
       {
@@ -14,38 +14,43 @@
         "type_info": "Text"
       },
       {
-        "name": "source_asset_id",
+        "name": "note",
         "ordinal": 2,
         "type_info": "Text"
       },
       {
-        "name": "result_asset_id",
+        "name": "source_asset_id",
         "ordinal": 3,
         "type_info": "Text"
       },
       {
-        "name": "target_duration_seconds",
+        "name": "result_asset_id",
         "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "target_duration_seconds",
+        "ordinal": 5,
         "type_info": "Integer"
       },
       {
         "name": "actual_duration_seconds",
-        "ordinal": 5,
+        "ordinal": 6,
         "type_info": "Float"
       },
       {
         "name": "finished_at",
-        "ordinal": 6,
-        "type_info": "Text"
-      },
-      {
-        "name": "created_at",
         "ordinal": 7,
         "type_info": "Text"
       },
       {
-        "name": "updated_at",
+        "name": "created_at",
         "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 9,
         "type_info": "Text"
       }
     ],
@@ -53,6 +58,7 @@
       "Right": 1
     },
     "nullable": [
+      false,
       false,
       false,
       true,
@@ -64,5 +70,5 @@
       false
     ]
   },
-  "hash": "5b979acd9b3506a073e3d29d7ec5e7bcc28ea8a173e41a61cab9cd3e32524eb8"
+  "hash": "50dc338d59e6180fd6666702ad61020f8107c10b1e3997348b0c1b3055cd3e26"
 }

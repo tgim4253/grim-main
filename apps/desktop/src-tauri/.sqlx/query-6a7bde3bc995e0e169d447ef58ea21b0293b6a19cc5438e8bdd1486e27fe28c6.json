@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO session_preset\n            (\n                id,\n                name,\n                description,\n                is_default,\n                window_width,\n                window_height,\n                is_shuffle,\n                created_at,\n                updated_at\n            )\n            VALUES (?1, 'Quick Croquis', 'Default single-step croquis preset', 1, '960', NULL, 0, ?2, ?2)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "6a7bde3bc995e0e169d447ef58ea21b0293b6a19cc5438e8bdd1486e27fe28c6"
+}

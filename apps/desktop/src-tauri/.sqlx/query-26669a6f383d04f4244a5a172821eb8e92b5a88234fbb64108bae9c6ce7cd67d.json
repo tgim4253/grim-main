@@ -1,0 +1,68 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id,\n                   title,\n                   source_asset_id,\n                   result_asset_id,\n                   target_duration_seconds,\n                   actual_duration_seconds,\n                   finished_at,\n                   created_at,\n                   updated_at\n            FROM croquis_record\n            WHERE finished_at IS NOT NULL\n            ORDER BY finished_at DESC, created_at DESC\n            LIMIT COALESCE(?1, -1)\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "title",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "source_asset_id",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "result_asset_id",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "target_duration_seconds",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "actual_duration_seconds",
+        "ordinal": 5,
+        "type_info": "Float"
+      },
+      {
+        "name": "finished_at",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 8,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "26669a6f383d04f4244a5a172821eb8e92b5a88234fbb64108bae9c6ce7cd67d"
+}

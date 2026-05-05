@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT COUNT(*) AS \"count!: i64\"\n            FROM tag grouped\n            INNER JOIN tag ungrouped\n                ON ungrouped.group_id IS NULL\n               AND ungrouped.name = grouped.name\n            WHERE grouped.group_id = ?1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c3d64a5fa569358ae42c42d24738490246df6978e68742a7bc3f423ef9d9d3dd"
+}

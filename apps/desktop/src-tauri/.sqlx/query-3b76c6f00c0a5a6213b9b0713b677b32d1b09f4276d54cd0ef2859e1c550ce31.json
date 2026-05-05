@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            WITH requested_asset(id, sort_order) AS (\n              SELECT CAST(value AS TEXT), key\n              FROM json_each(?1)\n            )\n            SELECT a.id,\n                   a.hash,\n                   a.file_name,\n                   a.file_size,\n                   a.mime_type,\n                   a.width,\n                   a.height,\n                   a.modified_at,\n                   a.created_at,\n                   a.updated_at\n            FROM requested_asset requested\n            INNER JOIN asset a ON a.id = requested.id\n            ORDER BY requested.sort_order ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "hash",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "file_name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "file_size",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "mime_type",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "width",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "height",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "modified_at",
+        "ordinal": 7,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 9,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "3b76c6f00c0a5a6213b9b0713b677b32d1b09f4276d54cd0ef2859e1c550ce31"
+}
