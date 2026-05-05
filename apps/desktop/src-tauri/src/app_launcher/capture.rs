@@ -12,19 +12,30 @@ pub fn launch_capture_overlay(
     let mut params = Vec::new();
 
     if let Some(record_id) = &payload.record_id {
-        params.push(format!("record_id={record_id}"));
+        push_query_param(&mut params, "record_id", record_id);
     }
     if let Some(asset_id) = &payload.asset_id {
-        params.push(format!("asset_id={asset_id}"));
+        push_query_param(&mut params, "asset_id", asset_id);
     }
     if let Some(session_id) = &payload.session_id {
-        params.push(format!("session_id={session_id}"));
+        push_query_param(&mut params, "session_id", session_id);
     }
     if let Some(target_seconds) = payload.target_seconds {
-        params.push(format!("target_seconds={target_seconds}"));
+        push_query_param(
+            &mut params,
+            "target_seconds",
+            &target_seconds.to_string(),
+        );
     }
     if let Some(actual_seconds) = payload.actual_seconds {
-        params.push(format!("actual_seconds={actual_seconds}"));
+        push_query_param(
+            &mut params,
+            "actual_seconds",
+            &actual_seconds.to_string(),
+        );
+    }
+    if let Some(result_save_path) = &payload.result_save_path {
+        push_query_param(&mut params, "result_save_path", result_save_path);
     }
 
     let uri = if params.is_empty() {
@@ -80,4 +91,25 @@ pub fn launch_capture_overlay(
     }
 
     Ok(window_label)
+}
+
+fn push_query_param(params: &mut Vec<String>, key: &str, value: &str) {
+    params.push(format!("{key}={}", encode_query_component(value)));
+}
+
+fn encode_query_component(value: &str) -> String {
+    let mut encoded = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z'
+            | b'a'..=b'z'
+            | b'0'..=b'9'
+            | b'-'
+            | b'_'
+            | b'.'
+            | b'~' => encoded.push(byte as char),
+            _ => encoded.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    encoded
 }

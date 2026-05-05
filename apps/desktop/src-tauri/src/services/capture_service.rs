@@ -1,5 +1,8 @@
+use std::path::{Path, PathBuf};
+
 use anyhow::{anyhow, bail, Result};
 use tauri::Emitter;
+use tokio::fs;
 
 use crate::{
     app_launcher,
@@ -8,7 +11,10 @@ use crate::{
         CaptureRect,
     },
     services::{AssetService, RecordService},
-    utils::{file_ops::decode_data_url, screen_capture},
+    utils::{
+        file_ops::{decode_data_url, ensure_unique_path},
+        media, screen_capture,
+    },
 };
 
 #[derive(Clone)]
@@ -86,6 +92,18 @@ impl CaptureService {
             )
             .await?;
 
+        if let Err(err) = persist_capture_result_to_requested_path(
+            &bytes,
+            context.result_save_path.as_deref(),
+            &file_name,
+        )
+        .await
+        {
+            eprintln!(
+                "Failed to persist capture result to requested path: {err:#}"
+            );
+        }
+
         #[derive(serde::Serialize, Clone)]
         #[serde(rename_all = "camelCase")]
         struct CaptureCompletedPayload {
@@ -104,6 +122,42 @@ impl CaptureService {
 
         Ok(())
     }
+}
+
+async fn persist_capture_result_to_requested_path(
+    bytes: &[u8],
+    result_save_path: Option<&str>,
+    file_name: &str,
+) -> Result<()> {
+    let Some(raw_path) =
+        result_save_path.map(str::trim).filter(|path| !path.is_empty())
+    else {
+        return Ok(());
+    };
+
+    let requested_path = PathBuf::from(raw_path);
+    let destination =
+        resolve_result_destination(&requested_path, file_name).await;
+    let destination = ensure_unique_path(destination).await?;
+    media::persist_bytes(&destination, bytes).await?;
+
+    Ok(())
+}
+
+async fn resolve_result_destination(
+    requested_path: &Path,
+    file_name: &str,
+) -> PathBuf {
+    if fs::metadata(requested_path)
+        .await
+        .map(|metadata| metadata.is_dir())
+        .unwrap_or(false)
+        || requested_path.extension().is_none()
+    {
+        return requested_path.join(file_name);
+    }
+
+    requested_path.to_path_buf()
 }
 
 /// Launch the transparent capture overlay used to select screen regions.
