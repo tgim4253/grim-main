@@ -10,7 +10,7 @@ i18n
   .init({
     fallbackLng: 'ko',
     supportedLngs: ['en', 'ko', 'jp'],
-    ns: ['common', 'home'],
+    ns: ['common', 'moa'],
     defaultNS: 'common',
     backend: {
       loadPath: '/locales/{{lng}}/{{ns}}.json',
@@ -23,7 +23,7 @@ i18n
       escapeValue: false,
     },
     react: {
-      useSuspense: true,
+      useSuspense: false,
     },
   });
 

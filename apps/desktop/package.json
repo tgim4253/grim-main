@@ -15,11 +15,11 @@
     "vite": "vite",
     "demo:library": "node scripts/build-theme.mjs && vite --open /library-demo/",
     "prebuild": "node scripts/build-theme.mjs",
-    "build": "tsc && vite build",
+    "build": "tsc && pnpm run ipc:check && vite build",
+    "ipc:check": "node scripts/check-ipc-contract.mjs",
     "prepreview": "node scripts/build-theme.mjs",
     "preview": "vite preview",
     "ui:demo": "node scripts/build-theme.mjs && vite --open /ui-demo/",
-    "db:prepare": "node ../../scripts/backend-sqlx-prepare.mjs",
     "tauri": "tauri"
   },
   "dependencies": {
