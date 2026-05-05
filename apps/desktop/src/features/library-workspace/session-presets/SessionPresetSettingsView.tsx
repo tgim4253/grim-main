@@ -123,18 +123,7 @@ function createDraftTags(value: string): Tag[] {
   }));
 }
 
-function describeTimeStep(step: EditableSessionStep) {
-  const tags = step.autoTags.length > 0 ? step.autoTags.map(tag => tag.name).join(', ') : 'No tags';
-  const flags = [
-    step.autoAdvance ? 'Auto' : 'Manual',
-    step.recordSaveEnabled ? 'Save' : 'No save',
-    step.captureEnabled ? 'Capture' : null,
-    step.grayscaleEnabled ? 'Gray' : null,
-    step.resultRequired ? 'Required' : null,
-  ].filter(Boolean);
-
-  return `${formatDurationCompact(getStepDuration(step))} · ${tags} · ${flags.join(' / ')}`;
-}
+const ignoreStepEditorChange = () => {};
 
 export function SessionPresetSettingsView() {
   const [sessionPresets, setSessionPresets] = useState<SessionPreset[]>([]);
@@ -643,9 +632,18 @@ export function SessionPresetSettingsView() {
                       </span>
                     </div>
                     <div className="session-preset-settings__step-body">
-                      <p className="session-preset-settings__step-description">
-                        {describeTimeStep(step)}
-                      </p>
+                      <SessionPresetStepEditor
+                        step={step}
+                        durationSeconds={getStepDuration(step)}
+                        disabled
+                        onTimerChange={ignoreStepEditorChange}
+                        onAutoAdvanceChange={ignoreStepEditorChange}
+                        onRecordsSaveChange={ignoreStepEditorChange}
+                        onRequireResultChange={ignoreStepEditorChange}
+                        onCaptureChange={ignoreStepEditorChange}
+                        onGrayscaleChange={ignoreStepEditorChange}
+                        onResultSavePathChange={ignoreStepEditorChange}
+                      />
                       <div className="session-preset-settings__step-actions">
                         <Button
                           size="sm"
