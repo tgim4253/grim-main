@@ -49,7 +49,7 @@ import {
 } from '../features/library-workspace/import';
 import { FolderSearchSelect } from '../features/library/components';
 import { CroquisStartModal } from '../features/croquis/ui/CroquisStartModal';
-import type { LibrarySettings, SessionPreset, VirtualFolder } from '../shared/types';
+import type { SessionPreset, TimeStepPreset, VirtualFolder } from '../shared/types';
 import './uiDemo.css';
 
 const DEMO_TIMESTAMP = '2024-01-01T00:00:00.000Z';
@@ -116,50 +116,116 @@ const IMPORT_MODAL_PREVIEWS = [
 
 type ImportModalPreview = (typeof IMPORT_MODAL_PREVIEWS)[number]['id'];
 const CROQUIS_MODAL_ASSET_IDS = ['demo-asset-01', 'demo-asset-02', 'demo-asset-03'];
+const CROQUIS_MODAL_TAGS = {
+  gesture: {
+    id: 'tag-gesture',
+    groupId: 'group-study',
+    name: 'GESTURE',
+    color: '#26997b',
+    sortOrder: 0,
+    createdAt: DEMO_TIMESTAMP,
+    updatedAt: DEMO_TIMESTAMP,
+  },
+  pose: {
+    id: 'tag-pose',
+    groupId: 'group-study',
+    name: 'POSE',
+    color: '#667085',
+    sortOrder: 1,
+    createdAt: DEMO_TIMESTAMP,
+    updatedAt: DEMO_TIMESTAMP,
+  },
+  anatomy: {
+    id: 'tag-anatomy',
+    groupId: 'group-study',
+    name: 'ANATOMY',
+    color: '#7f56d9',
+    sortOrder: 2,
+    createdAt: DEMO_TIMESTAMP,
+    updatedAt: DEMO_TIMESTAMP,
+  },
+};
+const CROQUIS_MODAL_TIME_STEP_PRESETS: TimeStepPreset[] = [
+  {
+    id: 'gesture-warmup-step',
+    name: 'Warm-up Gestures',
+    defaultDurationSeconds: 30,
+    autoAdvance: true,
+    recordSaveEnabled: true,
+    captureEnabled: true,
+    grayscaleEnabled: false,
+    resultRequired: true,
+    resultSavePath: null,
+    autoTags: [CROQUIS_MODAL_TAGS.gesture],
+    createdAt: DEMO_TIMESTAMP,
+    updatedAt: DEMO_TIMESTAMP,
+  },
+  {
+    id: 'figure-study-step',
+    name: 'Figure Study',
+    defaultDurationSeconds: 90,
+    autoAdvance: true,
+    recordSaveEnabled: true,
+    captureEnabled: true,
+    grayscaleEnabled: false,
+    resultRequired: true,
+    resultSavePath: null,
+    autoTags: [CROQUIS_MODAL_TAGS.pose],
+    createdAt: DEMO_TIMESTAMP,
+    updatedAt: DEMO_TIMESTAMP,
+  },
+  {
+    id: 'silhouette-step',
+    name: 'Silhouette',
+    defaultDurationSeconds: 120,
+    autoAdvance: true,
+    recordSaveEnabled: true,
+    captureEnabled: false,
+    grayscaleEnabled: false,
+    resultRequired: false,
+    resultSavePath: null,
+    autoTags: [],
+    createdAt: DEMO_TIMESTAMP,
+    updatedAt: DEMO_TIMESTAMP,
+  },
+  {
+    id: 'anatomy-pass-step',
+    name: 'Anatomy Pass',
+    defaultDurationSeconds: 300,
+    autoAdvance: true,
+    recordSaveEnabled: true,
+    captureEnabled: false,
+    grayscaleEnabled: false,
+    resultRequired: true,
+    resultSavePath: null,
+    autoTags: [CROQUIS_MODAL_TAGS.anatomy],
+    createdAt: DEMO_TIMESTAMP,
+    updatedAt: DEMO_TIMESTAMP,
+  },
+];
 const CROQUIS_MODAL_SESSION_PRESETS: SessionPreset[] = [
   {
     id: 'gesture-study',
     name: 'Gesture Study',
     description: 'Short pose warm-up with required result capture.',
     isDefault: true,
+    windowWidth: '1080',
+    windowHeight: '180',
+    isShuffle: true,
     createdAt: DEMO_TIMESTAMP,
     updatedAt: DEMO_TIMESTAMP,
     steps: [
       {
         id: 'gesture-warmup',
-        stepOrder: 0,
-        name: 'Warm-up Gestures',
-        defaultDurationSeconds: 30,
-        resultRequired: true,
-        autoTags: [
-          {
-            id: 'tag-gesture',
-            groupId: 'group-study',
-            name: 'GESTURE',
-            color: '#26997b',
-            sortOrder: 0,
-            createdAt: DEMO_TIMESTAMP,
-            updatedAt: DEMO_TIMESTAMP,
-          },
-        ],
+        timeStepPresetId: 'gesture-warmup-step',
+        stepOrder: 1,
+        timeStep: CROQUIS_MODAL_TIME_STEP_PRESETS[0],
       },
       {
         id: 'figure-study',
-        stepOrder: 1,
-        name: 'Figure Study',
-        defaultDurationSeconds: 90,
-        resultRequired: true,
-        autoTags: [
-          {
-            id: 'tag-pose',
-            groupId: 'group-study',
-            name: 'POSE',
-            color: '#667085',
-            sortOrder: 1,
-            createdAt: DEMO_TIMESTAMP,
-            updatedAt: DEMO_TIMESTAMP,
-          },
-        ],
+        timeStepPresetId: 'figure-study-step',
+        stepOrder: 2,
+        timeStep: CROQUIS_MODAL_TIME_STEP_PRESETS[1],
       },
     ],
   },
@@ -168,68 +234,27 @@ const CROQUIS_MODAL_SESSION_PRESETS: SessionPreset[] = [
     name: 'Long Pose',
     description: 'Longer study preset for anatomy passes.',
     isDefault: false,
+    windowWidth: '960',
+    windowHeight: null,
+    isShuffle: false,
     createdAt: DEMO_TIMESTAMP,
     updatedAt: DEMO_TIMESTAMP,
     steps: [
       {
         id: 'silhouette',
-        stepOrder: 0,
-        name: 'Silhouette',
-        defaultDurationSeconds: 120,
-        resultRequired: false,
-        autoTags: [],
+        timeStepPresetId: 'silhouette-step',
+        stepOrder: 1,
+        timeStep: CROQUIS_MODAL_TIME_STEP_PRESETS[2],
       },
       {
         id: 'anatomy-pass',
-        stepOrder: 1,
-        name: 'Anatomy Pass',
-        defaultDurationSeconds: 300,
-        resultRequired: true,
-        autoTags: [
-          {
-            id: 'tag-anatomy',
-            groupId: 'group-study',
-            name: 'ANATOMY',
-            color: '#7f56d9',
-            sortOrder: 2,
-            createdAt: DEMO_TIMESTAMP,
-            updatedAt: DEMO_TIMESTAMP,
-          },
-        ],
+        timeStepPresetId: 'anatomy-pass-step',
+        stepOrder: 2,
+        timeStep: CROQUIS_MODAL_TIME_STEP_PRESETS[3],
       },
     ],
   },
 ];
-const CROQUIS_MODAL_LIBRARY_SETTINGS: LibrarySettings = {
-  activeSessionPresetId: 'gesture-study',
-  croquisPreferences: {
-    activePresetId: 'ui-demo',
-    presets: [
-      {
-        id: 'ui-demo',
-        name: 'UI Demo',
-        option: {
-          window: {
-            width: '1080',
-            height: '180',
-          },
-          auto: {
-            isSkip: true,
-          },
-          timer: {
-            maxTime: 60,
-          },
-          isRecordSave: true,
-          isCapture: true,
-          savePath: '',
-          isGray: false,
-          isShuffle: true,
-        },
-      },
-    ],
-  },
-};
-
 const DEMO_VIRTUAL_FOLDERS: VirtualFolder[] = [
   {
     id: 'folder-references',
@@ -829,10 +854,9 @@ function CroquisModalDemo() {
         open={open}
         assetIds={CROQUIS_MODAL_ASSET_IDS}
         sessionPresets={CROQUIS_MODAL_SESSION_PRESETS}
-        librarySettings={CROQUIS_MODAL_LIBRARY_SETTINGS}
+        timeStepPresets={CROQUIS_MODAL_TIME_STEP_PRESETS}
         onClose={handleClose}
         onStarted={handleStarted}
-        saveCroquisPreferences={() => Promise.resolve()}
         startCroquisSession={() => Promise.resolve()}
       />
     </>

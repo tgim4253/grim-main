@@ -9,8 +9,8 @@ import type {
   CroquisRecordDetail,
   CroquisRecordSummary,
   ExplorerSnapshot,
-  LibrarySettings,
   SessionPreset,
+  TimeStepPreset,
   VirtualFolder,
 } from '../../../shared/types';
 import { Button } from '../../../shared/ui';
@@ -105,7 +105,7 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
   const [croquisModalOpen, setCroquisModalOpen] = useState(false);
   const [croquisAssetIds, setCroquisAssetIds] = useState<string[]>([]);
   const [sessionPresets, setSessionPresets] = useState<SessionPreset[]>([]);
-  const [librarySettings, setLibrarySettings] = useState<LibrarySettings>({});
+  const [timeStepPresets, setTimeStepPresets] = useState<TimeStepPreset[]>([]);
   const [isCroquisConfigLoading, setIsCroquisConfigLoading] = useState(false);
   const [croquisConfigError, setCroquisConfigError] = useState<string | null>(null);
   const [folderAction, setFolderAction] = useState<FolderAction | null>(null);
@@ -266,9 +266,9 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
     setCroquisConfigError(null);
 
     try {
-      const [nextPresets, nextSettings] = await Promise.all([
+      const [nextPresets, nextTimeStepPresets] = await Promise.all([
         ipc.session.listPresets(),
-        ipc.library.loadSettingsSnapshot(),
+        ipc.session.listTimeStepPresets(),
       ]);
 
       if (croquisConfigLoadSequenceRef.current !== loadSequence) {
@@ -276,7 +276,7 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
       }
 
       setSessionPresets(nextPresets);
-      setLibrarySettings(nextSettings);
+      setTimeStepPresets(nextTimeStepPresets);
       return true;
     } catch (nextError) {
       if (croquisConfigLoadSequenceRef.current !== loadSequence) {
@@ -284,6 +284,7 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
       }
 
       setSessionPresets([]);
+      setTimeStepPresets([]);
       setCroquisConfigError(
         getErrorMessage(nextError, 'Failed to load Croquis session configuration.'),
       );
@@ -575,7 +576,7 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
         open={croquisModalOpen}
         assetIds={croquisAssetIds}
         sessionPresets={sessionPresets}
-        librarySettings={librarySettings}
+        timeStepPresets={timeStepPresets}
         onClose={handleCloseCroquisModal}
         onStarted={handleCroquisStarted}
       />
