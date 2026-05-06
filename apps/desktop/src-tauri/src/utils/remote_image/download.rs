@@ -118,10 +118,10 @@ fn decode_remote_data_image(source: &str) -> Result<RemoteImageDownload> {
         .or_else(|| extension_hint.as_deref().and_then(supported_extension))
         .ok_or_else(|| anyhow!("Remote data URL is not a supported image"))?;
 
-    Ok(RemoteImageDownload {
-        bytes,
-        file_name: format!("remote-image.{extension}"),
-    })
+    let file_name = data_url_file_name_hint(source, &extension)
+        .unwrap_or_else(|| format!("remote-image.{extension}"));
+
+    Ok(RemoteImageDownload { bytes, file_name })
 }
 
 async fn request_remote_image(
@@ -422,12 +422,62 @@ fn sanitize_file_name(raw_name: &str) -> String {
     }
 }
 
+fn data_url_file_name_hint(source: &str, extension: &str) -> Option<String> {
+    let header = source.split_once(',')?.0;
+    for parameter in header.split(';').skip(1) {
+        let Some((key, value)) = parameter.split_once('=') else {
+            continue;
+        };
+        let key = key.trim().to_ascii_lowercase();
+        if key == "name" || key == "filename" {
+            let decoded = percent_decode_parameter(value.trim());
+            if !decoded.trim().is_empty() {
+                return Some(file_name_with_extension(&decoded, extension));
+            }
+        }
+    }
+
+    None
+}
+
+fn percent_decode_parameter(value: &str) -> String {
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+
+    while index < bytes.len() {
+        if bytes[index] == b'%' && index + 2 < bytes.len() {
+            let left = hex_value(bytes[index + 1]);
+            let right = hex_value(bytes[index + 2]);
+            if let (Some(left), Some(right)) = (left, right) {
+                decoded.push((left << 4) | right);
+                index += 3;
+                continue;
+            }
+        }
+
+        decoded.push(bytes[index]);
+        index += 1;
+    }
+
+    String::from_utf8(decoded).unwrap_or_else(|_| value.to_string())
+}
+
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use reqwest::Url;
 
     use super::{
-        ensure_data_url_encoded_size_within_limit,
+        data_url_file_name_hint, ensure_data_url_encoded_size_within_limit,
         ensure_remote_image_dimensions, validate_remote_image_url,
         MAX_REMOTE_IMAGE_DIMENSION,
     };
@@ -458,6 +508,16 @@ mod tests {
 
         assert!(ensure_data_url_encoded_size_within_limit(source, 2).is_err());
         assert!(ensure_data_url_encoded_size_within_limit(source, 3).is_ok());
+    }
+
+    #[test]
+    fn data_url_file_name_hint_uses_encoded_name_parameter() {
+        let source = "data:image/png;name=cat%20photo.jpg;base64,AAAA";
+
+        assert_eq!(
+            data_url_file_name_hint(source, "png").as_deref(),
+            Some("cat_photo.png")
+        );
     }
 
     #[test]
