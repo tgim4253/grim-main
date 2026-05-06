@@ -56,7 +56,7 @@
     margin: 0;
     padding-left: 16px;
     overflow: hidden;
-    color: var(--semantic-colors-text-teritary);
+    color: var(--semantic-colors-text-tertiary);
     font-size: 12px;
     line-height: 16px;
     font-weight: var(--font-weight-medium);
@@ -123,7 +123,7 @@
   }
 
   .reference-selection-toolbar__count {
-    color: var(--semantic-colors-text-teritary);
+    color: var(--semantic-colors-text-tertiary);
     font-size: 12px;
     line-height: 16px;
     font-weight: var(--font-weight-medium);
@@ -473,7 +473,7 @@
   }
 
   .asset-preview-panel__related-header h3 {
-    color: var(--semantic-colors-text-teritary);
+    color: var(--semantic-colors-text-tertiary);
   }
 
   .asset-preview-panel__related-header span {

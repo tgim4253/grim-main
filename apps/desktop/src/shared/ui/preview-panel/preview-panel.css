@@ -37,7 +37,7 @@
     height: 36px;
     border-radius: 999px;
     transform: translate(-50%, -50%);
-    background: color-mix(in srgb, var(--semantic-colors-text-teritary) 24%, transparent);
+    background: color-mix(in srgb, var(--semantic-colors-text-tertiary) 24%, transparent);
     transition: background-color 120ms ease;
   }
 

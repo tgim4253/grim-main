@@ -4,8 +4,8 @@
     --_icon-button-background: transparent;
     --_icon-button-border-left-color: transparent;
     --_icon-button-icon-size: var(--semantic-size-icon-sm);
-    --_icon-button-icon-color-base: var(--semantic-colors-text-teritary);
-    --_icon-button-icon-color-interactive: var(--semantic-colors-text-primary);
+    --_icon-button-icon-color-base: var(--semantic-colors-icon-tertiary);
+    --_icon-button-icon-color-interactive: var(--semantic-colors-icon-primary);
     position: relative;
     display: inline-flex;
     flex: none;

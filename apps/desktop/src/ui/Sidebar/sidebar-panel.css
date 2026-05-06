@@ -35,7 +35,7 @@
   }
 
   .c-sidebar-panel__title {
-    color: var(--semantic-colors-text-teritary);
+    color: var(--semantic-colors-text-tertiary);
     font-family: var(--components-typography-sidebar-panel-title-font-family);
     font-size: var(--components-typography-sidebar-panel-title-font-size);
     font-weight: var(--components-typography-sidebar-panel-title-font-weight);
