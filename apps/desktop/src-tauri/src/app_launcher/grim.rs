@@ -25,7 +25,8 @@ pub fn launch_main_window(app: &tauri::AppHandle) -> Result<(), String> {
     let web_builder =
         tauri::WebviewWindowBuilder::new(app, window_label.clone(), url)
             .title("Grim")
-            .inner_size(1440.0, 920.0);
+            .inner_size(1440.0, 920.0)
+            .disable_drag_drop_handler();
 
     #[cfg(target_os = "macos")]
     let web_builder =

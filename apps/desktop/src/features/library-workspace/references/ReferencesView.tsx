@@ -22,6 +22,7 @@ import { createReferenceAsset } from './referenceAssets';
 import { ReferenceExplorerHeader } from './ReferenceExplorerHeader';
 import { ReferenceMasonryTile } from './ReferenceMasonryTile';
 import { ReferenceSelectionToolbar } from './ReferenceSelectionToolbar';
+import { useReferenceDropImport } from './lib/useReferenceDropImport';
 import './reference-workspace.css';
 
 type ReferencesViewProps = {
@@ -165,6 +166,18 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
     const assetIds = new Set(assets.map(asset => asset.id));
     setSelectedAssetIds(current => current.filter(assetId => assetIds.has(assetId)));
   }, [assets]);
+
+  const {
+    dropImportBusy,
+    dropImportError,
+    dropImportTargetLabel,
+    dropOverlayVisible,
+    dropShellProps,
+  } = useReferenceDropImport({
+    source,
+    onAssetsRefresh: loadAssets,
+    onExplorerRefresh,
+  });
 
   useEffect(() => {
     const detailLoadSequence = selectedAssetDetailLoadSequenceRef.current + 1;
@@ -503,63 +516,79 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
   const folderActionModalBusy = folderActionBusy || folderActionLoading || assetActionBusy;
   const folderActionSelectDisabled =
     folderActionModalBusy || !folderActionFolderId || folderActionFolders.length === 0;
-  const statusError = assetActionError ?? croquisConfigError;
+  const statusError = dropImportError ?? assetActionError ?? croquisConfigError;
 
   return (
     <>
-      <LibraryWorkspace
-        mode="references"
-        items={items}
-        layout={layout}
-        selectedItemId={selectedAssetId ?? undefined}
-        selectedItemIds={selectedAssetIds}
-        selectionMode={selectionMode}
-        gridAriaLabel="References"
-        previewOpen={previewOpen}
-        gridBusy={isLoading}
-        gridEmptyState={gridEmptyState}
-        onLayoutChange={setLayout}
-        onSelectedItemChange={handleSelectedAssetChange}
-        renderHeader={headerProps => <ReferenceExplorerHeader {...headerProps} />}
-        renderToolbar={
-          <ReferenceSelectionToolbar
-            selectionMode={selectionMode}
-            selectedCount={selectedAssetIds.length}
-            totalCount={assets.length}
-            croquisDisabled={isCroquisConfigLoading}
-            folderActionsDisabled={assetActionBusy || folderActionModalBusy}
-            onSelectionModeChange={handleSelectionModeChange}
-            onSelectAllChange={handleSelectAllChange}
-            onAddToFolder={handleAddSelectedToFolder}
-            onMoveToFolder={handleMoveSelectedToFolder}
-            onStartCroquis={handleStartCroquis}
-          />
-        }
-        renderTile={(asset, tileState) => (
-          <ReferenceMasonryTile
-            asset={asset}
-            layout={tileState.layout}
-            selected={tileState.selected}
-            selectionIndex={tileState.selectionIndex}
-            selectionMode={tileState.selectionMode}
-            onSelect={tileState.onSelect}
-          />
-        )}
-        renderPreview={asset => (
-          <AssetPreviewPanel
-            asset={asset}
-            busy={assetActionBusy || isCroquisConfigLoading}
-            onClose={() => {
-              setPreviewOpen(false);
-            }}
-            onAddFolder={handlePreviewAddFolder}
-            onRemoveFolder={handlePreviewRemoveFolder}
-            onStartCroquis={assetId => {
-              openCroquisForAssets([assetId]);
-            }}
-          />
-        )}
-      />
+      <div className="references-view-drop-shell" {...dropShellProps}>
+        <LibraryWorkspace
+          mode="references"
+          items={items}
+          layout={layout}
+          selectedItemId={selectedAssetId ?? undefined}
+          selectedItemIds={selectedAssetIds}
+          selectionMode={selectionMode}
+          gridAriaLabel="References"
+          previewOpen={previewOpen}
+          gridBusy={isLoading}
+          gridEmptyState={gridEmptyState}
+          onLayoutChange={setLayout}
+          onSelectedItemChange={handleSelectedAssetChange}
+          renderHeader={headerProps => <ReferenceExplorerHeader {...headerProps} />}
+          renderToolbar={
+            <ReferenceSelectionToolbar
+              selectionMode={selectionMode}
+              selectedCount={selectedAssetIds.length}
+              totalCount={assets.length}
+              croquisDisabled={isCroquisConfigLoading}
+              folderActionsDisabled={assetActionBusy || folderActionModalBusy}
+              onSelectionModeChange={handleSelectionModeChange}
+              onSelectAllChange={handleSelectAllChange}
+              onAddToFolder={handleAddSelectedToFolder}
+              onMoveToFolder={handleMoveSelectedToFolder}
+              onStartCroquis={handleStartCroquis}
+            />
+          }
+          renderTile={(asset, tileState) => (
+            <ReferenceMasonryTile
+              asset={asset}
+              layout={tileState.layout}
+              selected={tileState.selected}
+              selectionIndex={tileState.selectionIndex}
+              selectionMode={tileState.selectionMode}
+              onSelect={tileState.onSelect}
+            />
+          )}
+          renderPreview={asset => (
+            <AssetPreviewPanel
+              asset={asset}
+              busy={assetActionBusy || isCroquisConfigLoading}
+              onClose={() => {
+                setPreviewOpen(false);
+              }}
+              onAddFolder={handlePreviewAddFolder}
+              onRemoveFolder={handlePreviewRemoveFolder}
+              onStartCroquis={assetId => {
+                openCroquisForAssets([assetId]);
+              }}
+            />
+          )}
+        />
+        {dropOverlayVisible ? (
+          <div className="reference-drop-overlay" aria-live="polite">
+            <div className="reference-drop-overlay__card">
+              <span className="reference-drop-overlay__title">
+                {dropImportBusy ? 'Importing assets...' : 'Drop to import references'}
+              </span>
+              <span className="reference-drop-overlay__copy">
+                {dropImportBusy
+                  ? 'Saving local files and web images to the library.'
+                  : `Local image files and web images are supported. ${dropImportTargetLabel}`}
+              </span>
+            </div>
+          </div>
+        ) : null}
+      </div>
       <FolderSearchModal
         open={folderAction !== null}
         folders={folderActionFolders}

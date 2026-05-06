@@ -8,13 +8,13 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
-import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { formatBytes } from '../../lib/format';
 import { cx } from '../../shared/lib/cx';
 import { ipc } from '../../shared/lib/ipc';
 import type {
   AssetListSource,
   ExplorerSnapshot,
+  ImportFailure,
   ImportPreviewResult,
   ImportResult,
   VirtualFolder,
@@ -40,6 +40,13 @@ import {
   ImportCompletedModal,
   type ImportSummary,
 } from '../../features/library-workspace/import';
+import {
+  collectSupportedDroppedImageFiles,
+  fileToDataImageSource,
+  formatDroppedImageFileWarnings,
+  hasFileDropData,
+  type DroppedImageFileCollection,
+} from '../../features/library-workspace/import/dropFileData';
 import { AppTopBar } from '../../ui/Header/AppTopBar';
 import {
   MiniSidebarRail,
@@ -130,6 +137,22 @@ function formatPreviewFailureMessage(failedCount: number) {
   return `${failedCount.toLocaleString()} ${itemLabel} could not be reviewed and will be skipped.`;
 }
 
+function createEmptyImportResult(failed: ImportFailure[] = []): ImportResult {
+  return {
+    imported: 0,
+    reused: 0,
+    failed,
+    assets: [],
+  };
+}
+
+function mergeImportResult(target: ImportResult, source: ImportResult) {
+  target.imported += source.imported;
+  target.reused += source.reused;
+  target.failed.push(...source.failed);
+  target.assets.push(...source.assets);
+}
+
 export function LibraryPage() {
   const [isSidebarPanelOpen, setIsSidebarPanelOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
@@ -146,6 +169,7 @@ export function LibraryPage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [importSummary, setImportSummary] = useState<ImportSummary | undefined>();
   const [importPreview, setImportPreview] = useState<ImportPreviewResult | undefined>();
+  const [importDroppedFiles, setImportDroppedFiles] = useState<readonly File[] | undefined>();
   const [importProgress, setImportProgress] = useState<ImportProgressState | undefined>();
   const [isImporting, setIsImporting] = useState(false);
   const [isImportPreviewing, setIsImportPreviewing] = useState(false);
@@ -154,6 +178,7 @@ export function LibraryPage() {
   const importInFlightRef = useRef(false);
   const importPreviewInFlightRef = useRef(false);
   const filePickerOpenRef = useRef(false);
+  const importDomDragDepthRef = useRef(0);
   const resizeSessionRef = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(
     null,
   );
@@ -283,6 +308,7 @@ export function LibraryPage() {
     setImportFolderId(getDefaultImportFolderId());
     setImportSummary(undefined);
     setImportPreview(undefined);
+    setImportDroppedFiles(undefined);
     setImportProgress(undefined);
     setImportError(assignableFolders.length > 0 ? null : NO_DESTINATION_FOLDERS_ERROR);
     setImportStep('folder');
@@ -303,8 +329,10 @@ export function LibraryPage() {
     setImportError(null);
     setImportSummary(undefined);
     setImportPreview(undefined);
+    setImportDroppedFiles(undefined);
     setImportProgress(undefined);
     setIsImportDragActive(false);
+    importDomDragDepthRef.current = 0;
   }, []);
 
   useEffect(() => {
@@ -357,6 +385,7 @@ export function LibraryPage() {
       if (selectedPaths.length === 0) {
         setImportError('Select at least one image file or folder.');
         setImportPreview(undefined);
+        setImportDroppedFiles(undefined);
         setImportProgress(undefined);
         setImportStep('assets');
         return;
@@ -367,6 +396,7 @@ export function LibraryPage() {
       setImportError(null);
       setImportSummary(undefined);
       setImportProgress(undefined);
+      setImportDroppedFiles(undefined);
 
       try {
         const preview = await ipc.import.previewImages({
@@ -381,21 +411,76 @@ export function LibraryPage() {
               : 'No supported image files were found.',
           );
           setImportPreview(undefined);
+          setImportDroppedFiles(undefined);
           setImportStep('assets');
           return;
         }
 
         setImportPreview(preview);
+        setImportDroppedFiles(undefined);
         setImportError(previewFailureMessage);
         setImportStep('assets');
       } catch (error) {
         setImportPreview(undefined);
+        setImportDroppedFiles(undefined);
         setImportError(getErrorMessage(error, 'Failed to review selected files.'));
         setImportStep('assets');
       } finally {
         importPreviewInFlightRef.current = false;
         setIsImportPreviewing(false);
         setIsImportDragActive(false);
+      }
+    },
+    [assignableFolderById, importFolderId],
+  );
+
+  const previewImportDroppedFiles = useCallback(
+    async (collectionPromise: Promise<DroppedImageFileCollection>) => {
+      if (importInFlightRef.current || importPreviewInFlightRef.current) {
+        return;
+      }
+
+      if (!importFolderId) {
+        setImportError('Select a destination folder before choosing files.');
+        setImportStep('folder');
+        return;
+      }
+
+      const destinationFolder = assignableFolderById.get(importFolderId);
+      if (!destinationFolder) {
+        setImportError('The selected destination folder cannot receive imported assets.');
+        setImportStep('folder');
+        return;
+      }
+
+      importPreviewInFlightRef.current = true;
+      setIsImportPreviewing(true);
+      setImportError(null);
+      setImportSummary(undefined);
+      setImportPreview(undefined);
+      setImportDroppedFiles(undefined);
+      setImportProgress(undefined);
+
+      try {
+        const collection = await collectionPromise;
+        const warningMessage = formatDroppedImageFileWarnings(collection);
+        if (collection.files.length === 0) {
+          setImportError(warningMessage ?? 'No supported image files were found.');
+          setImportStep('assets');
+          return;
+        }
+
+        setImportDroppedFiles(collection.files);
+        setImportError(warningMessage);
+        setImportStep('assets');
+      } catch (error) {
+        setImportError(getErrorMessage(error, 'Failed to review dropped files.'));
+        setImportStep('assets');
+      } finally {
+        importPreviewInFlightRef.current = false;
+        setIsImportPreviewing(false);
+        setIsImportDragActive(false);
+        importDomDragDepthRef.current = 0;
       }
     },
     [assignableFolderById, importFolderId],
@@ -419,8 +504,9 @@ export function LibraryPage() {
       return;
     }
 
+    const droppedFiles = importDroppedFiles ?? [];
     const filePaths = importPreview?.filePaths ?? [];
-    if (filePaths.length === 0) {
+    if (droppedFiles.length === 0 && filePaths.length === 0) {
       setImportError('Select image files before importing.');
       return;
     }
@@ -428,37 +514,58 @@ export function LibraryPage() {
     importInFlightRef.current = true;
     setIsImporting(true);
     setImportError(null);
-    setImportProgress({ completed: 0, total: filePaths.length });
+    setImportProgress({ completed: 0, total: droppedFiles.length || filePaths.length });
 
     void (async () => {
-      const aggregateResult: ImportResult = {
-        imported: 0,
-        reused: 0,
-        failed: [...(importPreview?.failed ?? [])],
-        assets: [],
-      };
+      const aggregateResult = createEmptyImportResult([...(importPreview?.failed ?? [])]);
 
       try {
-        for (let index = 0; index < filePaths.length; index += 1) {
-          const filePath = filePaths[index];
+        if (droppedFiles.length > 0) {
+          for (let index = 0; index < droppedFiles.length; index += 1) {
+            const file = droppedFiles[index];
 
-          try {
-            const result = await ipc.import.importImages({
-              filePaths: [filePath],
-              virtualFolderIds: [importFolderId],
-            });
+            try {
+              const source = await fileToDataImageSource(file);
+              if (!source) {
+                aggregateResult.failed.push({
+                  filePath: file.name,
+                  error: 'Dropped file is not a supported image.',
+                });
+                continue;
+              }
 
-            aggregateResult.imported += result.imported;
-            aggregateResult.reused += result.reused;
-            aggregateResult.failed.push(...result.failed);
-            aggregateResult.assets.push(...result.assets);
-          } catch (error) {
-            aggregateResult.failed.push({
-              filePath,
-              error: getErrorMessage(error, 'Failed to import file.'),
-            });
-          } finally {
-            setImportProgress({ completed: index + 1, total: filePaths.length });
+              const result = await ipc.import.importRemoteImages({
+                sources: [source],
+                virtualFolderIds: [importFolderId],
+              });
+              mergeImportResult(aggregateResult, result);
+            } catch (error) {
+              aggregateResult.failed.push({
+                filePath: file.name,
+                error: getErrorMessage(error, 'Failed to import dropped file.'),
+              });
+            } finally {
+              setImportProgress({ completed: index + 1, total: droppedFiles.length });
+            }
+          }
+        } else {
+          for (let index = 0; index < filePaths.length; index += 1) {
+            const filePath = filePaths[index];
+
+            try {
+              const result = await ipc.import.importImages({
+                filePaths: [filePath],
+                virtualFolderIds: [importFolderId],
+              });
+              mergeImportResult(aggregateResult, result);
+            } catch (error) {
+              aggregateResult.failed.push({
+                filePath,
+                error: getErrorMessage(error, 'Failed to import file.'),
+              });
+            } finally {
+              setImportProgress({ completed: index + 1, total: filePaths.length });
+            }
           }
         }
 
@@ -472,6 +579,7 @@ export function LibraryPage() {
 
         setImportSummary(createImportSummary(aggregateResult, destinationFolder));
         setImportPreview(undefined);
+        setImportDroppedFiles(undefined);
         setImportProgress(undefined);
         setImportStep('completed');
         setWorkspaceRefreshKey(current => current + 1);
@@ -484,9 +592,16 @@ export function LibraryPage() {
         importInFlightRef.current = false;
         setIsImporting(false);
         setIsImportDragActive(false);
+        importDomDragDepthRef.current = 0;
       }
     })();
-  }, [assignableFolderById, importFolderId, importPreview, loadExplorerSnapshot]);
+  }, [
+    assignableFolderById,
+    importDroppedFiles,
+    importFolderId,
+    importPreview,
+    loadExplorerSnapshot,
+  ]);
 
   const handleSelectImportFiles = useCallback(() => {
     if (importInFlightRef.current || filePickerOpenRef.current) {
@@ -556,46 +671,75 @@ export function LibraryPage() {
   useEffect(() => {
     if (importStep !== 'assets' || isImporting || isImportPreviewing || isFilePickerOpen) {
       setIsImportDragActive(false);
+      importDomDragDepthRef.current = 0;
       return undefined;
     }
 
-    let cancelled = false;
-    let unlisten: (() => void) | undefined;
+    const handleDocumentDragEnter = (event: DragEvent) => {
+      const dataTransfer = event.dataTransfer;
+      if (!dataTransfer || !hasFileDropData(dataTransfer)) {
+        return;
+      }
 
-    void getCurrentWebview()
-      .onDragDropEvent(event => {
-        if (event.payload.type === 'enter' || event.payload.type === 'over') {
-          setIsImportDragActive(true);
-          return;
-        }
+      event.preventDefault();
+      event.stopPropagation();
+      importDomDragDepthRef.current += 1;
+      setIsImportDragActive(true);
+    };
 
-        if (event.payload.type === 'leave') {
-          setIsImportDragActive(false);
-          return;
-        }
+    const handleDocumentDragOver = (event: DragEvent) => {
+      const dataTransfer = event.dataTransfer;
+      if (!dataTransfer || !hasFileDropData(dataTransfer)) {
+        return;
+      }
 
+      event.preventDefault();
+      event.stopPropagation();
+      dataTransfer.dropEffect = 'copy';
+      setIsImportDragActive(true);
+    };
+
+    const handleDocumentDragLeave = (event: DragEvent) => {
+      const dataTransfer = event.dataTransfer;
+      if (!dataTransfer || !hasFileDropData(dataTransfer)) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      importDomDragDepthRef.current = Math.max(0, importDomDragDepthRef.current - 1);
+      if (importDomDragDepthRef.current === 0) {
         setIsImportDragActive(false);
-        void previewImportFilePaths(event.payload.paths);
-      })
-      .then(nextUnlisten => {
-        if (cancelled) {
-          nextUnlisten();
-          return;
-        }
+      }
+    };
 
-        unlisten = nextUnlisten;
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          setImportError(getErrorMessage(error, 'Failed to listen for dropped files.'));
-        }
-      });
+    const handleDocumentDrop = (event: DragEvent) => {
+      const dataTransfer = event.dataTransfer;
+      if (!dataTransfer || !hasFileDropData(dataTransfer)) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      const collectionPromise = collectSupportedDroppedImageFiles(dataTransfer);
+      importDomDragDepthRef.current = 0;
+      setIsImportDragActive(false);
+      void previewImportDroppedFiles(collectionPromise);
+    };
+
+    document.addEventListener('dragenter', handleDocumentDragEnter, true);
+    document.addEventListener('dragover', handleDocumentDragOver, true);
+    document.addEventListener('dragleave', handleDocumentDragLeave, true);
+    document.addEventListener('drop', handleDocumentDrop, true);
 
     return () => {
-      cancelled = true;
-      unlisten?.();
+      document.removeEventListener('dragenter', handleDocumentDragEnter, true);
+      document.removeEventListener('dragover', handleDocumentDragOver, true);
+      document.removeEventListener('dragleave', handleDocumentDragLeave, true);
+      document.removeEventListener('drop', handleDocumentDrop, true);
+      importDomDragDepthRef.current = 0;
     };
-  }, [importStep, isFilePickerOpen, isImportPreviewing, isImporting, previewImportFilePaths]);
+  }, [importStep, isFilePickerOpen, isImportPreviewing, isImporting, previewImportDroppedFiles]);
 
   const handleSplitterPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -718,7 +862,12 @@ export function LibraryPage() {
         assetCount: importPreview.assetCount,
         totalSize: formatBytes(importPreview.totalSize),
       }
-    : undefined;
+    : importDroppedFiles
+      ? {
+          assetCount: importDroppedFiles.length,
+          totalSize: formatBytes(importDroppedFiles.reduce((sum, file) => sum + file.size, 0)),
+        }
+      : undefined;
 
   return (
     <div className="app-shell library-page">
@@ -835,7 +984,9 @@ export function LibraryPage() {
           !assignableFolderById.has(importFolderId)
         }
         importDisabled={
-          !importPreview || !importFolderId || !assignableFolderById.has(importFolderId)
+          (!importPreview && !importDroppedFiles?.length) ||
+          !importFolderId ||
+          !assignableFolderById.has(importFolderId)
         }
         dragActive={isImportDragActive}
       />

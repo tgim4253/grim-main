@@ -1,4 +1,56 @@
 @layer app {
+  .references-view-drop-shell {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .reference-drop-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    background: color-mix(in srgb, var(--semantic-colors-surface-canvas) 72%, transparent);
+    backdrop-filter: blur(3px);
+    pointer-events: none;
+  }
+
+  .reference-drop-overlay__card {
+    display: flex;
+    width: min(420px, 100%);
+    min-height: 168px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 28px;
+    border: 2px dashed var(--semantic-colors-brand-primary);
+    border-radius: var(--primitives-radius-12);
+    background: color-mix(in srgb, var(--semantic-colors-surface-panel) 92%, transparent);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+    text-align: center;
+  }
+
+  .reference-drop-overlay__title {
+    color: var(--semantic-colors-text-primary);
+    font-size: 18px;
+    line-height: 26px;
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .reference-drop-overlay__copy {
+    max-width: 320px;
+    color: var(--semantic-colors-text-secondary);
+    font-size: 13px;
+    line-height: 20px;
+    font-weight: var(--font-weight-regular);
+  }
+
   .reference-explorer-header {
     display: flex;
     flex: none;
