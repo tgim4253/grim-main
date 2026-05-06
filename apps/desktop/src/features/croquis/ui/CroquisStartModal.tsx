@@ -5,306 +5,54 @@ import {
   AccordionItemHeader,
   AccordionRoot,
   Button,
-  Chip,
-  ChipButton,
-  CheckboxConditionalRow,
   CheckboxRow,
   Icon,
+  IconButton,
   Input,
   Modal,
   ModalFooter,
   Select,
   type SelectOption,
 } from '../../../shared/ui';
-import type {
-  CroquisOption,
-  CroquisPreferences,
-  CroquisStartPayload,
-  LibrarySettings,
-  SessionPreset,
-} from '../../../shared/types';
+import type { CroquisStartPayload, SessionPreset, TimeStepPreset } from '../../../shared/types';
 import { ipc } from '../../../shared/lib/ipc';
-import { buildPreferences, cloneOption, findFallbackPreset } from '../lib/startModal';
+import { findFallbackPreset, setStoredActiveSessionPresetId } from '../lib/startModal';
+import {
+  USER_CUSTOM_STEP_LABEL,
+  USER_CUSTOM_STEP_VALUE,
+  applyTimeStepPresetToStep,
+  clampDurationSeconds,
+  createCustomStep,
+  createEditableSteps,
+  formatDurationCompact,
+  formatEstimate,
+  getStepDuration,
+  normalizeOptionalString,
+  normalizeStepOrders,
+  normalizeWindowDimension,
+  toCroquisRuntimeStep,
+  type EditableSessionStep,
+} from '../lib/sessionPresetEditor';
+import { SessionPresetStepEditor } from './SessionPresetStepEditor';
 import './croquis.css';
-
-const DURATION_OPTIONS = [
-  { label: '10s', value: 10 },
-  { label: '30s', value: 30 },
-  { label: '1m', value: 60 },
-  { label: '3m', value: 180 },
-  { label: '10m', value: 600 },
-  { label: '30m', value: 1800 },
-  { label: '1h', value: 3600 },
-  { label: '∞', value: 0 },
-] as const;
-
-const DURATION_MIN_SECONDS = 0;
-const DURATION_SLIDER_MAX_SECONDS = 3600;
-const DURATION_STEP_SECONDS = 1;
 
 type CroquisStartModalProps = {
   open: boolean;
   assetIds: string[];
   sessionPresets: SessionPreset[];
-  librarySettings: LibrarySettings;
+  timeStepPresets?: TimeStepPreset[];
   onClose: () => void;
   onStarted: () => Promise<void> | void;
-  saveCroquisPreferences?: (preferences: CroquisPreferences) => Promise<unknown>;
   startCroquisSession?: (payload: CroquisStartPayload) => Promise<unknown>;
 };
-
-const formatDurationCompact = (seconds?: number | null) => {
-  if (seconds === null || seconds === undefined || seconds <= 0) {
-    return '∞';
-  }
-
-  if (seconds % 3600 === 0) {
-    return `${String(seconds / 3600)}h`;
-  }
-
-  if (seconds % 60 === 0) {
-    return `${String(seconds / 60)}m`;
-  }
-
-  return `${String(seconds)}s`;
-};
-
-const formatSeconds = (seconds: number) => formatDurationCompact(seconds);
-
-const formatEstimate = (seconds: number) => {
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  return `${String(minutes)}:${String(remainingSeconds).padStart(2, '0')}`;
-};
-
-const normalizeWindowDimension = (value: string) => value.replace(/\D/g, '');
-
-const clampDurationSeconds = (seconds: number) => {
-  return Math.max(DURATION_MIN_SECONDS, Math.trunc(Number.isFinite(seconds) ? seconds : 0));
-};
-
-const normalizeDurationUnit = (value: string, max?: number) => {
-  const digits = value.replace(/\D/g, '');
-  const unitValue = Math.max(0, digits ? Number(digits) : 0);
-
-  if (!Number.isFinite(unitValue)) {
-    return 0;
-  }
-
-  return max === undefined ? unitValue : Math.min(max, unitValue);
-};
-
-const getDurationParts = (seconds: number) => {
-  const clampedSeconds = clampDurationSeconds(seconds);
-
-  return {
-    hours: Math.floor(clampedSeconds / 3600),
-    minutes: Math.floor((clampedSeconds % 3600) / 60),
-    seconds: clampedSeconds % 60,
-  };
-};
-
-const composeDurationSeconds = ({
-  hours,
-  minutes,
-  seconds,
-}: {
-  hours: number;
-  minutes: number;
-  seconds: number;
-}) => clampDurationSeconds(hours * 3600 + minutes * 60 + seconds);
-
-const getStepDuration = (
-  step: SessionPreset['steps'][number] | undefined,
-  fallbackSeconds: number,
-) => step?.defaultDurationSeconds ?? fallbackSeconds;
-
-type CroquisStepBodyProps = {
-  step: SessionPreset['steps'][number];
-  option: CroquisOption;
-  durationSeconds: number;
-  onTimerChange: (seconds: number) => void;
-  onAutoSkipChange: (checked: boolean) => void;
-  onCaptureChange: (checked: boolean) => void;
-  onRecordsSaveChange: (checked: boolean) => void;
-  onRequireResultChange: (checked: boolean) => void;
-};
-
-function CroquisStepBody({
-  step,
-  option,
-  durationSeconds,
-  onTimerChange,
-  onAutoSkipChange,
-  onCaptureChange,
-  onRecordsSaveChange,
-  onRequireResultChange,
-}: CroquisStepBodyProps) {
-  const durationParts = getDurationParts(durationSeconds);
-
-  return (
-    <div className="croquis-start-modal__step-body">
-      <div className="croquis-start-modal__step-column">
-        <section className="croquis-start-modal__control-group">
-          <div className="croquis-start-modal__control-header">
-            <span className="croquis-start-modal__control-label">Duration</span>
-            <span className="croquis-start-modal__control-value">
-              {formatSeconds(durationSeconds)}
-            </span>
-          </div>
-
-          <div className="croquis-start-modal__duration-row" aria-label="Fallback duration">
-            {DURATION_OPTIONS.map(duration => (
-              <ChipButton
-                key={duration.value}
-                shape="pill"
-                variant="outline"
-                pressed={durationSeconds === duration.value}
-                onClick={() => {
-                  onTimerChange(duration.value);
-                }}
-              >
-                {duration.label}
-              </ChipButton>
-            ))}
-          </div>
-
-          <input
-            className="croquis-start-modal__duration-slider"
-            type="range"
-            min={DURATION_MIN_SECONDS}
-            max={DURATION_SLIDER_MAX_SECONDS}
-            step={DURATION_STEP_SECONDS}
-            value={Math.min(durationSeconds, DURATION_SLIDER_MAX_SECONDS)}
-            aria-label="Fallback duration in seconds"
-            onChange={event => {
-              onTimerChange(clampDurationSeconds(Number(event.target.value)));
-            }}
-          />
-
-          <div className="croquis-start-modal__duration-time-inputs">
-            <Input
-              className="croquis-start-modal__duration-input"
-              label="h"
-              type="number"
-              min={0}
-              step={1}
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={durationParts.hours}
-              aria-label="Fallback duration hours"
-              onChange={event => {
-                onTimerChange(
-                  composeDurationSeconds({
-                    ...durationParts,
-                    hours: normalizeDurationUnit(event.target.value),
-                  }),
-                );
-              }}
-            />
-            <Input
-              className="croquis-start-modal__duration-input"
-              label="m"
-              type="number"
-              min={0}
-              max={59}
-              step={1}
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={durationParts.minutes}
-              aria-label="Fallback duration minutes"
-              onChange={event => {
-                onTimerChange(
-                  composeDurationSeconds({
-                    ...durationParts,
-                    minutes: normalizeDurationUnit(event.target.value, 59),
-                  }),
-                );
-              }}
-            />
-            <Input
-              className="croquis-start-modal__duration-input"
-              label="s"
-              type="number"
-              min={0}
-              max={59}
-              step={1}
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={durationParts.seconds}
-              aria-label="Fallback duration seconds"
-              onChange={event => {
-                onTimerChange(
-                  composeDurationSeconds({
-                    ...durationParts,
-                    seconds: normalizeDurationUnit(event.target.value, 59),
-                  }),
-                );
-              }}
-            />
-          </div>
-        </section>
-
-        <section className="croquis-start-modal__control-group">
-          <span className="croquis-start-modal__control-label">Asset Tags</span>
-          <div className="croquis-start-modal__tag-row">
-            {step.autoTags.map(tag => (
-              <Chip key={tag.id} shape="rounded" variant="neutral-dismiss">
-                {tag.name}
-              </Chip>
-            ))}
-            <Chip shape="rounded" variant="add">
-              ADD TAG
-            </Chip>
-          </div>
-        </section>
-      </div>
-
-      <div className="croquis-start-modal__step-column">
-        <section className="croquis-start-modal__control-group croquis-start-modal__step-settings">
-          <span className="croquis-start-modal__control-label">Step Settings</span>
-          <div className="croquis-start-modal__setting-stack">
-            <CheckboxRow
-              label="Auto-advance"
-              checked={option.auto.isSkip}
-              onCheckedChange={onAutoSkipChange}
-              width="full"
-            />
-            <CheckboxConditionalRow
-              label="Records Save"
-              checked={option.isRecordSave}
-              onCheckedChange={onRecordsSaveChange}
-              width="full"
-              childrenClassName="croquis-start-modal__nested-settings"
-            >
-              <CheckboxRow
-                label="Require result"
-                checked={step.resultRequired}
-                onCheckedChange={onRequireResultChange}
-                width="full"
-              />
-              <CheckboxRow
-                label="Capture enabled"
-                checked={option.isCapture}
-                onCheckedChange={onCaptureChange}
-                width="full"
-              />
-            </CheckboxConditionalRow>
-          </div>
-        </section>
-      </div>
-    </div>
-  );
-}
 
 export function CroquisStartModal({
   open,
   assetIds,
   sessionPresets,
-  librarySettings,
+  timeStepPresets = [],
   onClose,
   onStarted,
-  saveCroquisPreferences = ipc.library.saveCroquisPreferences,
   startCroquisSession = ipc.session.start,
 }: CroquisStartModalProps) {
   const presetOptions: SelectOption[] = useMemo(
@@ -317,38 +65,47 @@ export function CroquisStartModal({
   );
 
   const fallbackPreset: SessionPreset | null = useMemo(() => {
-    return findFallbackPreset(sessionPresets, librarySettings);
-  }, [librarySettings.activeSessionPresetId, sessionPresets]);
+    return findFallbackPreset(sessionPresets);
+  }, [sessionPresets]);
 
   const [selectedPresetId, setSelectedPresetId] = useState('');
-  const [option, setOption] = useState<CroquisOption>(cloneOption());
-  const [rememberOption, setRememberOption] = useState(true);
-  const [durationOverrides, setDurationOverrides] = useState<Record<string, number>>({});
-  const [resultRequiredOverrides, setResultRequiredOverrides] = useState<Record<string, boolean>>(
-    {},
-  );
+  const [windowWidth, setWindowWidth] = useState('');
+  const [windowHeight, setWindowHeight] = useState('');
+  const [isShuffle, setIsShuffle] = useState(false);
+  const [editableSteps, setEditableSteps] = useState<EditableSessionStep[]>([]);
+  const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const stepPresetOptions: SelectOption[] = useMemo(
+    () => [
+      {
+        value: USER_CUSTOM_STEP_VALUE,
+        label: USER_CUSTOM_STEP_LABEL,
+      },
+      ...timeStepPresets.map(preset => ({
+        value: preset.id,
+        label: preset.name,
+        supportingText: formatDurationCompact(getStepDuration(preset)),
+      })),
+    ],
+    [timeStepPresets],
+  );
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
-    const storedPreferences = librarySettings.croquisPreferences;
-    const activeOption =
-      storedPreferences?.presets.find(preset => preset.id === storedPreferences.activePresetId)
-        ?.option ??
-      storedPreferences?.presets[0]?.option ??
-      null;
-
-    setOption(cloneOption(activeOption));
-    setRememberOption(true);
-    setDurationOverrides({});
-    setResultRequiredOverrides({});
-    setSelectedPresetId(fallbackPreset ? fallbackPreset.id : '');
+    setSelectedPresetId(fallbackPreset?.id ?? '');
+    setWindowWidth(fallbackPreset?.windowWidth ?? '960');
+    setWindowHeight(fallbackPreset?.windowHeight ?? '');
+    setIsShuffle(fallbackPreset?.isShuffle ?? false);
+    const nextSteps = fallbackPreset ? createEditableSteps(fallbackPreset) : [];
+    setEditableSteps(nextSteps);
+    setExpandedStepId(nextSteps[0]?.id ?? null);
     setError(null);
-  }, [fallbackPreset, librarySettings.croquisPreferences, open]);
+  }, [fallbackPreset, open]);
 
   if (!open) {
     return null;
@@ -356,30 +113,95 @@ export function CroquisStartModal({
 
   const baseSelectedPreset =
     sessionPresets.find(preset => preset.id === selectedPresetId) || fallbackPreset;
-  const selectedPreset =
-    baseSelectedPreset === null
-      ? null
-      : {
-          ...baseSelectedPreset,
-          steps: baseSelectedPreset.steps.map(step => ({
-            ...step,
-            defaultDurationSeconds:
-              durationOverrides[step.id] ?? getStepDuration(step, option.timer.maxTime),
-            resultRequired: resultRequiredOverrides[step.id] ?? step.resultRequired,
-          })),
-        };
-  const selectedPresetSteps = selectedPreset?.steps ?? [];
-  const hasOpenEndedStep = selectedPresetSteps.some(
-    step => getStepDuration(step, option.timer.maxTime) <= 0,
-  );
+  const selectedPreset = baseSelectedPreset;
+  const hasOpenEndedStep = editableSteps.some(step => getStepDuration(step) <= 0);
   const totalDurationSeconds =
-    assetIds.length *
-    selectedPresetSteps.reduce(
-      (total, step) => total + getStepDuration(step, option.timer.maxTime),
-      0,
-    );
+    assetIds.length * editableSteps.reduce((total, step) => total + getStepDuration(step), 0);
   const totalDurationLabel = hasOpenEndedStep ? '∞' : formatEstimate(totalDurationSeconds);
   const totalAssetsLabel = `${String(assetIds.length)} ${assetIds.length === 1 ? 'Pose' : 'Poses'}`;
+
+  const handlePresetChange = (nextPresetId: string) => {
+    const nextPreset = sessionPresets.find(preset => preset.id === nextPresetId) ?? null;
+    const nextSteps = nextPreset ? createEditableSteps(nextPreset) : [];
+
+    setSelectedPresetId(nextPresetId);
+    setStoredActiveSessionPresetId(nextPreset?.id ?? null);
+    setWindowWidth(nextPreset?.windowWidth ?? '960');
+    setWindowHeight(nextPreset?.windowHeight ?? '');
+    setIsShuffle(nextPreset?.isShuffle ?? false);
+    setEditableSteps(nextSteps);
+    setExpandedStepId(nextSteps[0]?.id ?? null);
+  };
+
+  const handleAddStep = () => {
+    const nextStep = createCustomStep(editableSteps.length + 1);
+
+    setEditableSteps(current => normalizeStepOrders([...current, nextStep]));
+    setExpandedStepId(nextStep.id);
+  };
+
+  const handleDeleteStep = (stepId: string) => {
+    setEditableSteps(current => {
+      const deletedIndex = current.findIndex(step => step.id === stepId);
+      const nextSteps = normalizeStepOrders(current.filter(step => step.id !== stepId));
+
+      setExpandedStepId(currentExpandedStepId => {
+        if (currentExpandedStepId && nextSteps.some(step => step.id === currentExpandedStepId)) {
+          return currentExpandedStepId;
+        }
+
+        if (nextSteps.length === 0) {
+          return null;
+        }
+
+        return nextSteps[Math.min(Math.max(0, deletedIndex - 1), nextSteps.length - 1)].id;
+      });
+
+      return nextSteps;
+    });
+  };
+
+  const handleStepPresetChange = (stepId: string, nextValue: string) => {
+    setEditableSteps(current =>
+      normalizeStepOrders(
+        current.map(step => {
+          if (step.id !== stepId) {
+            return step;
+          }
+
+          if (nextValue === USER_CUSTOM_STEP_VALUE) {
+            return {
+              ...step,
+              timeStepPresetId: null,
+            };
+          }
+
+          const nextPreset = timeStepPresets.find(preset => preset.id === nextValue);
+          return nextPreset ? applyTimeStepPresetToStep(step, nextPreset) : step;
+        }),
+      ),
+    );
+  };
+
+  const updateStep = (
+    stepId: string,
+    updater: (step: EditableSessionStep) => EditableSessionStep,
+  ) => {
+    setEditableSteps(current =>
+      normalizeStepOrders(
+        current.map(step => {
+          if (step.id !== stepId) {
+            return step;
+          }
+
+          return {
+            ...updater(step),
+            timeStepPresetId: null,
+          };
+        }),
+      ),
+    );
+  };
 
   const handleStart = async () => {
     if (selectedPreset === null) {
@@ -391,20 +213,23 @@ export function CroquisStartModal({
       return;
     }
 
+    if (editableSteps.length === 0) {
+      setError('Add at least one time step to start a Croquis session.');
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
-      const preferencesPayload = rememberOption ? buildPreferences(option) : null;
-      if (preferencesPayload) {
-        await saveCroquisPreferences(preferencesPayload);
-      }
-
+      setStoredActiveSessionPresetId(selectedPreset.id);
       await startCroquisSession({
         assetIds,
-        preset: selectedPreset,
-        option,
-        saveOption: rememberOption,
-        preferences: preferencesPayload,
+        presetId: selectedPreset.id,
+        presetName: selectedPreset.name,
+        windowWidth: normalizeOptionalString(windowWidth),
+        windowHeight: normalizeOptionalString(windowHeight),
+        isShuffle,
+        steps: editableSteps.map(toCroquisRuntimeStep),
       });
 
       await onStarted();
@@ -424,22 +249,15 @@ export function CroquisStartModal({
       dialogClassName="croquis-start-modal"
       bodyClassName="croquis-start-modal__body"
       footer={
-        <ModalFooter
-          alignment="end"
-          leading={
-            <CheckboxRow
-              label="Remember session configuration"
-              checked={rememberOption}
-              onCheckedChange={setRememberOption}
-            />
-          }
-        >
+        <ModalFooter alignment="end">
           <Button size="lg" variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button
             size="lg"
-            disabled={busy || selectedPreset === null || assetIds.length === 0}
+            disabled={
+              busy || selectedPreset === null || assetIds.length === 0 || editableSteps.length === 0
+            }
             onClick={() => {
               void handleStart();
             }}
@@ -459,76 +277,121 @@ export function CroquisStartModal({
         placeholder="Select session preset"
         options={presetOptions}
         value={selectedPresetId}
-        onValueChange={nextPresetId => {
-          setSelectedPresetId(nextPresetId);
-          setDurationOverrides({});
-          setResultRequiredOverrides({});
-        }}
+        onValueChange={handlePresetChange}
       />
 
       <div className="croquis-start-modal__pipeline">
         <div className="croquis-start-modal__pipeline-header">
           <span>Time Steps Pipeline</span>
-          <span>{String(selectedPresetSteps.length)} Steps Total</span>
+          <span className="croquis-start-modal__pipeline-actions">
+            <span>{String(editableSteps.length)} Steps Total</span>
+            <IconButton
+              icon="plus"
+              size="md"
+              aria-label="Add time step"
+              disabled={busy || selectedPreset === null}
+              onClick={handleAddStep}
+            />
+          </span>
         </div>
 
-        <AccordionRoot
-          key={selectedPreset?.id ?? 'empty-preset'}
-          type="single"
-          collapsible
-          defaultValue={selectedPresetSteps[0]?.id ?? null}
-          className="croquis-start-modal__accordion"
-        >
-          {selectedPresetSteps.map((step, index) => (
-            <AccordionItem key={step.id} value={step.id}>
-              <AccordionItemHeader
-                index={String(index + 1).padStart(2, '0')}
-                meta={formatDurationCompact(getStepDuration(step, option.timer.maxTime))}
-              >
-                {step.name}
-              </AccordionItemHeader>
-              <AccordionItemBody>
-                <CroquisStepBody
-                  step={step}
-                  option={option}
-                  durationSeconds={getStepDuration(step, option.timer.maxTime)}
-                  onTimerChange={seconds => {
-                    const nextSeconds = clampDurationSeconds(seconds);
-                    setDurationOverrides(current => ({
-                      ...current,
-                      [step.id]: nextSeconds,
-                    }));
-                  }}
-                  onAutoSkipChange={checked => {
-                    setOption(current => ({
-                      ...current,
-                      auto: { isSkip: checked },
-                    }));
-                  }}
-                  onRecordsSaveChange={checked => {
-                    setOption(current => ({
-                      ...current,
-                      isRecordSave: checked,
-                      isCapture: checked ? current.isCapture : false,
-                    }));
-                  }}
-                  onRequireResultChange={checked => {
-                    setResultRequiredOverrides(current => ({
-                      ...current,
-                      [step.id]: checked,
-                    }));
-                  }}
-                  onCaptureChange={checked => {
-                    setOption(current => ({
-                      ...current,
-                      isCapture: checked,
-                    }));
-                  }}
-                />
-              </AccordionItemBody>
-            </AccordionItem>
-          ))}
-        </AccordionRoot>
+        {editableSteps.length > 0 ? (
+          <AccordionRoot
+            key={selectedPreset?.id ?? 'empty-preset'}
+            type="single"
+            collapsible
+            value={expandedStepId}
+            onValueChange={value => {
+              setExpandedStepId(typeof value === 'string' ? value : null);
+            }}
+            className="croquis-start-modal__accordion"
+          >
+            {editableSteps.map((step, index) => (
+              <AccordionItem key={step.id} value={step.id}>
+                <AccordionItemHeader
+                  index={String(index + 1).padStart(2, '0')}
+                  meta={formatDurationCompact(getStepDuration(step))}
+                >
+                  {step.name}
+                </AccordionItemHeader>
+                <AccordionItemBody className="croquis-start-modal__step-panel">
+                  <Select
+                    aria-label={`${step.name} source preset`}
+                    options={stepPresetOptions}
+                    value={step.timeStepPresetId ?? USER_CUSTOM_STEP_VALUE}
+                    onValueChange={nextValue => {
+                      handleStepPresetChange(step.id, nextValue);
+                    }}
+                  />
+                  <SessionPresetStepEditor
+                    step={step}
+                    durationSeconds={getStepDuration(step)}
+                    disabled={busy}
+                    onTimerChange={seconds => {
+                      const nextSeconds = clampDurationSeconds(seconds);
+                      updateStep(step.id, currentStep => ({
+                        ...currentStep,
+                        defaultDurationSeconds: nextSeconds,
+                      }));
+                    }}
+                    onAutoAdvanceChange={checked => {
+                      updateStep(step.id, currentStep => ({
+                        ...currentStep,
+                        autoAdvance: checked,
+                      }));
+                    }}
+                    onRecordsSaveChange={checked => {
+                      updateStep(step.id, currentStep => ({
+                        ...currentStep,
+                        recordSaveEnabled: checked,
+                        captureEnabled: checked ? currentStep.captureEnabled : false,
+                      }));
+                    }}
+                    onRequireResultChange={checked => {
+                      updateStep(step.id, currentStep => ({
+                        ...currentStep,
+                        resultRequired: checked,
+                      }));
+                    }}
+                    onCaptureChange={checked => {
+                      updateStep(step.id, currentStep => ({
+                        ...currentStep,
+                        captureEnabled: checked,
+                      }));
+                    }}
+                    onGrayscaleChange={checked => {
+                      updateStep(step.id, currentStep => ({
+                        ...currentStep,
+                        grayscaleEnabled: checked,
+                      }));
+                    }}
+                    onResultSavePathChange={path => {
+                      updateStep(step.id, currentStep => ({
+                        ...currentStep,
+                        resultSavePath: normalizeOptionalString(path),
+                      }));
+                    }}
+                  />
+                  <div className="croquis-start-modal__step-actions">
+                    <Button
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => {
+                        handleDeleteStep(step.id);
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </AccordionItemBody>
+              </AccordionItem>
+            ))}
+          </AccordionRoot>
+        ) : (
+          <div className="croquis-start-modal__pipeline-empty">
+            Add a user custom time step to build this session.
+          </div>
+        )}
       </div>
 
       <div className="croquis-start-modal__summary" aria-label="Croquis session summary">
@@ -556,17 +419,10 @@ export function CroquisStartModal({
           step={1}
           inputMode="numeric"
           pattern="[0-9]*"
-          value={option.window.height ?? ''}
+          value={windowHeight}
           placeholder="180"
           onChange={event => {
-            const height = normalizeWindowDimension(event.target.value);
-            setOption(current => ({
-              ...current,
-              window: {
-                ...current.window,
-                height,
-              },
-            }));
+            setWindowHeight(normalizeWindowDimension(event.target.value));
           }}
         />
 
@@ -577,30 +433,18 @@ export function CroquisStartModal({
           step={1}
           inputMode="numeric"
           pattern="[0-9]*"
-          value={option.window.width ?? ''}
+          value={windowWidth}
           placeholder="1080"
           onChange={event => {
-            const width = normalizeWindowDimension(event.target.value);
-            setOption(current => ({
-              ...current,
-              window: {
-                ...current.window,
-                width,
-              },
-            }));
+            setWindowWidth(normalizeWindowDimension(event.target.value));
           }}
         />
       </div>
 
       <CheckboxRow
         label="Shuffle entire queue"
-        checked={option.isShuffle}
-        onCheckedChange={checked => {
-          setOption(current => ({
-            ...current,
-            isShuffle: checked,
-          }));
-        }}
+        checked={isShuffle}
+        onCheckedChange={setIsShuffle}
       />
 
       {error ? <div className="croquis-inline-error">{error}</div> : null}

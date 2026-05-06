@@ -14,15 +14,17 @@ export function CroquisPresetStepList({ preset }: CroquisPresetStepListProps) {
       {preset.steps.map(step => (
         <div key={step.id} className="croquis-step">
           <div>
-            <strong>{step.name}</strong>
+            <strong>{step.timeStep.name}</strong>
             <span>
-              {step.autoTags.length > 0
-                ? step.autoTags.map(tag => tag.name).join(', ')
+              {step.timeStep.autoTags.length > 0
+                ? step.timeStep.autoTags.map(tag => tag.name).join(', ')
                 : 'No auto tags'}
             </span>
           </div>
           <span>
-            {step.defaultDurationSeconds ? `${String(step.defaultDurationSeconds)}s` : 'Free'}
+            {step.timeStep.defaultDurationSeconds
+              ? `${String(step.timeStep.defaultDurationSeconds)}s`
+              : 'Free'}
           </span>
         </div>
       ))}

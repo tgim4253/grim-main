@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            WITH requested_record(id, sort_order) AS (\n              SELECT CAST(value AS TEXT), key\n              FROM json_each(?1)\n            )\n            SELECT CAST(requested.id AS TEXT) AS \"record_id!: String\",\n                   t.id,\n                   t.group_id,\n                   t.name,\n                   t.color,\n                   t.sort_order,\n                   t.created_at,\n                   t.updated_at\n            FROM requested_record requested\n            INNER JOIN croquis_record_tag crt ON crt.record_id = requested.id\n            INNER JOIN tag t ON t.id = crt.tag_id\n            ORDER BY requested.sort_order ASC, t.name ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "record_id!: String",
+        "ordinal": 0,
+        "type_info": "Null"
+      },
+      {
+        "name": "id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "group_id",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "color",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "sort_order",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 7,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      null,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "e62575e0f771419bb9c979e88f7bb28b8fa79eae36417ad33017141af73164d4"
+}

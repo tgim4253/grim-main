@@ -1,94 +1,34 @@
 use serde::{Deserialize, Serialize};
 
-use crate::models::session::SessionPreset;
-
 fn default_true() -> bool {
     true
 }
 
-/// Window sizing preferences supplied by the renderer when launching Croquis.
+/// Runtime-only step values used when launching a Croquis session.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct CroquisWindowOption {
+pub struct CroquisRuntimeStep {
+    pub step_id: String,
     #[serde(default)]
-    pub width: Option<String>,
-    #[serde(default)]
-    pub height: Option<String>,
-}
-
-/// Automatic behaviour toggles for the Croquis session.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct CroquisAutoOption {
-    #[serde(default)]
-    pub is_skip: bool,
-}
-
-/// Timer configuration for the Croquis session.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct CroquisTimerOption {
-    #[serde(default)]
-    pub max_time: u32,
-}
-
-/// Aggregate Croquis options selected in the renderer.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CroquisOption {
-    #[serde(default)]
-    pub window: CroquisWindowOption,
-    #[serde(default)]
-    pub auto: CroquisAutoOption,
-    #[serde(default)]
-    pub timer: CroquisTimerOption,
-    #[serde(default = "default_true")]
-    pub is_record_save: bool,
-    #[serde(default)]
-    pub is_capture: bool,
-    #[serde(default)]
-    pub save_path: String,
-    #[serde(default)]
-    pub is_gray: bool,
-    #[serde(default)]
-    pub is_shuffle: bool,
-}
-
-impl Default for CroquisOption {
-    fn default() -> Self {
-        Self {
-            window: CroquisWindowOption::default(),
-            auto: CroquisAutoOption::default(),
-            timer: CroquisTimerOption::default(),
-            is_record_save: default_true(),
-            is_capture: bool::default(),
-            save_path: String::default(),
-            is_gray: bool::default(),
-            is_shuffle: bool::default(),
-        }
-    }
-}
-
-/// Named preset that stores a single Croquis option payload.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct CroquisPreset {
-    #[serde(default)]
-    pub id: String,
-    #[serde(default)]
+    pub time_step_preset_id: Option<String>,
+    pub step_order: i64,
     pub name: String,
     #[serde(default)]
-    pub option: CroquisOption,
-}
-
-/// Collection of Croquis option presets remembered for the library.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct CroquisPreferences {
+    pub default_duration_seconds: Option<i64>,
     #[serde(default)]
-    pub presets: Vec<CroquisPreset>,
+    pub tag_ids: Vec<String>,
+    #[serde(default = "default_true")]
+    pub auto_advance: bool,
+    #[serde(default = "default_true")]
+    pub record_save_enabled: bool,
     #[serde(default)]
-    pub active_preset_id: String,
+    pub capture_enabled: bool,
+    #[serde(default)]
+    pub grayscale_enabled: bool,
+    #[serde(default)]
+    pub result_required: bool,
+    #[serde(default)]
+    pub result_save_path: Option<String>,
 }
 
 /// Payload provided by the renderer to start a Croquis session.
@@ -97,13 +37,16 @@ pub struct CroquisPreferences {
 pub struct CroquisStartPayload {
     #[serde(default)]
     pub asset_ids: Vec<String>,
-    pub preset: SessionPreset,
+    pub preset_id: String,
+    pub preset_name: String,
     #[serde(default)]
-    pub option: CroquisOption,
+    pub window_width: Option<String>,
     #[serde(default)]
-    pub save_option: bool,
+    pub window_height: Option<String>,
     #[serde(default)]
-    pub preferences: Option<CroquisPreferences>,
+    pub is_shuffle: bool,
+    #[serde(default)]
+    pub steps: Vec<CroquisRuntimeStep>,
 }
 
 /// Metadata describing a single queue item inside a Croquis session.
@@ -126,8 +69,18 @@ pub struct CroquisSessionItem {
     pub step_name: String,
     pub step_index: i64,
     pub target_duration_seconds: Option<i64>,
+    #[serde(default = "default_true")]
+    pub auto_advance: bool,
+    #[serde(default = "default_true")]
+    pub record_save_enabled: bool,
+    #[serde(default)]
+    pub capture_enabled: bool,
+    #[serde(default)]
+    pub grayscale_enabled: bool,
     #[serde(default)]
     pub result_required: bool,
+    #[serde(default)]
+    pub result_save_path: Option<String>,
 }
 
 /// Persisted Croquis session information shared with the Croquis window.
@@ -136,8 +89,14 @@ pub struct CroquisSessionItem {
 pub struct CroquisSession {
     pub session_id: String,
     pub title: String,
-    pub option: CroquisOption,
-    pub preset: SessionPreset,
+    pub preset_id: String,
+    pub preset_name: String,
+    #[serde(default)]
+    pub window_width: Option<String>,
+    #[serde(default)]
+    pub window_height: Option<String>,
+    #[serde(default)]
+    pub is_shuffle: bool,
     pub items: Vec<CroquisSessionItem>,
     pub created_at: String,
 }

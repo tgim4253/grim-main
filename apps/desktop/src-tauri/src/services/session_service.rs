@@ -1,12 +1,15 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, ensure, Result};
+use sqlx::{Sqlite, Transaction};
 
 use crate::{
     models::session::{
-        DeleteSessionPresetPayload, SaveSessionPresetPayload, SessionPreset,
+        DeleteSessionPresetPayload, DeleteTimeStepPresetPayload,
+        SaveSessionPresetPayload, SaveTimeStepPresetPayload, SessionPreset,
+        TimeStepPreset,
     },
     repositories::{
-        SaveSessionPresetStepInput, SessionRepository, SettingsRepository,
-        TagRepository, UpsertSessionPresetInput,
+        SaveSessionPresetStepInput, SessionRepository, TagRepository,
+        UpsertSessionPresetInput, UpsertTimeStepPresetInput,
     },
     utils::{date::get_now_date, identifier::get_unique_id},
 };
@@ -14,21 +17,23 @@ use crate::{
 #[derive(Clone)]
 pub struct SessionService {
     session_repository: SessionRepository,
-    settings_repository: SettingsRepository,
     tag_repository: TagRepository,
 }
 
 impl SessionService {
     pub fn new(
         session_repository: SessionRepository,
-        settings_repository: SettingsRepository,
         tag_repository: TagRepository,
     ) -> Self {
-        Self { session_repository, settings_repository, tag_repository }
+        Self { session_repository, tag_repository }
     }
 
     pub async fn list_session_presets(&self) -> Result<Vec<SessionPreset>> {
         self.session_repository.list_presets().await
+    }
+
+    pub async fn list_time_step_presets(&self) -> Result<Vec<TimeStepPreset>> {
+        self.session_repository.list_time_step_presets().await
     }
 
     pub async fn save_session_preset(
@@ -36,24 +41,41 @@ impl SessionService {
         payload: SaveSessionPresetPayload,
     ) -> Result<Vec<SessionPreset>> {
         let now = get_now_date();
-        let preset_id = payload.id.clone().unwrap_or_else(get_unique_id);
         let mut tx = self.session_repository.begin().await?;
+        self.save_session_preset_in_tx(&mut tx, &payload, &now).await?;
+        tx.commit().await?;
+        self.session_repository.list_presets().await
+    }
+
+    async fn save_session_preset_in_tx(
+        &self,
+        tx: &mut Transaction<'_, Sqlite>,
+        payload: &SaveSessionPresetPayload,
+        now: &str,
+    ) -> Result<String> {
+        ensure!(
+            !payload.steps.is_empty(),
+            "Session preset must have at least one time step"
+        );
+
+        let preset_id = payload.id.clone().unwrap_or_else(get_unique_id);
 
         if payload.is_default {
-            self.session_repository
-                .clear_default_flags_in_tx(&mut tx, &now)
-                .await?;
+            self.session_repository.clear_default_flags_in_tx(tx, now).await?;
         }
 
         self.session_repository
             .upsert_preset_in_tx(
-                &mut tx,
+                tx,
                 &UpsertSessionPresetInput {
                     id: &preset_id,
                     name: &payload.name,
                     description: payload.description.as_deref(),
                     is_default: payload.is_default,
-                    timestamp: &now,
+                    window_width: payload.window_width.as_deref(),
+                    window_height: payload.window_height.as_deref(),
+                    is_shuffle: payload.is_shuffle,
+                    timestamp: now,
                     is_update: payload.id.is_some(),
                 },
             )
@@ -61,65 +83,86 @@ impl SessionService {
 
         if payload.id.is_some() {
             self.session_repository
-                .delete_preset_steps_in_tx(&mut tx, &preset_id)
+                .delete_preset_steps_in_tx(tx, &preset_id)
                 .await?;
         }
 
         for step in &payload.steps {
             let step_id = step.id.clone().unwrap_or_else(get_unique_id);
-            let tags = self
-                .tag_repository
-                .ensure_tags_by_names_in_tx(&mut tx, &step.auto_tag_names)
-                .await?;
-
             self.session_repository
                 .insert_step_in_tx(
-                    &mut tx,
+                    tx,
                     &SaveSessionPresetStepInput {
                         id: &step_id,
                         preset_id: &preset_id,
+                        time_step_preset_id: &step.time_step_preset_id,
                         step_order: step.step_order,
-                        name: &step.name,
-                        default_duration_seconds: step.default_duration_seconds,
-                        result_required: step.result_required,
-                        result_external_path: step
-                            .result_external_path
-                            .as_deref(),
                     },
-                    &now,
-                )
-                .await?;
-            self.session_repository
-                .link_step_tags_in_tx(
-                    &mut tx,
-                    &step_id,
-                    &tags.iter().map(|tag| tag.id.clone()).collect::<Vec<_>>(),
-                    &now,
+                    now,
                 )
                 .await?;
         }
 
-        let should_promote_current = payload.is_default
-            || self
-                .session_repository
-                .find_default_id_in_tx(&mut tx)
-                .await?
-                .is_none();
-        if should_promote_current {
+        if self.session_repository.find_default_id_in_tx(tx).await?.is_none() {
             self.session_repository
-                .set_default_in_tx(&mut tx, &preset_id, &now)
-                .await?;
-            self.settings_repository
-                .set_active_session_preset_in_tx(
-                    &mut tx,
-                    Some(&preset_id),
-                    &now,
-                )
+                .set_default_in_tx(tx, &preset_id, now)
                 .await?;
         }
+
+        Ok(preset_id)
+    }
+
+    pub async fn save_time_step_preset(
+        &self,
+        payload: SaveTimeStepPresetPayload,
+    ) -> Result<Vec<TimeStepPreset>> {
+        let now = get_now_date();
+        let preset_id = payload.id.clone().unwrap_or_else(get_unique_id);
+        let mut tx = self.session_repository.begin().await?;
+        let tags = self
+            .tag_repository
+            .ensure_tags_by_names_in_tx(&mut tx, &payload.auto_tag_names)
+            .await?;
+        let tag_ids = tags.iter().map(|tag| tag.id.clone()).collect::<Vec<_>>();
+
+        self.session_repository
+            .upsert_time_step_preset_in_tx(
+                &mut tx,
+                &UpsertTimeStepPresetInput {
+                    id: &preset_id,
+                    name: &payload.name,
+                    default_duration_seconds: payload.default_duration_seconds,
+                    auto_advance: payload.auto_advance,
+                    record_save_enabled: payload.record_save_enabled,
+                    capture_enabled: payload.capture_enabled,
+                    grayscale_enabled: payload.grayscale_enabled,
+                    result_required: payload.result_required,
+                    result_save_path: payload.result_save_path.as_deref(),
+                    timestamp: &now,
+                    is_update: payload.id.is_some(),
+                },
+            )
+            .await?;
+        self.session_repository
+            .replace_time_step_preset_tags_in_tx(
+                &mut tx, &preset_id, &tag_ids, &now,
+            )
+            .await?;
 
         tx.commit().await?;
-        self.session_repository.list_presets().await
+        self.session_repository.list_time_step_presets().await
+    }
+
+    pub async fn delete_time_step_preset(
+        &self,
+        payload: DeleteTimeStepPresetPayload,
+    ) -> Result<Vec<TimeStepPreset>> {
+        let mut tx = self.session_repository.begin().await?;
+        self.session_repository
+            .delete_time_step_preset_in_tx(&mut tx, &payload.preset_id)
+            .await?;
+        tx.commit().await?;
+        self.session_repository.list_time_step_presets().await
     }
 
     pub async fn delete_session_preset(
@@ -127,50 +170,24 @@ impl SessionService {
         payload: DeleteSessionPresetPayload,
     ) -> Result<Vec<SessionPreset>> {
         let mut tx = self.session_repository.begin().await?;
-        let active_preset_id = self
-            .settings_repository
-            .load_active_session_preset_id_in_tx(&mut tx)
-            .await?;
         self.session_repository
             .delete_preset_in_tx(&mut tx, &payload.preset_id)
             .await?;
 
-        let remaining_default =
-            self.session_repository.find_default_id_in_tx(&mut tx).await?;
-
-        if let Some(default_preset_id) = remaining_default {
-            if active_preset_id.is_none()
-                || active_preset_id.as_deref()
-                    == Some(payload.preset_id.as_str())
+        if self
+            .session_repository
+            .find_default_id_in_tx(&mut tx)
+            .await?
+            .is_none()
+        {
+            if let Some(first_preset_id) =
+                self.session_repository.find_first_id_in_tx(&mut tx).await?
             {
                 let now = get_now_date();
-                self.settings_repository
-                    .set_active_session_preset_in_tx(
-                        &mut tx,
-                        Some(&default_preset_id),
-                        &now,
-                    )
+                self.session_repository
+                    .set_default_in_tx(&mut tx, &first_preset_id, &now)
                     .await?;
             }
-        } else if let Some(first_preset_id) =
-            self.session_repository.find_first_id_in_tx(&mut tx).await?
-        {
-            let now = get_now_date();
-            self.session_repository
-                .set_default_in_tx(&mut tx, &first_preset_id, &now)
-                .await?;
-            self.settings_repository
-                .set_active_session_preset_in_tx(
-                    &mut tx,
-                    Some(&first_preset_id),
-                    &now,
-                )
-                .await?;
-        } else {
-            let now = get_now_date();
-            self.settings_repository
-                .set_active_session_preset_in_tx(&mut tx, None, &now)
-                .await?;
         }
 
         tx.commit().await?;
@@ -209,10 +226,10 @@ mod tests {
 
     use crate::{
         models::session::{
-            DeleteSessionPresetPayload, SaveSessionPresetPayload,
-            SessionPreset, SessionPresetStepDraft,
+            DeleteTimeStepPresetPayload, SaveSessionPresetPayload,
+            SaveTimeStepPresetPayload, SessionPresetStepDraft,
         },
-        repositories::{SessionRepository, SettingsRepository, TagRepository},
+        repositories::{SessionRepository, TagRepository},
         state::bootstrap::{ensure_schema, open_or_create_db, seed_defaults},
     };
 
@@ -232,123 +249,242 @@ mod tests {
     }
 
     fn build_service(pool: sqlx::SqlitePool) -> SessionService {
-        let settings_repository = SettingsRepository::new(pool.clone());
         let tag_repository = TagRepository::new(pool.clone());
-
-        SessionService::new(
-            SessionRepository::new(pool),
-            settings_repository,
-            tag_repository,
-        )
+        SessionService::new(SessionRepository::new(pool), tag_repository)
     }
 
-    fn to_save_payload(
-        preset: &SessionPreset,
-        is_default: bool,
-    ) -> SaveSessionPresetPayload {
-        SaveSessionPresetPayload {
-            id: Some(preset.id.clone()),
-            name: preset.name.clone(),
-            description: preset.description.clone(),
-            is_default,
-            steps: preset
-                .steps
-                .iter()
-                .map(|step| SessionPresetStepDraft {
-                    id: Some(step.id.clone()),
-                    name: step.name.clone(),
-                    step_order: step.step_order,
-                    default_duration_seconds: step.default_duration_seconds,
-                    auto_tag_names: step
-                        .auto_tags
-                        .iter()
-                        .map(|tag| tag.name.clone())
-                        .collect(),
-                    result_required: step.result_required,
-                    result_external_path: step.result_external_path.clone(),
-                })
-                .collect(),
-        }
-    }
-
-    #[tokio::test]
-    async fn save_session_preset_keeps_a_default_preset() {
-        let dir = make_temp_dir("default-invariant");
+    async fn build_seeded_service(prefix: &str) -> (PathBuf, SessionService) {
+        let dir = make_temp_dir(prefix);
         let db_path = dir.join("grim.db");
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
         seed_defaults(&pool).await.expect("failed to seed defaults");
+        (dir, build_service(pool))
+    }
 
-        let service = build_service(pool.clone());
-        let settings_repository = SettingsRepository::new(pool);
-        let existing = service
-            .list_session_presets()
+    #[tokio::test]
+    async fn save_session_preset_keeps_only_time_step_refs() {
+        let (dir, service) = build_seeded_service("refs-only").await;
+        let time_step = service
+            .list_time_step_presets()
             .await
-            .expect("failed to list presets")
+            .expect("failed to list time steps")
             .into_iter()
             .next()
-            .expect("expected seeded preset");
+            .expect("expected seeded time step");
 
         let presets = service
-            .save_session_preset(to_save_payload(&existing, false))
+            .save_session_preset(SaveSessionPresetPayload {
+                id: None,
+                name: "Reference Only".to_string(),
+                description: None,
+                is_default: false,
+                window_width: Some("800".to_string()),
+                window_height: None,
+                is_shuffle: true,
+                steps: vec![SessionPresetStepDraft {
+                    id: None,
+                    time_step_preset_id: time_step.id.clone(),
+                    step_order: 1,
+                }],
+            })
             .await
-            .expect("failed to save preset");
+            .expect("failed to save session preset");
 
-        assert_eq!(
-            presets.iter().filter(|preset| preset.is_default).count(),
-            1
-        );
-        assert!(
-            presets
-                .iter()
-                .find(|preset| preset.id == existing.id)
-                .expect("expected saved preset")
-                .is_default
-        );
+        let saved = presets
+            .into_iter()
+            .find(|preset| preset.name == "Reference Only")
+            .expect("expected saved session preset");
 
-        let settings = settings_repository
-            .load()
-            .await
-            .expect("failed to reload settings");
-        assert_eq!(settings.active_session_preset_id, Some(existing.id));
+        assert_eq!(saved.window_width.as_deref(), Some("800"));
+        assert!(saved.is_shuffle);
+        assert_eq!(saved.steps.len(), 1);
+        assert_eq!(saved.steps[0].time_step_preset_id, time_step.id);
+        assert_eq!(saved.steps[0].time_step.name, time_step.name);
 
         let _ = fs::remove_dir_all(dir);
     }
 
     #[tokio::test]
-    async fn delete_last_session_preset_clears_active_preset() {
-        let dir = make_temp_dir("delete-last");
-        let db_path = dir.join("grim.db");
-        let pool =
-            open_or_create_db(&db_path).await.expect("failed to open db");
-        ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
-
-        let service = build_service(pool.clone());
-        let settings_repository = SettingsRepository::new(pool);
-        let existing = service
-            .list_session_presets()
-            .await
-            .expect("failed to list presets")
-            .into_iter()
-            .next()
-            .expect("expected seeded preset");
-
-        let presets = service
-            .delete_session_preset(DeleteSessionPresetPayload {
-                preset_id: existing.id.clone(),
+    async fn session_preset_read_hydrates_time_step_fields_and_tags() {
+        let (dir, service) = build_seeded_service("hydrate").await;
+        let time_steps = service
+            .save_time_step_preset(SaveTimeStepPresetPayload {
+                id: None,
+                name: "Tagged Pose".to_string(),
+                default_duration_seconds: Some(45),
+                auto_advance: true,
+                record_save_enabled: true,
+                capture_enabled: true,
+                grayscale_enabled: true,
+                result_required: true,
+                result_save_path: Some("/tmp/result.png".to_string()),
+                auto_tag_names: vec!["Warmup".to_string(), "Pose".to_string()],
             })
             .await
-            .expect("failed to delete preset");
+            .expect("failed to save time step");
+        let time_step = time_steps
+            .into_iter()
+            .find(|preset| preset.name == "Tagged Pose")
+            .expect("expected created time step");
 
-        assert!(presets.is_empty());
-
-        let settings = settings_repository
-            .load()
+        service
+            .save_session_preset(SaveSessionPresetPayload {
+                id: None,
+                name: "Hydrated Session".to_string(),
+                description: None,
+                is_default: false,
+                window_width: None,
+                window_height: None,
+                is_shuffle: false,
+                steps: vec![SessionPresetStepDraft {
+                    id: None,
+                    time_step_preset_id: time_step.id.clone(),
+                    step_order: 1,
+                }],
+            })
             .await
-            .expect("failed to reload settings");
-        assert_eq!(settings.active_session_preset_id, None);
+            .expect("failed to save session preset");
+
+        let session = service
+            .list_session_presets()
+            .await
+            .expect("failed to list session presets")
+            .into_iter()
+            .find(|preset| preset.name == "Hydrated Session")
+            .expect("expected session preset");
+        let hydrated = &session.steps[0].time_step;
+
+        assert_eq!(hydrated.name, "Tagged Pose");
+        assert_eq!(hydrated.default_duration_seconds, Some(45));
+        assert!(hydrated.auto_advance);
+        assert!(hydrated.record_save_enabled);
+        assert!(hydrated.capture_enabled);
+        assert!(hydrated.grayscale_enabled);
+        assert!(hydrated.result_required);
+        assert_eq!(
+            hydrated.result_save_path.as_deref(),
+            Some("/tmp/result.png")
+        );
+        assert_eq!(
+            hydrated
+                .auto_tags
+                .iter()
+                .map(|tag| tag.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Pose", "Warmup"]
+        );
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn updating_time_step_updates_linked_session_read_result() {
+        let (dir, service) = build_seeded_service("live-hydrate").await;
+        let time_step = service
+            .save_time_step_preset(SaveTimeStepPresetPayload {
+                id: None,
+                name: "Short Pose".to_string(),
+                default_duration_seconds: Some(30),
+                auto_advance: true,
+                record_save_enabled: true,
+                capture_enabled: false,
+                grayscale_enabled: false,
+                result_required: false,
+                result_save_path: None,
+                auto_tag_names: vec!["Warmup".to_string()],
+            })
+            .await
+            .expect("failed to create time step preset")
+            .into_iter()
+            .find(|preset| preset.name == "Short Pose")
+            .expect("expected created time step preset");
+
+        service
+            .save_session_preset(SaveSessionPresetPayload {
+                id: None,
+                name: "Linked Session".to_string(),
+                description: None,
+                is_default: false,
+                window_width: None,
+                window_height: None,
+                is_shuffle: false,
+                steps: vec![SessionPresetStepDraft {
+                    id: None,
+                    time_step_preset_id: time_step.id.clone(),
+                    step_order: 1,
+                }],
+            })
+            .await
+            .expect("failed to create linked session preset");
+
+        service
+            .save_time_step_preset(SaveTimeStepPresetPayload {
+                id: Some(time_step.id.clone()),
+                name: "Long Pose".to_string(),
+                default_duration_seconds: Some(120),
+                auto_advance: false,
+                record_save_enabled: false,
+                capture_enabled: true,
+                grayscale_enabled: true,
+                result_required: true,
+                result_save_path: Some("/tmp/result.png".to_string()),
+                auto_tag_names: vec!["Hold".to_string()],
+            })
+            .await
+            .expect("failed to update time step preset");
+
+        let linked_session = service
+            .list_session_presets()
+            .await
+            .expect("failed to list session presets")
+            .into_iter()
+            .find(|preset| preset.name == "Linked Session")
+            .expect("expected linked session preset");
+        let linked_step = &linked_session.steps[0].time_step;
+
+        assert_eq!(linked_step.name, "Long Pose");
+        assert_eq!(linked_step.default_duration_seconds, Some(120));
+        assert!(!linked_step.auto_advance);
+        assert!(!linked_step.record_save_enabled);
+        assert!(linked_step.capture_enabled);
+        assert!(linked_step.grayscale_enabled);
+        assert!(linked_step.result_required);
+        assert_eq!(
+            linked_step.result_save_path.as_deref(),
+            Some("/tmp/result.png")
+        );
+        assert_eq!(
+            linked_step
+                .auto_tags
+                .iter()
+                .map(|tag| tag.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Hold"]
+        );
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn deleting_referenced_time_step_fails() {
+        let (dir, service) = build_seeded_service("delete-referenced").await;
+        let time_step = service
+            .list_time_step_presets()
+            .await
+            .expect("failed to list time steps")
+            .into_iter()
+            .next()
+            .expect("expected seeded time step");
+
+        let result = service
+            .delete_time_step_preset(DeleteTimeStepPresetPayload {
+                preset_id: time_step.id,
+            })
+            .await;
+
+        assert!(result.is_err());
 
         let _ = fs::remove_dir_all(dir);
     }

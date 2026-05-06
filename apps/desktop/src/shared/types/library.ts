@@ -1,10 +1,3 @@
-import type { CroquisPreferences } from './croquis';
-
-export interface LibrarySettings {
-  activeSessionPresetId?: string | null;
-  croquisPreferences?: CroquisPreferences | null;
-}
-
 export interface TagGroup {
   id: string;
   name: string;
@@ -110,6 +103,11 @@ export interface CroquisRecordDetail {
   tags: Tag[];
 }
 
+export interface CroquisRecordResultsSnapshot {
+  records: CroquisRecordSummary[];
+  details: CroquisRecordDetail[];
+}
+
 export type AssetListSource =
   | { kind: 'allAssets' }
   | { kind: 'uncategorized' }
@@ -125,6 +123,11 @@ export interface FolderStats {
 
 export interface ImportRequest {
   filePaths: string[];
+  virtualFolderIds: string[];
+}
+
+export interface ImportRemoteImagesRequest {
+  sources: string[];
   virtualFolderIds: string[];
 }
 
@@ -209,13 +212,26 @@ export interface UpdateCroquisRecordTagsPayload {
   tagIds: string[];
 }
 
-export interface SessionStepPreset {
+export interface TimeStepPreset {
   id: string;
-  stepOrder: number;
   name: string;
   defaultDurationSeconds?: number | null;
-  autoTags: Tag[];
+  autoAdvance: boolean;
+  recordSaveEnabled: boolean;
+  captureEnabled: boolean;
+  grayscaleEnabled: boolean;
   resultRequired: boolean;
+  resultSavePath?: string | null;
+  autoTags: Tag[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SessionStepPreset {
+  id: string;
+  timeStepPresetId: string;
+  stepOrder: number;
+  timeStep: TimeStepPreset;
 }
 
 export interface SessionPreset {
@@ -223,6 +239,9 @@ export interface SessionPreset {
   name: string;
   description?: string | null;
   isDefault: boolean;
+  windowWidth?: string | null;
+  windowHeight?: string | null;
+  isShuffle: boolean;
   steps: SessionStepPreset[];
   createdAt: string;
   updatedAt: string;
@@ -230,11 +249,8 @@ export interface SessionPreset {
 
 export interface SessionPresetStepDraft {
   id?: string | null;
-  name: string;
+  timeStepPresetId: string;
   stepOrder: number;
-  defaultDurationSeconds?: number | null;
-  autoTagNames: string[];
-  resultRequired: boolean;
 }
 
 export interface SaveSessionPresetPayload {
@@ -242,10 +258,30 @@ export interface SaveSessionPresetPayload {
   name: string;
   description?: string | null;
   isDefault?: boolean;
+  windowWidth?: string | null;
+  windowHeight?: string | null;
+  isShuffle?: boolean;
   steps: SessionPresetStepDraft[];
 }
 
 export interface DeleteSessionPresetPayload {
+  presetId: string;
+}
+
+export interface SaveTimeStepPresetPayload {
+  id?: string | null;
+  name: string;
+  defaultDurationSeconds?: number | null;
+  autoAdvance: boolean;
+  recordSaveEnabled: boolean;
+  captureEnabled: boolean;
+  grayscaleEnabled: boolean;
+  resultRequired: boolean;
+  resultSavePath?: string | null;
+  autoTagNames: string[];
+}
+
+export interface DeleteTimeStepPresetPayload {
   presetId: string;
 }
 
@@ -298,7 +334,6 @@ export interface ExplorerSnapshot {
 }
 
 export interface LibrarySnapshot {
-  settings: LibrarySettings;
   explorer: ExplorerSnapshot;
   sessionPresets: SessionPreset[];
   tagGroups: TagGroup[];

@@ -22,12 +22,12 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use crate::{
     repositories::{
         AssetRepository, FolderRepository, RecordRepository, SessionRepository,
-        SettingsRepository, TagRepository,
+        TagRepository,
     },
     services::{
         AssetService, CaptureService, CroquisService, FolderService,
         LibraryService, LibraryStorage, RecordService, SessionService,
-        SettingsService, TagService,
+        TagService,
     },
 };
 
@@ -46,10 +46,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::library_commands::load_library_snapshot,
             commands::library_commands::load_explorer_snapshot,
-            commands::library_commands::load_settings_snapshot,
-            commands::library_commands::save_library_settings,
-            commands::library_commands::load_croquis_preferences_snapshot,
-            commands::library_commands::save_croquis_preferences,
             commands::folder_commands::save_virtual_folder,
             commands::folder_commands::delete_virtual_folder,
             commands::folder_commands::search_virtual_folders,
@@ -61,15 +57,18 @@ pub fn run() {
             commands::import_commands::preview_import_images,
             commands::import_commands::import_images,
             commands::import_commands::import_remote_images,
-            commands::record_commands::list_recent_records,
+            commands::record_commands::list_recent_record_results,
             commands::record_commands::get_record_detail,
             commands::record_commands::save_croquis_record,
             commands::record_commands::delete_croquis_record,
             commands::record_commands::finish_croquis_record,
             commands::record_commands::update_croquis_record_tags,
             commands::session_commands::list_session_presets,
+            commands::session_commands::list_time_step_presets,
             commands::session_commands::save_session_preset,
             commands::session_commands::delete_session_preset,
+            commands::session_commands::save_time_step_preset,
+            commands::session_commands::delete_time_step_preset,
             commands::session_commands::start_croquis_session,
             commands::session_commands::load_croquis_session,
             commands::tag_commands::load_tag_index,
@@ -91,8 +90,6 @@ pub fn run() {
                 state::AppState::initialize(handle),
             )
             .map_err(std::io::Error::other)?;
-            let settings_repository =
-                SettingsRepository::new(app_state.pool.clone());
             let asset_repository = AssetRepository::new(app_state.pool.clone());
             let folder_repository =
                 FolderRepository::new(app_state.pool.clone());
@@ -104,8 +101,6 @@ pub fn run() {
 
             let library_storage =
                 LibraryStorage::new(app_state.library_paths.clone());
-            let settings_service =
-                SettingsService::new(settings_repository.clone());
             let asset_service = AssetService::new(
                 asset_repository.clone(),
                 folder_repository.clone(),
@@ -118,32 +113,24 @@ pub fn run() {
                 asset_repository,
                 library_storage.clone(),
             );
-            let session_service = SessionService::new(
-                session_repository,
-                settings_repository,
-                tag_repository,
-            );
+            let session_service =
+                SessionService::new(session_repository, tag_repository);
 
             let library_service = LibraryService::new(
-                settings_service.clone(),
                 asset_service.clone(),
                 folder_service.clone(),
                 tag_service.clone(),
                 session_service.clone(),
                 record_service.clone(),
             );
-            let croquis_service = CroquisService::new(
-                asset_service.clone(),
-                settings_service.clone(),
-                library_storage,
-            );
+            let croquis_service =
+                CroquisService::new(asset_service.clone(), library_storage);
             let capture_service = CaptureService::new(
                 asset_service.clone(),
                 record_service.clone(),
             );
 
             app.manage(app_state);
-            app.manage(settings_service);
             app.manage(asset_service);
             app.manage(folder_service);
             app.manage(tag_service);

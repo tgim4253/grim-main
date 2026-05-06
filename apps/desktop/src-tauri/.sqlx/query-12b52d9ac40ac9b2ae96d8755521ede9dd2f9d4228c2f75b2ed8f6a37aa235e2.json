@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO time_step_preset_tag (time_step_preset_id, tag_id, created_at)\n            VALUES ('time-step-tag-usage', ?1, '2026-01-01T00:00:00Z')\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "12b52d9ac40ac9b2ae96d8755521ede9dd2f9d4228c2f75b2ed8f6a37aa235e2"
+}

@@ -43,7 +43,7 @@ export function CroquisWindow() {
     ? Math.min(Math.max(controller.elapsedSeconds / controller.currentTargetSeconds, 0), 1)
     : 0;
   const isCritical = hasTimedStep && progress >= 0.9;
-  const captureVisible = session.option.isCapture;
+  const captureVisible = controller.isCaptureEnabled;
   const captureDisabled = !controller.isRecordSaveEnabled;
 
   return (
@@ -72,7 +72,7 @@ export function CroquisWindow() {
             className="croquis-page__image"
             data-tauri-drag-region
             style={{
-              filter: session.option.isGray ? 'grayscale(1)' : undefined,
+              filter: currentItem.grayscaleEnabled ? 'grayscale(1)' : undefined,
             }}
           />
         ) : (

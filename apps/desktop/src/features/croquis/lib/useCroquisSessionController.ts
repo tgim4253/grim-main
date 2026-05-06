@@ -62,7 +62,7 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
         return;
       }
 
-      const ordered = payload.option.isShuffle ? shuffleItems(payload.items) : payload.items;
+      const ordered = payload.isShuffle ? shuffleItems(payload.items) : payload.items;
       finishPromisesRef.current.clear();
       currentRecordIdRef.current = null;
       appliedWindowSizeKeyRef.current = null;
@@ -86,9 +86,9 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
     () => (currentItem === null ? null : convertFileSrc(currentItem.sourcePath)),
     [currentItem],
   );
-  const currentTargetSeconds =
-    currentItem?.targetDurationSeconds ?? (session === null ? 0 : session.option.timer.maxTime);
-  const isRecordSaveEnabled = session?.option.isRecordSave ?? true;
+  const currentTargetSeconds = currentItem?.targetDurationSeconds ?? 0;
+  const isRecordSaveEnabled = currentItem?.recordSaveEnabled ?? true;
+  const isCaptureEnabled = currentItem?.captureEnabled ?? false;
 
   useEffect(() => {
     if (status === null || !AUTO_DISMISS_STATUS_MESSAGES.has(status)) {
@@ -208,13 +208,14 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
     setIsPlaying(false);
     const run = async () => {
       try {
-        const shouldSaveRequiredResult = session.option.isRecordSave && currentItem.resultRequired;
+        const shouldSaveRequiredResult =
+          currentItem.recordSaveEnabled && currentItem.resultRequired;
         if (shouldSaveRequiredResult) {
           setStatus('Saving completed record...');
           await finishItem(currentItem, currentTargetSeconds);
         }
 
-        if (session.option.auto.isSkip && currentIndex < queue.length - 1) {
+        if (currentItem.autoAdvance && currentIndex < queue.length - 1) {
           setCurrentIndex(index => index + 1);
           setIsPlaying(true);
           setStatus(null);
@@ -249,16 +250,16 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
         return;
       }
 
-      const width = Number(session.option.window.width ?? '0');
-      const height = Number(session.option.window.height ?? '0');
+      const width = Number(session.windowWidth ?? '0');
+      const height = Number(session.windowHeight ?? '0');
       if (!Number.isFinite(width) || width <= 0) {
         return;
       }
 
       const windowSizeKey = [
         session.sessionId,
-        session.option.window.width ?? '',
-        session.option.window.height ?? '',
+        session.windowWidth ?? '',
+        session.windowHeight ?? '',
         queue
           .map(item => `${item.itemId}:${String(item.baseWidth)}x${String(item.baseHeight)}`)
           .join('|'),
@@ -355,12 +356,12 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
       return;
     }
 
-    if (!session.option.isRecordSave) {
+    if (!currentItem.recordSaveEnabled) {
       setStatus('Record saving is disabled for this session.');
       return;
     }
 
-    if (!session.option.isCapture) {
+    if (!currentItem.captureEnabled) {
       setStatus('Capture is disabled for this session.');
       return;
     }
@@ -379,6 +380,7 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
         recordId,
         targetSeconds: currentTargetSeconds || null,
         actualSeconds: elapsedSeconds,
+        resultSavePath: currentItem.resultSavePath ?? null,
       });
       setStatus(null);
     } catch (error) {
@@ -398,6 +400,7 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
     hasNext: currentIndex < queue.length - 1,
     hasPrevious: currentIndex > 0,
     isCurrentSaved: Boolean(currentItem?.recordId),
+    isCaptureEnabled,
     isRecordSaveEnabled,
     isPlaying,
     moveToIndex,

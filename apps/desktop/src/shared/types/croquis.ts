@@ -1,46 +1,26 @@
-import type { SessionPreset } from './library';
-
-export interface CroquisWindowOption {
-  width?: string | null;
-  height?: string | null;
-}
-
-export interface CroquisAutoOption {
-  isSkip: boolean;
-}
-
-export interface CroquisTimerOption {
-  maxTime: number;
-}
-
-export interface CroquisOption {
-  window: CroquisWindowOption;
-  auto: CroquisAutoOption;
-  timer: CroquisTimerOption;
-  isRecordSave: boolean;
-  isCapture: boolean;
-  savePath: string;
-  isGray: boolean;
-  isShuffle: boolean;
-}
-
-export interface CroquisPreset {
-  id: string;
+export interface CroquisRuntimeStep {
+  stepId: string;
+  timeStepPresetId?: string | null;
+  stepOrder: number;
   name: string;
-  option: CroquisOption;
-}
-
-export interface CroquisPreferences {
-  presets: CroquisPreset[];
-  activePresetId: string;
+  defaultDurationSeconds?: number | null;
+  tagIds: string[];
+  autoAdvance: boolean;
+  recordSaveEnabled: boolean;
+  captureEnabled: boolean;
+  grayscaleEnabled: boolean;
+  resultRequired: boolean;
+  resultSavePath?: string | null;
 }
 
 export interface CroquisStartPayload {
   assetIds: string[];
-  preset: SessionPreset;
-  option: CroquisOption;
-  saveOption?: boolean;
-  preferences?: CroquisPreferences | null;
+  presetId: string;
+  presetName: string;
+  windowWidth?: string | null;
+  windowHeight?: string | null;
+  isShuffle: boolean;
+  steps: CroquisRuntimeStep[];
 }
 
 export interface CroquisSessionItem {
@@ -58,14 +38,22 @@ export interface CroquisSessionItem {
   stepName: string;
   stepIndex: number;
   targetDurationSeconds?: number | null;
+  autoAdvance: boolean;
+  recordSaveEnabled: boolean;
+  captureEnabled: boolean;
+  grayscaleEnabled: boolean;
   resultRequired: boolean;
+  resultSavePath?: string | null;
 }
 
 export interface CroquisSession {
   sessionId: string;
   title: string;
-  option: CroquisOption;
-  preset: SessionPreset;
+  presetId: string;
+  presetName: string;
+  windowWidth?: string | null;
+  windowHeight?: string | null;
+  isShuffle: boolean;
   items: CroquisSessionItem[];
   createdAt: string;
 }

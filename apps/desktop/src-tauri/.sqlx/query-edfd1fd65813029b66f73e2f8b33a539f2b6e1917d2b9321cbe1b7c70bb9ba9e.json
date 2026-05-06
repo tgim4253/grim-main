@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO time_step_preset\n            (\n                id,\n                name,\n                default_duration_seconds,\n                auto_advance,\n                record_save_enabled,\n                capture_enabled,\n                grayscale_enabled,\n                result_required,\n                result_save_path,\n                created_at,\n                updated_at\n            )\n            VALUES ('time-step-tag-usage', 'Tag usage', 30, 1, 1, 0, 0, 0, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "edfd1fd65813029b66f73e2f8b33a539f2b6e1917d2b9321cbe1b7c70bb9ba9e"
+}

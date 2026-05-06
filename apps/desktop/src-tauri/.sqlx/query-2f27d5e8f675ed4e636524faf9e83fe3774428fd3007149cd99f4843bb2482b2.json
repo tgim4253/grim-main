@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO croquis_record_tag (record_id, tag_id, created_at)\n            VALUES ('record-tag-usage', ?1, '2026-01-01T00:00:00Z')\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "2f27d5e8f675ed4e636524faf9e83fe3774428fd3007149cd99f4843bb2482b2"
+}

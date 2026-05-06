@@ -6,14 +6,12 @@ use crate::{
         tag::{Tag, TagGroup},
     },
     services::{
-        AssetService, FolderService, RecordService, SessionService,
-        SettingsService, TagService,
+        AssetService, FolderService, RecordService, SessionService, TagService,
     },
 };
 
 #[derive(Clone)]
 pub struct LibraryService {
-    settings_service: SettingsService,
     asset_service: AssetService,
     folder_service: FolderService,
     tag_service: TagService,
@@ -23,7 +21,6 @@ pub struct LibraryService {
 
 impl LibraryService {
     pub fn new(
-        settings_service: SettingsService,
         asset_service: AssetService,
         folder_service: FolderService,
         tag_service: TagService,
@@ -31,7 +28,6 @@ impl LibraryService {
         record_service: RecordService,
     ) -> Self {
         Self {
-            settings_service,
             asset_service,
             folder_service,
             tag_service,
@@ -41,7 +37,6 @@ impl LibraryService {
     }
 
     pub async fn load_library_snapshot(&self) -> Result<LibrarySnapshot> {
-        let settings = self.settings_service.load_settings().await?;
         let explorer = self.load_explorer_snapshot().await?;
         let session_presets =
             self.session_service.list_session_presets().await?;
@@ -49,13 +44,7 @@ impl LibraryService {
             self.tag_service.list_tag_groups().await?;
         let tags: Vec<Tag> = self.tag_service.list_tags().await?;
 
-        Ok(LibrarySnapshot {
-            settings,
-            explorer,
-            session_presets,
-            tag_groups,
-            tags,
-        })
+        Ok(LibrarySnapshot { explorer, session_presets, tag_groups, tags })
     }
 
     pub async fn load_explorer_snapshot(&self) -> Result<ExplorerSnapshot> {
@@ -67,7 +56,10 @@ impl LibraryService {
                 .asset_service
                 .count_unassigned_assets()
                 .await?,
-            recent_records: self.record_service.list_recent_records(12).await?,
+            recent_records: self
+                .record_service
+                .list_recent_records(Some(12))
+                .await?,
         })
     }
 }

@@ -1,0 +1,122 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT tsp.id,\n                   tsp.name,\n                   tsp.default_duration_seconds,\n                   tsp.auto_advance AS \"auto_advance: bool\",\n                   tsp.record_save_enabled AS \"record_save_enabled: bool\",\n                   tsp.capture_enabled AS \"capture_enabled: bool\",\n                   tsp.grayscale_enabled AS \"grayscale_enabled: bool\",\n                   tsp.result_required AS \"result_required: bool\",\n                   tsp.result_save_path,\n                   tsp.created_at,\n                   tsp.updated_at,\n                   t.id AS tag_id,\n                   t.group_id,\n                   t.name AS tag_name,\n                   t.color,\n                   t.sort_order,\n                   t.created_at AS tag_created_at,\n                   t.updated_at AS tag_updated_at\n            FROM time_step_preset tsp\n            LEFT JOIN time_step_preset_tag tspt ON tspt.time_step_preset_id = tsp.id\n            LEFT JOIN tag t ON t.id = tspt.tag_id\n            ORDER BY tsp.created_at ASC, t.name ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "default_duration_seconds",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "auto_advance: bool",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "record_save_enabled: bool",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "capture_enabled: bool",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "grayscale_enabled: bool",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "result_required: bool",
+        "ordinal": 7,
+        "type_info": "Integer"
+      },
+      {
+        "name": "result_save_path",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 10,
+        "type_info": "Text"
+      },
+      {
+        "name": "tag_id",
+        "ordinal": 11,
+        "type_info": "Text"
+      },
+      {
+        "name": "group_id",
+        "ordinal": 12,
+        "type_info": "Text"
+      },
+      {
+        "name": "tag_name",
+        "ordinal": 13,
+        "type_info": "Text"
+      },
+      {
+        "name": "color",
+        "ordinal": 14,
+        "type_info": "Text"
+      },
+      {
+        "name": "sort_order",
+        "ordinal": 15,
+        "type_info": "Integer"
+      },
+      {
+        "name": "tag_created_at",
+        "ordinal": 16,
+        "type_info": "Text"
+      },
+      {
+        "name": "tag_updated_at",
+        "ordinal": 17,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "d236221962be565b84425ce6df8e265050fde9fea751b700889826d05bce699a"
+}

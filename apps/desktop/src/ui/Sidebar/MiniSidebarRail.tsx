@@ -1,14 +1,14 @@
-import { IconButton } from '../../shared/ui';
+import { IconButton, type IconName } from '../../shared/ui';
 import './mini-sidebar-rail.css';
 
 export type PrimaryRailAction =
   | 'toggle-sidebar-panel'
   | 'open-search'
-  | 'open-grid'
-  | 'open-favorites';
+  | 'open-tag-settings'
+  | 'open-preset-settings';
 
 export type PrimaryRailItem = {
-  icon: 'folder-open' | 'search' | 'grid' | 'star';
+  icon: IconName;
   label: string;
   action: PrimaryRailAction;
   active?: boolean;

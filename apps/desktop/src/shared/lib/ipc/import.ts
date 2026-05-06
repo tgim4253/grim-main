@@ -1,8 +1,16 @@
-import type { ImportPreviewResult, ImportRequest, ImportResult } from '../../types';
+import type {
+  ImportPreviewResult,
+  ImportRemoteImagesRequest,
+  ImportRequest,
+  ImportResult,
+} from '../../types';
 import { invokeCamel } from './core';
 
 export const importIpc = {
-  previewImages: (payload: ImportRequest) =>
-    invokeCamel<ImportPreviewResult>('preview_import_images', { payload }),
-  importImages: (payload: ImportRequest) => invokeCamel<ImportResult>('import_images', { payload }),
+  previewImages: (payload: ImportRequest): Promise<ImportPreviewResult> =>
+    invokeCamel('preview_import_images', { payload }),
+  importImages: (payload: ImportRequest): Promise<ImportResult> =>
+    invokeCamel('import_images', { payload }),
+  importRemoteImages: (payload: ImportRemoteImagesRequest): Promise<ImportResult> =>
+    invokeCamel('import_remote_images', { payload }),
 };

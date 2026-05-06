@@ -31,8 +31,8 @@ pub fn launch_croquis(
             .always_on_top(true)
             .background_color(Color(0, 0, 0, 0));
 
-    let width = parse_dimension(session.option.window.width.as_ref());
-    let height = parse_dimension(session.option.window.height.as_ref());
+    let width = parse_dimension(session.window_width.as_ref());
+    let height = parse_dimension(session.window_height.as_ref());
 
     builder = match (width, height) {
         (Some(w), Some(h)) => builder.inner_size(w, h),

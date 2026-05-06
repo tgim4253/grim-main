@@ -15,7 +15,8 @@ use crate::{
 
 use super::mappers::{
     record_detail_row_into_summary, record_summary_from_row, tag_from_row,
-    CroquisRecordDetailRow, CroquisRecordSummaryRow, TagRow,
+    CroquisRecordDetailRow, CroquisRecordSummaryRow, CroquisRecordTagJoinRow,
+    TagRow,
 };
 
 #[derive(Clone)]
@@ -30,7 +31,7 @@ impl RecordRepository {
 
     pub async fn list_recent(
         &self,
-        limit: i64,
+        limit: Option<i64>,
     ) -> Result<Vec<CroquisRecordSummary>> {
         let rows = sqlx::query_as!(
             CroquisRecordSummaryRow,
@@ -47,7 +48,7 @@ impl RecordRepository {
             FROM croquis_record
             WHERE finished_at IS NOT NULL
             ORDER BY finished_at DESC, created_at DESC
-            LIMIT ?1
+            LIMIT COALESCE(?1, -1)
             "#,
             limit
         )
@@ -154,6 +155,101 @@ impl RecordRepository {
             result_asset: None,
             tags: tag_rows.into_iter().map(tag_from_row).collect::<Vec<Tag>>(),
         })
+    }
+
+    pub async fn list_recent_details(
+        &self,
+        limit: Option<i64>,
+    ) -> Result<Vec<CroquisRecordDetail>> {
+        let rows = sqlx::query_as!(
+            CroquisRecordDetailRow,
+            r#"
+            SELECT id,
+                   title,
+                   note,
+                   source_asset_id,
+                   result_asset_id,
+                   target_duration_seconds,
+                   actual_duration_seconds,
+                   finished_at,
+                   created_at,
+                   updated_at
+            FROM croquis_record
+            WHERE finished_at IS NOT NULL
+            ORDER BY finished_at DESC, created_at DESC
+            LIMIT COALESCE(?1, -1)
+            "#,
+            limit
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut details = rows
+            .into_iter()
+            .map(|row| CroquisRecordDetail {
+                record: record_detail_row_into_summary(&row),
+                note: row.note,
+                source_asset: None,
+                result_asset: None,
+                tags: Vec::new(),
+            })
+            .collect::<Vec<_>>();
+
+        if details.is_empty() {
+            return Ok(details);
+        }
+
+        let record_ids = details
+            .iter()
+            .map(|detail| detail.record.id.clone())
+            .collect::<Vec<_>>();
+        let record_ids_json = serde_json::to_string(&record_ids)?;
+        let tag_rows = sqlx::query_as!(
+            CroquisRecordTagJoinRow,
+            r#"
+            WITH requested_record(id, sort_order) AS (
+              SELECT CAST(value AS TEXT), key
+              FROM json_each(?1)
+            )
+            SELECT CAST(requested.id AS TEXT) AS "record_id!: String",
+                   t.id,
+                   t.group_id,
+                   t.name,
+                   t.color,
+                   t.sort_order,
+                   t.created_at,
+                   t.updated_at
+            FROM requested_record requested
+            INNER JOIN croquis_record_tag crt ON crt.record_id = requested.id
+            INNER JOIN tag t ON t.id = crt.tag_id
+            ORDER BY requested.sort_order ASC, t.name ASC
+            "#,
+            record_ids_json
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut detail_index =
+            std::collections::HashMap::with_capacity(details.len());
+        for (index, detail) in details.iter().enumerate() {
+            detail_index.insert(detail.record.id.clone(), index);
+        }
+
+        for row in tag_rows {
+            if let Some(index) = detail_index.get(&row.record_id) {
+                details[*index].tags.push(Tag {
+                    id: row.id,
+                    group_id: row.group_id,
+                    name: row.name,
+                    color: row.color,
+                    sort_order: row.sort_order,
+                    created_at: row.created_at,
+                    updated_at: row.updated_at,
+                });
+            }
+        }
+
+        Ok(details)
     }
 
     pub async fn save(

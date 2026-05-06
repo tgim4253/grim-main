@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT id\n                FROM tag\n                WHERE group_id = ?1\n                  AND name = ?2\n                LIMIT 1\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d86f34da09b2c615a87dc55d5c343d6c259d256df304c8d602164c6f957b6a7c"
+}

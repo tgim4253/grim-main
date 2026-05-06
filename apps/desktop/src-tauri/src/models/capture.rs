@@ -14,6 +14,8 @@ pub struct CaptureContext {
     pub target_seconds: Option<i64>,
     #[serde(default)]
     pub actual_seconds: Option<f64>,
+    #[serde(default)]
+    pub result_save_path: Option<String>,
 }
 
 pub type CaptureOverlayPayload = CaptureContext;

@@ -43,12 +43,12 @@ export function CroquisSessionSidebar({
 
       <div className="croquis-panel">
         <div className="app-kicker">Session Options</div>
-        <span>Shuffle: {session.option.isShuffle ? 'On' : 'Off'}</span>
-        <span>Grayscale: {session.option.isGray ? 'On' : 'Off'}</span>
-        <span>Records Save: {session.option.isRecordSave ? 'On' : 'Off'}</span>
+        <span>Shuffle: {session.isShuffle ? 'On' : 'Off'}</span>
+        <span>Grayscale: {currentItem.grayscaleEnabled ? 'On' : 'Off'}</span>
+        <span>Records Save: {currentItem.recordSaveEnabled ? 'On' : 'Off'}</span>
         <span>Require Result: {currentItem.resultRequired ? 'On' : 'Off'}</span>
-        <span>Capture: {session.option.isCapture ? 'On' : 'Off'}</span>
-        <span>Auto Skip: {session.option.auto.isSkip ? 'On' : 'Off'}</span>
+        <span>Capture: {currentItem.captureEnabled ? 'On' : 'Off'}</span>
+        <span>Auto-advance: {currentItem.autoAdvance ? 'On' : 'Off'}</span>
       </div>
 
       {status ? <div className="croquis-inline-status">{status}</div> : null}

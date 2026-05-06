@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { LibraryPage } from '../pages/library';
 import { CroquisPage } from '../pages/croquis';
@@ -5,7 +7,13 @@ import { CapturePage } from '../pages/capture';
 import { useTheme } from '../shared/hooks';
 
 export default function App() {
+  const { t } = useTranslation('common');
+
   useTheme();
+
+  useEffect(() => {
+    document.title = t('app_name');
+  }, [t]);
 
   return (
     <HashRouter>

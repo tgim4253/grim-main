@@ -28,6 +28,7 @@ export interface CaptureContext {
   assetId?: string | null;
   targetSeconds?: number | null;
   actualSeconds?: number | null;
+  resultSavePath?: string | null;
 }
 
 export type CaptureOverlayPayload = CaptureContext;

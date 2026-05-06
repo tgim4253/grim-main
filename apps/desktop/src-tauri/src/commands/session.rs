@@ -5,7 +5,9 @@ use crate::{
     models::{
         croquis::{CroquisSession, CroquisStartPayload, CroquisStartResponse},
         session::{
-            DeleteSessionPresetPayload, SaveSessionPresetPayload, SessionPreset,
+            DeleteSessionPresetPayload, DeleteTimeStepPresetPayload,
+            SaveSessionPresetPayload, SaveTimeStepPresetPayload, SessionPreset,
+            TimeStepPreset,
         },
     },
     services::{CroquisService, SessionService},
@@ -19,6 +21,14 @@ pub async fn list_session_presets(
 }
 
 #[tauri::command]
+pub async fn list_time_step_presets(
+    session_service: State<'_, SessionService>,
+) -> CommandResult<Vec<TimeStepPreset>> {
+    session_service.list_time_step_presets().await.into_command()
+}
+
+#[tauri::command]
+/// Save session-level settings and ordered Time Step preset references only.
 pub async fn save_session_preset(
     payload: SaveSessionPresetPayload,
     session_service: State<'_, SessionService>,
@@ -32,6 +42,22 @@ pub async fn delete_session_preset(
     session_service: State<'_, SessionService>,
 ) -> CommandResult<Vec<SessionPreset>> {
     session_service.delete_session_preset(payload).await.into_command()
+}
+
+#[tauri::command]
+pub async fn save_time_step_preset(
+    payload: SaveTimeStepPresetPayload,
+    session_service: State<'_, SessionService>,
+) -> CommandResult<Vec<TimeStepPreset>> {
+    session_service.save_time_step_preset(payload).await.into_command()
+}
+
+#[tauri::command]
+pub async fn delete_time_step_preset(
+    payload: DeleteTimeStepPresetPayload,
+    session_service: State<'_, SessionService>,
+) -> CommandResult<Vec<TimeStepPreset>> {
+    session_service.delete_time_step_preset(payload).await.into_command()
 }
 
 #[tauri::command]

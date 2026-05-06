@@ -1,0 +1,251 @@
+import type {
+  CroquisRuntimeStep,
+  SaveSessionPresetPayload,
+  SaveTimeStepPresetPayload,
+  SessionPreset,
+  SessionPresetStepDraft,
+  SessionStepPreset,
+  Tag,
+  TimeStepPreset,
+} from '../../../shared/types';
+
+export const DURATION_OPTIONS = [
+  { label: '10s', value: 10 },
+  { label: '30s', value: 30 },
+  { label: '1m', value: 60 },
+  { label: '3m', value: 180 },
+  { label: '10m', value: 600 },
+  { label: '30m', value: 1800 },
+  { label: '1h', value: 3600 },
+  { label: '∞', value: 0 },
+] as const;
+
+export const DURATION_MIN_SECONDS = 0;
+export const DURATION_SLIDER_MAX_SECONDS = 3600;
+export const DURATION_STEP_SECONDS = 1;
+export const USER_CUSTOM_STEP_VALUE = '__user-custom-step__';
+export const USER_CUSTOM_STEP_LABEL = 'User Custom Step';
+
+export type EditableSessionStep = {
+  id: string;
+  timeStepPresetId?: string | null;
+  stepOrder: number;
+  name: string;
+  defaultDurationSeconds?: number | null;
+  autoTags: Tag[];
+  autoAdvance: boolean;
+  recordSaveEnabled: boolean;
+  captureEnabled: boolean;
+  grayscaleEnabled: boolean;
+  resultRequired: boolean;
+  resultSavePath?: string | null;
+};
+
+export const formatDurationCompact = (seconds?: number | null) => {
+  if (seconds === null || seconds === undefined || seconds <= 0) {
+    return '∞';
+  }
+
+  if (seconds % 3600 === 0) {
+    return `${String(seconds / 3600)}h`;
+  }
+
+  if (seconds % 60 === 0) {
+    return `${String(seconds / 60)}m`;
+  }
+
+  return `${String(seconds)}s`;
+};
+
+export const formatEstimate = (seconds: number) => {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${String(minutes)}:${String(remainingSeconds).padStart(2, '0')}`;
+};
+
+export const normalizeWindowDimension = (value: string) => value.replace(/\D/g, '');
+
+export const normalizeOptionalString = (value: string) => {
+  const trimmedValue = value.trim();
+  return trimmedValue ? trimmedValue : null;
+};
+
+export const clampDurationSeconds = (seconds: number) => {
+  return Math.max(DURATION_MIN_SECONDS, Math.trunc(Number.isFinite(seconds) ? seconds : 0));
+};
+
+export const normalizeDurationUnit = (value: string, max?: number) => {
+  const digits = value.replace(/\D/g, '');
+  const unitValue = Math.max(0, digits ? Number(digits) : 0);
+
+  if (!Number.isFinite(unitValue)) {
+    return 0;
+  }
+
+  return max === undefined ? unitValue : Math.min(max, unitValue);
+};
+
+export const getDurationParts = (seconds: number) => {
+  const clampedSeconds = clampDurationSeconds(seconds);
+
+  return {
+    hours: Math.floor(clampedSeconds / 3600),
+    minutes: Math.floor((clampedSeconds % 3600) / 60),
+    seconds: clampedSeconds % 60,
+  };
+};
+
+export const composeDurationSeconds = ({
+  hours,
+  minutes,
+  seconds,
+}: {
+  hours: number;
+  minutes: number;
+  seconds: number;
+}) => clampDurationSeconds(hours * 3600 + minutes * 60 + seconds);
+
+export const getStepDuration = (step: { defaultDurationSeconds?: number | null } | undefined) =>
+  step?.defaultDurationSeconds ?? 0;
+
+const createStepId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `custom-step-${String(Date.now())}-${Math.random().toString(36).slice(2)}`;
+};
+
+export const normalizeStepOrders = <TStep extends { stepOrder: number }>(steps: TStep[]) =>
+  steps.map((step, index) => ({
+    ...step,
+    stepOrder: index + 1,
+  }));
+
+export const flattenTimeStepPreset = (
+  preset: TimeStepPreset,
+  stepOrder: number,
+  id = createStepId(),
+): EditableSessionStep => ({
+  id,
+  timeStepPresetId: preset.id,
+  stepOrder,
+  name: preset.name,
+  defaultDurationSeconds: preset.defaultDurationSeconds,
+  autoTags: preset.autoTags,
+  autoAdvance: preset.autoAdvance,
+  recordSaveEnabled: preset.recordSaveEnabled,
+  captureEnabled: preset.captureEnabled,
+  grayscaleEnabled: preset.grayscaleEnabled,
+  resultRequired: preset.resultRequired,
+  resultSavePath: preset.resultSavePath,
+});
+
+export const flattenSessionStep = (step: SessionStepPreset): EditableSessionStep =>
+  flattenTimeStepPreset(step.timeStep, step.stepOrder, step.id);
+
+export const createEditableSteps = (preset: SessionPreset): EditableSessionStep[] =>
+  normalizeStepOrders(preset.steps.map(step => flattenSessionStep(step)));
+
+export const createCustomStep = (stepOrder: number): EditableSessionStep => ({
+  id: createStepId(),
+  stepOrder,
+  name: USER_CUSTOM_STEP_LABEL,
+  timeStepPresetId: null,
+  defaultDurationSeconds: 180,
+  autoTags: [],
+  autoAdvance: true,
+  recordSaveEnabled: true,
+  captureEnabled: false,
+  grayscaleEnabled: false,
+  resultRequired: false,
+  resultSavePath: null,
+});
+
+export const createStepFromTimeStepPreset = (
+  preset: TimeStepPreset,
+  stepOrder: number,
+): EditableSessionStep => flattenTimeStepPreset(preset, stepOrder);
+
+export const applyTimeStepPresetToStep = (
+  currentStep: EditableSessionStep,
+  preset: TimeStepPreset,
+): EditableSessionStep => ({
+  ...flattenTimeStepPreset(preset, currentStep.stepOrder, currentStep.id),
+});
+
+export const toSessionPresetStepDraft = (
+  step: EditableSessionStep,
+  includeStepId: boolean,
+): SessionPresetStepDraft => ({
+  id: includeStepId ? step.id : undefined,
+  timeStepPresetId: step.timeStepPresetId ?? '',
+  stepOrder: step.stepOrder,
+});
+
+export const toSaveSessionPresetPayload = ({
+  preset,
+  name,
+  description,
+  windowWidth,
+  windowHeight,
+  isShuffle,
+  steps,
+  duplicate = false,
+}: {
+  preset: SessionPreset | null;
+  name: string;
+  description: string;
+  windowWidth?: string | null;
+  windowHeight?: string | null;
+  isShuffle: boolean;
+  steps: EditableSessionStep[];
+  duplicate?: boolean;
+}): SaveSessionPresetPayload => ({
+  id: duplicate ? undefined : preset?.id,
+  name,
+  description: description.trim() ? description.trim() : null,
+  isDefault: duplicate ? false : (preset?.isDefault ?? false),
+  windowWidth,
+  windowHeight,
+  isShuffle,
+  steps: steps.map(step => toSessionPresetStepDraft(step, !duplicate)),
+});
+
+export const toSaveTimeStepPresetPayload = ({
+  preset,
+  name,
+  step,
+  duplicate = false,
+}: {
+  preset: TimeStepPreset | null;
+  name: string;
+  step: EditableSessionStep;
+  duplicate?: boolean;
+}): SaveTimeStepPresetPayload => ({
+  id: duplicate ? undefined : preset?.id,
+  name,
+  defaultDurationSeconds: step.defaultDurationSeconds,
+  autoAdvance: step.autoAdvance,
+  recordSaveEnabled: step.recordSaveEnabled,
+  captureEnabled: step.captureEnabled,
+  grayscaleEnabled: step.grayscaleEnabled,
+  resultRequired: step.resultRequired,
+  resultSavePath: step.resultSavePath,
+  autoTagNames: step.autoTags.map(tag => tag.name),
+});
+
+export const toCroquisRuntimeStep = (step: EditableSessionStep): CroquisRuntimeStep => ({
+  stepId: step.id,
+  timeStepPresetId: step.timeStepPresetId ?? null,
+  stepOrder: step.stepOrder,
+  name: step.name,
+  defaultDurationSeconds: step.defaultDurationSeconds,
+  tagIds: step.autoTags.map(tag => tag.id).filter(Boolean),
+  autoAdvance: step.autoAdvance,
+  recordSaveEnabled: step.recordSaveEnabled,
+  captureEnabled: step.captureEnabled,
+  grayscaleEnabled: step.grayscaleEnabled,
+  resultRequired: step.resultRequired,
+  resultSavePath: step.resultSavePath,
+});

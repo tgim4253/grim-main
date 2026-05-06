@@ -81,6 +81,7 @@ export function CaptureOverlay() {
       assetId: params.get('asset_id'),
       targetSeconds: parseOptionalNumber(params.get('target_seconds')),
       actualSeconds: parseOptionalNumber(params.get('actual_seconds')),
+      resultSavePath: params.get('result_save_path'),
     }),
     [params],
   );
