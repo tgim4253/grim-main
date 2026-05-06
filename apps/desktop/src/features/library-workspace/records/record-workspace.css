@@ -55,7 +55,7 @@
   .record-explorer-header__sort,
   .record-explorer-header__count {
     overflow: hidden;
-    color: var(--semantic-colors-text-teritary);
+    color: var(--semantic-colors-text-tertiary);
     font-size: 12px;
     line-height: 16px;
     font-weight: var(--font-weight-medium);
@@ -125,7 +125,7 @@
   }
 
   .record-selection-toolbar__count {
-    color: var(--semantic-colors-text-teritary);
+    color: var(--semantic-colors-text-tertiary);
     font-size: 12px;
     line-height: 16px;
     font-weight: var(--font-weight-medium);
@@ -420,7 +420,7 @@
   }
 
   .record-result-preview__empty-text {
-    color: var(--semantic-colors-text-teritary);
+    color: var(--semantic-colors-text-tertiary);
     text-transform: none;
   }
 
@@ -456,7 +456,7 @@
   }
 
   .record-result-preview__related-header h3 {
-    color: var(--semantic-colors-text-teritary);
+    color: var(--semantic-colors-text-tertiary);
   }
 
   .record-result-preview__related-header span {

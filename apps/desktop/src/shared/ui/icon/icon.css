@@ -1,7 +1,7 @@
 @layer app {
   .c-icon {
     --_icon-size: var(--semantic-size-icon-md);
-    --_icon-color: var(--semantic-colors-text-primary);
+    --_icon-color: var(--semantic-colors-icon-primary);
     display: inline-block;
     flex: none;
     width: var(--_icon-size);
@@ -31,18 +31,18 @@
   }
 
   .c-icon--text-primary {
-    --_icon-color: var(--semantic-colors-text-primary);
+    --_icon-color: var(--semantic-colors-icon-primary);
   }
 
   .c-icon--text-tertiary {
-    --_icon-color: var(--semantic-colors-text-teritary);
+    --_icon-color: var(--semantic-colors-icon-tertiary);
   }
 
   .c-icon--brand-primary {
-    --_icon-color: var(--semantic-colors-brand-primary);
+    --_icon-color: var(--semantic-colors-icon-brand);
   }
 
   .c-icon--brand-tertiary {
-    --_icon-color: var(--semantic-colors-brand-teritary);
+    --_icon-color: var(--semantic-colors-brand-tertiary);
   }
 }

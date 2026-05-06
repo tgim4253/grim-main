@@ -106,7 +106,7 @@
     --components-input-text-disabled: var(--semantic-colors-text-muted);
     --components-input-text-error: var(--semantic-colors-text-error);
     --components-input-text-helper: var(--semantic-colors-text-secondary);
-    --components-input-text-placeholder: var(--semantic-colors-text-teritary);
+    --components-input-text-placeholder: var(--semantic-colors-text-tertiary);
     --components-input-text-val: var(--semantic-colors-text-primary);
     --components-modal-background: var(--semantic-colors-surface-panel);
     --components-modal-border: var(--semantic-colors-border-primary);
@@ -134,7 +134,7 @@
     --components-select-trigger-border-focus: var(--semantic-colors-border-focus);
     --components-select-trigger-placeholder: var(--semantic-colors-text-muted);
     --components-select-trigger-text-primary: var(--semantic-colors-text-primary);
-    --components-select-trigger-text-tertiary: var(--semantic-colors-text-teritary);
+    --components-select-trigger-text-tertiary: var(--semantic-colors-text-tertiary);
     --components-typography-accordion-meta-font-family: var(--primitives-typography-font-family-mono);
     --components-typography-accordion-meta-font-size: var(--primitives-typography-font-size-xs);
     --components-typography-accordion-meta-font-weight: var(--primitives-typography-font-weight-normal);
@@ -264,6 +264,12 @@
     --semantic-colors-brand-primary-container: #e6f7ed;
     --semantic-colors-brand-secondary: var(--primitives-colors-emerald-700);
     --semantic-colors-brand-teritary: var(--primitives-colors-emerald-800);
+    --semantic-colors-brand-tertiary: var(--semantic-colors-brand-teritary);
+    --semantic-colors-icon-brand: var(--semantic-colors-brand-primary);
+    --semantic-colors-icon-disabled: var(--semantic-colors-text-muted);
+    --semantic-colors-icon-primary: var(--semantic-colors-text-primary);
+    --semantic-colors-icon-secondary: var(--semantic-colors-text-secondary);
+    --semantic-colors-icon-tertiary: var(--semantic-colors-text-tertiary);
     --semantic-colors-overlay-scrim: rgba(16, 20, 18, 0.32);
     --semantic-colors-status-error: var(--primitives-colors-error-500);
     --semantic-colors-status-info: var(--primitives-colors-info-400);
@@ -289,6 +295,7 @@
     --semantic-colors-text-primary: var(--primitives-colors-charcoal-700);
     --semantic-colors-text-secondary: var(--primitives-colors-charcoal-600);
     --semantic-colors-text-teritary: var(--primitives-colors-charcoal-500);
+    --semantic-colors-text-tertiary: var(--semantic-colors-text-teritary);
     --semantic-size-avatar-lg: 160px;
     --semantic-size-avatar-md: 128px;
     --semantic-size-checkbox-mark-lg: 12px;

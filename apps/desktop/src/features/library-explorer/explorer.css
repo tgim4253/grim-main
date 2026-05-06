@@ -146,7 +146,7 @@
   .explorer-tree-row__meta {
     flex: none;
     padding-left: 8px;
-    color: var(--semantic-colors-text-teritary);
+    color: var(--semantic-colors-text-tertiary);
     font-family: var(--font-mono);
     font-size: 10px;
     line-height: 15px;

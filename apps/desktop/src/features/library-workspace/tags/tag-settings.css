@@ -146,7 +146,7 @@
     padding: 0 6px;
     border-radius: var(--primitives-radius-full);
     background: var(--semantic-colors-surface-panel);
-    color: var(--semantic-colors-text-teritary);
+    color: var(--semantic-colors-text-tertiary);
     font-size: 11px;
     line-height: 14px;
     font-weight: var(--font-weight-medium);

@@ -30,12 +30,12 @@ const DEFAULT_ICON_SIZES: Record<IconButtonSize, IconButtonIconSize> = {
 
 const ICON_COLOR_VARIABLES: Record<IconColor, Record<IconHierarchy, string>> = {
   text: {
-    primary: 'var(--semantic-colors-text-primary)',
-    tertiary: 'var(--semantic-colors-text-teritary)',
+    primary: 'var(--semantic-colors-icon-primary)',
+    tertiary: 'var(--semantic-colors-icon-tertiary)',
   },
   brand: {
-    primary: 'var(--semantic-colors-brand-primary)',
-    tertiary: 'var(--semantic-colors-brand-teritary)',
+    primary: 'var(--semantic-colors-icon-brand)',
+    tertiary: 'var(--semantic-colors-brand-tertiary)',
   },
 };
 

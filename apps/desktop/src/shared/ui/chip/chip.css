@@ -93,7 +93,7 @@
     --_chip-letter-spacing: 0.225px;
     --_chip-text-transform: uppercase;
     --_chip-button-background-hover: var(--semantic-colors-brand-secondary);
-    --_chip-button-background-active: var(--semantic-colors-brand-teritary);
+    --_chip-button-background-active: var(--semantic-colors-brand-tertiary);
   }
 
   .c-chip--add {

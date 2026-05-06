@@ -364,6 +364,10 @@
           "$value": "{primitives.colors.Charcoal.500}",
           "$type": "color"
         },
+        "tertiary": {
+          "$value": "{semantic.colors.text.teritary}",
+          "$type": "color"
+        },
         "muted": {
           "$value": "{primitives.colors.Charcoal.500}",
           "$type": "color"
@@ -396,6 +400,32 @@
         },
         "teritary": {
           "$value": "{primitives.colors.Emerald.800}",
+          "$type": "color"
+        },
+        "tertiary": {
+          "$value": "{semantic.colors.brand.teritary}",
+          "$type": "color"
+        }
+      },
+      "icon": {
+        "primary": {
+          "$value": "{semantic.colors.text.primary}",
+          "$type": "color"
+        },
+        "secondary": {
+          "$value": "{semantic.colors.text.secondary}",
+          "$type": "color"
+        },
+        "tertiary": {
+          "$value": "{semantic.colors.text.tertiary}",
+          "$type": "color"
+        },
+        "brand": {
+          "$value": "{semantic.colors.brand.primary}",
+          "$type": "color"
+        },
+        "disabled": {
+          "$value": "{semantic.colors.text.muted}",
           "$type": "color"
         }
       },
@@ -1223,7 +1253,7 @@
           "$type": "color"
         },
         "placeholder": {
-          "$value": "{semantic.colors.text.teritary}",
+          "$value": "{semantic.colors.text.tertiary}",
           "$type": "color"
         },
         "helper": {
@@ -1414,7 +1444,7 @@
             "$type": "color"
           },
           "tertiary": {
-            "$value": "{semantic.colors.text.teritary}",
+            "$value": "{semantic.colors.text.tertiary}",
             "$type": "color"
           }
         },
