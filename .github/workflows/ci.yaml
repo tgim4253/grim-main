@@ -24,9 +24,10 @@ jobs:
 
       # Set up pnpm for consistent package management
       - name: Set up pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 10.13.1
+          run_install: false
 
       # Install Node.js and enable pnpm cache for faster installs
       - name: Set up Node.js
@@ -34,18 +35,19 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       # Install JS dependencies
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       # TypeScript linting
       - name: Lint (TypeScript)
-        run: npx eslint . --ext .ts,.tsx
+        run: pnpm exec eslint .
 
       # Prettier formatting check
       - name: Format check (Prettier)
-        run: npx prettier --check .
+        run: pnpm exec prettier --check .
 
       # Build the frontend app (adjust filter/package name if needed)
       - name: Build frontend
