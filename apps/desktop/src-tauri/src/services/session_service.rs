@@ -20,6 +20,17 @@ pub struct SessionService {
     tag_repository: TagRepository,
 }
 
+fn normalize_tag_ids(tag_ids: &[String]) -> Vec<String> {
+    tag_ids.iter().fold(Vec::<String>::new(), |mut acc, tag_id| {
+        let tag_id = tag_id.trim();
+        if !tag_id.is_empty() && !acc.iter().any(|existing| existing == tag_id)
+        {
+            acc.push(tag_id.to_string());
+        }
+        acc
+    })
+}
+
 impl SessionService {
     pub fn new(
         session_repository: SessionRepository,
@@ -81,6 +92,16 @@ impl SessionService {
             )
             .await?;
 
+        let auto_tag_ids = normalize_tag_ids(&payload.auto_tag_ids);
+        self.session_repository
+            .replace_session_preset_tags_in_tx(
+                tx,
+                &preset_id,
+                &auto_tag_ids,
+                now,
+            )
+            .await?;
+
         if payload.id.is_some() {
             self.session_repository
                 .delete_preset_steps_in_tx(tx, &preset_id)
@@ -119,11 +140,16 @@ impl SessionService {
         let now = get_now_date();
         let preset_id = payload.id.clone().unwrap_or_else(get_unique_id);
         let mut tx = self.session_repository.begin().await?;
-        let tags = self
-            .tag_repository
-            .ensure_tags_by_names_in_tx(&mut tx, &payload.auto_tag_names)
-            .await?;
-        let tag_ids = tags.iter().map(|tag| tag.id.clone()).collect::<Vec<_>>();
+        let tag_ids = if payload.auto_tag_ids.is_empty() {
+            self.tag_repository
+                .ensure_tags_by_names_in_tx(&mut tx, &payload.auto_tag_names)
+                .await?
+                .iter()
+                .map(|tag| tag.id.clone())
+                .collect::<Vec<_>>()
+        } else {
+            normalize_tag_ids(&payload.auto_tag_ids)
+        };
 
         self.session_repository
             .upsert_time_step_preset_in_tx(
@@ -283,6 +309,7 @@ mod tests {
                 window_width: Some("800".to_string()),
                 window_height: None,
                 is_shuffle: true,
+                auto_tag_ids: Vec::new(),
                 steps: vec![SessionPresetStepDraft {
                     id: None,
                     time_step_preset_id: time_step.id.clone(),
@@ -320,6 +347,7 @@ mod tests {
                 grayscale_enabled: true,
                 result_required: true,
                 result_save_path: Some("/tmp/result.png".to_string()),
+                auto_tag_ids: Vec::new(),
                 auto_tag_names: vec!["Warmup".to_string(), "Pose".to_string()],
             })
             .await
@@ -338,6 +366,7 @@ mod tests {
                 window_width: None,
                 window_height: None,
                 is_shuffle: false,
+                auto_tag_ids: vec![time_step.auto_tags[0].id.clone()],
                 steps: vec![SessionPresetStepDraft {
                     id: None,
                     time_step_preset_id: time_step.id.clone(),
@@ -375,6 +404,8 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["Pose", "Warmup"]
         );
+        assert_eq!(session.auto_tags.len(), 1);
+        assert_eq!(session.auto_tags[0].id, time_step.auto_tags[0].id);
 
         let _ = fs::remove_dir_all(dir);
     }
@@ -393,6 +424,7 @@ mod tests {
                 grayscale_enabled: false,
                 result_required: false,
                 result_save_path: None,
+                auto_tag_ids: Vec::new(),
                 auto_tag_names: vec!["Warmup".to_string()],
             })
             .await
@@ -410,6 +442,7 @@ mod tests {
                 window_width: None,
                 window_height: None,
                 is_shuffle: false,
+                auto_tag_ids: Vec::new(),
                 steps: vec![SessionPresetStepDraft {
                     id: None,
                     time_step_preset_id: time_step.id.clone(),
@@ -430,6 +463,7 @@ mod tests {
                 grayscale_enabled: true,
                 result_required: true,
                 result_save_path: Some("/tmp/result.png".to_string()),
+                auto_tag_ids: Vec::new(),
                 auto_tag_names: vec!["Hold".to_string()],
             })
             .await

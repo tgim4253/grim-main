@@ -10,6 +10,8 @@ import type {
   CroquisRecordSummary,
   ExplorerSnapshot,
   SessionPreset,
+  Tag,
+  TagGroup,
   TimeStepPreset,
   VirtualFolder,
 } from '../../../shared/types';
@@ -107,6 +109,8 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
   const [croquisAssetIds, setCroquisAssetIds] = useState<string[]>([]);
   const [sessionPresets, setSessionPresets] = useState<SessionPreset[]>([]);
   const [timeStepPresets, setTimeStepPresets] = useState<TimeStepPreset[]>([]);
+  const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [isCroquisConfigLoading, setIsCroquisConfigLoading] = useState(false);
   const [croquisConfigError, setCroquisConfigError] = useState<string | null>(null);
   const [folderAction, setFolderAction] = useState<FolderAction | null>(null);
@@ -279,9 +283,10 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
     setCroquisConfigError(null);
 
     try {
-      const [nextPresets, nextTimeStepPresets] = await Promise.all([
+      const [nextPresets, nextTimeStepPresets, nextTagIndex] = await Promise.all([
         ipc.session.listPresets(),
         ipc.session.listTimeStepPresets(),
+        ipc.tag.loadIndex(),
       ]);
 
       if (croquisConfigLoadSequenceRef.current !== loadSequence) {
@@ -290,6 +295,8 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
 
       setSessionPresets(nextPresets);
       setTimeStepPresets(nextTimeStepPresets);
+      setTagGroups(nextTagIndex.groups);
+      setTags(nextTagIndex.tags);
       return true;
     } catch (nextError) {
       if (croquisConfigLoadSequenceRef.current !== loadSequence) {
@@ -298,6 +305,8 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
 
       setSessionPresets([]);
       setTimeStepPresets([]);
+      setTagGroups([]);
+      setTags([]);
       setCroquisConfigError(
         getErrorMessage(nextError, 'Failed to load Croquis session configuration.'),
       );
@@ -606,6 +615,8 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
         assetIds={croquisAssetIds}
         sessionPresets={sessionPresets}
         timeStepPresets={timeStepPresets}
+        tags={tags}
+        tagGroups={tagGroups}
         onClose={handleCloseCroquisModal}
         onStarted={handleCroquisStarted}
       />

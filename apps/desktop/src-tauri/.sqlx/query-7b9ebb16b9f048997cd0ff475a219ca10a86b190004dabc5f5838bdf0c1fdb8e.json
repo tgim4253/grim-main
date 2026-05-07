@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO session_preset_tag (session_preset_id, tag_id, created_at) VALUES (?1, ?2, ?3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "7b9ebb16b9f048997cd0ff475a219ca10a86b190004dabc5f5838bdf0c1fdb8e"
+}

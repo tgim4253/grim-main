@@ -8,12 +8,27 @@ export const formatSeconds = (value: number) => {
 };
 
 export const shuffleItems = (items: CroquisSessionItem[]) => {
-  const next = [...items];
-  for (let index = next.length - 1; index > 0; index -= 1) {
+  const bundles = items.reduce<CroquisSessionItem[][]>((nextBundles, item) => {
+    if (nextBundles.length > 0) {
+      const lastBundle = nextBundles[nextBundles.length - 1];
+      const lastItem = lastBundle[lastBundle.length - 1];
+
+      if (lastItem.assetId === item.assetId) {
+        lastBundle.push(item);
+        return nextBundles;
+      }
+    }
+
+    nextBundles.push([item]);
+    return nextBundles;
+  }, []);
+
+  for (let index = bundles.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(Math.random() * (index + 1));
-    [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+    [bundles[index], bundles[swapIndex]] = [bundles[swapIndex], bundles[index]];
   }
-  return next;
+
+  return bundles.flat();
 };
 
 export const timestampNow = () => new Date().toISOString();

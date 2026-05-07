@@ -266,12 +266,24 @@ impl TagRepository {
         .fetch_one(&self.pool)
         .await?
         .count;
+        let session_preset_usage = sqlx::query!(
+            r#"
+            SELECT COUNT(*) AS "count!: i64"
+            FROM session_preset_tag
+            WHERE tag_id = ?1
+            "#,
+            tag_id
+        )
+        .fetch_one(&self.pool)
+        .await?
+        .count;
 
-        if record_usage > 0 || time_step_usage > 0 {
+        if record_usage > 0 || time_step_usage > 0 || session_preset_usage > 0 {
             bail!(
-                "Cannot delete tag because it is used by {} records and {} time step presets.",
+                "Cannot delete tag because it is used by {} records, {} time step presets, and {} session presets.",
                 record_usage,
-                time_step_usage
+                time_step_usage,
+                session_preset_usage
             );
         }
 

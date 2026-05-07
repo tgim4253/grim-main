@@ -56,6 +56,8 @@ pub struct SessionPreset {
     #[serde(default)]
     pub is_shuffle: bool,
     #[serde(default)]
+    pub auto_tags: Vec<Tag>,
+    #[serde(default)]
     pub steps: Vec<SessionStepPreset>,
     pub created_at: String,
     pub updated_at: String,
@@ -87,6 +89,8 @@ pub struct SaveSessionPresetPayload {
     #[serde(default)]
     pub is_shuffle: bool,
     #[serde(default)]
+    pub auto_tag_ids: Vec<String>,
+    #[serde(default)]
     pub steps: Vec<SessionPresetStepDraft>,
 }
 
@@ -116,6 +120,8 @@ pub struct SaveTimeStepPresetPayload {
     pub result_required: bool,
     #[serde(default)]
     pub result_save_path: Option<String>,
+    #[serde(default)]
+    pub auto_tag_ids: Vec<String>,
     #[serde(default)]
     pub auto_tag_names: Vec<String>,
 }

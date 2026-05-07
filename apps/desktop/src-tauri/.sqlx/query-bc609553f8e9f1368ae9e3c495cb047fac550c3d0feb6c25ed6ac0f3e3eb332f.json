@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT spt.session_preset_id AS \"preset_id!: String\",\n                   t.id AS \"tag_id!: String\",\n                   t.group_id,\n                   t.name AS \"tag_name!: String\",\n                   t.color,\n                   t.sort_order AS \"sort_order!: i64\",\n                   t.created_at AS \"tag_created_at!: String\",\n                   t.updated_at AS \"tag_updated_at!: String\"\n            FROM session_preset_tag spt\n            INNER JOIN tag t ON t.id = spt.tag_id\n            ORDER BY spt.session_preset_id ASC, t.name ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "preset_id!: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "tag_id!: String",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "group_id",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "tag_name!: String",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "color",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "sort_order!: i64",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "tag_created_at!: String",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "tag_updated_at!: String",
+        "ordinal": 7,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "bc609553f8e9f1368ae9e3c495cb047fac550c3d0feb6c25ed6ac0f3e3eb332f"
+}
