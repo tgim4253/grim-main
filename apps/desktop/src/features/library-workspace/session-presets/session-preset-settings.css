@@ -272,6 +272,11 @@
     min-width: 0;
   }
 
+  .session-preset-settings__session-auto-tags {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
   .session-preset-settings__textarea {
     width: 100%;
     min-height: var(--semantic-size-control-lg);

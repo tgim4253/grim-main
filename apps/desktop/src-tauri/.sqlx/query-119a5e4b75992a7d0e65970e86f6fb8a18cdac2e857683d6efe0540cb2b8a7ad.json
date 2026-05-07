@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT COUNT(*) AS \"count!: i64\"\n            FROM session_preset_tag\n            WHERE tag_id = ?1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "119a5e4b75992a7d0e65970e86f6fb8a18cdac2e857683d6efe0540cb2b8a7ad"
+}

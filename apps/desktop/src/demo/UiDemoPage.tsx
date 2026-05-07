@@ -212,6 +212,7 @@ const CROQUIS_MODAL_SESSION_PRESETS: SessionPreset[] = [
     windowWidth: '1080',
     windowHeight: '180',
     isShuffle: true,
+    autoTags: [CROQUIS_MODAL_TAGS.gesture],
     createdAt: DEMO_TIMESTAMP,
     updatedAt: DEMO_TIMESTAMP,
     steps: [
@@ -237,6 +238,7 @@ const CROQUIS_MODAL_SESSION_PRESETS: SessionPreset[] = [
     windowWidth: '960',
     windowHeight: null,
     isShuffle: false,
+    autoTags: [CROQUIS_MODAL_TAGS.anatomy],
     createdAt: DEMO_TIMESTAMP,
     updatedAt: DEMO_TIMESTAMP,
     steps: [

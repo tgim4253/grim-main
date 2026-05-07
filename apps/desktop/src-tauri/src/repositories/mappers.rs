@@ -120,6 +120,17 @@ pub(crate) struct SessionStepPresetJoinRow {
     pub tag_updated_at: Option<String>,
 }
 
+pub(crate) struct SessionPresetTagJoinRow {
+    pub preset_id: String,
+    pub tag_id: String,
+    pub group_id: Option<String>,
+    pub tag_name: String,
+    pub color: Option<String>,
+    pub sort_order: i64,
+    pub tag_created_at: String,
+    pub tag_updated_at: String,
+}
+
 pub(crate) struct TimeStepPresetJoinRow {
     pub id: String,
     pub name: String,

@@ -242,6 +242,7 @@ export interface SessionPreset {
   windowWidth?: string | null;
   windowHeight?: string | null;
   isShuffle: boolean;
+  autoTags: Tag[];
   steps: SessionStepPreset[];
   createdAt: string;
   updatedAt: string;
@@ -261,6 +262,7 @@ export interface SaveSessionPresetPayload {
   windowWidth?: string | null;
   windowHeight?: string | null;
   isShuffle?: boolean;
+  autoTagIds: string[];
   steps: SessionPresetStepDraft[];
 }
 
@@ -278,7 +280,7 @@ export interface SaveTimeStepPresetPayload {
   grayscaleEnabled: boolean;
   resultRequired: boolean;
   resultSavePath?: string | null;
-  autoTagNames: string[];
+  autoTagIds: string[];
 }
 
 export interface DeleteTimeStepPresetPayload {

@@ -9,7 +9,8 @@ use crate::models::{
 };
 
 use super::mappers::{
-    SessionPresetRow, SessionStepPresetJoinRow, TimeStepPresetJoinRow,
+    SessionPresetRow, SessionPresetTagJoinRow, SessionStepPresetJoinRow,
+    TimeStepPresetJoinRow,
 };
 
 #[derive(Clone)]
@@ -161,6 +162,40 @@ impl SessionRepository {
             });
         }
 
+        let session_tag_rows = sqlx::query_as!(
+            SessionPresetTagJoinRow,
+            r#"
+            SELECT spt.session_preset_id AS "preset_id!: String",
+                   t.id AS "tag_id!: String",
+                   t.group_id,
+                   t.name AS "tag_name!: String",
+                   t.color,
+                   t.sort_order AS "sort_order!: i64",
+                   t.created_at AS "tag_created_at!: String",
+                   t.updated_at AS "tag_updated_at!: String"
+            FROM session_preset_tag spt
+            INNER JOIN tag t ON t.id = spt.tag_id
+            ORDER BY spt.session_preset_id ASC, t.name ASC
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        let mut tags_by_preset: HashMap<String, Vec<Tag>> = HashMap::new();
+
+        for row in session_tag_rows {
+            tags_by_preset.entry(row.preset_id.clone()).or_default().push(
+                Tag {
+                    id: row.tag_id,
+                    group_id: row.group_id,
+                    name: row.tag_name,
+                    color: row.color,
+                    sort_order: row.sort_order,
+                    created_at: row.tag_created_at,
+                    updated_at: row.tag_updated_at,
+                },
+            );
+        }
+
         let presets = preset_rows
             .into_iter()
             .map(|row| SessionPreset {
@@ -171,6 +206,7 @@ impl SessionRepository {
                 window_width: row.window_width,
                 window_height: row.window_height,
                 is_shuffle: row.is_shuffle,
+                auto_tags: tags_by_preset.remove(&row.id).unwrap_or_default(),
                 steps: steps_by_preset.remove(&row.id).unwrap_or_default(),
                 created_at: row.created_at,
                 updated_at: row.updated_at,
@@ -435,6 +471,34 @@ impl SessionRepository {
                 result_required,
                 input.result_save_path,
                 input.timestamp
+            )
+            .execute(&mut **tx)
+            .await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn replace_session_preset_tags_in_tx(
+        &self,
+        tx: &mut Transaction<'_, Sqlite>,
+        preset_id: &str,
+        tag_ids: &[String],
+        created_at: &str,
+    ) -> Result<()> {
+        sqlx::query!(
+            "DELETE FROM session_preset_tag WHERE session_preset_id = ?1",
+            preset_id
+        )
+        .execute(&mut **tx)
+        .await?;
+
+        for tag_id in tag_ids {
+            sqlx::query!(
+                "INSERT OR IGNORE INTO session_preset_tag (session_preset_id, tag_id, created_at) VALUES (?1, ?2, ?3)",
+                preset_id,
+                tag_id,
+                created_at
             )
             .execute(&mut **tx)
             .await?;

@@ -108,6 +108,27 @@ export const composeDurationSeconds = ({
 export const getStepDuration = (step: { defaultDurationSeconds?: number | null } | undefined) =>
   step?.defaultDurationSeconds ?? 0;
 
+export const getUniqueTagIds = (tags: readonly Tag[]) =>
+  tags.reduce<string[]>((tagIds, tag) => {
+    if (tag.id && !tagIds.includes(tag.id)) {
+      tagIds.push(tag.id);
+    }
+
+    return tagIds;
+  }, []);
+
+export const mergeUniqueTags = (primaryTags: readonly Tag[], secondaryTags: readonly Tag[]) => {
+  const tagsById = new Map<string, Tag>();
+
+  [...primaryTags, ...secondaryTags].forEach(tag => {
+    if (tag.id && !tagsById.has(tag.id)) {
+      tagsById.set(tag.id, tag);
+    }
+  });
+
+  return [...tagsById.values()];
+};
+
 const createStepId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -190,6 +211,7 @@ export const toSaveSessionPresetPayload = ({
   windowWidth,
   windowHeight,
   isShuffle,
+  autoTags,
   steps,
   duplicate = false,
 }: {
@@ -199,6 +221,7 @@ export const toSaveSessionPresetPayload = ({
   windowWidth?: string | null;
   windowHeight?: string | null;
   isShuffle: boolean;
+  autoTags: Tag[];
   steps: EditableSessionStep[];
   duplicate?: boolean;
 }): SaveSessionPresetPayload => ({
@@ -209,6 +232,7 @@ export const toSaveSessionPresetPayload = ({
   windowWidth,
   windowHeight,
   isShuffle,
+  autoTagIds: getUniqueTagIds(autoTags),
   steps: steps.map(step => toSessionPresetStepDraft(step, !duplicate)),
 });
 
@@ -232,16 +256,19 @@ export const toSaveTimeStepPresetPayload = ({
   grayscaleEnabled: step.grayscaleEnabled,
   resultRequired: step.resultRequired,
   resultSavePath: step.resultSavePath,
-  autoTagNames: step.autoTags.map(tag => tag.name),
+  autoTagIds: step.autoTags.map(tag => tag.id).filter(Boolean),
 });
 
-export const toCroquisRuntimeStep = (step: EditableSessionStep): CroquisRuntimeStep => ({
+export const toCroquisRuntimeStep = (
+  step: EditableSessionStep,
+  sessionAutoTags: readonly Tag[] = [],
+): CroquisRuntimeStep => ({
   stepId: step.id,
   timeStepPresetId: step.timeStepPresetId ?? null,
   stepOrder: step.stepOrder,
   name: step.name,
   defaultDurationSeconds: step.defaultDurationSeconds,
-  tagIds: step.autoTags.map(tag => tag.id).filter(Boolean),
+  tagIds: getUniqueTagIds([...sessionAutoTags, ...step.autoTags]),
   autoAdvance: step.autoAdvance,
   recordSaveEnabled: step.recordSaveEnabled,
   captureEnabled: step.captureEnabled,

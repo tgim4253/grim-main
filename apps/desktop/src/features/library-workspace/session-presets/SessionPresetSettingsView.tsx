@@ -9,7 +9,7 @@ import {
   type SelectOption,
 } from '../../../shared/ui';
 import { ipc } from '../../../shared/lib/ipc';
-import type { SessionPreset, Tag, TimeStepPreset } from '../../../shared/types';
+import type { SessionPreset, Tag, TagGroup, TimeStepPreset } from '../../../shared/types';
 import { findFallbackPreset, setStoredActiveSessionPresetId } from '../../croquis/lib/startModal';
 import {
   applyTimeStepPresetToStep,
@@ -27,6 +27,7 @@ import {
   type EditableSessionStep,
 } from '../../croquis/lib/sessionPresetEditor';
 import { SessionPresetStepEditor } from '../../croquis/ui/SessionPresetStepEditor';
+import { AutoTagPicker } from '../../croquis/ui/AutoTagPicker';
 import './session-preset-settings.css';
 
 const NEW_SESSION_PRESET_NAME = 'Untitled Preset';
@@ -98,36 +99,13 @@ function refreshSessionStepsFromTimeStepPresets(
   );
 }
 
-function formatTagNames(tags: readonly Tag[]) {
-  return tags.map(tag => tag.name).join(', ');
-}
-
-function createDraftTags(value: string): Tag[] {
-  const uniqueNames = Array.from(
-    new Set(
-      value
-        .split(',')
-        .map(tagName => tagName.trim())
-        .filter(Boolean),
-    ),
-  );
-
-  return uniqueNames.map((name, index) => ({
-    id: `draft-tag-${name}`,
-    groupId: null,
-    name,
-    color: null,
-    sortOrder: index,
-    createdAt: '',
-    updatedAt: '',
-  }));
-}
-
 const ignoreStepEditorChange = () => {};
 
 export function SessionPresetSettingsView() {
   const [sessionPresets, setSessionPresets] = useState<SessionPreset[]>([]);
   const [timeStepPresets, setTimeStepPresets] = useState<TimeStepPreset[]>([]);
+  const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [editorMode, setEditorMode] = useState<EditorMode>('session');
   const [selectedSessionPresetId, setSelectedSessionPresetId] = useState('');
   const [selectedTimeStepPresetId, setSelectedTimeStepPresetId] = useState('');
@@ -136,9 +114,9 @@ export function SessionPresetSettingsView() {
   const [sessionWindowWidth, setSessionWindowWidth] = useState('');
   const [sessionWindowHeight, setSessionWindowHeight] = useState('');
   const [sessionIsShuffle, setSessionIsShuffle] = useState(false);
+  const [sessionAutoTags, setSessionAutoTags] = useState<Tag[]>([]);
   const [sessionSteps, setSessionSteps] = useState<EditableSessionStep[]>([]);
   const [timeStepName, setTimeStepName] = useState('');
-  const [timeStepTagInput, setTimeStepTagInput] = useState('');
   const [editableTimeStep, setEditableTimeStep] = useState<EditableSessionStep | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -174,13 +152,13 @@ export function SessionPresetSettingsView() {
     setSessionWindowWidth(preset?.windowWidth ?? '');
     setSessionWindowHeight(preset?.windowHeight ?? '');
     setSessionIsShuffle(preset?.isShuffle ?? false);
+    setSessionAutoTags(preset?.autoTags ?? []);
     setSessionSteps(nextSteps);
   }, []);
 
   const applyTimeStepPresetToEditor = useCallback((preset: TimeStepPreset | null) => {
     setSelectedTimeStepPresetId(preset?.id ?? '');
     setTimeStepName(preset?.name ?? '');
-    setTimeStepTagInput(preset ? formatTagNames(preset.autoTags) : '');
     setEditableTimeStep(preset ? createStepFromTimeStepPreset(preset, 1) : null);
   }, []);
 
@@ -190,14 +168,17 @@ export function SessionPresetSettingsView() {
     setStatus(null);
 
     try {
-      const [nextSessionPresets, nextTimeStepPresets] = await Promise.all([
+      const [nextSessionPresets, nextTimeStepPresets, nextTagIndex] = await Promise.all([
         ipc.session.listPresets(),
         ipc.session.listTimeStepPresets(),
+        ipc.tag.loadIndex(),
       ]);
       const fallbackSessionPreset = findFallbackPreset(nextSessionPresets);
 
       setSessionPresets(nextSessionPresets);
       setTimeStepPresets(nextTimeStepPresets);
+      setTagGroups(nextTagIndex.groups);
+      setTags(nextTagIndex.tags);
       applySessionPresetToEditor(fallbackSessionPreset);
       applyTimeStepPresetToEditor(nextTimeStepPresets[0] ?? null);
       setEditorMode('session');
@@ -205,6 +186,8 @@ export function SessionPresetSettingsView() {
       setError(getErrorMessage(nextError, 'Failed to load preset settings.'));
       setSessionPresets([]);
       setTimeStepPresets([]);
+      setTagGroups([]);
+      setTags([]);
       applySessionPresetToEditor(null);
       applyTimeStepPresetToEditor(null);
     } finally {
@@ -245,6 +228,7 @@ export function SessionPresetSettingsView() {
     setSessionWindowWidth('960');
     setSessionWindowHeight('');
     setSessionIsShuffle(false);
+    setSessionAutoTags([]);
     setSessionSteps(nextStep ? [nextStep] : []);
   };
 
@@ -256,7 +240,6 @@ export function SessionPresetSettingsView() {
     setEditorMode('time-step');
     setSelectedTimeStepPresetId('');
     setTimeStepName(NEW_TIME_STEP_PRESET_NAME);
-    setTimeStepTagInput('');
     setEditableTimeStep(nextStep);
   };
 
@@ -308,9 +291,45 @@ export function SessionPresetSettingsView() {
     setStatus(null);
   };
 
+  const handleSessionAutoTagAdd = (tag: Tag) => {
+    setSessionAutoTags(current => {
+      if (current.some(autoTag => autoTag.id === tag.id)) {
+        return current;
+      }
+
+      return [...current, tag];
+    });
+    setStatus(null);
+  };
+
+  const handleSessionAutoTagRemove = (tagId: string) => {
+    setSessionAutoTags(current => current.filter(tag => tag.id !== tagId));
+    setStatus(null);
+  };
+
   const updateEditableTimeStep = (updater: (step: EditableSessionStep) => EditableSessionStep) => {
     setEditableTimeStep(current => (current === null ? current : updater(current)));
     setStatus(null);
+  };
+
+  const handleEditableTimeStepTagAdd = (tag: Tag) => {
+    updateEditableTimeStep(currentStep => {
+      if (currentStep.autoTags.some(autoTag => autoTag.id === tag.id)) {
+        return currentStep;
+      }
+
+      return {
+        ...currentStep,
+        autoTags: [...currentStep.autoTags, tag],
+      };
+    });
+  };
+
+  const handleEditableTimeStepTagRemove = (tagId: string) => {
+    updateEditableTimeStep(currentStep => ({
+      ...currentStep,
+      autoTags: currentStep.autoTags.filter(tag => tag.id !== tagId),
+    }));
   };
 
   const persistSessionPreset = async (duplicate = false) => {
@@ -340,6 +359,7 @@ export function SessionPresetSettingsView() {
       windowWidth: normalizeOptionalString(sessionWindowWidth),
       windowHeight: normalizeOptionalString(sessionWindowHeight),
       isShuffle: sessionIsShuffle,
+      autoTags: sessionAutoTags,
       steps: sessionSteps,
       duplicate,
     });
@@ -602,6 +622,18 @@ export function SessionPresetSettingsView() {
                     }}
                   />
                 </label>
+                <div className="session-preset-settings__session-auto-tags">
+                  <AutoTagPicker
+                    label="Session Auto Tags"
+                    tags={sessionAutoTags}
+                    availableTags={tags}
+                    tagGroups={tagGroups}
+                    disabled={editorDisabled}
+                    emptyLabel="No session auto tags"
+                    onTagAdd={handleSessionAutoTagAdd}
+                    onTagRemove={handleSessionAutoTagRemove}
+                  />
+                </div>
               </div>
             </div>
 
@@ -813,6 +845,8 @@ export function SessionPresetSettingsView() {
                         step={{ ...editableTimeStep, name: timeStepName }}
                         durationSeconds={getStepDuration(editableTimeStep)}
                         disabled={editorDisabled}
+                        availableAutoTags={tags}
+                        autoTagGroups={tagGroups}
                         onTimerChange={seconds => {
                           const nextSeconds = clampDurationSeconds(seconds);
                           updateEditableTimeStep(currentStep => ({
@@ -857,21 +891,8 @@ export function SessionPresetSettingsView() {
                             resultSavePath: normalizeOptionalString(path),
                           }));
                         }}
-                      />
-                      <Input
-                        label="Auto Tags"
-                        value={timeStepTagInput}
-                        placeholder="Female, Dynamic"
-                        disabled={editorDisabled}
-                        onChange={event => {
-                          const nextValue = event.target.value;
-                          const nextTags = createDraftTags(nextValue);
-                          setTimeStepTagInput(nextValue);
-                          updateEditableTimeStep(currentStep => ({
-                            ...currentStep,
-                            autoTags: nextTags,
-                          }));
-                        }}
+                        onAutoTagAdd={handleEditableTimeStepTagAdd}
+                        onAutoTagRemove={handleEditableTimeStepTagRemove}
                       />
                     </div>
                   </article>

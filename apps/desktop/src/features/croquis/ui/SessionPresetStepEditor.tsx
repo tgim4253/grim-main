@@ -1,7 +1,8 @@
 import type { KeyboardEvent } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
-import { Chip, ChipButton, CheckboxConditionalRow, CheckboxRow, Input } from '../../../shared/ui';
+import { ChipButton, CheckboxConditionalRow, CheckboxRow, Input } from '../../../shared/ui';
 import { cx } from '../../../shared/lib/cx';
+import type { Tag, TagGroup } from '../../../shared/types';
 import type { EditableSessionStep } from '../lib/sessionPresetEditor';
 import {
   DURATION_OPTIONS,
@@ -13,6 +14,7 @@ import {
   getDurationParts,
   normalizeDurationUnit,
 } from '../lib/sessionPresetEditor';
+import { AutoTagPicker } from './AutoTagPicker';
 import './session-preset-step-editor.css';
 
 type SessionPresetStepEditorProps = {
@@ -21,6 +23,8 @@ type SessionPresetStepEditorProps = {
   className?: string;
   disabled?: boolean;
   showTagSummary?: boolean;
+  availableAutoTags?: readonly Tag[];
+  autoTagGroups?: readonly TagGroup[];
   onTimerChange: (seconds: number) => void;
   onAutoAdvanceChange: (checked: boolean) => void;
   onCaptureChange: (checked: boolean) => void;
@@ -28,6 +32,8 @@ type SessionPresetStepEditorProps = {
   onGrayscaleChange: (checked: boolean) => void;
   onRequireResultChange: (checked: boolean) => void;
   onResultSavePathChange: (path: string) => void;
+  onAutoTagAdd?: (tag: Tag) => void;
+  onAutoTagRemove?: (tagId: string) => void;
 };
 
 function getDialogStringSelection(selection: unknown) {
@@ -49,6 +55,8 @@ export function SessionPresetStepEditor({
   className,
   disabled = false,
   showTagSummary = true,
+  availableAutoTags = [],
+  autoTagGroups = [],
   onTimerChange,
   onAutoAdvanceChange,
   onCaptureChange,
@@ -56,10 +64,11 @@ export function SessionPresetStepEditor({
   onGrayscaleChange,
   onRequireResultChange,
   onResultSavePathChange,
+  onAutoTagAdd,
+  onAutoTagRemove,
 }: SessionPresetStepEditorProps) {
   const durationParts = getDurationParts(durationSeconds);
   const resultSavePathValue = step.resultSavePath ?? '';
-
   const handleResultSavePathPick = () => {
     if (disabled) {
       return;
@@ -200,21 +209,16 @@ export function SessionPresetStepEditor({
         </section>
 
         {showTagSummary ? (
-          <section className="session-preset-step-editor__group">
-            <span className="session-preset-step-editor__label">Asset Tags</span>
-            <div className="session-preset-step-editor__tag-row">
-              {step.autoTags.map(tag => (
-                <Chip key={tag.id} shape="rounded" variant="neutral-dismiss">
-                  {tag.name}
-                </Chip>
-              ))}
-              {step.autoTags.length === 0 ? (
-                <Chip shape="rounded" variant="accent-outline">
-                  No auto tags
-                </Chip>
-              ) : null}
-            </div>
-          </section>
+          <AutoTagPicker
+            label="Asset Tags"
+            tags={step.autoTags}
+            availableTags={availableAutoTags}
+            tagGroups={autoTagGroups}
+            disabled={disabled}
+            emptyLabel="No auto tags"
+            onTagAdd={onAutoTagAdd}
+            onTagRemove={onAutoTagRemove}
+          />
         ) : null}
       </div>
 

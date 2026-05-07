@@ -14,7 +14,13 @@ import {
   Select,
   type SelectOption,
 } from '../../../shared/ui';
-import type { CroquisStartPayload, SessionPreset, TimeStepPreset } from '../../../shared/types';
+import type {
+  CroquisStartPayload,
+  SessionPreset,
+  Tag,
+  TagGroup,
+  TimeStepPreset,
+} from '../../../shared/types';
 import { ipc } from '../../../shared/lib/ipc';
 import { findFallbackPreset, setStoredActiveSessionPresetId } from '../lib/startModal';
 import {
@@ -33,6 +39,7 @@ import {
   toCroquisRuntimeStep,
   type EditableSessionStep,
 } from '../lib/sessionPresetEditor';
+import { AutoTagPicker } from './AutoTagPicker';
 import { SessionPresetStepEditor } from './SessionPresetStepEditor';
 import './croquis.css';
 
@@ -41,6 +48,8 @@ type CroquisStartModalProps = {
   assetIds: string[];
   sessionPresets: SessionPreset[];
   timeStepPresets?: TimeStepPreset[];
+  tags?: Tag[];
+  tagGroups?: TagGroup[];
   onClose: () => void;
   onStarted: () => Promise<void> | void;
   startCroquisSession?: (payload: CroquisStartPayload) => Promise<unknown>;
@@ -51,6 +60,8 @@ export function CroquisStartModal({
   assetIds,
   sessionPresets,
   timeStepPresets = [],
+  tags = [],
+  tagGroups = [],
   onClose,
   onStarted,
   startCroquisSession = ipc.session.start,
@@ -72,6 +83,7 @@ export function CroquisStartModal({
   const [windowWidth, setWindowWidth] = useState('');
   const [windowHeight, setWindowHeight] = useState('');
   const [isShuffle, setIsShuffle] = useState(false);
+  const [sessionAutoTags, setSessionAutoTags] = useState<Tag[]>([]);
   const [editableSteps, setEditableSteps] = useState<EditableSessionStep[]>([]);
   const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -101,6 +113,7 @@ export function CroquisStartModal({
     setWindowWidth(fallbackPreset?.windowWidth ?? '960');
     setWindowHeight(fallbackPreset?.windowHeight ?? '');
     setIsShuffle(fallbackPreset?.isShuffle ?? false);
+    setSessionAutoTags(fallbackPreset?.autoTags ?? []);
     const nextSteps = fallbackPreset ? createEditableSteps(fallbackPreset) : [];
     setEditableSteps(nextSteps);
     setExpandedStepId(nextSteps[0]?.id ?? null);
@@ -129,6 +142,7 @@ export function CroquisStartModal({
     setWindowWidth(nextPreset?.windowWidth ?? '960');
     setWindowHeight(nextPreset?.windowHeight ?? '');
     setIsShuffle(nextPreset?.isShuffle ?? false);
+    setSessionAutoTags(nextPreset?.autoTags ?? []);
     setEditableSteps(nextSteps);
     setExpandedStepId(nextSteps[0]?.id ?? null);
   };
@@ -203,6 +217,40 @@ export function CroquisStartModal({
     );
   };
 
+  const handleStepAutoTagAdd = (stepId: string, tag: Tag) => {
+    updateStep(stepId, currentStep => {
+      if (currentStep.autoTags.some(autoTag => autoTag.id === tag.id)) {
+        return currentStep;
+      }
+
+      return {
+        ...currentStep,
+        autoTags: [...currentStep.autoTags, tag],
+      };
+    });
+  };
+
+  const handleStepAutoTagRemove = (stepId: string, tagId: string) => {
+    updateStep(stepId, currentStep => ({
+      ...currentStep,
+      autoTags: currentStep.autoTags.filter(tag => tag.id !== tagId),
+    }));
+  };
+
+  const handleSessionAutoTagAdd = (tag: Tag) => {
+    setSessionAutoTags(current => {
+      if (current.some(autoTag => autoTag.id === tag.id)) {
+        return current;
+      }
+
+      return [...current, tag];
+    });
+  };
+
+  const handleSessionAutoTagRemove = (tagId: string) => {
+    setSessionAutoTags(current => current.filter(tag => tag.id !== tagId));
+  };
+
   const handleStart = async () => {
     if (selectedPreset === null) {
       return;
@@ -229,7 +277,7 @@ export function CroquisStartModal({
         windowWidth: normalizeOptionalString(windowWidth),
         windowHeight: normalizeOptionalString(windowHeight),
         isShuffle,
-        steps: editableSteps.map(toCroquisRuntimeStep),
+        steps: editableSteps.map(step => toCroquisRuntimeStep(step, sessionAutoTags)),
       });
 
       await onStarted();
@@ -280,6 +328,17 @@ export function CroquisStartModal({
         onValueChange={handlePresetChange}
       />
 
+      <AutoTagPicker
+        label="Session Auto Tags"
+        tags={sessionAutoTags}
+        availableTags={tags}
+        tagGroups={tagGroups}
+        disabled={busy}
+        emptyLabel="No session auto tags"
+        onTagAdd={handleSessionAutoTagAdd}
+        onTagRemove={handleSessionAutoTagRemove}
+      />
+
       <div className="croquis-start-modal__pipeline">
         <div className="croquis-start-modal__pipeline-header">
           <span>Time Steps Pipeline</span>
@@ -327,6 +386,8 @@ export function CroquisStartModal({
                     step={step}
                     durationSeconds={getStepDuration(step)}
                     disabled={busy}
+                    availableAutoTags={tags}
+                    autoTagGroups={tagGroups}
                     onTimerChange={seconds => {
                       const nextSeconds = clampDurationSeconds(seconds);
                       updateStep(step.id, currentStep => ({
@@ -370,6 +431,12 @@ export function CroquisStartModal({
                         ...currentStep,
                         resultSavePath: normalizeOptionalString(path),
                       }));
+                    }}
+                    onAutoTagAdd={tag => {
+                      handleStepAutoTagAdd(step.id, tag);
+                    }}
+                    onAutoTagRemove={tagId => {
+                      handleStepAutoTagRemove(step.id, tagId);
                     }}
                   />
                   <div className="croquis-start-modal__step-actions">

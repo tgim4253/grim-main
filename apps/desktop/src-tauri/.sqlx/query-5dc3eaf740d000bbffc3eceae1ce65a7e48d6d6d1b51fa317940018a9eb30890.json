@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM session_preset_tag WHERE session_preset_id = ?1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "5dc3eaf740d000bbffc3eceae1ce65a7e48d6d6d1b51fa317940018a9eb30890"
+}
