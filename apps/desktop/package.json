@@ -23,7 +23,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.7.0",
+    "@tauri-apps/api": "^2.8.0",
     "@tauri-apps/plugin-dialog": "^2.3.2",
     "@types/node": "^24.3.0",
     "i18next": "^25.3.2",
