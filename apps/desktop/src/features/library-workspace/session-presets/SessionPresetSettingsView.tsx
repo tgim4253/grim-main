@@ -774,15 +774,6 @@ export function SessionPresetSettingsView() {
                     setStatus(null);
                   }}
                 />
-                <Button
-                  size="sm"
-                  disabled={!canSaveSession}
-                  onClick={() => {
-                    void persistSessionPreset(false);
-                  }}
-                >
-                  {busy ? 'Saving...' : 'Save Session'}
-                </Button>
               </section>
 
               {error ? (
@@ -796,6 +787,15 @@ export function SessionPresetSettingsView() {
             </main>
 
             <footer className="session-preset-settings__footer">
+              <Button
+                size="sm"
+                disabled={!canSaveSession}
+                onClick={() => {
+                  void persistSessionPreset(false);
+                }}
+              >
+                {busy ? 'Saving...' : 'Save Session'}
+              </Button>
               <Button
                 size="sm"
                 variant="secondary"
