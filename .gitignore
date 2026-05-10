@@ -42,6 +42,7 @@ yarn-error.log*
 apps/**/dist/
 packages/**/dist/
 scripts/**/dist/
+/library/
 # Logs
 logs
 *.log
