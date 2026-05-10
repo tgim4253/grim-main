@@ -1,4 +1,4 @@
-use std::{path::Path, str::FromStr};
+use std::path::Path;
 
 use anyhow::{Context, Result};
 use sqlx::{
@@ -45,18 +45,13 @@ struct DefaultTagGroup {
 }
 
 pub async fn open_or_create_db(db_path: &Path) -> Result<Pool<Sqlite>> {
-    let options = SqliteConnectOptions::from_str(&format!(
-        "sqlite://{}",
-        db_path.to_string_lossy()
-    ))
-    .with_context(|| {
-        format!("Failed to parse sqlite URL for {}", db_path.display())
-    })?
-    .create_if_missing(true)
-    .read_only(false)
-    .journal_mode(SqliteJournalMode::Wal)
-    .synchronous(SqliteSynchronous::Normal)
-    .busy_timeout(std::time::Duration::from_secs(15));
+    let options = SqliteConnectOptions::new()
+        .filename(db_path)
+        .create_if_missing(true)
+        .read_only(false)
+        .journal_mode(SqliteJournalMode::Wal)
+        .synchronous(SqliteSynchronous::Normal)
+        .busy_timeout(std::time::Duration::from_secs(15));
 
     let pool = PoolOptions::new()
         .max_connections(4)

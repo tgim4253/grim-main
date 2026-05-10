@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @grim/desktop dev",
+    "dev:local-db": "pnpm --filter @grim/desktop dev:local-db",
     "dev:db": "pnpm --filter @grim/desktop dev:db",
     "dev:reset-db": "pnpm --filter @grim/desktop dev:reset-db",
     "ui:demo": "pnpm --filter @grim/desktop ui:demo",

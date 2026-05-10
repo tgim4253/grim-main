@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "theme:build": "node scripts/build-theme.mjs",
+    "dev:local-db": "node scripts/dev-local-db.mjs",
     "dev:db": "node ../../scripts/backend-export-dburl.mjs",
     "db:dev": "pnpm run dev:db",
     "dev:reset-db": "node scripts/reset-dev-db.mjs && pnpm run dev",

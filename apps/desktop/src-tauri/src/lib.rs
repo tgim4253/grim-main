@@ -90,6 +90,13 @@ pub fn run() {
                 state::AppState::initialize(handle),
             )
             .map_err(std::io::Error::other)?;
+            let asset_scope = app.asset_protocol_scope();
+            asset_scope
+                .allow_directory(&app_state.library_paths.asset_dir, true)
+                .map_err(std::io::Error::other)?;
+            asset_scope
+                .allow_directory(&app_state.library_paths.thumb_dir, true)
+                .map_err(std::io::Error::other)?;
             let asset_repository = AssetRepository::new(app_state.pool.clone());
             let folder_repository =
                 FolderRepository::new(app_state.pool.clone());

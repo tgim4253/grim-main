@@ -52,6 +52,7 @@ docs/                # Project documentation and refactor notes
 | Command             | Description                                                               |
 | ------------------- | ------------------------------------------------------------------------- |
 | `pnpm dev`          | Launches the desktop development server (proxies to `@grim/desktop dev`). |
+| `pnpm dev:local-db` | Launches dev mode with DB/storage under the repo-local `library/` folder. |
 | `pnpm ui:demo`      | Opens the standalone library demo page entry.                             |
 | `pnpm build:front`  | Produces a static React/Vite build for the desktop front end.             |
 | `pnpm build`        | Runs `tauri build` to bundle the full desktop application.                |
@@ -64,6 +65,8 @@ docs/                # Project documentation and refactor notes
 | `pnpm format`       | Checks formatting via Prettier and `cargo fmt --check`.                   |
 | `pnpm format:write` | Applies formatting with Prettier and `cargo fmt`.                         |
 | `pnpm translate`    | Regenerates locale JSON from `scripts/translator.mjs`.                    |
+
+`pnpm dev:local-db` defaults to `./library`; set `GRIM_LIBRARY_DIR=/absolute/path` to use a different local development library.
 
 ## Quality Checklist
 
