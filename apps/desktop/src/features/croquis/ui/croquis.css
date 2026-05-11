@@ -53,22 +53,62 @@
     background: var(--components-croquis-step-list-overlay);
   }
 
-  .croquis-start-modal__accordion .c-accordion-item__header {
+  .croquis-start-modal__accordion .c-accordion-item__header,
+  .croquis-start-modal__step-header {
     min-height: 38px;
+  }
+
+  .croquis-start-modal__accordion .c-accordion-item__header {
     padding: var(--semantic-spacing-component-md) var(--semantic-spacing-component-lg);
   }
 
-  .croquis-start-modal__accordion .c-accordion-item__header-main {
-    gap: var(--semantic-spacing-component-xl);
+  .croquis-start-modal__step-header {
+    display: grid;
+    grid-template-columns: 44px 48px minmax(0, 1fr) auto 44px;
+    align-items: stretch;
   }
 
-  .croquis-start-modal__accordion .c-accordion-item__index {
+  .croquis-start-modal__step-header .c-accordion-item__drag-handle {
+    border-right: 1px solid var(--semantic-colors-border-subtle);
+  }
+
+  .croquis-start-modal__step-header .c-accordion-item__disclosure-button {
+    border-left: 1px solid var(--semantic-colors-border-subtle);
+  }
+
+  .croquis-start-modal__step-index {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--semantic-colors-border-subtle);
     color: var(--semantic-colors-brand-primary);
+    font-family: var(--components-typography-accordion-meta-font-family);
+    font-size: var(--components-typography-accordion-meta-font-size);
+    font-weight: var(--components-typography-accordion-meta-font-weight);
+    line-height: var(--components-typography-accordion-meta-line-height);
   }
 
-  .croquis-start-modal__accordion .c-accordion-item__title {
+  .croquis-start-modal__step-title {
+    align-self: center;
+    min-width: 0;
+    overflow: hidden;
+    padding: 0 var(--semantic-spacing-component-lg);
+    color: var(--semantic-colors-text-primary);
     font-size: var(--type-text-sm-size);
     line-height: var(--type-text-sm-line-height);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .croquis-start-modal__step-duration {
+    align-self: center;
+    padding: 0 var(--semantic-spacing-component-lg);
+    color: var(--semantic-colors-brand-primary);
+    font-family: var(--components-typography-accordion-meta-font-family);
+    font-size: var(--components-typography-accordion-meta-font-size);
+    font-weight: var(--components-typography-accordion-meta-font-weight);
+    line-height: var(--components-typography-accordion-meta-line-height);
+    white-space: nowrap;
   }
 
   .croquis-start-modal__step-panel {

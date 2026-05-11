@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   AccordionItem,
   AccordionItemBody,
-  AccordionItemHeader,
+  AccordionItemDragHeader,
   AccordionRoot,
   Button,
   CheckboxRow,
@@ -13,6 +13,8 @@ import {
   Modal,
   ModalFooter,
   Select,
+  type AccordionReorderPayload,
+  type AccordionReorderPosition,
   type SelectOption,
 } from '../../../shared/ui';
 import type {
@@ -120,7 +122,7 @@ export function CroquisStartModal({
     setSessionAutoTags(fallbackPreset?.autoTags ?? []);
     const nextSteps = fallbackPreset ? createEditableSteps(fallbackPreset) : [];
     setEditableSteps(nextSteps);
-    setExpandedStepId(nextSteps[0]?.id ?? null);
+    setExpandedStepId(null);
     setError(null);
   }, [fallbackPreset, open]);
 
@@ -152,7 +154,7 @@ export function CroquisStartModal({
     setIsShuffle(nextPreset?.isShuffle ?? false);
     setSessionAutoTags(nextPreset?.autoTags ?? []);
     setEditableSteps(nextSteps);
-    setExpandedStepId(nextSteps[0]?.id ?? null);
+    setExpandedStepId(null);
   };
 
   const handleAddStep = () => {
@@ -184,6 +186,38 @@ export function CroquisStartModal({
 
       return nextSteps;
     });
+  };
+
+  const reorderStep = (
+    sourceStepId: string,
+    targetStepId: string,
+    position: AccordionReorderPosition,
+  ) => {
+    setEditableSteps(current => {
+      if (sourceStepId === targetStepId) {
+        return current;
+      }
+
+      const sourceIndex = current.findIndex(step => step.id === sourceStepId);
+      const targetIndex = current.findIndex(step => step.id === targetStepId);
+      if (sourceIndex < 0 || targetIndex < 0) {
+        return current;
+      }
+
+      const nextSteps = [...current];
+      const [sourceStep] = nextSteps.splice(sourceIndex, 1);
+      const nextTargetIndex = nextSteps.findIndex(step => step.id === targetStepId);
+      if (nextTargetIndex < 0) {
+        return current;
+      }
+
+      nextSteps.splice(position === 'after' ? nextTargetIndex + 1 : nextTargetIndex, 0, sourceStep);
+      return normalizeStepOrders(nextSteps);
+    });
+  };
+
+  const handleStepReorder = ({ value, targetValue, position }: AccordionReorderPayload) => {
+    reorderStep(value, targetValue, position);
   };
 
   const handleStepPresetChange = (stepId: string, nextValue: string) => {
@@ -404,16 +438,27 @@ export function CroquisStartModal({
             onValueChange={value => {
               setExpandedStepId(typeof value === 'string' ? value : null);
             }}
+            reorderable={!busy && editableSteps.length > 1}
+            onItemReorder={handleStepReorder}
             className="croquis-start-modal__accordion"
           >
             {editableSteps.map((step, index) => (
-              <AccordionItem key={step.id} value={step.id}>
-                <AccordionItemHeader
-                  index={String(index + 1).padStart(2, '0')}
-                  meta={formatDurationCompact(getStepDuration(step))}
+              <AccordionItem key={step.id} value={step.id} disabled={busy}>
+                <AccordionItemDragHeader
+                  className="croquis-start-modal__step-header"
+                  disclosureLabel={`${expandedStepId === step.id ? 'Collapse' : 'Expand'} step ${String(
+                    index + 1,
+                  )}`}
+                  dragLabel={`Drag step ${String(index + 1)} to reorder`}
                 >
-                  {step.name}
-                </AccordionItemHeader>
+                  <span className="croquis-start-modal__step-index">
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  <span className="croquis-start-modal__step-title">{step.name}</span>
+                  <span className="croquis-start-modal__step-duration">
+                    {formatDurationCompact(getStepDuration(step))}
+                  </span>
+                </AccordionItemDragHeader>
                 <AccordionItemBody className="croquis-start-modal__step-panel">
                   <Select
                     aria-label={t('croquis.step_source_preset', {

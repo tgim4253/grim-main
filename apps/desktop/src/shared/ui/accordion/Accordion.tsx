@@ -1,15 +1,36 @@
 import {
+  Children,
   createContext,
   forwardRef,
+  isValidElement,
   useEffect,
   useContext,
   useId,
+  useMemo,
   useRef,
   useState,
   type ButtonHTMLAttributes,
+  type CSSProperties,
+  type ForwardedRef,
   type HTMLAttributes,
   type ReactNode,
 } from 'react';
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { cx } from '../../lib/cx';
 import { Icon } from '../icon/Icon';
 import './accordion.css';
@@ -18,6 +39,12 @@ export const ACCORDION_ROOT_TYPES = ['single', 'multiple'] as const;
 
 export type AccordionRootType = (typeof ACCORDION_ROOT_TYPES)[number];
 export type AccordionRootValue = string | string[] | null;
+export type AccordionReorderPosition = 'before' | 'after';
+export type AccordionReorderPayload = {
+  value: string;
+  targetValue: string;
+  position: AccordionReorderPosition;
+};
 
 export type AccordionRootProps = Omit<HTMLAttributes<HTMLDivElement>, 'defaultValue' | 'value'> & {
   type?: AccordionRootType;
@@ -25,6 +52,8 @@ export type AccordionRootProps = Omit<HTMLAttributes<HTMLDivElement>, 'defaultVa
   defaultValue?: AccordionRootValue;
   onValueChange?: (value: AccordionRootValue) => void;
   collapsible?: boolean;
+  reorderable?: boolean;
+  onItemReorder?: (payload: AccordionReorderPayload) => void;
 };
 
 export type AccordionItemProps = Omit<HTMLAttributes<HTMLDivElement>, 'value'> & {
@@ -45,6 +74,19 @@ export type AccordionItemHeaderProps = Omit<ButtonHTMLAttributes<HTMLButtonEleme
   onToggle?: () => void;
 };
 
+export type AccordionItemDragHeaderProps = HTMLAttributes<HTMLDivElement> & {
+  children: ReactNode;
+  controlsId?: string;
+  disabled?: boolean;
+  disclosureLabel?: string;
+  dragLabel?: string;
+  dragTitle?: string;
+  expanded?: boolean;
+  onToggle?: () => void;
+  reorderable?: boolean;
+  showDisclosure?: boolean;
+};
+
 export type AccordionItemBodyProps = HTMLAttributes<HTMLDivElement> & {
   expanded?: boolean;
   labelledBy?: string;
@@ -59,9 +101,12 @@ export type AccordionDisclosureProps = HTMLAttributes<HTMLSpanElement> & {
 type AccordionRootContextValue = {
   type: AccordionRootType;
   collapsible: boolean;
+  reorderable: boolean;
   isExpanded: (value: string) => boolean;
   setExpanded: (value: string, nextExpanded: boolean) => void;
 };
+
+type AccordionSortableReturn = ReturnType<typeof useSortable>;
 
 type AccordionItemContextValue = {
   value: string;
@@ -71,11 +116,25 @@ type AccordionItemContextValue = {
   bodyId: string;
   hasBody: boolean;
   setHasBody: (hasBody: boolean) => void;
+  setDragActivatorNodeRef: AccordionSortableReturn['setActivatorNodeRef'];
+  dragAttributes: AccordionSortableReturn['attributes'];
+  dragListeners: AccordionSortableReturn['listeners'];
   toggle: () => void;
 };
 
 const AccordionRootContext = createContext<AccordionRootContextValue | null>(null);
 const AccordionItemContext = createContext<AccordionItemContextValue | null>(null);
+
+type AccordionElementProps = {
+  children?: ReactNode;
+  value?: unknown;
+};
+
+const POINTER_SENSOR_OPTIONS = {
+  activationConstraint: {
+    distance: 6,
+  },
+};
 
 const normalizeRootValue = (
   type: AccordionRootType,
@@ -112,6 +171,38 @@ const isExpandedInRoot = (
   return value === itemValue;
 };
 
+const getAccordionItemValues = (children: ReactNode): string[] => {
+  const values: string[] = [];
+
+  Children.forEach(children, child => {
+    if (!isValidElement<AccordionElementProps>(child)) {
+      return;
+    }
+
+    if (typeof child.props.value === 'string') {
+      values.push(child.props.value);
+      return;
+    }
+
+    if (child.props.children) {
+      values.push(...getAccordionItemValues(child.props.children));
+    }
+  });
+
+  return values;
+};
+
+const setForwardedRef = <T,>(ref: ForwardedRef<T>, value: T | null) => {
+  if (typeof ref === 'function') {
+    ref(value);
+    return;
+  }
+
+  if (ref) {
+    (ref as { current: T | null }).current = value;
+  }
+};
+
 export const AccordionRoot = forwardRef<HTMLDivElement, AccordionRootProps>(function AccordionRoot(
   {
     type = 'single',
@@ -119,6 +210,8 @@ export const AccordionRoot = forwardRef<HTMLDivElement, AccordionRootProps>(func
     defaultValue,
     onValueChange,
     collapsible = true,
+    reorderable = false,
+    onItemReorder,
     className,
     children,
     ...props
@@ -129,7 +222,19 @@ export const AccordionRoot = forwardRef<HTMLDivElement, AccordionRootProps>(func
   const [internalValue, setInternalValue] = useState<AccordionRootValue>(() =>
     normalizeRootValue(type, defaultValue),
   );
+  const onItemReorderRef = useRef(onItemReorder);
   const resolvedValue = normalizeRootValue(type, isControlled ? value : internalValue);
+  const itemValues = useMemo(() => getAccordionItemValues(children), [children]);
+  const sensors = useSensors(
+    useSensor(PointerSensor, POINTER_SENSOR_OPTIONS),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  useEffect(() => {
+    onItemReorderRef.current = onItemReorder;
+  }, [onItemReorder]);
 
   const setResolvedValue = (nextValue: AccordionRootValue) => {
     if (!isControlled) {
@@ -139,9 +244,31 @@ export const AccordionRoot = forwardRef<HTMLDivElement, AccordionRootProps>(func
     onValueChange?.(nextValue);
   };
 
+  const handleDragEnd = (event: DragEndEvent) => {
+    if (!reorderable || !event.over || event.active.id === event.over.id) {
+      return;
+    }
+
+    const activeValue = String(event.active.id);
+    const overValue = String(event.over.id);
+    const activeIndex = itemValues.indexOf(activeValue);
+    const overIndex = itemValues.indexOf(overValue);
+
+    if (activeIndex < 0 || overIndex < 0) {
+      return;
+    }
+
+    onItemReorderRef.current?.({
+      value: activeValue,
+      targetValue: overValue,
+      position: activeIndex < overIndex ? 'after' : 'before',
+    });
+  };
+
   const contextValue: AccordionRootContextValue = {
     type,
     collapsible,
+    reorderable,
     isExpanded: itemValue => isExpandedInRoot(type, resolvedValue, itemValue),
     setExpanded: (itemValue, nextExpanded) => {
       if (type === 'multiple') {
@@ -166,13 +293,17 @@ export const AccordionRoot = forwardRef<HTMLDivElement, AccordionRootProps>(func
 
   return (
     <AccordionRootContext.Provider value={contextValue}>
-      <div
-        {...props}
-        ref={ref}
-        className={cx('c-accordion-root', `c-accordion-root--type-${type}`, className)}
-      >
-        {children}
-      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={itemValues} strategy={verticalListSortingStrategy}>
+          <div
+            {...props}
+            ref={ref}
+            className={cx('c-accordion-root', `c-accordion-root--type-${type}`, className)}
+          >
+            {children}
+          </div>
+        </SortableContext>
+      </DndContext>
     </AccordionRootContext.Provider>
   );
 });
@@ -186,6 +317,7 @@ export const AccordionItem = forwardRef<HTMLDivElement, AccordionItemProps>(func
     disabled = false,
     className,
     children,
+    style,
     ...props
   },
   ref,
@@ -195,6 +327,10 @@ export const AccordionItem = forwardRef<HTMLDivElement, AccordionItemProps>(func
   const [internalExpanded, setInternalExpanded] = useState(defaultExpanded);
   const [hasBody, setHasBody] = useState(false);
   const itemId = useId();
+  const sortable = useSortable({
+    id: value,
+    disabled: disabled || !rootContext?.reorderable,
+  });
 
   const resolvedExpanded = rootContext
     ? rootContext.isExpanded(value)
@@ -244,18 +380,36 @@ export const AccordionItem = forwardRef<HTMLDivElement, AccordionItemProps>(func
     bodyId: `${itemId}-body`,
     hasBody,
     setHasBody,
+    setDragActivatorNodeRef: sortable.setActivatorNodeRef,
+    dragAttributes: sortable.attributes,
+    dragListeners: sortable.listeners,
     toggle: () => {
       setResolvedExpanded(!resolvedExpanded);
     },
+  };
+  const sortableStyle: CSSProperties = {
+    ...style,
+    transform: CSS.Transform.toString(sortable.transform),
+    transition: sortable.transition,
+    zIndex: sortable.isDragging ? 2 : style?.zIndex,
+  };
+
+  const setItemRef = (node: HTMLDivElement | null) => {
+    sortable.setNodeRef(node);
+    setForwardedRef(ref, node);
   };
 
   return (
     <AccordionItemContext.Provider value={contextValue}>
       <div
         {...props}
-        ref={ref}
+        ref={setItemRef}
+        style={sortableStyle}
+        data-accordion-item-value={value}
         data-expanded={resolvedExpanded ? 'true' : 'false'}
         data-disabled={disabled ? 'true' : 'false'}
+        data-reorderable={rootContext?.reorderable ? 'true' : 'false'}
+        data-dragging={sortable.isDragging ? 'true' : undefined}
         className={cx('c-accordion-item', className)}
       >
         {children}
@@ -325,6 +479,92 @@ export const AccordionItemHeader = forwardRef<HTMLButtonElement, AccordionItemHe
         </span>
         {resolvedTrailing}
       </button>
+    );
+  },
+);
+
+export const AccordionItemDragHeader = forwardRef<HTMLDivElement, AccordionItemDragHeaderProps>(
+  function AccordionItemDragHeader(
+    {
+      controlsId,
+      disclosureLabel,
+      dragLabel,
+      dragTitle,
+      expanded,
+      onToggle,
+      reorderable,
+      showDisclosure = true,
+      disabled,
+      className,
+      children,
+      id,
+      ...props
+    },
+    ref,
+  ) {
+    const rootContext = useContext(AccordionRootContext);
+    const itemContext = useContext(AccordionItemContext);
+    const resolvedExpanded = expanded ?? itemContext?.expanded ?? false;
+    const resolvedDisabled = disabled ?? itemContext?.disabled ?? false;
+    const resolvedReorderable = reorderable ?? rootContext?.reorderable ?? false;
+    const resolvedControlsId =
+      controlsId ?? (itemContext?.hasBody ? itemContext.bodyId : undefined);
+    const resolvedId = id ?? itemContext?.triggerId;
+    const dragListeners = itemContext?.dragListeners;
+
+    const handleDisclosureClick: ButtonHTMLAttributes<HTMLButtonElement>['onClick'] = event => {
+      if (event.defaultPrevented || resolvedDisabled) {
+        return;
+      }
+
+      onToggle?.();
+      itemContext?.toggle();
+    };
+
+    return (
+      <div
+        {...props}
+        ref={ref}
+        id={resolvedId}
+        className={cx('c-accordion-item__drag-header', className)}
+      >
+        {resolvedReorderable ? (
+          <button
+            type="button"
+            className="c-accordion-item__drag-handle"
+            disabled={resolvedDisabled}
+            aria-label={dragLabel ?? 'Drag to reorder'}
+            title={dragTitle ?? 'Drag to reorder. Press Space to pick up, then use arrow keys.'}
+            ref={node => itemContext?.setDragActivatorNodeRef(node)}
+            {...itemContext?.dragAttributes}
+            {...dragListeners}
+          >
+            <Icon name="grip" size="sm" hierarchy="tertiary" aria-hidden />
+          </button>
+        ) : null}
+        {children}
+        {showDisclosure ? (
+          <button
+            type="button"
+            className="c-accordion-item__disclosure-button"
+            disabled={resolvedDisabled}
+            aria-label={
+              disclosureLabel ?? `${resolvedExpanded ? 'Collapse' : 'Expand'} accordion item`
+            }
+            aria-controls={resolvedControlsId}
+            aria-expanded={resolvedExpanded}
+            onClick={handleDisclosureClick}
+          >
+            <Icon
+              name={resolvedExpanded ? 'chevron-up' : 'chevron-down'}
+              size="sm"
+              color={resolvedExpanded ? 'brand' : 'text'}
+              hierarchy={resolvedExpanded ? 'primary' : 'tertiary'}
+              aria-hidden
+            />
+          </button>
+        ) : null}
+      </div>
     );
   },
 );
