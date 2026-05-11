@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ipc } from '../../../shared/lib/ipc';
 import type { CroquisRecordDetail, CroquisRecordSummary } from '../../../shared/types';
 import { Button } from '../../../shared/ui';
@@ -86,6 +87,7 @@ function getRelatedRecords(
 }
 
 export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewProps) {
+  const { t } = useTranslation('common');
   const [layout, setLayout] = useState<LibraryWorkspaceLayout>('masonry');
   const [records, setRecords] = useState<CroquisRecordSummary[]>([]);
   const [recordDetailsById, setRecordDetailsById] = useState(
@@ -142,10 +144,15 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
       setSelectedRecordId(null);
       setSelectedRecordIds([]);
       setPreviewOpen(false);
-      setError(getErrorMessage(nextError, 'Failed to load records.'));
+      setError(
+        getErrorMessage(
+          nextError,
+          t('records.error.load', { defaultValue: 'Failed to load records.' }),
+        ),
+      );
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadRecords();
@@ -187,19 +194,19 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
   const recordsBySourceAssetId = useMemo(() => createRecordsBySourceAssetId(items), [items]);
 
   const gridEmptyState = isLoading ? (
-    <RecordGridState title="Loading records..." />
+    <RecordGridState title={t('records.loading', { defaultValue: 'Loading records...' })} />
   ) : error ? (
     <RecordGridState
-      title="Failed to load records"
+      title={t('records.failed_to_load', { defaultValue: 'Failed to load records' })}
       description={error}
       action={
         <Button size="sm" onClick={() => void loadRecords()}>
-          Retry
+          {t('common.retry', { defaultValue: 'Retry' })}
         </Button>
       }
     />
   ) : (
-    <RecordGridState title="No records yet" />
+    <RecordGridState title={t('records.empty', { defaultValue: 'No records yet' })} />
   );
 
   const handleSelectedRecordChange = (recordId: string) => {
@@ -268,12 +275,19 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
         await onExplorerRefresh?.();
       })
       .catch((nextError: unknown) => {
-        setActionError(getErrorMessage(nextError, 'Failed to delete selected records.'));
+        setActionError(
+          getErrorMessage(
+            nextError,
+            t('records.error.delete_selected', {
+              defaultValue: 'Failed to delete selected records.',
+            }),
+          ),
+        );
       })
       .finally(() => {
         setIsActionBusy(false);
       });
-  }, [isActionBusy, loadRecords, onExplorerRefresh, selectedRecordId, selectedRecordIds]);
+  }, [isActionBusy, loadRecords, onExplorerRefresh, selectedRecordId, selectedRecordIds, t]);
 
   const statusError = actionError;
 
@@ -286,7 +300,7 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
         selectedItemId={selectedRecordId ?? undefined}
         selectedItemIds={selectedRecordIds}
         selectionMode={selectionMode}
-        gridAriaLabel="Records"
+        gridAriaLabel={t('records.title', { defaultValue: 'Records' })}
         previewOpen={previewOpen}
         gridBusy={isLoading}
         gridEmptyState={gridEmptyState}

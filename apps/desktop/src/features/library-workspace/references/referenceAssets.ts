@@ -7,13 +7,15 @@ const DEFAULT_TILE_HEIGHT = 320;
 const MIN_TILE_HEIGHT = 180;
 const MAX_TILE_HEIGHT = 560;
 
+type Translate = (key: string, options?: Record<string, unknown>) => string;
+
 function toFileSrc(path?: string | null) {
   return path ? convertFileSrc(path) : null;
 }
 
-function formatDate(value?: string | null) {
+function formatDate(value: string | null | undefined, locale: string | undefined, t: Translate) {
   if (!value) {
-    return 'None';
+    return t('common.none', { defaultValue: 'None' });
   }
 
   const date = new Date(value);
@@ -21,19 +23,19 @@ function formatDate(value?: string | null) {
     return value;
   }
 
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(locale, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
   }).format(date);
 }
 
-function formatResolution(asset: AssetSummary) {
+function formatResolution(asset: AssetSummary, t: Translate) {
   if (asset.width && asset.height) {
     return `${asset.width.toLocaleString()} x ${asset.height.toLocaleString()} px`;
   }
 
-  return 'Unknown';
+  return t('common.unknown', { defaultValue: 'Unknown' });
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -94,10 +96,17 @@ function createConnectedImages(
   return connectedImages;
 }
 
+const defaultTranslate: Translate = (key, options) => {
+  const defaultValue = options?.defaultValue;
+  return typeof defaultValue === 'string' ? defaultValue : key;
+};
+
 export function createReferenceAsset(
   asset: AssetSummary,
   detail?: AssetDetail,
   recordDetailsById?: ReadonlyMap<string, CroquisRecordDetail>,
+  t: Translate = defaultTranslate,
+  locale?: string,
 ): ReferenceAsset {
   const relatedRecordCount = detail?.relatedRecords.length ?? 0;
 
@@ -109,9 +118,9 @@ export function createReferenceAsset(
     ratio: getPlaceholderRatio(asset),
     height: getTileHeight(asset),
     metadata: {
-      resolution: formatResolution(asset),
-      addedAt: formatDate(asset.createdAt),
-      lastCroquisAt: formatDate(detail?.lastCroquisAt),
+      resolution: formatResolution(asset, t),
+      addedAt: formatDate(asset.createdAt, locale, t),
+      lastCroquisAt: formatDate(detail?.lastCroquisAt, locale, t),
     },
     folders: detail?.virtualFolders.map(folder => folder.fullPath || folder.name) ?? [],
     folderItems:
@@ -120,8 +129,15 @@ export function createReferenceAsset(
         path: folder.fullPath || folder.name,
       })) ?? [],
     croquisResult: {
-      label: 'Croquis Records',
-      status: relatedRecordCount > 0 ? `${relatedRecordCount.toLocaleString()} linked` : 'None',
+      label: t('references.croquis_records', { defaultValue: 'Croquis Records' }),
+      status:
+        relatedRecordCount > 0
+          ? t('references.linked_count', {
+              count: relatedRecordCount,
+              formattedCount: relatedRecordCount.toLocaleString(),
+              defaultValue: '{{formattedCount}} linked',
+            })
+          : t('common.none', { defaultValue: 'None' }),
       connectedImages: createConnectedImages(detail, recordDetailsById),
     },
   };

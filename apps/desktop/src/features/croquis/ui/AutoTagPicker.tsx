@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button, Chip, ChipButton, Modal, ModalFooter } from '../../../shared/ui';
 import type { Tag, TagGroup } from '../../../shared/types';
 import { TagSearchSelect } from '../../library/components';
@@ -21,10 +22,11 @@ export function AutoTagPicker({
   availableTags,
   tagGroups = [],
   disabled = false,
-  emptyLabel = 'No auto tags',
+  emptyLabel,
   onTagAdd,
   onTagRemove,
 }: AutoTagPickerProps) {
+  const { t } = useTranslation('common');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTagId, setSelectedTagId] = useState('');
   const canEditTags = Boolean(onTagAdd && onTagRemove);
@@ -37,10 +39,12 @@ export function AutoTagPicker({
     () => selectableTags.find(tag => tag.id === selectedTagId) ?? null,
     [selectableTags, selectedTagId],
   );
+  const resolvedEmptyLabel =
+    emptyLabel ?? t('croquis.auto_tags.empty', { defaultValue: 'No auto tags' });
   const tagEmptyMessage =
     availableTags.length > 0 && selectableTags.length === 0
-      ? 'All tags are linked'
-      : 'No tags found';
+      ? t('croquis.auto_tags.all_linked', { defaultValue: 'All tags are linked' })
+      : t('tags.no_tags_found', { defaultValue: 'No tags found' });
 
   useEffect(() => {
     if (selectedTagId && !selectableTags.some(tag => tag.id === selectedTagId)) {
@@ -95,7 +99,10 @@ export function AutoTagPicker({
               shape="rounded"
               variant="neutral-dismiss"
               disabled={disabled}
-              aria-label={`Remove tag ${tag.name}`}
+              aria-label={t('tags.remove_tag', {
+                tag: tag.name,
+                defaultValue: 'Remove tag {{tag}}',
+              })}
               onClick={() => {
                 onTagRemove?.(tag.id);
               }}
@@ -110,7 +117,7 @@ export function AutoTagPicker({
         )}
         {tags.length === 0 ? (
           <Chip shape="rounded" variant="accent-outline">
-            {emptyLabel}
+            {resolvedEmptyLabel}
           </Chip>
         ) : null}
         {canEditTags ? (
@@ -118,24 +125,32 @@ export function AutoTagPicker({
             shape="rounded"
             variant="add"
             disabled={disabled || selectableTags.length === 0}
-            aria-label={`Add ${label}`}
+            aria-label={t('common.add_label', {
+              label,
+              defaultValue: 'Add {{label}}',
+            })}
             onClick={() => {
               setIsModalOpen(true);
             }}
           >
-            Tag
+            {t('tags.tag', { defaultValue: 'Tag' })}
           </ChipButton>
         ) : null}
       </div>
       {canEditTags && availableTags.length === 0 ? (
         <span className="session-preset-step-editor__tag-hint">
-          Create tags in Tag Settings first.
+          {t('croquis.auto_tags.create_tags_first', {
+            defaultValue: 'Create tags in Tag Settings first.',
+          })}
         </span>
       ) : null}
       <Modal
         open={isModalOpen}
         size="sm"
-        title={`Add ${label}`}
+        title={t('common.add_label', {
+          label,
+          defaultValue: 'Add {{label}}',
+        })}
         onClose={handleModalClose}
         closeOnEscape={false}
         dialogClassName="session-preset-step-editor__tag-modal"
@@ -143,10 +158,10 @@ export function AutoTagPicker({
         footer={
           <ModalFooter alignment="end">
             <Button size="sm" variant="secondary" onClick={handleModalClose}>
-              Cancel
+              {t('common.cancel', { defaultValue: 'Cancel' })}
             </Button>
             <Button size="sm" disabled={disabled || selectedTag === null} onClick={handleAddTag}>
-              Add Tag
+              {t('common.add_tag', { defaultValue: 'Add Tag' })}
             </Button>
           </ModalFooter>
         }
@@ -155,16 +170,21 @@ export function AutoTagPicker({
           tags={selectableTags}
           groups={tagGroups}
           value={selectedTagId}
-          placeholder="Search existing tags"
+          placeholder={t('tags.search_existing', { defaultValue: 'Search existing tags' })}
           emptyMessage={tagEmptyMessage}
           disabled={disabled || availableTags.length === 0}
-          aria-label={`Search ${label}`}
+          aria-label={t('common.search_label', {
+            label,
+            defaultValue: 'Search {{label}}',
+          })}
           onValueChange={nextTagId => {
             setSelectedTagId(nextTagId);
           }}
         />
         <span className="session-preset-step-editor__tag-hint">
-          Existing tags only. Use Tag Settings to create or edit tags.
+          {t('croquis.auto_tags.existing_only_hint', {
+            defaultValue: 'Existing tags only. Use Tag Settings to create or edit tags.',
+          })}
         </span>
       </Modal>
     </section>

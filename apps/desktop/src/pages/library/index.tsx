@@ -8,6 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
+import { useTranslation } from 'react-i18next';
 import { formatBytes } from '../../lib/format';
 import { cx } from '../../shared/lib/cx';
 import { ipc } from '../../shared/lib/ipc';
@@ -64,7 +65,6 @@ const SIDEBAR_MIN_WIDTH = 240;
 const SIDEBAR_RESIZE_STEP = 24;
 const MAIN_CONTAINER_MIN_WIDTH = 320;
 const SUPPORTED_IMPORT_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif', 'tif', 'tiff'];
-const NO_DESTINATION_FOLDERS_ERROR = 'No destination folders are available for import.';
 
 type ImportStep = 'folder' | 'assets' | 'completed';
 type WorkspaceView = 'references' | 'records' | 'tag-settings' | 'preset-settings';
@@ -130,13 +130,18 @@ function createImportSummary(
   };
 }
 
-function formatPreviewFailureMessage(failedCount: number) {
+type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+function formatPreviewFailureMessage(failedCount: number, t: Translate) {
   if (failedCount === 0) {
     return null;
   }
 
-  const itemLabel = failedCount === 1 ? 'item' : 'items';
-  return `${failedCount.toLocaleString()} ${itemLabel} could not be reviewed and will be skipped.`;
+  return t('import.preview_failure_message', {
+    count: failedCount,
+    formattedCount: failedCount.toLocaleString(),
+    defaultValue: '{{formattedCount}} items could not be reviewed and will be skipped.',
+  });
 }
 
 function createEmptyImportResult(failed: ImportFailure[] = []): ImportResult {
@@ -156,6 +161,7 @@ function mergeImportResult(target: ImportResult, source: ImportResult) {
 }
 
 export function LibraryPage() {
+  const { t } = useTranslation('common');
   const [isSidebarPanelOpen, setIsSidebarPanelOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
@@ -185,7 +191,13 @@ export function LibraryPage() {
   const resizeSessionRef = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(
     null,
   );
-  const explorerNodes = useMemo(() => buildExplorerNodes(explorerSnapshot), [explorerSnapshot]);
+  const noDestinationFoldersError = t('import.error.no_destination_folders', {
+    defaultValue: 'No destination folders are available for import.',
+  });
+  const explorerNodes = useMemo(
+    () => buildExplorerNodes(explorerSnapshot, t),
+    [explorerSnapshot, t],
+  );
   const assignableFolderIds = useMemo(() => {
     const nextIds = new Set<string>();
 
@@ -215,11 +227,16 @@ export function LibraryPage() {
       const snapshot = await ipc.library.loadExplorerSnapshot();
       setExplorerSnapshot(snapshot);
     } catch (error) {
-      setExplorerError(getErrorMessage(error, 'Failed to load explorer.'));
+      setExplorerError(
+        getErrorMessage(
+          error,
+          t('explorer.error.load', { defaultValue: 'Failed to load explorer.' }),
+        ),
+      );
     } finally {
       setIsExplorerLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadExplorerSnapshot();
@@ -228,24 +245,24 @@ export function LibraryPage() {
   const primaryItems: readonly PrimaryRailItem[] = [
     {
       icon: 'folder-open',
-      label: 'Library',
+      label: t('library.title', { defaultValue: 'Library' }),
       action: 'toggle-sidebar-panel',
       active: isSidebarPanelOpen,
     },
     {
       icon: 'search',
-      label: 'Result Preview',
+      label: t('library.result_preview', { defaultValue: 'Result Preview' }),
       action: 'open-search',
     },
     {
       icon: 'grid',
-      label: 'Tag Settings',
+      label: t('tags.settings.title', { defaultValue: 'Tag Settings' }),
       action: 'open-tag-settings',
       active: workspaceView === 'tag-settings',
     },
     {
       icon: 'layers',
-      label: 'Preset Settings',
+      label: t('presets.settings.title', { defaultValue: 'Preset Settings' }),
       action: 'open-preset-settings',
       active: workspaceView === 'preset-settings',
     },
@@ -323,10 +340,15 @@ export function LibraryPage() {
     setImportPreview(undefined);
     setImportDroppedFiles(undefined);
     setImportProgress(undefined);
-    setImportError(assignableFolders.length > 0 ? null : NO_DESTINATION_FOLDERS_ERROR);
+    setImportError(assignableFolders.length > 0 ? null : noDestinationFoldersError);
     setImportStep('folder');
     setIsImportDragActive(false);
-  }, [assignableFolders.length, getDefaultImportFolderId, isExplorerLoading]);
+  }, [
+    assignableFolders.length,
+    getDefaultImportFolderId,
+    isExplorerLoading,
+    noDestinationFoldersError,
+  ]);
 
   const handleCloseImport = useCallback(() => {
     if (
@@ -351,14 +373,14 @@ export function LibraryPage() {
   useEffect(() => {
     if (
       importStep !== 'folder' ||
-      importError !== NO_DESTINATION_FOLDERS_ERROR ||
+      importError !== noDestinationFoldersError ||
       assignableFolders.length === 0
     ) {
       return;
     }
 
     setImportError(null);
-  }, [assignableFolders.length, importError, importStep]);
+  }, [assignableFolders.length, importError, importStep, noDestinationFoldersError]);
 
   const handleImportFolderChange = useCallback((folderId: string) => {
     setImportFolderId(folderId);
@@ -367,7 +389,11 @@ export function LibraryPage() {
 
   const handleSelectImportFolder = useCallback(() => {
     if (!importFolderId || !assignableFolderById.has(importFolderId)) {
-      setImportError('Select a destination folder before choosing files.');
+      setImportError(
+        t('import.error.select_destination_before_files', {
+          defaultValue: 'Select a destination folder before choosing files.',
+        }),
+      );
       return;
     }
 
@@ -382,21 +408,33 @@ export function LibraryPage() {
       }
 
       if (!importFolderId) {
-        setImportError('Select a destination folder before choosing files.');
+        setImportError(
+          t('import.error.select_destination_before_files', {
+            defaultValue: 'Select a destination folder before choosing files.',
+          }),
+        );
         setImportStep('folder');
         return;
       }
 
       const destinationFolder = assignableFolderById.get(importFolderId);
       if (!destinationFolder) {
-        setImportError('The selected destination folder cannot receive imported assets.');
+        setImportError(
+          t('import.error.destination_cannot_receive_assets', {
+            defaultValue: 'The selected destination folder cannot receive imported assets.',
+          }),
+        );
         setImportStep('folder');
         return;
       }
 
       const selectedPaths = normalizeSelectedFilePaths(filePaths);
       if (selectedPaths.length === 0) {
-        setImportError('Select at least one image file or folder.');
+        setImportError(
+          t('import.error.select_image_file_or_folder', {
+            defaultValue: 'Select at least one image file or folder.',
+          }),
+        );
         setImportPreview(undefined);
         setImportDroppedFiles(undefined);
         setImportProgress(undefined);
@@ -416,12 +454,17 @@ export function LibraryPage() {
           filePaths: selectedPaths,
           virtualFolderIds: [importFolderId],
         });
-        const previewFailureMessage = formatPreviewFailureMessage(preview.failed.length);
+        const previewFailureMessage = formatPreviewFailureMessage(preview.failed.length, t);
         if (preview.assetCount === 0 || preview.filePaths.length === 0) {
           setImportError(
             previewFailureMessage
-              ? `No supported image files were found. ${previewFailureMessage}`
-              : 'No supported image files were found.',
+              ? t('import.error.no_supported_images_with_warning', {
+                  warning: previewFailureMessage,
+                  defaultValue: 'No supported image files were found. {{warning}}',
+                })
+              : t('import.error.no_supported_images', {
+                  defaultValue: 'No supported image files were found.',
+                }),
           );
           setImportPreview(undefined);
           setImportDroppedFiles(undefined);
@@ -436,7 +479,14 @@ export function LibraryPage() {
       } catch (error) {
         setImportPreview(undefined);
         setImportDroppedFiles(undefined);
-        setImportError(getErrorMessage(error, 'Failed to review selected files.'));
+        setImportError(
+          getErrorMessage(
+            error,
+            t('import.error.review_selected_files', {
+              defaultValue: 'Failed to review selected files.',
+            }),
+          ),
+        );
         setImportStep('assets');
       } finally {
         importPreviewInFlightRef.current = false;
@@ -444,7 +494,7 @@ export function LibraryPage() {
         setIsImportDragActive(false);
       }
     },
-    [assignableFolderById, importFolderId],
+    [assignableFolderById, importFolderId, t],
   );
 
   const previewImportDroppedFiles = useCallback(
@@ -454,14 +504,22 @@ export function LibraryPage() {
       }
 
       if (!importFolderId) {
-        setImportError('Select a destination folder before choosing files.');
+        setImportError(
+          t('import.error.select_destination_before_files', {
+            defaultValue: 'Select a destination folder before choosing files.',
+          }),
+        );
         setImportStep('folder');
         return;
       }
 
       const destinationFolder = assignableFolderById.get(importFolderId);
       if (!destinationFolder) {
-        setImportError('The selected destination folder cannot receive imported assets.');
+        setImportError(
+          t('import.error.destination_cannot_receive_assets', {
+            defaultValue: 'The selected destination folder cannot receive imported assets.',
+          }),
+        );
         setImportStep('folder');
         return;
       }
@@ -478,7 +536,12 @@ export function LibraryPage() {
         const collection = await collectionPromise;
         const warningMessage = formatDroppedImageFileWarnings(collection);
         if (collection.files.length === 0) {
-          setImportError(warningMessage ?? 'No supported image files were found.');
+          setImportError(
+            warningMessage ??
+              t('import.error.no_supported_images', {
+                defaultValue: 'No supported image files were found.',
+              }),
+          );
           setImportStep('assets');
           return;
         }
@@ -487,7 +550,14 @@ export function LibraryPage() {
         setImportError(warningMessage);
         setImportStep('assets');
       } catch (error) {
-        setImportError(getErrorMessage(error, 'Failed to review dropped files.'));
+        setImportError(
+          getErrorMessage(
+            error,
+            t('import.error.review_dropped_files', {
+              defaultValue: 'Failed to review dropped files.',
+            }),
+          ),
+        );
         setImportStep('assets');
       } finally {
         importPreviewInFlightRef.current = false;
@@ -496,7 +566,7 @@ export function LibraryPage() {
         importDomDragDepthRef.current = 0;
       }
     },
-    [assignableFolderById, importFolderId],
+    [assignableFolderById, importFolderId, t],
   );
 
   const handleImportPreviewedFiles = useCallback(() => {
@@ -505,14 +575,22 @@ export function LibraryPage() {
     }
 
     if (!importFolderId) {
-      setImportError('Select a destination folder before importing files.');
+      setImportError(
+        t('import.error.select_destination_before_import', {
+          defaultValue: 'Select a destination folder before importing files.',
+        }),
+      );
       setImportStep('folder');
       return;
     }
 
     const destinationFolder = assignableFolderById.get(importFolderId);
     if (!destinationFolder) {
-      setImportError('The selected destination folder cannot receive imported assets.');
+      setImportError(
+        t('import.error.destination_cannot_receive_assets', {
+          defaultValue: 'The selected destination folder cannot receive imported assets.',
+        }),
+      );
       setImportStep('folder');
       return;
     }
@@ -520,7 +598,11 @@ export function LibraryPage() {
     const droppedFiles = importDroppedFiles ?? [];
     const filePaths = importPreview?.filePaths ?? [];
     if (droppedFiles.length === 0 && filePaths.length === 0) {
-      setImportError('Select image files before importing.');
+      setImportError(
+        t('import.error.select_image_files_before_import', {
+          defaultValue: 'Select image files before importing.',
+        }),
+      );
       return;
     }
 
@@ -542,7 +624,9 @@ export function LibraryPage() {
               if (!source) {
                 aggregateResult.failed.push({
                   filePath: file.name,
-                  error: 'Dropped file is not a supported image.',
+                  error: t('import.error.dropped_file_unsupported', {
+                    defaultValue: 'Dropped file is not a supported image.',
+                  }),
                 });
                 continue;
               }
@@ -555,7 +639,12 @@ export function LibraryPage() {
             } catch (error) {
               aggregateResult.failed.push({
                 filePath: file.name,
-                error: getErrorMessage(error, 'Failed to import dropped file.'),
+                error: getErrorMessage(
+                  error,
+                  t('import.error.import_dropped_file', {
+                    defaultValue: 'Failed to import dropped file.',
+                  }),
+                ),
               });
             } finally {
               setImportProgress({ completed: index + 1, total: droppedFiles.length });
@@ -574,7 +663,10 @@ export function LibraryPage() {
             } catch (error) {
               aggregateResult.failed.push({
                 filePath,
-                error: getErrorMessage(error, 'Failed to import file.'),
+                error: getErrorMessage(
+                  error,
+                  t('import.error.import_file', { defaultValue: 'Failed to import file.' }),
+                ),
               });
             } finally {
               setImportProgress({ completed: index + 1, total: filePaths.length });
@@ -584,7 +676,11 @@ export function LibraryPage() {
 
         const processedCount = aggregateResult.imported + aggregateResult.reused;
         if (processedCount === 0 && aggregateResult.failed.length === 0) {
-          setImportError('No supported images were imported.');
+          setImportError(
+            t('import.error.no_supported_images_imported', {
+              defaultValue: 'No supported images were imported.',
+            }),
+          );
           setImportProgress(undefined);
           setImportStep('assets');
           return;
@@ -598,7 +694,12 @@ export function LibraryPage() {
         setWorkspaceRefreshKey(current => current + 1);
         void loadExplorerSnapshot();
       } catch (error) {
-        setImportError(getErrorMessage(error, 'Failed to import assets.'));
+        setImportError(
+          getErrorMessage(
+            error,
+            t('import.error.import_assets', { defaultValue: 'Failed to import assets.' }),
+          ),
+        );
         setImportProgress(undefined);
         setImportStep('assets');
       } finally {
@@ -614,6 +715,7 @@ export function LibraryPage() {
     importFolderId,
     importPreview,
     loadExplorerSnapshot,
+    t,
   ]);
 
   const handleSelectImportFiles = useCallback(() => {
@@ -631,7 +733,7 @@ export function LibraryPage() {
           directory: false,
           filters: [
             {
-              name: 'Supported Images',
+              name: t('import.supported_images', { defaultValue: 'Supported Images' }),
               extensions: SUPPORTED_IMPORT_EXTENSIONS,
             },
           ],
@@ -643,13 +745,18 @@ export function LibraryPage() {
 
         await previewImportFilePaths(selectedFilePaths);
       } catch (error) {
-        setImportError(getErrorMessage(error, 'Failed to open file picker.'));
+        setImportError(
+          getErrorMessage(
+            error,
+            t('import.error.open_file_picker', { defaultValue: 'Failed to open file picker.' }),
+          ),
+        );
       } finally {
         filePickerOpenRef.current = false;
         setIsFilePickerOpen(false);
       }
     })();
-  }, [previewImportFilePaths]);
+  }, [previewImportFilePaths, t]);
 
   const handleSelectImportFolders = useCallback(() => {
     if (importInFlightRef.current || filePickerOpenRef.current) {
@@ -673,13 +780,20 @@ export function LibraryPage() {
 
         await previewImportFilePaths(selectedFolderPaths);
       } catch (error) {
-        setImportError(getErrorMessage(error, 'Failed to open folder picker.'));
+        setImportError(
+          getErrorMessage(
+            error,
+            t('import.error.open_folder_picker', {
+              defaultValue: 'Failed to open folder picker.',
+            }),
+          ),
+        );
       } finally {
         filePickerOpenRef.current = false;
         setIsFilePickerOpen(false);
       }
     })();
-  }, [previewImportFilePaths]);
+  }, [previewImportFilePaths, t]);
 
   useEffect(() => {
     if (importStep !== 'assets' || isImporting || isImportPreviewing || isFilePickerOpen) {
@@ -903,7 +1017,7 @@ export function LibraryPage() {
                 onSecondaryAction={handleSecondaryAction}
               />
             }
-            title="Explorer"
+            title={t('explorer.title', { defaultValue: 'Explorer' })}
             collapsed={!isSidebarPanelOpen}
           >
             <ExplorerPanel
@@ -925,7 +1039,9 @@ export function LibraryPage() {
           <div
             role="separator"
             tabIndex={0}
-            aria-label="Resize sidebar panel"
+            aria-label={t('library.resize_sidebar_panel', {
+              defaultValue: 'Resize sidebar panel',
+            })}
             aria-orientation="vertical"
             aria-valuemin={SIDEBAR_MIN_WIDTH}
             aria-valuemax={sidebarMaxWidth}
@@ -985,7 +1101,11 @@ export function LibraryPage() {
         onImport={handleImportPreviewedFiles}
         filePreview={importFilePreview}
         progress={importProgress}
-        busyLabel={isImporting ? 'Importing assets...' : 'Reviewing files...'}
+        busyLabel={
+          isImporting
+            ? t('import.importing_assets', { defaultValue: 'Importing assets...' })
+            : t('import.reviewing_files', { defaultValue: 'Reviewing files...' })
+        }
         selectFilesDisabled={
           isFilePickerOpen ||
           isImportPreviewing ||

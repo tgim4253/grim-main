@@ -12,7 +12,7 @@ export default function App() {
   useTheme();
 
   useEffect(() => {
-    document.title = t('app_name');
+    document.title = t('app_name', { defaultValue: 'GRIM' });
   }, [t]);
 
   return (

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../../shared/ui';
 import { ExplorerTreeGroup } from './ExplorerTreeGroup';
 import { FOLDERS_NODE_ID } from './explorerTree';
@@ -73,6 +74,7 @@ export function ExplorerPanel({
   onCreateFolder,
   onRetry,
 }: ExplorerPanelProps) {
+  const { t } = useTranslation('common');
   const [expandedById, setExpandedById] = useState<Record<string, boolean>>(() =>
     buildDefaultExpandedState(nodes),
   );
@@ -144,14 +146,19 @@ export function ExplorerPanel({
               ? {
                   ...current,
                   pending: false,
-                  error: getErrorMessage(nextError, 'Failed to create folder.'),
+                  error: getErrorMessage(
+                    nextError,
+                    t('explorer.error.create_folder', {
+                      defaultValue: 'Failed to create folder.',
+                    }),
+                  ),
                 }
               : current,
           );
         }
       })();
     },
-    [folderDraft?.parentNodeId, onCreateFolder],
+    [folderDraft?.parentNodeId, onCreateFolder, t],
   );
 
   const folderActionsDisabled = loading || createFolderDisabled || Boolean(folderDraft);
@@ -166,23 +173,27 @@ export function ExplorerPanel({
           onClick={onImport}
           disabled={importDisabled}
         >
-          Import
+          {t('common.import', { defaultValue: 'Import' })}
         </Button>
       </div>
 
-      <div className="library-explorer__tree" role="tree" aria-label="Explorer">
+      <div
+        className="library-explorer__tree"
+        role="tree"
+        aria-label={t('explorer.title', { defaultValue: 'Explorer' })}
+      >
         {error ? (
           <div className="library-explorer__state" role="status">
             <p>{error}</p>
             {onRetry ? (
               <Button size="sm" onClick={onRetry}>
-                Retry
+                {t('common.retry', { defaultValue: 'Retry' })}
               </Button>
             ) : null}
           </div>
         ) : loading && nodes.length === 0 ? (
           <div className="library-explorer__state" role="status">
-            <p>Loading library...</p>
+            <p>{t('explorer.loading_library', { defaultValue: 'Loading library...' })}</p>
           </div>
         ) : (
           nodes.map(node => (

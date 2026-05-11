@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Select,
   type SelectFilterOptions,
@@ -25,8 +26,6 @@ export type TagSearchSelectProps = Omit<
   filterTags?: TagSearchFilter;
 };
 
-const DEFAULT_EMPTY_MESSAGE = 'No tags found';
-
 const normalizeSearchText = (value: string) => value.trim().toLocaleLowerCase();
 
 const getTagGroupName = (tag: Tag, groupsById: ReadonlyMap<string, TagGroup>) =>
@@ -47,10 +46,14 @@ export const filterTagSearchOptions: TagSearchFilter = (query, tags, groupsById)
   });
 };
 
-const getTagOption = (tag: Tag, groupsById: ReadonlyMap<string, TagGroup>): SelectOption => ({
+const getTagOption = (
+  tag: Tag,
+  groupsById: ReadonlyMap<string, TagGroup>,
+  ungroupedLabel: string,
+): SelectOption => ({
   value: tag.id,
   label: tag.name,
-  supportingText: getTagGroupName(tag, groupsById) ?? 'Ungrouped',
+  supportingText: getTagGroupName(tag, groupsById) ?? ungroupedLabel,
 });
 
 export function TagSearchSelect({
@@ -60,12 +63,17 @@ export function TagSearchSelect({
   defaultValue,
   onValueChange,
   filterTags = filterTagSearchOptions,
-  placeholder = 'Search tags',
-  emptyMessage = DEFAULT_EMPTY_MESSAGE,
+  placeholder,
+  emptyMessage,
   searchValue,
   onSearchValueChange,
   ...props
 }: TagSearchSelectProps) {
+  const { t } = useTranslation('common');
+  const ungroupedLabel = t('tags.ungrouped', { defaultValue: 'Ungrouped' });
+  const resolvedPlaceholder = placeholder ?? t('tags.search_tags', { defaultValue: 'Search tags' });
+  const resolvedEmptyMessage =
+    emptyMessage ?? t('tags.no_tags_found', { defaultValue: 'No tags found' });
   const groupsById = useMemo(() => {
     const nextGroupsById = new Map<string, TagGroup>();
 
@@ -96,11 +104,15 @@ export function TagSearchSelect({
   const [internalSearchValue, setInternalSearchValue] = useState(selectedTagName);
   const resolvedSearchValue = isSearchValueControlled ? searchValue : internalSearchValue;
 
-  const options = useMemo(() => tags.map(tag => getTagOption(tag, groupsById)), [groupsById, tags]);
+  const options = useMemo(
+    () => tags.map(tag => getTagOption(tag, groupsById, ungroupedLabel)),
+    [groupsById, tags, ungroupedLabel],
+  );
 
   const filterOptions = useCallback<SelectFilterOptions>(
-    query => filterTags(query, tags, groupsById).map(tag => getTagOption(tag, groupsById)),
-    [filterTags, groupsById, tags],
+    query =>
+      filterTags(query, tags, groupsById).map(tag => getTagOption(tag, groupsById, ungroupedLabel)),
+    [filterTags, groupsById, tags, ungroupedLabel],
   );
 
   const handleSearchValueChange = useCallback(
@@ -138,11 +150,11 @@ export function TagSearchSelect({
       options={options}
       value={resolvedValue}
       onValueChange={handleValueChange}
-      placeholder={placeholder}
+      placeholder={resolvedPlaceholder}
       searchValue={resolvedSearchValue}
       onSearchValueChange={handleSearchValueChange}
       filterOptions={filterOptions}
-      emptyMessage={emptyMessage}
+      emptyMessage={resolvedEmptyMessage}
     />
   );
 }

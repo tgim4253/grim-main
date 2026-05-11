@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button, Checkbox } from '../../../shared/ui';
 
 type RecordSelectionToolbarProps = {
@@ -19,8 +20,13 @@ export function RecordSelectionToolbar({
   onSelectAllChange,
   onDeleteSelected,
 }: RecordSelectionToolbarProps) {
+  const { t } = useTranslation('common');
   const allSelected = totalCount > 0 && selectedCount === totalCount;
-  const selectedLabel = `${selectedCount.toLocaleString()} selected`;
+  const selectedLabel = t('common.selected_count', {
+    count: selectedCount,
+    formattedCount: selectedCount.toLocaleString(),
+    defaultValue: '{{formattedCount}} selected',
+  });
   const selectedActionsDisabled = actionBusy || selectedCount === 0;
 
   if (!selectionMode) {
@@ -33,7 +39,7 @@ export function RecordSelectionToolbar({
             onSelectionModeChange(true);
           }}
         >
-          Select
+          {t('common.select', { defaultValue: 'Select' })}
         </Button>
       </div>
     );
@@ -51,17 +57,19 @@ export function RecordSelectionToolbar({
             onSelectionModeChange(false);
           }}
         >
-          Cancel
+          {t('common.cancel', { defaultValue: 'Cancel' })}
         </Button>
         <label className="record-selection-toolbar__select-all">
           <Checkbox
             size="sm"
             checked={allSelected}
             disabled={actionBusy || totalCount === 0}
-            aria-label="Select all records"
+            aria-label={t('records.select_all_records', {
+              defaultValue: 'Select all records',
+            })}
             onCheckedChange={onSelectAllChange}
           />
-          <span>Select all</span>
+          <span>{t('common.select_all', { defaultValue: 'Select all' })}</span>
         </label>
         <span className="record-selection-toolbar__divider" aria-hidden />
         <span className="record-selection-toolbar__count">{selectedLabel}</span>
@@ -69,7 +77,7 @@ export function RecordSelectionToolbar({
 
       <div className="record-selection-toolbar__actions">
         <Button size="sm" variant="secondary" disabled>
-          Add Tag
+          {t('common.add_tag', { defaultValue: 'Add Tag' })}
         </Button>
         <Button
           size="sm"
@@ -77,10 +85,10 @@ export function RecordSelectionToolbar({
           disabled={selectedActionsDisabled}
           onClick={onDeleteSelected}
         >
-          Delete
+          {t('common.delete', { defaultValue: 'Delete' })}
         </Button>
         <Button size="sm" disabled>
-          Export
+          {t('common.export', { defaultValue: 'Export' })}
         </Button>
       </div>
     </div>

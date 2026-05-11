@@ -13,6 +13,8 @@ export const FOLDERS_NODE_ID = 'section:folders';
 
 export const DEFAULT_ASSET_SOURCE: AssetListSource = { kind: 'allAssets' };
 
+type Translate = (key: string, options?: Record<string, unknown>) => string;
+
 function formatCount(value: number) {
   return value.toLocaleString();
 }
@@ -69,7 +71,10 @@ function createFolderNode(
   };
 }
 
-export function buildExplorerNodes(snapshot: ExplorerSnapshot | null): ExplorerNode[] {
+export function buildExplorerNodes(
+  snapshot: ExplorerSnapshot | null,
+  t: Translate,
+): ExplorerNode[] {
   const allAssetsCount = snapshot?.allAssetsCount ?? 0;
   const unassignedAssetsCount = snapshot?.unassignedAssetsCount ?? 0;
   const folders = snapshot?.virtualFolders ?? [];
@@ -80,28 +85,28 @@ export function buildExplorerNodes(snapshot: ExplorerSnapshot | null): ExplorerN
   return [
     {
       id: ALL_ASSETS_NODE_ID,
-      label: 'All Assets',
+      label: t('explorer.all_assets', { defaultValue: 'All Assets' }),
       icon: 'grid',
       meta: formatCount(allAssetsCount),
       source: DEFAULT_ASSET_SOURCE,
     },
     {
       id: UNCATEGORIZED_NODE_ID,
-      label: 'Uncategorized',
+      label: t('explorer.uncategorized', { defaultValue: 'Uncategorized' }),
       icon: 'folder',
       meta: formatCount(unassignedAssetsCount),
       source: { kind: 'uncategorized' },
     },
     {
       id: RECENT_RECORDS_NODE_ID,
-      label: 'Recent Records',
+      label: t('explorer.recent_records', { defaultValue: 'Recent Records' }),
       icon: 'gesture',
       meta: '',
       view: 'records',
     },
     {
       id: FOLDERS_NODE_ID,
-      label: 'Folders',
+      label: t('explorer.folders', { defaultValue: 'Folders' }),
       icon: 'folder-open',
       meta: '',
       children: rootFolders.map(folder =>

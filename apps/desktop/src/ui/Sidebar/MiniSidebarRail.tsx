@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { IconButton, type IconName } from '../../shared/ui';
 import './mini-sidebar-rail.css';
 
@@ -32,28 +34,39 @@ type MiniSidebarRailProps = {
   onSecondaryAction?: (action: SecondaryRailAction, item: SecondaryRailItem) => void;
 };
 
-const DEFAULT_SECONDARY_ITEMS: readonly SecondaryRailItem[] = [
-  {
-    icon: 'user',
-    label: 'Account',
-    action: 'open-account',
-  },
-  {
-    icon: 'setting',
-    label: 'Settings',
-    action: 'open-settings',
-  },
-];
-
 export function MiniSidebarRail({
   primaryItems,
-  secondaryItems = DEFAULT_SECONDARY_ITEMS,
+  secondaryItems,
   onPrimaryAction,
   onSecondaryAction,
 }: MiniSidebarRailProps) {
+  const { t } = useTranslation('common');
+  const resolvedSecondaryItems = useMemo<readonly SecondaryRailItem[]>(
+    () =>
+      secondaryItems ?? [
+        {
+          icon: 'user',
+          label: t('common.account', { defaultValue: 'Account' }),
+          action: 'open-account',
+        },
+        {
+          icon: 'setting',
+          label: t('settings.title', { defaultValue: 'Settings' }),
+          action: 'open-settings',
+        },
+      ],
+    [secondaryItems, t],
+  );
+
   return (
-    <aside className="mini-sidebar-rail" aria-label="Primary navigation">
-      <nav className="mini-sidebar-rail__primary" aria-label="Library sections">
+    <aside
+      className="mini-sidebar-rail"
+      aria-label={t('navigation.primary', { defaultValue: 'Primary navigation' })}
+    >
+      <nav
+        className="mini-sidebar-rail__primary"
+        aria-label={t('navigation.library_sections', { defaultValue: 'Library sections' })}
+      >
         {primaryItems.map(item => (
           <IconButton
             key={item.icon}
@@ -73,8 +86,11 @@ export function MiniSidebarRail({
 
       <div className="mini-sidebar-rail__spacer" aria-hidden="true" />
 
-      <div className="mini-sidebar-rail__secondary" aria-label="Window utilities">
-        {secondaryItems.map(item => (
+      <div
+        className="mini-sidebar-rail__secondary"
+        aria-label={t('navigation.window_utilities', { defaultValue: 'Window utilities' })}
+      >
+        {resolvedSecondaryItems.map(item => (
           <IconButton
             key={item.icon}
             aria-label={item.label}

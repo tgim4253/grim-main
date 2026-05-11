@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button, Checkbox } from '../../../shared/ui';
 
 type ReferenceSelectionToolbarProps = {
@@ -25,8 +26,13 @@ export function ReferenceSelectionToolbar({
   onMoveToFolder,
   onStartCroquis,
 }: ReferenceSelectionToolbarProps) {
+  const { t } = useTranslation('common');
   const allSelected = totalCount > 0 && selectedCount === totalCount;
-  const selectedLabel = `${selectedCount.toLocaleString()} selected`;
+  const selectedLabel = t('common.selected_count', {
+    count: selectedCount,
+    formattedCount: selectedCount.toLocaleString(),
+    defaultValue: '{{formattedCount}} selected',
+  });
   const selectionActionsDisabled = folderActionsDisabled || selectedCount === 0;
 
   if (!selectionMode) {
@@ -39,7 +45,7 @@ export function ReferenceSelectionToolbar({
             onSelectionModeChange(true);
           }}
         >
-          Select
+          {t('common.select', { defaultValue: 'Select' })}
         </Button>
       </div>
     );
@@ -56,17 +62,19 @@ export function ReferenceSelectionToolbar({
             onSelectionModeChange(false);
           }}
         >
-          Cancel
+          {t('common.cancel', { defaultValue: 'Cancel' })}
         </Button>
         <label className="reference-selection-toolbar__select-all">
           <Checkbox
             size="sm"
             checked={allSelected}
             disabled={totalCount === 0}
-            aria-label="Select all reference assets"
+            aria-label={t('references.select_all_assets', {
+              defaultValue: 'Select all reference assets',
+            })}
             onCheckedChange={onSelectAllChange}
           />
-          <span>Select all</span>
+          <span>{t('common.select_all', { defaultValue: 'Select all' })}</span>
         </label>
         <span className="reference-selection-toolbar__divider" aria-hidden />
         <span className="reference-selection-toolbar__count">{selectedLabel}</span>
@@ -79,7 +87,7 @@ export function ReferenceSelectionToolbar({
           disabled={selectionActionsDisabled}
           onClick={onAddToFolder}
         >
-          Add to Folder
+          {t('references.add_to_folder', { defaultValue: 'Add to Folder' })}
         </Button>
         <Button
           size="sm"
@@ -87,10 +95,10 @@ export function ReferenceSelectionToolbar({
           disabled={selectionActionsDisabled}
           onClick={onMoveToFolder}
         >
-          Move
+          {t('common.move', { defaultValue: 'Move' })}
         </Button>
         <Button size="sm" variant="secondary" disabled>
-          Delete
+          {t('common.delete', { defaultValue: 'Delete' })}
         </Button>
         <Button
           size="sm"
@@ -98,7 +106,7 @@ export function ReferenceSelectionToolbar({
           disabled={croquisDisabled || selectedCount === 0}
           onClick={onStartCroquis}
         >
-          Croquis
+          {t('common.croquis', { defaultValue: 'Croquis' })}
         </Button>
       </div>
     </div>

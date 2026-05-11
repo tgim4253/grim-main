@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button, Icon, Modal, ModalBody, ModalFooter } from '../../../shared/ui';
 import { cx } from '../../../shared/lib/cx';
 import { FolderSearchSelect } from '../../library/components';
@@ -78,23 +79,43 @@ const DEFAULT_IMPORT_SUMMARY: ImportSummary = {
   processedCount: 0,
   failedCount: 0,
   totalSize: '0 B',
-  destinationFolder: 'Search directories...',
+  destinationFolder: '',
 };
 
-function formatImportStatus(summary: ImportSummary) {
+type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+function formatImportStatus(summary: ImportSummary, t: Translate) {
   if (summary.processedCount === 0 && summary.failedCount === 0) {
-    return 'No assets imported';
+    return t('import.no_assets_imported', { defaultValue: 'No assets imported' });
   }
 
   const segments: string[] = [];
   if (summary.importedCount > 0) {
-    segments.push(`${summary.importedCount.toLocaleString()} imported`);
+    segments.push(
+      t('import.status.imported', {
+        count: summary.importedCount,
+        formattedCount: summary.importedCount.toLocaleString(),
+        defaultValue: '{{formattedCount}} imported',
+      }),
+    );
   }
   if (summary.reusedCount > 0) {
-    segments.push(`${summary.reusedCount.toLocaleString()} reused`);
+    segments.push(
+      t('import.status.reused', {
+        count: summary.reusedCount,
+        formattedCount: summary.reusedCount.toLocaleString(),
+        defaultValue: '{{formattedCount}} reused',
+      }),
+    );
   }
   if (summary.failedCount > 0) {
-    segments.push(`${summary.failedCount.toLocaleString()} failed`);
+    segments.push(
+      t('import.status.failed', {
+        count: summary.failedCount,
+        formattedCount: summary.failedCount.toLocaleString(),
+        defaultValue: '{{formattedCount}} failed',
+      }),
+    );
   }
 
   return segments.join(', ');
@@ -127,6 +148,8 @@ function ImportPreviewCard({
   filePreview?: ImportFilePreview;
   progress?: ImportProgress;
 }) {
+  const { t } = useTranslation('common');
+
   if (!filePreview && !progress) {
     return null;
   }
@@ -138,13 +161,17 @@ function ImportPreviewCard({
     <div className="library-import-modal__preview" aria-live="polite">
       <div className="library-import-modal__preview-metrics">
         <div className="library-import-modal__preview-metric">
-          <span className="library-import-modal__preview-label">ASSETS</span>
+          <span className="library-import-modal__preview-label">
+            {t('import.preview.assets', { defaultValue: 'ASSETS' })}
+          </span>
           <span className="library-import-modal__preview-value">
             {(filePreview?.assetCount ?? progress?.total ?? 0).toLocaleString()}
           </span>
         </div>
         <div className="library-import-modal__preview-metric">
-          <span className="library-import-modal__preview-label">TOTAL SIZE</span>
+          <span className="library-import-modal__preview-label">
+            {t('import.preview.total_size', { defaultValue: 'TOTAL SIZE' })}
+          </span>
           <span className="library-import-modal__preview-value">
             {filePreview?.totalSize ?? '0 B'}
           </span>
@@ -185,6 +212,8 @@ function ModalFolderSearchSelect({
   placeholder,
   className,
 }: ModalFolderSearchSelectProps) {
+  const { t } = useTranslation('common');
+
   return (
     <FolderSearchSelect
       className={className}
@@ -193,7 +222,7 @@ function ModalFolderSearchSelect({
       folders={folders}
       value={folderId}
       onValueChange={onFolderChange}
-      emptyMessage="No folders found"
+      emptyMessage={t('folders.no_folders_found', { defaultValue: 'No folders found' })}
       disabled={folderDisabled}
     />
   );
@@ -211,19 +240,21 @@ export function FolderSearchModal({
   onSelectFolder,
   selectFolderDisabled = false,
 }: FolderSearchModalProps) {
+  const { t } = useTranslation('common');
+
   return (
     <Modal
       open={open}
       size="lg"
-      title="Select Folder"
+      title={t('import.select_folder.title', { defaultValue: 'Select Folder' })}
       dialogClassName="library-import-modal__dialog"
       onClose={busy ? undefined : onClose}
       body={
         <ModalBody className="library-import-modal__body library-import-modal__body--folder">
           <ModalFolderSearchSelect
             className="library-import-modal__folder-select"
-            label="Folder"
-            placeholder="Search folders"
+            label={t('folders.folder', { defaultValue: 'Folder' })}
+            placeholder={t('folders.search_folders', { defaultValue: 'Search folders' })}
             folders={folders}
             folderId={folderId}
             onFolderChange={onFolderChange}
@@ -235,14 +266,14 @@ export function FolderSearchModal({
       footer={
         <ModalFooter alignment="end">
           <Button size="lg" variant="secondary" onClick={onClose} disabled={busy}>
-            Cancel
+            {t('common.cancel', { defaultValue: 'Cancel' })}
           </Button>
           <Button
             size="lg"
             onClick={onSelectFolder ?? onClose}
             disabled={busy || selectFolderDisabled}
           >
-            Select Folder
+            {t('import.select_folder.action', { defaultValue: 'Select Folder' })}
           </Button>
         </ModalFooter>
       }
@@ -270,34 +301,45 @@ export function ImportAssetsModal({
   importDisabled = false,
   dragActive = false,
 }: ImportAssetsModalProps) {
-  const dropTitle = busy ? (busyLabel ?? 'Working...') : 'Drag & Drop files here';
+  const { t } = useTranslation('common');
+  const dropTitle = busy
+    ? (busyLabel ?? t('common.working', { defaultValue: 'Working...' }))
+    : t('import.drop_title', { defaultValue: 'Drag & Drop files here' });
   const dropCopy = busy
-    ? 'Please wait'
+    ? t('common.please_wait', { defaultValue: 'Please wait' })
     : filePreview
-      ? 'Review the files, then import when ready'
-      : 'or click to browse files or folders from your machine';
+      ? t('import.review_files_hint', {
+          defaultValue: 'Review the files, then import when ready',
+        })
+      : t('import.browse_files_hint', {
+          defaultValue: 'or click to browse files or folders from your machine',
+        });
 
   return (
     <Modal
       open={open}
       size="lg"
-      title="Import Assets"
+      title={t('import.assets.title', { defaultValue: 'Import Assets' })}
       dialogClassName="library-import-modal__dialog"
       onClose={busy ? undefined : onClose}
       body={
         <ModalBody className="library-import-modal__body library-import-modal__body--assets">
           <ModalFolderSearchSelect
             className="library-import-modal__folder-select"
-            label="Destination Folder"
-            placeholder="Search destination folder"
+            label={t('import.destination_folder', { defaultValue: 'Destination Folder' })}
+            placeholder={t('import.search_destination_folder', {
+              defaultValue: 'Search destination folder',
+            })}
             folders={folders}
             folderId={folderId}
             onFolderChange={onFolderChange}
             folderDisabled={busy || folderDisabled}
           />
           <p className="library-import-modal__supporting-copy">
-            Drag and drop image files or folders here. Supported formats include .png, .jpg, .jpeg,
-            .webp, .bmp, .gif, .tif, and .tiff.
+            {t('import.supported_formats_help', {
+              defaultValue:
+                'Drag and drop image files or folders here. Supported formats include .png, .jpg, .jpeg, .webp, .bmp, .gif, .tif, and .tiff.',
+            })}
           </p>
           <ModalErrorMessage message={errorMessage} />
           <ImportPreviewCard filePreview={filePreview} progress={progress} />
@@ -309,7 +351,7 @@ export function ImportAssetsModal({
             )}
             onClick={onSelectFiles}
             disabled={busy || selectFilesDisabled}
-            aria-label="Select asset files"
+            aria-label={t('import.select_asset_files', { defaultValue: 'Select asset files' })}
             aria-busy={busy}
           >
             <Icon name="file" size="xl" color="brand" hierarchy="tertiary" aria-hidden />
@@ -321,7 +363,7 @@ export function ImportAssetsModal({
       footer={
         <ModalFooter alignment="end">
           <Button size="lg" variant="secondary" onClick={onClose} disabled={busy}>
-            Cancel
+            {t('common.cancel', { defaultValue: 'Cancel' })}
           </Button>
           <Button
             size="lg"
@@ -329,7 +371,7 @@ export function ImportAssetsModal({
             onClick={onSelectFiles ?? onClose}
             disabled={busy || selectFilesDisabled}
           >
-            Select Files
+            {t('import.select_files', { defaultValue: 'Select Files' })}
           </Button>
           <Button
             size="lg"
@@ -337,15 +379,19 @@ export function ImportAssetsModal({
             onClick={onSelectFolders ?? onClose}
             disabled={busy || selectFoldersDisabled}
           >
-            Select Folder
+            {t('import.select_folder.action', { defaultValue: 'Select Folder' })}
           </Button>
           <Button
             size="lg"
             onClick={onImport}
             disabled={busy || importDisabled}
-            aria-label={progress ? 'Import in progress' : 'Import selected assets'}
+            aria-label={
+              progress
+                ? t('import.in_progress', { defaultValue: 'Import in progress' })
+                : t('import.selected_assets', { defaultValue: 'Import selected assets' })
+            }
           >
-            Import
+            {t('common.import', { defaultValue: 'Import' })}
           </Button>
         </ModalFooter>
       }
@@ -366,20 +412,31 @@ export function ImportCompletedModal({
   onDone,
   doneDisabled = false,
 }: ImportCompletedModalProps) {
-  const statusTone = getImportStatusTone(summary);
+  const { t } = useTranslation('common');
+  const resolvedSummary = summary.destinationFolder
+    ? summary
+    : {
+        ...summary,
+        destinationFolder: t('import.search_directories', {
+          defaultValue: 'Search directories...',
+        }),
+      };
+  const statusTone = getImportStatusTone(resolvedSummary);
 
   return (
     <Modal
       open={open}
       size="lg"
-      title="Import Completed"
+      title={t('import.completed.title', { defaultValue: 'Import Completed' })}
       dialogClassName="library-import-modal__dialog"
       onClose={busy ? undefined : onClose}
       body={
         <ModalBody className="library-import-modal__body library-import-modal__body--completed">
           <div className="library-import-modal__summary">
             <div className="library-import-modal__metric">
-              <div className="library-import-modal__metric-label">STATUS</div>
+              <div className="library-import-modal__metric-label">
+                {t('import.metric.status', { defaultValue: 'STATUS' })}
+              </div>
               <div className="library-import-modal__metric-value">
                 <span
                   className={cx(
@@ -388,23 +445,27 @@ export function ImportCompletedModal({
                   )}
                   aria-hidden
                 />
-                <span>{formatImportStatus(summary)}</span>
+                <span>{formatImportStatus(resolvedSummary, t)}</span>
               </div>
             </div>
-            {summary.failedCount > 0 ? (
+            {resolvedSummary.failedCount > 0 ? (
               <div className="library-import-modal__metric">
-                <div className="library-import-modal__metric-label">FAILED</div>
+                <div className="library-import-modal__metric-label">
+                  {t('import.metric.failed', { defaultValue: 'FAILED' })}
+                </div>
                 <div className="library-import-modal__metric-value">
                   <Icon name="file" size="xs" color="brand" hierarchy="tertiary" aria-hidden />
-                  <span>{summary.failedCount.toLocaleString()}</span>
+                  <span>{resolvedSummary.failedCount.toLocaleString()}</span>
                 </div>
               </div>
             ) : null}
             <div className="library-import-modal__metric">
-              <div className="library-import-modal__metric-label">TOTAL SIZE</div>
+              <div className="library-import-modal__metric-label">
+                {t('import.metric.total_size', { defaultValue: 'TOTAL SIZE' })}
+              </div>
               <div className="library-import-modal__metric-value">
                 <Icon name="file" size="xs" color="brand" hierarchy="tertiary" aria-hidden />
-                <span>{summary.totalSize}</span>
+                <span>{resolvedSummary.totalSize}</span>
               </div>
             </div>
           </div>
@@ -412,12 +473,12 @@ export function ImportCompletedModal({
           <div className="library-import-modal__destination">
             <div className="library-import-modal__destination-heading">
               <Icon name="folder" size="sm" hierarchy="tertiary" aria-hidden />
-              <span>Destination Folder</span>
+              <span>{t('import.destination_folder', { defaultValue: 'Destination Folder' })}</span>
             </div>
             <ModalFolderSearchSelect
               className="library-import-modal__folder-select"
-              label="Folder"
-              placeholder={summary.destinationFolder}
+              label={t('folders.folder', { defaultValue: 'Folder' })}
+              placeholder={resolvedSummary.destinationFolder}
               folders={folders}
               folderId={folderId}
               onFolderChange={onFolderChange}
@@ -430,10 +491,10 @@ export function ImportCompletedModal({
       footer={
         <ModalFooter alignment="end">
           <Button size="lg" variant="secondary" onClick={onClose} disabled={busy}>
-            Close
+            {t('common.close', { defaultValue: 'Close' })}
           </Button>
           <Button size="lg" onClick={onDone ?? onClose} disabled={busy || doneDisabled}>
-            Done
+            {t('common.done', { defaultValue: 'Done' })}
           </Button>
         </ModalFooter>
       }

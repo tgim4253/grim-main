@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { cx } from '../../shared/lib/cx';
 import { Icon, IconButton } from '../../shared/ui';
 import type { ExplorerNodeIcon } from './types';
@@ -33,6 +34,7 @@ export function ExplorerTreeRow({
   onAddFolder,
   onRefresh,
 }: ExplorerTreeRowProps) {
+  const { t } = useTranslation('common');
   const chevronName = expanded ? 'chevron-down' : 'chevron-right';
   const chevronHierarchy = expanded ? 'primary' : 'tertiary';
   const iconColor = active ? 'brand' : expanded ? 'brand' : 'text';
@@ -73,18 +75,21 @@ export function ExplorerTreeRow({
       </button>
 
       {showActions ? (
-        <span className="explorer-tree-row__actions" aria-label="Folder actions">
+        <span
+          className="explorer-tree-row__actions"
+          aria-label={t('explorer.folder_actions', { defaultValue: 'Folder actions' })}
+        >
           <IconButton
             icon="folder-plus"
             size="sm"
-            aria-label="Add folder"
+            aria-label={t('explorer.add_folder', { defaultValue: 'Add folder' })}
             disabled={actionsDisabled || !onAddFolder}
             onClick={onAddFolder}
           />
           <IconButton
             icon="reload"
             size="sm"
-            aria-label="Refresh folders"
+            aria-label={t('explorer.refresh_folders', { defaultValue: 'Refresh folders' })}
             disabled={actionsDisabled || !onRefresh}
             onClick={onRefresh}
           />
