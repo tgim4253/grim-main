@@ -438,7 +438,7 @@ export function CroquisStartModal({
             onValueChange={value => {
               setExpandedStepId(typeof value === 'string' ? value : null);
             }}
-            reorderable={!busy && editableSteps.length > 1}
+            reorderable={!busy && editableSteps.length > 0}
             onItemReorder={handleStepReorder}
             className="croquis-start-modal__accordion"
           >

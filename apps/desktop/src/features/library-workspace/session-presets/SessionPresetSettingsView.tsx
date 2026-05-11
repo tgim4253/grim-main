@@ -877,7 +877,7 @@ export function SessionPresetSettingsView() {
                 type="multiple"
                 value={expandedSessionStepIds}
                 onValueChange={handleSessionStepAccordionValueChange}
-                reorderable={sessionSteps.length > 1}
+                reorderable={sessionSteps.length > 0}
                 onItemReorder={handleSessionStepReorder}
                 className="session-preset-settings__timeline-grid"
               >
