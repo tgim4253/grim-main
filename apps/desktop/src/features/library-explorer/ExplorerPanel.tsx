@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { getErrorMessage } from '../../shared/lib/error';
 import { Button } from '../../shared/ui';
 import { ExplorerTreeGroup } from './ExplorerTreeGroup';
 import { FOLDERS_NODE_ID } from './explorerTree';
@@ -18,18 +19,6 @@ function buildDefaultExpandedState(nodes: ExplorerNode[]): Record<string, boolea
 }
 
 const FOLDER_NODE_ID_PREFIX = 'folder:';
-
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  if (typeof error === 'string') {
-    return error;
-  }
-
-  return fallback;
-}
 
 function getFolderIdFromNodeId(nodeId: string) {
   return nodeId.startsWith(FOLDER_NODE_ID_PREFIX)

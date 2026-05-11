@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            WITH requested_asset(id) AS (\n              SELECT CAST(value AS TEXT)\n              FROM json_each(?1)\n            ),\n            asset_record_match AS (\n              SELECT requested.id AS asset_id,\n                     cr.id AS record_id\n              FROM requested_asset requested\n              LEFT JOIN croquis_record cr\n                ON cr.source_asset_id = requested.id\n               AND cr.finished_at IS NOT NULL\n              UNION ALL\n              SELECT requested.id AS asset_id,\n                     cr.id AS record_id\n              FROM requested_asset requested\n              LEFT JOIN croquis_record cr\n                ON cr.result_asset_id = requested.id\n               AND cr.finished_at IS NOT NULL\n               AND (cr.source_asset_id IS NULL OR cr.source_asset_id != requested.id)\n            )\n            SELECT asset_id AS \"asset_id!: String\",\n                   COUNT(record_id) AS \"related_record_count!: i64\"\n            FROM asset_record_match\n            GROUP BY asset_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "asset_id!: String",
+        "ordinal": 0,
+        "type_info": "Null"
+      },
+      {
+        "name": "related_record_count!: i64",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      null,
+      false
+    ]
+  },
+  "hash": "613f9d836593ca57542f42dc961a524ae1982fe9e8ddab06d6f731e50ab44bcf"
+}

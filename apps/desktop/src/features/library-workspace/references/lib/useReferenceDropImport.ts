@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { getErrorMessage } from '../../../../shared/lib/error';
 import { ipc } from '../../../../shared/lib/ipc';
 import type { AssetListSource, ImportFailure, ImportResult } from '../../../../shared/types';
 import {
@@ -29,18 +30,6 @@ const REMOTE_DROP_TYPES = [
   'public.text',
   'public.url',
 ];
-
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  if (typeof error === 'string') {
-    return error;
-  }
-
-  return fallback;
-}
 
 function getImportTargetFolderIds(source: AssetListSource) {
   if (source.kind === 'folder' || source.kind === 'folderDescendants') {

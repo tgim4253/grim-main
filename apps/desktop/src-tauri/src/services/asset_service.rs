@@ -9,7 +9,7 @@ use tokio::fs;
 
 use crate::{
     models::asset::{
-        AssetDetail, AssetListSource, AssetSummary,
+        AssetDetail, AssetListSource, AssetRecordCount, AssetSummary,
         BatchUpdateAssetFoldersMode, BatchUpdateAssetFoldersPayload,
         ImportFailure, ImportPreviewResult, ImportRemoteImagesRequest,
         ImportRequest, ImportResult, UpdateAssetFoldersPayload,
@@ -67,6 +67,13 @@ impl AssetService {
     ) -> Result<Vec<AssetSummary>> {
         let assets = self.asset_repository.list_by_source(source).await?;
         Ok(self.hydrate_asset_summaries(assets).await)
+    }
+
+    pub async fn list_asset_record_counts(
+        &self,
+        source: AssetListSource,
+    ) -> Result<Vec<AssetRecordCount>> {
+        self.asset_repository.list_record_counts_by_source(source).await
     }
 
     pub async fn get_asset(&self, asset_id: &str) -> Result<AssetDetail> {

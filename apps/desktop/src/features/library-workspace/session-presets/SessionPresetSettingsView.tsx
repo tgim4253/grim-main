@@ -9,6 +9,7 @@ import {
   Select,
   type SelectOption,
 } from '../../../shared/ui';
+import { getErrorMessage } from '../../../shared/lib/error';
 import { ipc } from '../../../shared/lib/ipc';
 import type { SessionPreset, Tag, TagGroup, TimeStepPreset } from '../../../shared/types';
 import { findFallbackPreset, setStoredActiveSessionPresetId } from '../../croquis/lib/startModal';
@@ -37,18 +38,6 @@ const NEW_TIME_STEP_PRESET_NAME = 'Untitled Time Step';
 type EditorMode = 'session' | 'time-step';
 type NamedPreset = { id: string; name: string };
 type Translate = (key: string, options?: Record<string, unknown>) => string;
-
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  if (typeof error === 'string') {
-    return error;
-  }
-
-  return fallback;
-}
 
 function formatStepCount(stepCount: number, t: Translate) {
   return t('presets.step_count', {

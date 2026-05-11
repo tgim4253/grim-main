@@ -51,135 +51,14 @@
     font-weight: var(--font-weight-regular);
   }
 
-  .reference-explorer-header {
-    display: flex;
-    flex: none;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 48px;
-    padding: 0 24px;
-    border-bottom: 1px solid var(--semantic-colors-border-secondary);
-    background: var(--semantic-colors-surface-panel);
-  }
-
-  .reference-explorer-header__leading {
-    display: flex;
-    flex: none;
-    align-items: center;
-    gap: 16px;
-    min-width: 0;
-  }
-
-  .reference-explorer-header__filter {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    min-height: 24px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--semantic-colors-text-secondary);
-    font-size: 12px;
-    line-height: 16px;
-    font-weight: var(--font-weight-medium);
-    cursor: pointer;
-  }
-
-  .reference-explorer-header__filter:hover,
-  .reference-explorer-header__filter:focus-visible {
-    color: var(--semantic-colors-text-primary);
-  }
-
-  .reference-explorer-header__filter:focus-visible {
-    border-radius: var(--primitives-radius-05);
-    outline: 2px solid var(--semantic-colors-border-focus);
-    outline-offset: 2px;
-  }
-
-  .reference-explorer-header__divider {
-    width: 1px;
-    height: 16px;
-    background: var(--semantic-colors-border-subtle);
-  }
-
   .reference-explorer-header__count {
     flex: 1 1 auto;
     min-width: 0;
-    margin: 0;
     padding-left: 16px;
-    overflow: hidden;
-    color: var(--semantic-colors-text-tertiary);
-    font-size: 12px;
-    line-height: 16px;
-    font-weight: var(--font-weight-medium);
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
-  .reference-explorer-header__actions {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .reference-selection-toolbar {
-    display: flex;
-    flex: none;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 44px;
-    padding: 0 24px;
-    border-bottom: 1px solid var(--semantic-colors-border-secondary);
-    background: var(--semantic-colors-surface-panel);
-  }
-
-  .reference-selection-toolbar__left,
-  .reference-selection-toolbar__actions {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    min-width: 0;
-  }
-
-  .reference-selection-toolbar__left {
-    gap: 16px;
-  }
-
-  .reference-selection-toolbar__actions {
-    gap: 8px;
-  }
-
-  .reference-selection-toolbar .reference-selection-toolbar__button {
-    align-self: center;
-    min-width: 60px;
-  }
-
-  .reference-selection-toolbar__select-all {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
+  .reference-explorer-filter-panel__checkbox {
     color: var(--semantic-colors-text-primary);
-    font-size: 12px;
-    line-height: 16px;
-    font-weight: var(--font-weight-medium);
-    white-space: nowrap;
-    cursor: pointer;
-  }
-
-  .reference-selection-toolbar__divider {
-    width: 1px;
-    height: 16px;
-    background: var(--semantic-colors-border-subtle);
-  }
-
-  .reference-selection-toolbar__count {
-    color: var(--semantic-colors-text-tertiary);
-    font-size: 12px;
-    line-height: 16px;
-    font-weight: var(--font-weight-medium);
-    white-space: nowrap;
   }
 
   .reference-masonry-tile {

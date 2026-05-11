@@ -1,6 +1,7 @@
 import type {
   AssetDetail,
   AssetListSource,
+  AssetRecordCount,
   AssetSummary,
   BatchUpdateAssetFoldersPayload,
   UpdateAssetFoldersPayload,
@@ -10,6 +11,8 @@ import { invokeCamel, invokeRaw } from './core';
 export const assetIpc = {
   list: (source: AssetListSource): Promise<AssetSummary[]> =>
     invokeCamel('list_assets', { source }),
+  listRecordCounts: (source: AssetListSource): Promise<AssetRecordCount[]> =>
+    invokeCamel('list_asset_record_counts', { source }),
   getDetail: (assetId: string): Promise<AssetDetail> =>
     invokeCamel('get_asset_detail', { assetId }),
   updateFolders: (payload: UpdateAssetFoldersPayload) =>

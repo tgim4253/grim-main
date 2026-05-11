@@ -11,6 +11,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { useTranslation } from 'react-i18next';
 import { formatBytes } from '../../lib/format';
 import { cx } from '../../shared/lib/cx';
+import { getErrorMessage } from '../../shared/lib/error';
 import { ipc } from '../../shared/lib/ipc';
 import type {
   AssetListSource,
@@ -73,18 +74,6 @@ type ImportProgressState = {
   completed: number;
   total: number;
 };
-
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  if (typeof error === 'string') {
-    return error;
-  }
-
-  return fallback;
-}
 
 function getSidebarMaxWidth() {
   if (typeof window === 'undefined') {

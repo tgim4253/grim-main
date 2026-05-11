@@ -38,6 +38,13 @@ pub struct AssetDetail {
     pub last_croquis_at: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetRecordCount {
+    pub asset_id: String,
+    pub related_record_count: i64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum AssetListSource {

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CroquisStartModal } from '../../croquis/ui/CroquisStartModal';
+import { getErrorMessage } from '../../../shared/lib/error';
 import { ipc } from '../../../shared/lib/ipc';
 import type {
   AssetDetail,
   AssetListSource,
+  AssetRecordCount,
   AssetSummary,
   BatchUpdateAssetFoldersMode,
   CroquisRecordDetail,
@@ -45,18 +47,6 @@ type FolderAction = {
   mode: BatchUpdateAssetFoldersMode;
 };
 
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  if (typeof error === 'string') {
-    return error;
-  }
-
-  return fallback;
-}
-
 function getSelectableFolders(snapshot: ExplorerSnapshot) {
   const statsByFolderId = new Map(snapshot.folderStats.map(stats => [stats.folderId, stats]));
 
@@ -81,6 +71,64 @@ function createRelatedRecordDetailMap(
   return detailsById;
 }
 
+function createAssetRecordCountMap(
+  assets: readonly AssetSummary[],
+  recordCounts: readonly AssetRecordCount[],
+) {
+  const assetIds = new Set(assets.map(asset => asset.id));
+  const recordCountsById = new Map(assets.map(asset => [asset.id, 0]));
+
+  for (const recordCount of recordCounts) {
+    if (assetIds.has(recordCount.assetId)) {
+      recordCountsById.set(recordCount.assetId, recordCount.relatedRecordCount);
+    }
+  }
+
+  return recordCountsById;
+}
+
+function mergeCachedAssetDetails(
+  current: Map<string, AssetDetail>,
+  updatedDetails: readonly AssetDetail[],
+) {
+  if (updatedDetails.length === 0 || current.size === 0) {
+    return current;
+  }
+
+  let changed = false;
+  const nextDetailsById = new Map(current);
+
+  for (const detail of updatedDetails) {
+    if (nextDetailsById.has(detail.id)) {
+      nextDetailsById.set(detail.id, detail);
+      changed = true;
+    }
+  }
+
+  return changed ? nextDetailsById : current;
+}
+
+function mergeCachedAssetRecordCounts(
+  current: Map<string, number>,
+  updatedDetails: readonly AssetDetail[],
+) {
+  if (updatedDetails.length === 0 || current.size === 0) {
+    return current;
+  }
+
+  let changed = false;
+  const nextRecordCountsById = new Map(current);
+
+  for (const detail of updatedDetails) {
+    if (nextRecordCountsById.has(detail.id)) {
+      nextRecordCountsById.set(detail.id, detail.relatedRecords.length);
+      changed = true;
+    }
+  }
+
+  return changed ? nextRecordCountsById : current;
+}
+
 function ReferenceGridState({ title, description, action }: ReferenceGridStateProps) {
   return (
     <div className="masonry-grid__empty">
@@ -101,12 +149,21 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [selectedAssetDetail, setSelectedAssetDetail] = useState<AssetDetail | null>(null);
+  const [assetDetailsById, setAssetDetailsById] = useState(() => new Map<string, AssetDetail>());
+  const [assetRecordCountsById, setAssetRecordCountsById] = useState(
+    () => new Map<string, number>(),
+  );
   const [relatedRecordDetailsById, setRelatedRecordDetailsById] = useState(
     () => new Map<string, CroquisRecordDetail>(),
   );
   const [previewOpen, setPreviewOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filterExpanded, setFilterExpanded] = useState(false);
+  const [noRecordFilterSelected, setNoRecordFilterSelected] = useState(false);
+  const [noRecordFilterLoading, setNoRecordFilterLoading] = useState(false);
+  const [noRecordFilterError, setNoRecordFilterError] = useState<string | null>(null);
+  const [noRecordFilterRefreshKey, setNoRecordFilterRefreshKey] = useState(0);
   const [croquisModalOpen, setCroquisModalOpen] = useState(false);
   const [croquisAssetIds, setCroquisAssetIds] = useState<string[]>([]);
   const [sessionPresets, setSessionPresets] = useState<SessionPreset[]>([]);
@@ -125,6 +182,7 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
   const [assetActionError, setAssetActionError] = useState<string | null>(null);
   const loadSequenceRef = useRef(0);
   const selectedAssetDetailLoadSequenceRef = useRef(0);
+  const noRecordFilterLoadSequenceRef = useRef(0);
   const croquisConfigLoadSequenceRef = useRef(0);
   const folderActionLoadSequenceRef = useRef(0);
 
@@ -176,6 +234,34 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
   useEffect(() => {
     const assetIds = new Set(assets.map(asset => asset.id));
     setSelectedAssetIds(current => current.filter(assetId => assetIds.has(assetId)));
+    setAssetDetailsById(current => {
+      let changed = false;
+      const nextDetailsById = new Map<string, AssetDetail>();
+
+      for (const [assetId, detail] of current.entries()) {
+        if (assetIds.has(assetId)) {
+          nextDetailsById.set(assetId, detail);
+        } else {
+          changed = true;
+        }
+      }
+
+      return changed || nextDetailsById.size !== current.size ? nextDetailsById : current;
+    });
+    setAssetRecordCountsById(current => {
+      let changed = false;
+      const nextRecordCountsById = new Map<string, number>();
+
+      for (const [assetId, recordCount] of current.entries()) {
+        if (assetIds.has(assetId)) {
+          nextRecordCountsById.set(assetId, recordCount);
+        } else {
+          changed = true;
+        }
+      }
+
+      return changed || nextRecordCountsById.size !== current.size ? nextRecordCountsById : current;
+    });
   }, [assets]);
 
   const {
@@ -211,6 +297,14 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
         }
 
         setSelectedAssetDetail(detail);
+        setAssetDetailsById(current => new Map(current).set(detail.id, detail));
+        setAssetRecordCountsById(current => {
+          if (!current.has(detail.id)) {
+            return current;
+          }
+
+          return new Map(current).set(detail.id, detail.relatedRecords.length);
+        });
         setRelatedRecordDetailsById(new Map());
 
         const detailResults = await Promise.allSettled(
@@ -241,17 +335,90 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
 
   const items = useMemo(
     () =>
-      assets.map(asset =>
-        createReferenceAsset(
+      assets.map(asset => {
+        const detail =
+          assetDetailsById.get(asset.id) ??
+          (selectedAssetDetail?.id === asset.id ? selectedAssetDetail : undefined);
+
+        return createReferenceAsset(
           asset,
-          selectedAssetDetail?.id === asset.id ? selectedAssetDetail : undefined,
+          detail,
           selectedAssetDetail?.id === asset.id ? relatedRecordDetailsById : undefined,
           t,
           i18n.resolvedLanguage,
-        ),
-      ),
-    [assets, i18n.resolvedLanguage, relatedRecordDetailsById, selectedAssetDetail, t],
+        );
+      }),
+    [
+      assetDetailsById,
+      assets,
+      i18n.resolvedLanguage,
+      relatedRecordDetailsById,
+      selectedAssetDetail,
+      t,
+    ],
   );
+
+  useEffect(() => {
+    if (!noRecordFilterSelected) {
+      noRecordFilterLoadSequenceRef.current += 1;
+      setNoRecordFilterLoading(false);
+      setNoRecordFilterError(null);
+      return;
+    }
+
+    if (assets.length === 0) {
+      setAssetRecordCountsById(new Map());
+      setNoRecordFilterLoading(false);
+      setNoRecordFilterError(null);
+      return;
+    }
+
+    const loadSequence = noRecordFilterLoadSequenceRef.current + 1;
+    noRecordFilterLoadSequenceRef.current = loadSequence;
+    setNoRecordFilterLoading(true);
+    setNoRecordFilterError(null);
+
+    void ipc.asset
+      .listRecordCounts(source)
+      .then(recordCounts => {
+        if (noRecordFilterLoadSequenceRef.current !== loadSequence) {
+          return;
+        }
+
+        setAssetRecordCountsById(createAssetRecordCountMap(assets, recordCounts));
+      })
+      .catch((nextError: unknown) => {
+        if (noRecordFilterLoadSequenceRef.current !== loadSequence) {
+          return;
+        }
+
+        setAssetRecordCountsById(new Map());
+        setNoRecordFilterError(getErrorMessage(nextError, 'Failed to load reference filter data.'));
+      })
+      .finally(() => {
+        if (noRecordFilterLoadSequenceRef.current === loadSequence) {
+          setNoRecordFilterLoading(false);
+        }
+      });
+  }, [assets, noRecordFilterRefreshKey, noRecordFilterSelected, source]);
+
+  const filteredItems = useMemo(() => {
+    if (!noRecordFilterSelected) {
+      return items;
+    }
+
+    if (noRecordFilterLoading || noRecordFilterError) {
+      return [];
+    }
+
+    return items.filter(item => assetRecordCountsById.get(item.id) === 0);
+  }, [
+    assetRecordCountsById,
+    items,
+    noRecordFilterError,
+    noRecordFilterLoading,
+    noRecordFilterSelected,
+  ]);
 
   const gridEmptyState = isLoading ? (
     <ReferenceGridState
@@ -267,9 +434,52 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
         </Button>
       }
     />
+  ) : noRecordFilterLoading ? (
+    <ReferenceGridState title="Loading filter data..." />
+  ) : noRecordFilterError ? (
+    <ReferenceGridState
+      title="Failed to load filter data"
+      description={noRecordFilterError}
+      action={
+        <Button
+          size="sm"
+          onClick={() => {
+            setNoRecordFilterLoading(true);
+            setNoRecordFilterError(null);
+            setNoRecordFilterRefreshKey(current => current + 1);
+          }}
+        >
+          Retry
+        </Button>
+      }
+    />
+  ) : noRecordFilterSelected ? (
+    <ReferenceGridState title="No references without records" />
   ) : (
     <ReferenceGridState title={t('references.empty', { defaultValue: 'No assets in this view' })} />
   );
+
+  useEffect(() => {
+    const itemIds = new Set(filteredItems.map(item => item.id));
+    setSelectedAssetIds(current => current.filter(assetId => itemIds.has(assetId)));
+    if (selectedAssetId && noRecordFilterSelected && !noRecordFilterLoading) {
+      if (!itemIds.has(selectedAssetId)) {
+        setSelectedAssetId(null);
+        setPreviewOpen(false);
+      }
+    }
+  }, [filteredItems, noRecordFilterLoading, noRecordFilterSelected, selectedAssetId]);
+
+  const handleNoRecordFilterChange = useCallback((selected: boolean) => {
+    setNoRecordFilterSelected(selected);
+    if (!selected) {
+      setNoRecordFilterError(null);
+      return;
+    }
+
+    setNoRecordFilterLoading(true);
+    setNoRecordFilterRefreshKey(current => current + 1);
+  }, []);
 
   const handleSelectedAssetChange = (assetId: string) => {
     if (selectionMode) {
@@ -347,19 +557,19 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
           return current;
         }
 
-        return selectedAssetId && assets.some(asset => asset.id === selectedAssetId)
+        return selectedAssetId && filteredItems.some(asset => asset.id === selectedAssetId)
           ? [selectedAssetId]
           : [];
       });
     },
-    [assets, selectedAssetId],
+    [filteredItems, selectedAssetId],
   );
 
   const handleSelectAllChange = useCallback(
     (selected: boolean) => {
-      setSelectedAssetIds(selected ? assets.map(asset => asset.id) : []);
+      setSelectedAssetIds(selected ? filteredItems.map(asset => asset.id) : []);
     },
-    [assets],
+    [filteredItems],
   );
 
   const applyAssetFolderUpdate = useCallback(
@@ -373,6 +583,7 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
           virtualFolderIds,
           mode,
         });
+        const updatedDetailsById = new Map(updatedDetails.map(detail => [detail.id, detail]));
 
         setSelectedAssetDetail(current => {
           if (!selectedAssetId && !current) {
@@ -380,9 +591,11 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
           }
 
           const targetId = current?.id ?? selectedAssetId;
-          const updatedDetail = updatedDetails.find(detail => detail.id === targetId);
+          const updatedDetail = targetId ? updatedDetailsById.get(targetId) : undefined;
           return updatedDetail ?? current;
         });
+        setAssetDetailsById(current => mergeCachedAssetDetails(current, updatedDetails));
+        setAssetRecordCountsById(current => mergeCachedAssetRecordCounts(current, updatedDetails));
         await loadAssets();
         try {
           await onExplorerRefresh?.();
@@ -572,23 +785,31 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
       <div className="references-view-drop-shell" {...dropShellProps}>
         <LibraryWorkspace
           mode="references"
-          items={items}
+          items={filteredItems}
           layout={layout}
           selectedItemId={selectedAssetId ?? undefined}
           selectedItemIds={selectedAssetIds}
           selectionMode={selectionMode}
           gridAriaLabel={t('references.title', { defaultValue: 'References' })}
           previewOpen={previewOpen}
-          gridBusy={isLoading}
+          gridBusy={isLoading || noRecordFilterLoading}
           gridEmptyState={gridEmptyState}
           onLayoutChange={setLayout}
           onSelectedItemChange={handleSelectedAssetChange}
-          renderHeader={headerProps => <ReferenceExplorerHeader {...headerProps} />}
+          renderHeader={headerProps => (
+            <ReferenceExplorerHeader
+              {...headerProps}
+              filterExpanded={filterExpanded}
+              noRecordFilterSelected={noRecordFilterSelected}
+              onFilterExpandedChange={setFilterExpanded}
+              onNoRecordFilterChange={handleNoRecordFilterChange}
+            />
+          )}
           renderToolbar={
             <ReferenceSelectionToolbar
               selectionMode={selectionMode}
               selectedCount={selectedAssetIds.length}
-              totalCount={assets.length}
+              totalCount={filteredItems.length}
               croquisDisabled={isCroquisConfigLoading}
               folderActionsDisabled={assetActionBusy || folderActionModalBusy}
               onSelectionModeChange={handleSelectionModeChange}
