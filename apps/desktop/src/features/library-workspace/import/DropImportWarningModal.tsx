@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button, Modal, ModalBody, ModalFooter } from '../../../shared/ui';
 import './library-import-modal.css';
 
@@ -18,36 +19,52 @@ export function DropImportWarningModal({
   onCancel,
   onContinue,
 }: DropImportWarningModalProps) {
+  const { t } = useTranslation('common');
   const countMessage =
     countIsExact && itemCount !== undefined
-      ? `You dropped ${itemCount.toLocaleString()} items.`
-      : `You dropped more than ${threshold.toLocaleString()} items.`;
+      ? t('import.drop_warning.exact_count', {
+          count: itemCount,
+          formattedCount: itemCount.toLocaleString(),
+          defaultValue: 'You dropped {{formattedCount}} items.',
+        })
+      : t('import.drop_warning.threshold_count', {
+          threshold,
+          formattedThreshold: threshold.toLocaleString(),
+          defaultValue: 'You dropped more than {{formattedThreshold}} items.',
+        });
 
   return (
     <Modal
       open={open}
       size="sm"
-      title="Large Drop Detected"
+      title={t('import.drop_warning.title', { defaultValue: 'Large Drop Detected' })}
       onClose={onCancel}
       closeOnOverlayClick={false}
       body={
         <ModalBody className="library-import-modal__body library-import-modal__body--warning">
           <p className="library-import-modal__warning-copy">
-            {countMessage} Processing more than {threshold.toLocaleString()} items can take a while
-            and may temporarily slow the app.
+            {t('import.drop_warning.processing_hint', {
+              countMessage,
+              threshold,
+              formattedThreshold: threshold.toLocaleString(),
+              defaultValue:
+                '{{countMessage}} Processing more than {{formattedThreshold}} items can take a while and may temporarily slow the app.',
+            })}
           </p>
           <p className="library-import-modal__warning-copy">
-            Continue to process this drop, or cancel before any import starts.
+            {t('import.drop_warning.continue_hint', {
+              defaultValue: 'Continue to process this drop, or cancel before any import starts.',
+            })}
           </p>
         </ModalBody>
       }
       footer={
         <ModalFooter alignment="end">
           <Button size="lg" variant="secondary" onClick={onCancel}>
-            Cancel
+            {t('common.cancel', { defaultValue: 'Cancel' })}
           </Button>
           <Button size="lg" onClick={onContinue}>
-            Continue
+            {t('common.continue', { defaultValue: 'Continue' })}
           </Button>
         </ModalFooter>
       }

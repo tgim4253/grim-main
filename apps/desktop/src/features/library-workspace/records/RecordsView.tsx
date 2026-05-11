@@ -335,8 +335,12 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
     />
   ) : hasActiveFilters ? (
     <RecordGridState
-      title="No records match these filters"
-      description="Try clearing a tag filter."
+      title={t('records.filters.no_matches', {
+        defaultValue: 'No records match these filters',
+      })}
+      description={t('records.filters.clear_tag_hint', {
+        defaultValue: 'Try clearing a tag filter.',
+      })}
     />
   ) : (
     <RecordGridState title={t('records.empty', { defaultValue: 'No records yet' })} />
