@@ -12,8 +12,6 @@
     "core:window:allow-unmaximize",
     "core:window:allow-unminimize",
     "core:window:allow-start-dragging",
-    "dialog:allow-open",
-    "process:default",
-    "updater:default"
+    "dialog:allow-open"
   ]
 }

@@ -15,10 +15,7 @@
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost data: blob:; media-src 'self' asset: http://asset.localhost data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost http://localhost:1420 ws://localhost:1420; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
       "assetProtocol": {
         "enable": true,
-        "scope": [
-          "$APPDATA/library/**",
-          "$APPLOCALDATA/library/**"
-        ]
+        "scope": ["$APPDATA/library/**", "$APPLOCALDATA/library/**"]
       }
     }
   },
@@ -31,18 +28,6 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ],
-    "createUpdaterArtifacts": true
-  },
-  "plugins": {
-    "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERERUI5QTBEMjlGOEI3RTMKUldUanQvZ3BEWnJyM1YxenduMmMzN3NpREphQW42MGlDUlViYUtpODdHZXBOOHh4QTFMQVJGT0MK",
-      "endpoints": [
-        "https://github.com/tgim4253/grim-main/releases/latest/download/latest.json"
-      ],
-      "windows": {
-        "installMode": "passive"
-      }
-    }
+    ]
   }
 }

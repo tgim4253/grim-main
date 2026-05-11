@@ -1,20 +1,5 @@
 {
   "app_name": "GRIM",
   "vault_name": "moa",
-  "back": "이전으로 돌아가기",
-  "settings.title": "설정",
-  "settings.close": "설정 닫기",
-  "settings.current_version": "현재 버전",
-  "settings.check_for_updates": "업데이트 확인",
-  "settings.checking_for_updates": "업데이트 확인 중… {{progress}}%",
-  "settings.language": "언어",
-  "settings.language_help": "표시 언어를 선택합니다.",
-  "settings.done": "완료",
-  "settings.update_status.unsupported": "업데이트 확인은 데스크톱 앱에서 사용할 수 있습니다.",
-  "settings.update_status.up_to_date": "이미 최신 버전입니다.",
-  "settings.update_status.downloading": "업데이트 다운로드 중…",
-  "settings.update_status.downloading_with_progress": "업데이트 다운로드 중… {{progress}}%",
-  "settings.update_status.installing": "업데이트 설치 중…",
-  "settings.update_status.restarting": "앱 재시작 중…",
-  "settings.update_status.error": "업데이트 확인에 실패했습니다."
+  "back": "이전으로 돌아가기"
 }
