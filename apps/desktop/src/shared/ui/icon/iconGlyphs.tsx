@@ -18,6 +18,7 @@ export const ICON_NAMES = [
   'folder-plus',
   'gesture',
   'grid',
+  'grip',
   'help-circle',
   'layers',
   'link-2',
@@ -197,6 +198,19 @@ export const ICON_GLYPHS = {
     </>
   ),
   grid: gridGlyph,
+  grip: (
+    <>
+      <circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="7" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="17" cy="7" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="7" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="17" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="7" cy="17" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="17" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="17" cy="17" r="1.5" fill="currentColor" stroke="none" />
+    </>
+  ),
   'help-circle': helpCircleGlyph,
   layers: (
     <>

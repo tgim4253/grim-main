@@ -236,7 +236,7 @@ export const toSaveSessionPresetPayload = ({
   windowHeight,
   isShuffle,
   autoTagIds: getUniqueTagIds(autoTags),
-  steps: steps.map(step => toSessionPresetStepDraft(step, !duplicate)),
+  steps: normalizeStepOrders(steps).map(step => toSessionPresetStepDraft(step, !duplicate)),
 });
 
 export const toSaveTimeStepPresetPayload = ({

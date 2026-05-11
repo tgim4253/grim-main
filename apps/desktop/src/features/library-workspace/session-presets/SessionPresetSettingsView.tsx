@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  AccordionItem,
+  AccordionItemBody,
+  AccordionItemDragHeader,
+  AccordionRoot,
+  type AccordionReorderPayload,
+  type AccordionReorderPosition,
+  type AccordionRootValue,
   Button,
   CheckboxRow,
   Icon,
@@ -45,6 +52,37 @@ function formatStepCount(stepCount: number, t: Translate) {
     formattedCount: stepCount.toLocaleString(),
     defaultValue: '{{formattedCount}} steps',
   });
+}
+
+function formatAutoTagSummary(autoTags: readonly Tag[], t: Translate) {
+  if (autoTags.length === 0) {
+    return t('croquis.auto_tags.empty', { defaultValue: 'No auto tags' });
+  }
+
+  const visibleTagNames = autoTags.slice(0, 3).map(tag => tag.name);
+  const hiddenTagCount = autoTags.length - visibleTagNames.length;
+
+  return hiddenTagCount > 0
+    ? `${visibleTagNames.join(', ')} +${String(hiddenTagCount)}`
+    : visibleTagNames.join(', ');
+}
+
+function formatStepOptionSummary(step: EditableSessionStep, t: Translate) {
+  const enabledOptions = [
+    step.autoAdvance
+      ? t('presets.step_summary.auto_advance', { defaultValue: 'Auto-advance' })
+      : t('presets.step_summary.manual_advance', { defaultValue: 'Manual advance' }),
+    step.recordSaveEnabled
+      ? t('presets.step_summary.records_save', { defaultValue: 'Records save' })
+      : t('presets.step_summary.records_off', { defaultValue: 'Records off' }),
+    step.captureEnabled ? t('common.capture', { defaultValue: 'Capture' }) : null,
+    step.grayscaleEnabled ? t('croquis.grayscale', { defaultValue: 'Grayscale' }) : null,
+    step.resultRequired
+      ? t('presets.step_summary.result_required', { defaultValue: 'Result required' })
+      : null,
+  ].filter((option): option is string => Boolean(option));
+
+  return enabledOptions.join(' · ');
 }
 
 function getDuplicateName(name: string, fallbackName: string, t: Translate) {
@@ -114,6 +152,9 @@ export function SessionPresetSettingsView() {
   const [sessionIsShuffle, setSessionIsShuffle] = useState(false);
   const [sessionAutoTags, setSessionAutoTags] = useState<Tag[]>([]);
   const [sessionSteps, setSessionSteps] = useState<EditableSessionStep[]>([]);
+  const [collapsedSessionStepIds, setCollapsedSessionStepIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [timeStepName, setTimeStepName] = useState('');
   const [editableTimeStep, setEditableTimeStep] = useState<EditableSessionStep | null>(null);
   const [loading, setLoading] = useState(true);
@@ -130,6 +171,10 @@ export function SessionPresetSettingsView() {
     [timeStepPresets, selectedTimeStepPresetId],
   );
   const editorDisabled = loading || busy;
+  const expandedSessionStepIds = useMemo(
+    () => sessionSteps.filter(step => !collapsedSessionStepIds.has(step.id)).map(step => step.id),
+    [collapsedSessionStepIds, sessionSteps],
+  );
 
   const timeStepPresetOptions: SelectOption[] = useMemo(
     () =>
@@ -152,6 +197,7 @@ export function SessionPresetSettingsView() {
     setSessionIsShuffle(preset?.isShuffle ?? false);
     setSessionAutoTags(preset?.autoTags ?? []);
     setSessionSteps(nextSteps);
+    setCollapsedSessionStepIds(new Set(nextSteps.map(step => step.id)));
   }, []);
 
   const applyTimeStepPresetToEditor = useCallback((preset: TimeStepPreset | null) => {
@@ -204,6 +250,18 @@ export function SessionPresetSettingsView() {
     void loadPresetSettings();
   }, [loadPresetSettings]);
 
+  useEffect(() => {
+    const sessionStepIds = new Set(sessionSteps.map(step => step.id));
+
+    setCollapsedSessionStepIds(current => {
+      const nextCollapsedStepIds = new Set(
+        [...current].filter(stepId => sessionStepIds.has(stepId)),
+      );
+
+      return nextCollapsedStepIds.size === current.size ? current : nextCollapsedStepIds;
+    });
+  }, [sessionSteps]);
+
   const handleSessionPresetSelect = (presetId: string) => {
     const nextPreset = sessionPresets.find(preset => preset.id === presetId) ?? null;
     setError(null);
@@ -235,6 +293,7 @@ export function SessionPresetSettingsView() {
     setSessionIsShuffle(false);
     setSessionAutoTags([]);
     setSessionSteps(nextStep ? [nextStep] : []);
+    setCollapsedSessionStepIds(new Set());
   };
 
   const handleCreateTimeStepPreset = () => {
@@ -263,11 +322,58 @@ export function SessionPresetSettingsView() {
     }
 
     setSessionSteps(normalizeStepOrders([...sessionSteps, nextStep]));
+    setCollapsedSessionStepIds(current => {
+      if (!current.has(nextStep.id)) {
+        return current;
+      }
+
+      const nextCollapsedStepIds = new Set(current);
+      nextCollapsedStepIds.delete(nextStep.id);
+      return nextCollapsedStepIds;
+    });
     setStatus(null);
   };
 
   const handleDeleteSessionStep = (stepId: string) => {
     setSessionSteps(current => normalizeStepOrders(current.filter(step => step.id !== stepId)));
+    setCollapsedSessionStepIds(current => {
+      if (!current.has(stepId)) {
+        return current;
+      }
+
+      const nextCollapsedStepIds = new Set(current);
+      nextCollapsedStepIds.delete(stepId);
+      return nextCollapsedStepIds;
+    });
+    setStatus(null);
+  };
+
+  const reorderSessionStep = (
+    sourceStepId: string,
+    targetStepId: string,
+    position: AccordionReorderPosition,
+  ) => {
+    setSessionSteps(current => {
+      if (sourceStepId === targetStepId) {
+        return current;
+      }
+
+      const sourceIndex = current.findIndex(step => step.id === sourceStepId);
+      const targetIndex = current.findIndex(step => step.id === targetStepId);
+      if (sourceIndex < 0 || targetIndex < 0) {
+        return current;
+      }
+
+      const nextSteps = [...current];
+      const [sourceStep] = nextSteps.splice(sourceIndex, 1);
+      const nextTargetIndex = nextSteps.findIndex(step => step.id === targetStepId);
+      if (nextTargetIndex < 0) {
+        return current;
+      }
+
+      nextSteps.splice(position === 'after' ? nextTargetIndex + 1 : nextTargetIndex, 0, sourceStep);
+      return normalizeStepOrders(nextSteps);
+    });
     setStatus(null);
   };
 
@@ -285,6 +391,20 @@ export function SessionPresetSettingsView() {
       return normalizeStepOrders(nextSteps);
     });
     setStatus(null);
+  };
+
+  const handleSessionStepAccordionValueChange = (value: AccordionRootValue) => {
+    const expandedStepIds = new Set(
+      Array.isArray(value) ? value : typeof value === 'string' ? [value] : [],
+    );
+
+    setCollapsedSessionStepIds(
+      new Set(sessionSteps.map(step => step.id).filter(stepId => !expandedStepIds.has(stepId))),
+    );
+  };
+
+  const handleSessionStepReorder = ({ value, targetValue, position }: AccordionReorderPayload) => {
+    reorderSessionStep(value, targetValue, position);
   };
 
   const handleSessionStepPresetChange = (stepId: string, nextValue: string) => {
@@ -753,77 +873,123 @@ export function SessionPresetSettingsView() {
                 <span>{formatStepCount(sessionSteps.length, t)}</span>
               </div>
 
-              <div className="session-preset-settings__timeline-grid">
-                {sessionSteps.map((step, index) => (
-                  <article key={step.id} className="session-preset-settings__step-card">
-                    <div className="session-preset-settings__step-header">
-                      <span className="session-preset-settings__step-index">
-                        {String(index + 1).padStart(2, '0')}
-                      </span>
-                      <Select
-                        aria-label={t('presets.step_time_step_preset', {
-                          step: String(index + 1),
-                          defaultValue: 'Step {{step}} time step preset',
+              <AccordionRoot
+                type="multiple"
+                value={expandedSessionStepIds}
+                onValueChange={handleSessionStepAccordionValueChange}
+                reorderable={sessionSteps.length > 1}
+                onItemReorder={handleSessionStepReorder}
+                className="session-preset-settings__timeline-grid"
+              >
+                {sessionSteps.map((step, index) => {
+                  const stepNumber = index + 1;
+                  const stepBodyId = `session-preset-step-${step.id}`;
+                  const stepHeaderId = `${stepBodyId}-header`;
+                  const isCollapsed = collapsedSessionStepIds.has(step.id);
+
+                  return (
+                    <AccordionItem
+                      key={step.id}
+                      value={step.id}
+                      className="session-preset-settings__step-card"
+                      disabled={editorDisabled}
+                    >
+                      <AccordionItemDragHeader
+                        id={stepHeaderId}
+                        className="session-preset-settings__step-header"
+                        controlsId={stepBodyId}
+                        disclosureLabel={t(
+                          isCollapsed ? 'presets.expand_step' : 'presets.collapse_step',
+                          {
+                            step: String(stepNumber),
+                            defaultValue: isCollapsed
+                              ? 'Expand step {{step}}'
+                              : 'Collapse step {{step}}',
+                          },
+                        )}
+                        dragLabel={t('presets.drag_step_to_reorder', {
+                          step: String(stepNumber),
+                          defaultValue: 'Drag step {{step}} to reorder',
                         })}
-                        options={timeStepPresetOptions}
-                        value={step.timeStepPresetId ?? ''}
-                        disabled={editorDisabled || timeStepPresetOptions.length === 0}
-                        onValueChange={nextValue => {
-                          handleSessionStepPresetChange(step.id, nextValue);
-                        }}
-                      />
-                      <span className="session-preset-settings__step-duration">
-                        {formatDurationCompact(getStepDuration(step))}
-                      </span>
-                    </div>
-                    <div className="session-preset-settings__step-body">
-                      <SessionPresetStepEditor
-                        step={step}
-                        durationSeconds={getStepDuration(step)}
-                        disabled
-                        onTimerChange={ignoreStepEditorChange}
-                        onAutoAdvanceChange={ignoreStepEditorChange}
-                        onRecordsSaveChange={ignoreStepEditorChange}
-                        onRequireResultChange={ignoreStepEditorChange}
-                        onCaptureChange={ignoreStepEditorChange}
-                        onGrayscaleChange={ignoreStepEditorChange}
-                        onResultSavePathChange={ignoreStepEditorChange}
-                      />
-                      <div className="session-preset-settings__step-actions">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          disabled={editorDisabled || index === 0}
-                          onClick={() => {
-                            handleMoveSessionStep(step.id, -1);
+                      >
+                        <span className="session-preset-settings__step-index">
+                          {String(stepNumber).padStart(2, '0')}
+                        </span>
+                        <Select
+                          aria-label={t('presets.step_time_step_preset', {
+                            step: String(stepNumber),
+                            defaultValue: 'Step {{step}} time step preset',
+                          })}
+                          options={timeStepPresetOptions}
+                          value={step.timeStepPresetId ?? ''}
+                          disabled={editorDisabled || timeStepPresetOptions.length === 0}
+                          onValueChange={nextValue => {
+                            handleSessionStepPresetChange(step.id, nextValue);
                           }}
-                        >
-                          {t('common.move_up', { defaultValue: 'Move Up' })}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          disabled={editorDisabled || index === sessionSteps.length - 1}
-                          onClick={() => {
-                            handleMoveSessionStep(step.id, 1);
-                          }}
-                        >
-                          {t('common.move_down', { defaultValue: 'Move Down' })}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          disabled={editorDisabled}
-                          onClick={() => {
-                            handleDeleteSessionStep(step.id);
-                          }}
-                        >
-                          {t('common.delete', { defaultValue: 'Delete' })}
-                        </Button>
+                        />
+                        <span className="session-preset-settings__step-duration">
+                          {formatDurationCompact(getStepDuration(step))}
+                        </span>
+                      </AccordionItemDragHeader>
+                      <div className="session-preset-settings__step-summary">
+                        <strong>{step.name}</strong>
+                        <span>{formatDurationCompact(getStepDuration(step))}</span>
+                        <span>{formatStepOptionSummary(step, t)}</span>
+                        <span>{formatAutoTagSummary(step.autoTags, t)}</span>
                       </div>
-                    </div>
-                  </article>
-                ))}
+                      <AccordionItemBody
+                        id={stepBodyId}
+                        labelledBy={stepHeaderId}
+                        className="session-preset-settings__step-body"
+                      >
+                        <SessionPresetStepEditor
+                          step={step}
+                          durationSeconds={getStepDuration(step)}
+                          disabled
+                          onTimerChange={ignoreStepEditorChange}
+                          onAutoAdvanceChange={ignoreStepEditorChange}
+                          onRecordsSaveChange={ignoreStepEditorChange}
+                          onRequireResultChange={ignoreStepEditorChange}
+                          onCaptureChange={ignoreStepEditorChange}
+                          onGrayscaleChange={ignoreStepEditorChange}
+                          onResultSavePathChange={ignoreStepEditorChange}
+                        />
+                        <div className="session-preset-settings__step-actions">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={editorDisabled || index === 0}
+                            onClick={() => {
+                              handleMoveSessionStep(step.id, -1);
+                            }}
+                          >
+                            {t('common.move_up', { defaultValue: 'Move Up' })}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={editorDisabled || index === sessionSteps.length - 1}
+                            onClick={() => {
+                              handleMoveSessionStep(step.id, 1);
+                            }}
+                          >
+                            {t('common.move_down', { defaultValue: 'Move Down' })}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            disabled={editorDisabled}
+                            onClick={() => {
+                              handleDeleteSessionStep(step.id);
+                            }}
+                          >
+                            {t('common.delete', { defaultValue: 'Delete' })}
+                          </Button>
+                        </div>
+                      </AccordionItemBody>
+                    </AccordionItem>
+                  );
+                })}
 
                 {sessionSteps.length === 0 ? (
                   <div className="session-preset-settings__empty-detail">
@@ -849,7 +1015,7 @@ export function SessionPresetSettingsView() {
                     <Icon name="plus" size="sm" hierarchy="tertiary" aria-hidden />
                   </button>
                 )}
-              </div>
+              </AccordionRoot>
 
               <section className="session-preset-settings__options-strip">
                 <div className="session-preset-settings__window-grid">
