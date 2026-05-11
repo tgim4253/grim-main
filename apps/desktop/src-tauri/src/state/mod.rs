@@ -44,9 +44,6 @@ impl AppState {
         bootstrap::ensure_schema(&pool)
             .await
             .map_err(|error| error.to_string())?;
-        bootstrap::seed_defaults(&pool)
-            .await
-            .map_err(|error| error.to_string())?;
 
         Ok(Self {
             pool,

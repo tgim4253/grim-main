@@ -739,7 +739,7 @@ mod tests {
         },
         services::{AssetService, FolderService, LibraryStorage},
         state::{
-            bootstrap::{ensure_schema, open_or_create_db, seed_defaults},
+            bootstrap::{ensure_schema, open_or_create_db},
             LibraryPaths,
         },
         utils::media,
@@ -814,7 +814,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let source_path = dir.join("source.bmp");
         fs::write(&source_path, BMP_1X1).expect("failed to write test image");
@@ -868,7 +867,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let source_path = dir.join("source.bmp");
         let missing_path = dir.join("missing.bmp");
@@ -907,7 +905,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let service = AssetService::new(
             AssetRepository::new(pool.clone()),
@@ -988,7 +985,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let service = AssetService::new(
             AssetRepository::new(pool.clone()),
@@ -1034,7 +1030,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let source_path = dir.join("source.bmp");
         let missing_path = dir.join("missing.bmp");
@@ -1073,7 +1068,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let service = AssetService::new(
             AssetRepository::new(pool.clone()),
@@ -1184,7 +1178,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let service = AssetService::new(
             AssetRepository::new(pool.clone()),
@@ -1229,7 +1222,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let folder_service =
             FolderService::new(FolderRepository::new(pool.clone()));
@@ -1297,7 +1289,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let folder_service =
             FolderService::new(FolderRepository::new(pool.clone()));
@@ -1388,7 +1379,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let folder_service =
             FolderService::new(FolderRepository::new(pool.clone()));
@@ -1473,7 +1463,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let folder_service =
             FolderService::new(FolderRepository::new(pool.clone()));
@@ -1535,7 +1524,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let folder_service =
             FolderService::new(FolderRepository::new(pool.clone()));
@@ -1639,7 +1627,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let source_path = dir.join("source.bmp");
         fs::write(&source_path, BMP_1X1).expect("failed to write test image");
@@ -1720,7 +1707,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let source_path = dir.join("source.bmp");
         fs::write(&source_path, BMP_1X1).expect("failed to write test image");
@@ -1770,7 +1756,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let folder_service =
             FolderService::new(FolderRepository::new(pool.clone()));
