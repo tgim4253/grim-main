@@ -440,10 +440,14 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
       }
     />
   ) : noRecordFilterLoading ? (
-    <ReferenceGridState title="Loading filter data..." />
+    <ReferenceGridState
+      title={t('references.filters.loading', { defaultValue: 'Loading filter data...' })}
+    />
   ) : noRecordFilterError ? (
     <ReferenceGridState
-      title="Failed to load filter data"
+      title={t('references.filters.failed_to_load', {
+        defaultValue: 'Failed to load filter data',
+      })}
       description={noRecordFilterError}
       action={
         <Button
@@ -454,12 +458,16 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
             setNoRecordFilterRefreshKey(current => current + 1);
           }}
         >
-          Retry
+          {t('common.retry', { defaultValue: 'Retry' })}
         </Button>
       }
     />
   ) : noRecordFilterSelected ? (
-    <ReferenceGridState title="No references without records" />
+    <ReferenceGridState
+      title={t('references.filters.no_references_without_records', {
+        defaultValue: 'No references without records',
+      })}
+    />
   ) : (
     <ReferenceGridState title={t('references.empty', { defaultValue: 'No assets in this view' })} />
   );
