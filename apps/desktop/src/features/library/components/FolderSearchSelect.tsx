@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Icon,
   Select,
@@ -23,8 +24,6 @@ export type FolderSearchSelectProps = Omit<
   onValueChange?: (folderId: string, folder?: VirtualFolder) => void;
   filterFolders?: FolderSearchFilter;
 };
-
-const DEFAULT_EMPTY_MESSAGE = 'No folders found';
 
 const normalizeSearchText = (value: string) => value.trim().toLocaleLowerCase();
 
@@ -55,12 +54,17 @@ export function FolderSearchSelect({
   defaultValue,
   onValueChange,
   filterFolders = filterFolderSearchOptions,
-  placeholder = 'Search folders',
-  emptyMessage = DEFAULT_EMPTY_MESSAGE,
+  placeholder,
+  emptyMessage,
   searchValue,
   onSearchValueChange,
   ...props
 }: FolderSearchSelectProps) {
+  const { t } = useTranslation('common');
+  const resolvedPlaceholder =
+    placeholder ?? t('folders.search_folders', { defaultValue: 'Search folders' });
+  const resolvedEmptyMessage =
+    emptyMessage ?? t('folders.no_folders_found', { defaultValue: 'No folders found' });
   const folderById = useMemo(() => {
     const nextFolderById = new Map<string, VirtualFolder>();
 
@@ -123,11 +127,11 @@ export function FolderSearchSelect({
       options={options}
       value={resolvedValue}
       onValueChange={handleValueChange}
-      placeholder={placeholder}
+      placeholder={resolvedPlaceholder}
       searchValue={resolvedSearchValue}
       onSearchValueChange={handleSearchValueChange}
       filterOptions={filterOptions}
-      emptyMessage={emptyMessage}
+      emptyMessage={resolvedEmptyMessage}
     />
   );
 }

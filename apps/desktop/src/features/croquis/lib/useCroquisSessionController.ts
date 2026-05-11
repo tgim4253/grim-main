@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { LogicalSize, getCurrentWindow } from '@tauri-apps/api/window';
+import { useTranslation } from 'react-i18next';
 import { ipc } from '../../../shared/lib/ipc';
 import type {
   CroquisRecordDetail,
@@ -11,11 +12,6 @@ import type {
 import { formatSeconds, shuffleItems, timestampNow } from './sessionUtils';
 
 const sessionLoadCache = new Map<string, Promise<CroquisSession | null>>();
-const AUTO_DISMISS_STATUS_MESSAGES = new Set([
-  'Capture saved to the current record.',
-  'Record saved.',
-  'Step complete.',
-]);
 const STATUS_AUTO_DISMISS_MS = 2200;
 
 type UseCroquisSessionControllerParams = {
@@ -23,12 +19,24 @@ type UseCroquisSessionControllerParams = {
 };
 
 export function useCroquisSessionController({ sessionId }: UseCroquisSessionControllerParams) {
+  const { t } = useTranslation('common');
   const [session, setSession] = useState<CroquisSession | null>(null);
   const [queue, setQueue] = useState<CroquisSessionItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [status, setStatus] = useState<string | null>(null);
+  const autoDismissStatusMessages = useMemo(
+    () =>
+      new Set([
+        t('croquis.status.capture_saved', {
+          defaultValue: 'Capture saved to the current record.',
+        }),
+        t('croquis.status.record_saved', { defaultValue: 'Record saved.' }),
+        t('croquis.status.step_complete', { defaultValue: 'Step complete.' }),
+      ]),
+    [t],
+  );
 
   const intervalRef = useRef<number | null>(null);
   const elapsedSecondsRef = useRef(0);
@@ -40,7 +48,9 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
 
   useEffect(() => {
     if (!sessionId) {
-      setStatus('Missing session identifier.');
+      setStatus(
+        t('croquis.error.missing_session_id', { defaultValue: 'Missing session identifier.' }),
+      );
       return;
     }
 
@@ -58,7 +68,11 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
         return;
       }
       if (!payload) {
-        setStatus('Croquis session payload is no longer available.');
+        setStatus(
+          t('croquis.error.payload_unavailable', {
+            defaultValue: 'Croquis session payload is no longer available.',
+          }),
+        );
         return;
       }
 
@@ -79,7 +93,7 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+  }, [sessionId, t]);
 
   const currentItem = currentIndex < queue.length ? queue[currentIndex] : null;
   const currentImageSrc = useMemo(
@@ -91,7 +105,7 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
   const isCaptureEnabled = currentItem?.captureEnabled ?? false;
 
   useEffect(() => {
-    if (status === null || !AUTO_DISMISS_STATUS_MESSAGES.has(status)) {
+    if (status === null || !autoDismissStatusMessages.has(status)) {
       return;
     }
 
@@ -102,7 +116,7 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [status]);
+  }, [autoDismissStatusMessages, status]);
 
   useEffect(() => {
     currentItemRef.current = currentItem;
@@ -211,7 +225,11 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
         const shouldSaveRequiredResult =
           currentItem.recordSaveEnabled && currentItem.resultRequired;
         if (shouldSaveRequiredResult) {
-          setStatus('Saving completed record...');
+          setStatus(
+            t('croquis.status.saving_completed_record', {
+              defaultValue: 'Saving completed record...',
+            }),
+          );
           await finishItem(currentItem, currentTargetSeconds);
         }
 
@@ -222,9 +240,17 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
           return;
         }
 
-        setStatus(shouldSaveRequiredResult ? 'Record saved.' : 'Step complete.');
+        setStatus(
+          shouldSaveRequiredResult
+            ? t('croquis.status.record_saved', { defaultValue: 'Record saved.' })
+            : t('croquis.status.step_complete', { defaultValue: 'Step complete.' }),
+        );
       } catch (error) {
-        setStatus(error instanceof Error ? error.message : 'Failed to save record.');
+        setStatus(
+          error instanceof Error
+            ? error.message
+            : t('croquis.error.save_record', { defaultValue: 'Failed to save record.' }),
+        );
       }
     };
 
@@ -238,6 +264,7 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
     isPlaying,
     queue.length,
     session,
+    t,
   ]);
 
   useEffect(() => {
@@ -293,7 +320,11 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
       try {
         unlisten = await listen<{ recordId: string }>('capture://completed', event => {
           if (event.payload.recordId === currentRecordIdRef.current) {
-            setStatus('Capture saved to the current record.');
+            setStatus(
+              t('croquis.status.capture_saved', {
+                defaultValue: 'Capture saved to the current record.',
+              }),
+            );
           }
         });
       } catch (error) {
@@ -304,7 +335,7 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
     return () => {
       unlisten?.();
     };
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     return () => {
@@ -333,23 +364,33 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
     }
 
     if (!isRecordSaveEnabled) {
-      setStatus('Record saving is disabled for this session.');
+      setStatus(
+        t('croquis.status.record_saving_disabled', {
+          defaultValue: 'Record saving is disabled for this session.',
+        }),
+      );
       return;
     }
 
     if (currentItem.recordId) {
-      setStatus('Record already saved.');
+      setStatus(
+        t('croquis.status.record_already_saved', { defaultValue: 'Record already saved.' }),
+      );
       return;
     }
 
-    setStatus('Saving record...');
+    setStatus(t('croquis.status.saving_record', { defaultValue: 'Saving record...' }));
     try {
       await finishItem(currentItem, elapsedSeconds);
-      setStatus('Record saved.');
+      setStatus(t('croquis.status.record_saved', { defaultValue: 'Record saved.' }));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Failed to save record.');
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : t('croquis.error.save_record', { defaultValue: 'Failed to save record.' }),
+      );
     }
-  }, [currentItem, elapsedSeconds, finishItem, isRecordSaveEnabled]);
+  }, [currentItem, elapsedSeconds, finishItem, isRecordSaveEnabled, t]);
 
   const handleCapture = useCallback(async () => {
     if (currentItem === null || session === null) {
@@ -357,21 +398,37 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
     }
 
     if (!currentItem.recordSaveEnabled) {
-      setStatus('Record saving is disabled for this session.');
+      setStatus(
+        t('croquis.status.record_saving_disabled', {
+          defaultValue: 'Record saving is disabled for this session.',
+        }),
+      );
       return;
     }
 
     if (!currentItem.captureEnabled) {
-      setStatus('Capture is disabled for this session.');
+      setStatus(
+        t('croquis.status.capture_disabled', {
+          defaultValue: 'Capture is disabled for this session.',
+        }),
+      );
       return;
     }
 
     setIsPlaying(false);
-    setStatus('Saving record for capture...');
+    setStatus(
+      t('croquis.status.saving_record_for_capture', {
+        defaultValue: 'Saving record for capture...',
+      }),
+    );
     try {
       const recordId = await finishItem(currentItem, elapsedSeconds);
       if (!recordId) {
-        setStatus('Failed to save record for capture.');
+        setStatus(
+          t('croquis.error.save_record_for_capture', {
+            defaultValue: 'Failed to save record for capture.',
+          }),
+        );
         return;
       }
 
@@ -384,9 +441,13 @@ export function useCroquisSessionController({ sessionId }: UseCroquisSessionCont
       });
       setStatus(null);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Failed to open capture.');
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : t('croquis.error.open_capture', { defaultValue: 'Failed to open capture.' }),
+      );
     }
-  }, [currentItem, currentTargetSeconds, elapsedSeconds, finishItem, session]);
+  }, [currentItem, currentTargetSeconds, elapsedSeconds, finishItem, session, t]);
 
   return {
     currentImageSrc,

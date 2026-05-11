@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { CroquisSession, CroquisSessionItem } from '../../../shared/types';
 
 type CroquisSessionSidebarProps = {
@@ -17,16 +18,22 @@ export function CroquisSessionSidebar({
   session,
   status,
 }: CroquisSessionSidebarProps) {
+  const { t } = useTranslation('common');
+  const optionValue = (value: boolean) =>
+    value ? t('common.on', { defaultValue: 'On' }) : t('common.off', { defaultValue: 'Off' });
+
   return (
     <aside className="croquis-page__sidebar">
       <div className="croquis-panel">
-        <div className="app-kicker">Current Item</div>
+        <div className="app-kicker">
+          {t('croquis.current_item', { defaultValue: 'Current Item' })}
+        </div>
         <strong>{currentItem.fileName}</strong>
         <span>{currentItem.stepName}</span>
       </div>
 
       <div className="croquis-panel">
-        <div className="app-kicker">Timer</div>
+        <div className="app-kicker">{t('croquis.timer', { defaultValue: 'Timer' })}</div>
         <strong className="croquis-page__timer">
           {formatSeconds(
             currentTargetSeconds > 0
@@ -36,19 +43,54 @@ export function CroquisSessionSidebar({
         </strong>
         <span>
           {currentTargetSeconds > 0
-            ? `Target ${formatSeconds(currentTargetSeconds)}`
-            : 'Free timer'}
+            ? t('croquis.target_time', {
+                time: formatSeconds(currentTargetSeconds),
+                defaultValue: 'Target {{time}}',
+              })
+            : t('croquis.free_timer', { defaultValue: 'Free timer' })}
         </span>
       </div>
 
       <div className="croquis-panel">
-        <div className="app-kicker">Session Options</div>
-        <span>Shuffle: {session.isShuffle ? 'On' : 'Off'}</span>
-        <span>Grayscale: {currentItem.grayscaleEnabled ? 'On' : 'Off'}</span>
-        <span>Records Save: {currentItem.recordSaveEnabled ? 'On' : 'Off'}</span>
-        <span>Require Result: {currentItem.resultRequired ? 'On' : 'Off'}</span>
-        <span>Capture: {currentItem.captureEnabled ? 'On' : 'Off'}</span>
-        <span>Auto-advance: {currentItem.autoAdvance ? 'On' : 'Off'}</span>
+        <div className="app-kicker">
+          {t('croquis.session_options', { defaultValue: 'Session Options' })}
+        </div>
+        <span>
+          {t('croquis.option.shuffle', {
+            value: optionValue(session.isShuffle),
+            defaultValue: 'Shuffle: {{value}}',
+          })}
+        </span>
+        <span>
+          {t('croquis.option.grayscale', {
+            value: optionValue(currentItem.grayscaleEnabled),
+            defaultValue: 'Grayscale: {{value}}',
+          })}
+        </span>
+        <span>
+          {t('croquis.option.records_save', {
+            value: optionValue(currentItem.recordSaveEnabled),
+            defaultValue: 'Records Save: {{value}}',
+          })}
+        </span>
+        <span>
+          {t('croquis.option.require_result', {
+            value: optionValue(currentItem.resultRequired),
+            defaultValue: 'Require Result: {{value}}',
+          })}
+        </span>
+        <span>
+          {t('croquis.option.capture', {
+            value: optionValue(currentItem.captureEnabled),
+            defaultValue: 'Capture: {{value}}',
+          })}
+        </span>
+        <span>
+          {t('croquis.option.auto_advance', {
+            value: optionValue(currentItem.autoAdvance),
+            defaultValue: 'Auto-advance: {{value}}',
+          })}
+        </span>
       </div>
 
       {status ? <div className="croquis-inline-status">{status}</div> : null}

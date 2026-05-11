@@ -168,10 +168,13 @@ export const flattenSessionStep = (step: SessionStepPreset): EditableSessionStep
 export const createEditableSteps = (preset: SessionPreset): EditableSessionStep[] =>
   normalizeStepOrders(preset.steps.map(step => flattenSessionStep(step)));
 
-export const createCustomStep = (stepOrder: number): EditableSessionStep => ({
+export const createCustomStep = (
+  stepOrder: number,
+  name = USER_CUSTOM_STEP_LABEL,
+): EditableSessionStep => ({
   id: createStepId(),
   stepOrder,
-  name: USER_CUSTOM_STEP_LABEL,
+  name,
   timeStepPresetId: null,
   defaultDurationSeconds: 180,
   autoTags: [],

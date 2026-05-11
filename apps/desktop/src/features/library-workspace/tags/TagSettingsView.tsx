@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   ChipButton,
@@ -58,6 +59,8 @@ const EMPTY_TAG_INDEX: TagIndex = {
   groups: [],
   tags: [],
 };
+
+type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 function compareBySortOrderThenName(
   first: Pick<Tag | TagGroup, 'name' | 'sortOrder'>,
@@ -121,7 +124,7 @@ function getSelectionKey(selection: TagSettingsSelection) {
   return `${selection.kind}:${selection.id}`;
 }
 
-function getGroupedTags(tagIndex: TagIndex): TagGroupView[] {
+function getGroupedTags(tagIndex: TagIndex, t: Translate): TagGroupView[] {
   const groupedTags = new Map<string | null, Tag[]>();
 
   for (const tag of tagIndex.tags) {
@@ -141,7 +144,7 @@ function getGroupedTags(tagIndex: TagIndex): TagGroupView[] {
   if (ungroupedTags.length > 0) {
     groups.push({
       id: null,
-      name: 'Ungrouped',
+      name: t('tags.ungrouped', { defaultValue: 'Ungrouped' }),
       tags: ungroupedTags,
       synthetic: true,
     });
@@ -150,16 +153,24 @@ function getGroupedTags(tagIndex: TagIndex): TagGroupView[] {
   return groups;
 }
 
-function formatTagCount(tagCount: number) {
-  return `${tagCount.toLocaleString()} TAGS`;
+function formatTagCount(tagCount: number, t: Translate) {
+  return t('tags.count', {
+    count: tagCount,
+    formattedCount: tagCount.toLocaleString(),
+    defaultValue: '{{formattedCount}} TAGS',
+  });
 }
 
-function getPanelTitle(selection: TagSettingsSelection) {
+function getPanelTitle(selection: TagSettingsSelection, t: Translate) {
   if (selection.kind === 'group' || selection.kind === 'new-group') {
-    return selection.kind === 'new-group' ? 'New Group' : 'Tag Group';
+    return selection.kind === 'new-group'
+      ? t('tags.new_group', { defaultValue: 'New Group' })
+      : t('tags.tag_group', { defaultValue: 'Tag Group' });
   }
 
-  return selection.kind === 'new-tag' ? 'New Tag' : 'Tag Detail';
+  return selection.kind === 'new-tag'
+    ? t('tags.new_tag', { defaultValue: 'New Tag' })
+    : t('tags.detail', { defaultValue: 'Tag Detail' });
 }
 
 function TagSettingsState({
@@ -189,6 +200,7 @@ function TagSettingsPreviewPanel({
   onDeleteGroup,
   onDeleteTag,
 }: TagSettingsPreviewPanelProps) {
+  const { t } = useTranslation('common');
   const selectionKey = getSelectionKey(selection);
   const selectedGroup =
     selection.kind === 'group'
@@ -201,14 +213,14 @@ function TagSettingsPreviewPanel({
     () => [
       {
         value: UNGROUPED_GROUP_VALUE,
-        label: 'Ungrouped',
+        label: t('tags.ungrouped', { defaultValue: 'Ungrouped' }),
       },
       ...[...tagIndex.groups].sort(compareBySortOrderThenName).map(group => ({
         value: group.id,
         label: group.name,
       })),
     ],
-    [tagIndex.groups],
+    [t, tagIndex.groups],
   );
   const [name, setName] = useState('');
   const [groupId, setGroupId] = useState<string>(UNGROUPED_GROUP_VALUE);
@@ -257,13 +269,19 @@ function TagSettingsPreviewPanel({
 
     const trimmedName = normalizeName(name);
     if (!trimmedName) {
-      setErrorMessage(isGroupForm ? 'Group name is required.' : 'Tag name is required.');
+      setErrorMessage(
+        isGroupForm
+          ? t('tags.error.group_name_required', { defaultValue: 'Group name is required.' })
+          : t('tags.error.tag_name_required', { defaultValue: 'Tag name is required.' }),
+      );
       return;
     }
 
     const parsedSortOrder = parseSortOrder(sortOrder);
     if (parsedSortOrder === undefined) {
-      setErrorMessage('Sort order must be a number.');
+      setErrorMessage(
+        t('tags.error.sort_order_number', { defaultValue: 'Sort order must be a number.' }),
+      );
       return;
     }
 
@@ -288,7 +306,11 @@ function TagSettingsPreviewPanel({
         sortOrder: parsedSortOrder,
       });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to save tag settings.');
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : t('tags.error.save_settings', { defaultValue: 'Failed to save tag settings.' }),
+      );
     } finally {
       setBusy(false);
     }
@@ -303,8 +325,14 @@ function TagSettingsPreviewPanel({
       setDeleteConfirmationPending(true);
       setErrorMessage(
         selection.kind === 'group'
-          ? 'Click Confirm Delete to delete this group. Tags in the group will be moved to Ungrouped.'
-          : 'Click Confirm Delete to permanently delete this tag. Tags already used by records or session steps cannot be deleted.',
+          ? t('tags.confirm_delete_group_help', {
+              defaultValue:
+                'Click Confirm Delete to delete this group. Tags in the group will be moved to Ungrouped.',
+            })
+          : t('tags.confirm_delete_tag_help', {
+              defaultValue:
+                'Click Confirm Delete to permanently delete this tag. Tags already used by records or session steps cannot be deleted.',
+            }),
       );
       return;
     }
@@ -319,19 +347,25 @@ function TagSettingsPreviewPanel({
         await onDeleteTag(selection.id);
       }
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to delete tag settings.');
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : t('tags.error.delete_settings', { defaultValue: 'Failed to delete tag settings.' }),
+      );
     } finally {
       setBusy(false);
     }
   };
 
   const deleteDisabled = busy || selection.kind === 'new-group' || selection.kind === 'new-tag';
-  const deleteButtonLabel = deleteConfirmationPending ? 'Confirm Delete' : 'Delete';
+  const deleteButtonLabel = deleteConfirmationPending
+    ? t('common.confirm_delete', { defaultValue: 'Confirm Delete' })
+    : t('common.delete', { defaultValue: 'Delete' });
 
   return (
     <PreviewPanel
-      title={getPanelTitle(selection)}
-      ariaLabel="Tag settings detail"
+      title={getPanelTitle(selection, t)}
+      ariaLabel={t('tags.settings_detail', { defaultValue: 'Tag settings detail' })}
       className="tag-settings-preview"
       onClose={onClose}
     >
@@ -344,14 +378,26 @@ function TagSettingsPreviewPanel({
         <section className="tag-settings-preview__section">
           <div className="tag-settings-preview__section-heading">
             <span className="tag-settings-preview__section-marker" aria-hidden />
-            <h3>{isGroupForm ? 'Group Metadata' : 'Tag Metadata'}</h3>
+            <h3>
+              {isGroupForm
+                ? t('tags.group_metadata', { defaultValue: 'Group Metadata' })
+                : t('tags.tag_metadata', { defaultValue: 'Tag Metadata' })}
+            </h3>
           </div>
 
           <div className="tag-settings-preview__fields">
             <Input
-              label={isGroupForm ? 'Group Name' : 'Tag Name'}
+              label={
+                isGroupForm
+                  ? t('tags.group_name', { defaultValue: 'Group Name' })
+                  : t('tags.tag_name', { defaultValue: 'Tag Name' })
+              }
               value={name}
-              placeholder={isGroupForm ? 'Purpose' : 'Pose'}
+              placeholder={
+                isGroupForm
+                  ? t('tags.placeholder.purpose', { defaultValue: 'Purpose' })
+                  : t('tags.placeholder.pose', { defaultValue: 'Pose' })
+              }
               disabled={busy}
               onChange={event => {
                 setName(event.target.value);
@@ -360,7 +406,7 @@ function TagSettingsPreviewPanel({
 
             {!isGroupForm ? (
               <Select
-                label="Group"
+                label={t('tags.group', { defaultValue: 'Group' })}
                 value={groupId}
                 options={groupOptions}
                 disabled={busy}
@@ -370,7 +416,7 @@ function TagSettingsPreviewPanel({
 
             {!isGroupForm ? (
               <Input
-                label="Color"
+                label={t('tags.color', { defaultValue: 'Color' })}
                 value={color}
                 placeholder="#26997b"
                 disabled={busy}
@@ -381,7 +427,7 @@ function TagSettingsPreviewPanel({
             ) : null}
 
             <Input
-              label="Sort Order"
+              label={t('tags.sort_order', { defaultValue: 'Sort Order' })}
               type="number"
               step={1}
               value={sortOrder}
@@ -397,7 +443,7 @@ function TagSettingsPreviewPanel({
 
         <div className="tag-settings-preview__actions">
           <Button type="submit" size="sm" disabled={busy}>
-            Save
+            {t('common.save', { defaultValue: 'Save' })}
           </Button>
           <Button
             type="button"
@@ -417,12 +463,13 @@ function TagSettingsPreviewPanel({
 }
 
 export function TagSettingsView() {
+  const { t } = useTranslation('common');
   const [tagIndex, setTagIndex] = useState<TagIndex>(EMPTY_TAG_INDEX);
   const [selection, setSelection] = useState<TagSettingsSelection | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const groupedTags = useMemo(() => getGroupedTags(tagIndex), [tagIndex]);
+  const groupedTags = useMemo(() => getGroupedTags(tagIndex, t), [tagIndex, t]);
 
   const loadTagIndex = useCallback(async () => {
     setLoading(true);
@@ -431,11 +478,15 @@ export function TagSettingsView() {
     try {
       setTagIndex(await ipc.tag.loadIndex());
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to load tag settings.');
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : t('tags.error.load_settings', { defaultValue: 'Failed to load tag settings.' }),
+      );
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadTagIndex();
@@ -498,26 +549,29 @@ export function TagSettingsView() {
   const selectedGroupId = selection?.kind === 'group' ? selection.id : null;
 
   return (
-    <section className="tag-settings-view" aria-label="Tag settings">
+    <section
+      className="tag-settings-view"
+      aria-label={t('tags.settings.aria_label', { defaultValue: 'Tag settings' })}
+    >
       <div className="tag-settings-view__main">
         <header className="tag-settings-header">
           <div className="tag-settings-header__leading">
-            <h2>Tag Settings</h2>
+            <h2>{t('tags.settings.title', { defaultValue: 'Tag Settings' })}</h2>
             <span className="tag-settings-header__count">
-              {formatTagCount(tagIndex.tags.length)}
+              {formatTagCount(tagIndex.tags.length, t)}
             </span>
           </div>
 
           <div className="tag-settings-header__actions">
             <Button size="sm" variant="ghost" disabled>
               <Icon name="filter" size="sm" hierarchy="tertiary" aria-hidden />
-              Filter
+              {t('common.filter', { defaultValue: 'Filter' })}
             </Button>
             <Button size="sm" variant="ghost" disabled>
-              Sort
+              {t('common.sort', { defaultValue: 'Sort' })}
             </Button>
             <Button size="sm" variant="secondary" disabled>
-              Manage Groups
+              {t('tags.manage_groups', { defaultValue: 'Manage Groups' })}
             </Button>
           </div>
         </header>
@@ -525,21 +579,26 @@ export function TagSettingsView() {
         <div className="tag-settings-view__body">
           {loading ? (
             <TagSettingsState
-              title="Loading tags"
-              description="Tag groups and tags are being loaded."
+              title={t('tags.loading', { defaultValue: 'Loading tags' })}
+              description={t('tags.loading_description', {
+                defaultValue: 'Tag groups and tags are being loaded.',
+              })}
             />
           ) : errorMessage ? (
             <TagSettingsState
-              title="Failed to load tags"
+              title={t('tags.failed_to_load', { defaultValue: 'Failed to load tags' })}
               description={errorMessage}
               action={
                 <Button size="sm" variant="secondary" onClick={() => void loadTagIndex()}>
-                  Retry
+                  {t('common.retry', { defaultValue: 'Retry' })}
                 </Button>
               }
             />
           ) : (
-            <div className="tag-settings-groups" aria-label="Tag groups">
+            <div
+              className="tag-settings-groups"
+              aria-label={t('tags.groups', { defaultValue: 'Tag groups' })}
+            >
               {groupedTags.map(group => (
                 <section key={group.id ?? UNGROUPED_GROUP_VALUE} className="tag-settings-group">
                   <div className="tag-settings-group__header">
@@ -585,7 +644,7 @@ export function TagSettingsView() {
                         setSelection({ kind: 'new-tag', groupId: group.id });
                       }}
                     >
-                      New tag
+                      {t('tags.new_tag_lower', { defaultValue: 'New tag' })}
                     </ChipButton>
                   </div>
                 </section>
@@ -599,7 +658,7 @@ export function TagSettingsView() {
                   setSelection({ kind: 'new-group' });
                 }}
               >
-                Add Group
+                {t('tags.add_group', { defaultValue: 'Add Group' })}
               </Button>
             </div>
           )}

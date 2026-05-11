@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from '../../../shared/ui';
 import type { CroquisSession } from '../../../shared/types';
 
@@ -36,10 +37,14 @@ export function CroquisSessionHeader({
   onMovePrevious,
   onTogglePlayback,
 }: CroquisSessionHeaderProps) {
+  const { t } = useTranslation('common');
+
   return (
     <header className="croquis-page__header">
       <div>
-        <div className="app-kicker">Croquis Session</div>
+        <div className="app-kicker">
+          {t('croquis.session', { defaultValue: 'Croquis Session' })}
+        </div>
         <strong className="croquis-page__title">{session.title}</strong>
         <span className="croquis-page__copy">
           {currentIndex + 1} / {queueLength} · {currentStepName}
@@ -53,22 +58,30 @@ export function CroquisSessionHeader({
             onMovePrevious();
           }}
         >
-          Prev
+          {t('common.prev', { defaultValue: 'Prev' })}
         </Button>
-        <Button onClick={onTogglePlayback}>{isPlaying ? 'Pause' : 'Resume'}</Button>
+        <Button onClick={onTogglePlayback}>
+          {isPlaying
+            ? t('common.pause', { defaultValue: 'Pause' })
+            : t('common.resume', { defaultValue: 'Resume' })}
+        </Button>
         <Button
           disabled={!hasNext}
           onClick={() => {
             onMoveNext();
           }}
         >
-          Next
+          {t('common.next', { defaultValue: 'Next' })}
         </Button>
         <Button disabled={!isRecordSaveEnabled || isCurrentSaved} onClick={() => void onSave()}>
-          {!isRecordSaveEnabled ? 'Save Off' : isCurrentSaved ? 'Saved' : 'Save'}
+          {!isRecordSaveEnabled
+            ? t('croquis.save_off', { defaultValue: 'Save Off' })
+            : isCurrentSaved
+              ? t('common.saved', { defaultValue: 'Saved' })
+              : t('common.save', { defaultValue: 'Save' })}
         </Button>
         <Button disabled={!isCaptureEnabled} onClick={() => void onCapture()}>
-          Capture
+          {t('common.capture', { defaultValue: 'Capture' })}
         </Button>
       </div>
     </header>

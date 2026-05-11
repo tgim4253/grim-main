@@ -1,3 +1,5 @@
+import i18n from '../../../i18n';
+
 export const MAX_DROP_IMAGE_BYTES = 50 * 1024 * 1024;
 export const MAX_DROP_IMAGE_COUNT = 200;
 const MAX_DROP_FILE_CANDIDATES = 1_000;
@@ -229,7 +231,11 @@ export async function fileToDataImageSource(file: File) {
 
   if (file.size > MAX_DROP_IMAGE_BYTES) {
     throw new Error(
-      `${file.name} exceeds the ${String(MAX_DROP_IMAGE_BYTES / 1024 / 1024)} MB image drop limit.`,
+      i18n.t('import.error.image_drop_limit', {
+        fileName: file.name,
+        limitMb: String(MAX_DROP_IMAGE_BYTES / 1024 / 1024),
+        defaultValue: '{{fileName}} exceeds the {{limitMb}} MB image drop limit.',
+      }),
     );
   }
 
@@ -242,24 +248,50 @@ export function formatDroppedImageFileWarnings(collection: DroppedImageFileColle
   const warnings: string[] = [];
 
   if (collection.unsupportedCount > 0) {
-    warnings.push(`${collection.unsupportedCount.toLocaleString()} non-image files skipped`);
+    warnings.push(
+      i18n.t('import.warning.non_image_skipped', {
+        count: collection.unsupportedCount,
+        formattedCount: collection.unsupportedCount.toLocaleString(),
+        defaultValue: '{{formattedCount}} non-image files skipped',
+      }),
+    );
   }
 
   if (collection.oversizedCount > 0) {
     warnings.push(
-      `${collection.oversizedCount.toLocaleString()} images over ${String(MAX_DROP_IMAGE_BYTES / 1024 / 1024)} MB skipped`,
+      i18n.t('import.warning.oversized_skipped', {
+        count: collection.oversizedCount,
+        formattedCount: collection.oversizedCount.toLocaleString(),
+        limitMb: String(MAX_DROP_IMAGE_BYTES / 1024 / 1024),
+        defaultValue: '{{formattedCount}} images over {{limitMb}} MB skipped',
+      }),
     );
   }
 
   if (collection.skippedCount > 0) {
     warnings.push(
-      `${collection.skippedCount.toLocaleString()} images skipped after the ${MAX_DROP_IMAGE_COUNT.toLocaleString()} file limit`,
+      i18n.t('import.warning.count_limit_skipped', {
+        count: collection.skippedCount,
+        formattedCount: collection.skippedCount.toLocaleString(),
+        limit: MAX_DROP_IMAGE_COUNT.toLocaleString(),
+        defaultValue: '{{formattedCount}} images skipped after the {{limit}} file limit',
+      }),
     );
   }
 
   if (collection.truncated) {
-    warnings.push(`folder scan stopped after ${MAX_DROP_FILE_CANDIDATES.toLocaleString()} files`);
+    warnings.push(
+      i18n.t('import.warning.folder_scan_stopped', {
+        limit: MAX_DROP_FILE_CANDIDATES.toLocaleString(),
+        defaultValue: 'folder scan stopped after {{limit}} files',
+      }),
+    );
   }
 
-  return warnings.length > 0 ? `${warnings.join('; ')}.` : null;
+  return warnings.length > 0
+    ? i18n.t('import.warning.joined', {
+        warnings: warnings.join('; '),
+        defaultValue: '{{warnings}}.',
+      })
+    : null;
 }

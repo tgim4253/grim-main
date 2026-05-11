@@ -8,6 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cx } from '../../lib/cx';
 import { IconButton } from '../icon-button/IconButton';
 import './preview-panel.css';
@@ -37,6 +38,7 @@ export function PreviewPanel({
   className,
   onClose,
 }: PreviewPanelProps) {
+  const { t } = useTranslation('common');
   const panelRef = useRef<HTMLElement | null>(null);
   const resizeSessionRef = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(
     null,
@@ -189,7 +191,7 @@ export function PreviewPanel({
       <div
         role="separator"
         tabIndex={0}
-        aria-label="Resize preview panel"
+        aria-label={t('preview_panel.resize', { defaultValue: 'Resize preview panel' })}
         aria-orientation="vertical"
         aria-valuemin={PREVIEW_PANEL_MIN_WIDTH}
         aria-valuemax={Math.round(maxPanelWidth)}
@@ -205,7 +207,15 @@ export function PreviewPanel({
       <header className="preview-panel__header">
         <h2>{title}</h2>
         {onClose ? (
-          <IconButton icon="close" size="sm" aria-label={`Close ${title}`} onClick={onClose} />
+          <IconButton
+            icon="close"
+            size="sm"
+            aria-label={t('preview_panel.close', {
+              title,
+              defaultValue: 'Close {{title}}',
+            })}
+            onClick={onClose}
+          />
         ) : null}
       </header>
       <div className="preview-panel__content">{children}</div>

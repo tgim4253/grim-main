@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CroquisStartModal } from '../../croquis/ui/CroquisStartModal';
 import { ipc } from '../../../shared/lib/ipc';
 import type {
@@ -93,6 +94,7 @@ function ReferenceGridState({ title, description, action }: ReferenceGridStatePr
 }
 
 export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: ReferencesViewProps) {
+  const { i18n, t } = useTranslation('common');
   const [layout, setLayout] = useState<LibraryWorkspaceLayout>('masonry');
   const [assets, setAssets] = useState<AssetSummary[]>([]);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
@@ -154,13 +156,18 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
       setAssets([]);
       setSelectedAssetId(null);
       setPreviewOpen(false);
-      setError(getErrorMessage(nextError, 'Failed to load assets.'));
+      setError(
+        getErrorMessage(
+          nextError,
+          t('references.error.load_assets', { defaultValue: 'Failed to load assets.' }),
+        ),
+      );
     } finally {
       if (loadSequenceRef.current === loadSequence) {
         setIsLoading(false);
       }
     }
-  }, [source]);
+  }, [source, t]);
 
   useEffect(() => {
     void loadAssets();
@@ -239,25 +246,29 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
           asset,
           selectedAssetDetail?.id === asset.id ? selectedAssetDetail : undefined,
           selectedAssetDetail?.id === asset.id ? relatedRecordDetailsById : undefined,
+          t,
+          i18n.resolvedLanguage,
         ),
       ),
-    [assets, relatedRecordDetailsById, selectedAssetDetail],
+    [assets, i18n.resolvedLanguage, relatedRecordDetailsById, selectedAssetDetail, t],
   );
 
   const gridEmptyState = isLoading ? (
-    <ReferenceGridState title="Loading assets..." />
+    <ReferenceGridState
+      title={t('references.loading_assets', { defaultValue: 'Loading assets...' })}
+    />
   ) : error ? (
     <ReferenceGridState
-      title="Failed to load assets"
+      title={t('references.failed_to_load_assets', { defaultValue: 'Failed to load assets' })}
       description={error}
       action={
         <Button size="sm" onClick={() => void loadAssets()}>
-          Retry
+          {t('common.retry', { defaultValue: 'Retry' })}
         </Button>
       }
     />
   ) : (
-    <ReferenceGridState title="No assets in this view" />
+    <ReferenceGridState title={t('references.empty', { defaultValue: 'No assets in this view' })} />
   );
 
   const handleSelectedAssetChange = (assetId: string) => {
@@ -308,7 +319,12 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
       setTagGroups([]);
       setTags([]);
       setCroquisConfigError(
-        getErrorMessage(nextError, 'Failed to load Croquis session configuration.'),
+        getErrorMessage(
+          nextError,
+          t('croquis.error.load_configuration', {
+            defaultValue: 'Failed to load Croquis session configuration.',
+          }),
+        ),
       );
       return false;
     } finally {
@@ -316,7 +332,7 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
         setIsCroquisConfigLoading(false);
       }
     }
-  }, []);
+  }, [t]);
 
   const handleSelectionModeChange = useCallback(
     (nextSelectionMode: boolean) => {
@@ -371,51 +387,71 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
         try {
           await onExplorerRefresh?.();
         } catch (refreshError) {
-          setAssetActionError(getErrorMessage(refreshError, 'Failed to refresh explorer.'));
+          setAssetActionError(
+            getErrorMessage(
+              refreshError,
+              t('explorer.error.refresh', { defaultValue: 'Failed to refresh explorer.' }),
+            ),
+          );
         }
         return true;
       } catch (nextError) {
-        setAssetActionError(getErrorMessage(nextError, 'Failed to update asset folders.'));
+        setAssetActionError(
+          getErrorMessage(
+            nextError,
+            t('references.error.update_asset_folders', {
+              defaultValue: 'Failed to update asset folders.',
+            }),
+          ),
+        );
         return false;
       } finally {
         setAssetActionBusy(false);
       }
     },
-    [loadAssets, onExplorerRefresh, selectedAssetId],
+    [loadAssets, onExplorerRefresh, selectedAssetId, t],
   );
 
-  const openFolderAction = useCallback((action: FolderAction) => {
-    const loadSequence = folderActionLoadSequenceRef.current + 1;
-    folderActionLoadSequenceRef.current = loadSequence;
+  const openFolderAction = useCallback(
+    (action: FolderAction) => {
+      const loadSequence = folderActionLoadSequenceRef.current + 1;
+      folderActionLoadSequenceRef.current = loadSequence;
 
-    setFolderAction(action);
-    setFolderActionFolderId('');
-    setFolderActionFolders([]);
-    setFolderActionError(null);
-    setFolderActionLoading(true);
+      setFolderAction(action);
+      setFolderActionFolderId('');
+      setFolderActionFolders([]);
+      setFolderActionError(null);
+      setFolderActionLoading(true);
 
-    void ipc.library
-      .loadExplorerSnapshot()
-      .then(snapshot => {
-        if (folderActionLoadSequenceRef.current !== loadSequence) {
-          return;
-        }
+      void ipc.library
+        .loadExplorerSnapshot()
+        .then(snapshot => {
+          if (folderActionLoadSequenceRef.current !== loadSequence) {
+            return;
+          }
 
-        setFolderActionFolders(getSelectableFolders(snapshot));
-      })
-      .catch((nextError: unknown) => {
-        if (folderActionLoadSequenceRef.current !== loadSequence) {
-          return;
-        }
+          setFolderActionFolders(getSelectableFolders(snapshot));
+        })
+        .catch((nextError: unknown) => {
+          if (folderActionLoadSequenceRef.current !== loadSequence) {
+            return;
+          }
 
-        setFolderActionError(getErrorMessage(nextError, 'Failed to load folders.'));
-      })
-      .finally(() => {
-        if (folderActionLoadSequenceRef.current === loadSequence) {
-          setFolderActionLoading(false);
-        }
-      });
-  }, []);
+          setFolderActionError(
+            getErrorMessage(
+              nextError,
+              t('folders.error.load', { defaultValue: 'Failed to load folders.' }),
+            ),
+          );
+        })
+        .finally(() => {
+          if (folderActionLoadSequenceRef.current === loadSequence) {
+            setFolderActionLoading(false);
+          }
+        });
+    },
+    [t],
+  );
 
   const handleCloseFolderAction = useCallback(() => {
     folderActionLoadSequenceRef.current += 1;
@@ -445,9 +481,13 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
         return;
       }
 
-      setFolderActionError('Failed to update asset folders.');
+      setFolderActionError(
+        t('references.error.update_asset_folders', {
+          defaultValue: 'Failed to update asset folders.',
+        }),
+      );
     });
-  }, [applyAssetFolderUpdate, folderAction, folderActionFolderId, handleCloseFolderAction]);
+  }, [applyAssetFolderUpdate, folderAction, folderActionFolderId, handleCloseFolderAction, t]);
 
   const handlePreviewAddFolder = useCallback(
     (assetId: string) => {
@@ -537,7 +577,7 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
           selectedItemId={selectedAssetId ?? undefined}
           selectedItemIds={selectedAssetIds}
           selectionMode={selectionMode}
-          gridAriaLabel="References"
+          gridAriaLabel={t('references.title', { defaultValue: 'References' })}
           previewOpen={previewOpen}
           gridBusy={isLoading}
           gridEmptyState={gridEmptyState}
@@ -587,12 +627,19 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
           <div className="reference-drop-overlay" aria-live="polite">
             <div className="reference-drop-overlay__card">
               <span className="reference-drop-overlay__title">
-                {dropImportBusy ? 'Importing assets...' : 'Drop to import references'}
+                {dropImportBusy
+                  ? t('import.importing_assets', { defaultValue: 'Importing assets...' })
+                  : t('references.drop_to_import', { defaultValue: 'Drop to import references' })}
               </span>
               <span className="reference-drop-overlay__copy">
                 {dropImportBusy
-                  ? 'Saving local files and web images to the library.'
-                  : `Local image files and web images are supported. ${dropImportTargetLabel}`}
+                  ? t('references.saving_dropped_assets', {
+                      defaultValue: 'Saving local files and web images to the library.',
+                    })
+                  : t('references.drop_supported_hint', {
+                      target: dropImportTargetLabel,
+                      defaultValue: 'Local image files and web images are supported. {{target}}',
+                    })}
               </span>
             </div>
           </div>

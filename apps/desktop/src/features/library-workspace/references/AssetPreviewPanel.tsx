@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Icon } from '../../../shared/ui/icon/Icon';
 import { PreviewPanel } from '../../../shared/ui/preview-panel/PreviewPanel';
 import { ImagePlaceholder } from '../common/ImagePlaceholder';
@@ -46,6 +47,8 @@ function FolderPathRow({
   busy?: boolean;
   onRemove?: (folderId: string) => void;
 }) {
+  const { t } = useTranslation('common');
+
   return (
     <div className="asset-preview-panel__folder-row">
       <Icon name="folder" size="xs" hierarchy="tertiary" aria-hidden />
@@ -54,7 +57,10 @@ function FolderPathRow({
         <button
           type="button"
           className="asset-preview-panel__folder-remove"
-          aria-label={`Remove ${folder.path}`}
+          aria-label={t('common.remove_label', {
+            label: folder.path,
+            defaultValue: 'Remove {{label}}',
+          })}
           disabled={busy}
           onClick={() => {
             onRemove?.(folder.id);
@@ -76,12 +82,16 @@ function ConnectedImageThumb({
   busy?: boolean;
   onAdd?: () => void;
 }) {
+  const { t } = useTranslation('common');
+
   if (image.tone === 'add') {
     return (
       <button
         type="button"
         className="asset-preview-panel__related-add"
-        aria-label="Start croquis with this asset"
+        aria-label={t('references.start_croquis_with_asset', {
+          defaultValue: 'Start croquis with this asset',
+        })}
         disabled={busy}
         onClick={onAdd}
       >
@@ -118,13 +128,14 @@ export function AssetPreviewPanel({
   onRemoveFolder,
   onStartCroquis,
 }: AssetPreviewPanelProps) {
+  const { t } = useTranslation('common');
   const previewSrc = asset.imageSrc ?? asset.thumbnailSrc;
   const folderItems = asset.folderItems ?? asset.folders.map(path => ({ id: path, path }));
 
   return (
     <PreviewPanel
-      title="Asset Preview"
-      ariaLabel="Asset preview"
+      title={t('references.preview.title', { defaultValue: 'Asset Preview' })}
+      ariaLabel={t('references.preview.aria_label', { defaultValue: 'Asset preview' })}
       className="asset-preview-panel"
       onClose={onClose}
     >
@@ -143,16 +154,29 @@ export function AssetPreviewPanel({
 
       <div className="asset-preview-panel__sections">
         <section className="asset-preview-panel__section">
-          <PreviewSectionHeading>Metadata</PreviewSectionHeading>
+          <PreviewSectionHeading>
+            {t('common.metadata', { defaultValue: 'Metadata' })}
+          </PreviewSectionHeading>
           <dl className="asset-preview-panel__metadata-grid">
-            <PreviewMetadataField label="Resolution" value={asset.metadata.resolution} />
-            <PreviewMetadataField label="Added" value={asset.metadata.addedAt} />
-            <PreviewMetadataField label="Last Croquis Date" value={asset.metadata.lastCroquisAt} />
+            <PreviewMetadataField
+              label={t('references.resolution', { defaultValue: 'Resolution' })}
+              value={asset.metadata.resolution}
+            />
+            <PreviewMetadataField
+              label={t('references.added', { defaultValue: 'Added' })}
+              value={asset.metadata.addedAt}
+            />
+            <PreviewMetadataField
+              label={t('references.last_croquis_date', { defaultValue: 'Last Croquis Date' })}
+              value={asset.metadata.lastCroquisAt}
+            />
           </dl>
         </section>
 
         <section className="asset-preview-panel__section">
-          <PreviewSectionHeading>Folders</PreviewSectionHeading>
+          <PreviewSectionHeading>
+            {t('explorer.folders', { defaultValue: 'Folders' })}
+          </PreviewSectionHeading>
           <div className="asset-preview-panel__folder-list">
             {folderItems.length > 0 ? (
               folderItems.map(folder => (
@@ -166,7 +190,13 @@ export function AssetPreviewPanel({
                 />
               ))
             ) : (
-              <FolderPathRow folder={{ id: 'unassigned', path: 'Unassigned' }} removable={false} />
+              <FolderPathRow
+                folder={{
+                  id: 'unassigned',
+                  path: t('references.unassigned', { defaultValue: 'Unassigned' }),
+                }}
+                removable={false}
+              />
             )}
             <button
               type="button"
@@ -176,7 +206,7 @@ export function AssetPreviewPanel({
                 onAddFolder?.(asset.id);
               }}
             >
-              + Add Folder
+              {t('references.add_folder', { defaultValue: '+ Add Folder' })}
             </button>
           </div>
         </section>

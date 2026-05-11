@@ -12,6 +12,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cx } from '../../lib/cx';
 import { Icon } from '../icon/Icon';
 import './select.css';
@@ -105,7 +106,7 @@ export const Select = forwardRef<HTMLButtonElement | HTMLInputElement, SelectPro
     onOpenChange,
     type = 'default',
     label,
-    placeholder = 'Select',
+    placeholder,
     placeholderLeading,
     className,
     triggerClassName,
@@ -115,7 +116,7 @@ export const Select = forwardRef<HTMLButtonElement | HTMLInputElement, SelectPro
     defaultSearchValue = '',
     onSearchValueChange,
     filterOptions,
-    emptyMessage = 'No results found',
+    emptyMessage,
     disabled = false,
     onClick,
     onKeyDown,
@@ -125,6 +126,7 @@ export const Select = forwardRef<HTMLButtonElement | HTMLInputElement, SelectPro
   },
   ref,
 ) {
+  const { t } = useTranslation('common');
   const triggerId = useId();
   const listboxId = useId();
   const labelId = useId();
@@ -139,6 +141,9 @@ export const Select = forwardRef<HTMLButtonElement | HTMLInputElement, SelectPro
   const isOpenControlled = open !== undefined;
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const resolvedOpen = isOpenControlled ? open : internalOpen;
+  const resolvedPlaceholder = placeholder ?? t('common.select', { defaultValue: 'Select' });
+  const resolvedEmptyMessage =
+    emptyMessage ?? t('common.no_results_found', { defaultValue: 'No results found' });
 
   const isSearchValueControlled = searchValue !== undefined;
   const [internalSearchValue, setInternalSearchValue] = useState(defaultSearchValue);
@@ -452,7 +457,8 @@ export const Select = forwardRef<HTMLButtonElement | HTMLInputElement, SelectPro
     resolvedOpen && highlightedIndex >= 0 && displayedOptions[highlightedIndex]
       ? `${listboxId}-option-${String(highlightedIndex)}`
       : undefined;
-  const searchPlaceholder = typeof placeholder === 'string' ? placeholder : undefined;
+  const searchPlaceholder =
+    typeof resolvedPlaceholder === 'string' ? resolvedPlaceholder : undefined;
 
   return (
     <div
@@ -535,7 +541,7 @@ export const Select = forwardRef<HTMLButtonElement | HTMLInputElement, SelectPro
               <span
                 className={cx('c-select__value', !selectedOption && 'c-select__value--placeholder')}
               >
-                {selectedOption ? selectedOption.label : placeholder}
+                {selectedOption ? selectedOption.label : resolvedPlaceholder}
               </span>
 
               {selectedOption?.supportingText ? (
@@ -638,7 +644,7 @@ export const Select = forwardRef<HTMLButtonElement | HTMLInputElement, SelectPro
               })
             ) : (
               <div className="c-select__empty" role="status">
-                {emptyMessage}
+                {resolvedEmptyMessage}
               </div>
             )}
           </div>
