@@ -57,6 +57,11 @@ export interface AssetSummary {
   updatedAt: string;
 }
 
+export interface AssetRecordCount {
+  assetId: string;
+  relatedRecordCount: number;
+}
+
 export interface CroquisRecordSummary {
   id: string;
   title: string;

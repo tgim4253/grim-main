@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type {
   AssetDetail,
   AssetListSource,
+  AssetRecordCount,
   AssetSummary,
   BatchUpdateAssetFoldersPayload,
   CaptureContext,
@@ -58,6 +59,7 @@ export type IpcCommandContract = {
   search_virtual_folders: CommandContract<{ query: string }, VirtualFolder[]>;
 
   list_assets: CommandContract<{ source: AssetListSource }, AssetSummary[]>;
+  list_asset_record_counts: CommandContract<{ source: AssetListSource }, AssetRecordCount[]>;
   get_asset_detail: CommandContract<{ assetId: string }, AssetDetail>;
   update_asset_folders: CommandContract<{ payload: UpdateAssetFoldersPayload }, AssetDetail>;
   batch_update_asset_folders: CommandContract<

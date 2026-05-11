@@ -50,6 +50,7 @@ pub fn run() {
             commands::folder_commands::delete_virtual_folder,
             commands::folder_commands::search_virtual_folders,
             commands::asset_commands::list_assets,
+            commands::asset_commands::list_asset_record_counts,
             commands::asset_commands::get_asset_detail,
             commands::asset_commands::update_asset_folders,
             commands::asset_commands::batch_update_asset_folders,

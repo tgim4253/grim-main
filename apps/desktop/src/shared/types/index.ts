@@ -16,6 +16,7 @@ export type {
 export type {
   AssetDetail,
   AssetListSource,
+  AssetRecordCount,
   AssetSummary,
   BatchUpdateAssetFoldersMode,
   BatchUpdateAssetFoldersPayload,
