@@ -7,3 +7,4 @@ export {
   type ImportCompletedModalProps,
   type ImportSummary,
 } from './LibraryImportModals';
+export { DropImportWarningModal, type DropImportWarningModalProps } from './DropImportWarningModal';

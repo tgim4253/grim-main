@@ -26,6 +26,11 @@
     gap: var(--semantic-spacing-component-xl);
   }
 
+  .library-import-modal__body--warning {
+    align-content: start;
+    gap: var(--semantic-spacing-component-md);
+  }
+
   .library-import-modal__supporting-copy {
     margin: 0;
     color: var(--semantic-colors-text-secondary);
@@ -33,6 +38,15 @@
     font-size: var(--semantic-typography-body-small-font-size);
     font-weight: var(--semantic-typography-body-small-font-weight);
     line-height: var(--semantic-typography-body-small-line-height);
+  }
+
+  .library-import-modal__warning-copy {
+    margin: 0;
+    color: var(--semantic-colors-text-secondary);
+    font-family: var(--semantic-typography-body-large-font-family);
+    font-size: var(--semantic-typography-body-large-font-size);
+    font-weight: var(--semantic-typography-body-large-font-weight);
+    line-height: var(--semantic-typography-body-large-line-height);
   }
 
   .library-import-modal__error {
