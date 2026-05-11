@@ -100,5 +100,6 @@ jobs:
             - Windows x64 (unsigned)
           releaseDraft: false
           prerelease: false
-          includeUpdaterJson: true
+          uploadUpdaterJson: true
+          uploadUpdaterSignatures: true
           args: ${{ matrix.tauri_args }}
