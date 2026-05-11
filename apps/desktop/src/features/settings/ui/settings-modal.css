@@ -1,6 +1,11 @@
 @layer app {
   .settings-modal {
+    overflow: visible;
     box-shadow: none;
+  }
+
+  .settings-modal .c-modal__body-slot {
+    overflow: visible;
   }
 
   .settings-modal__body {
