@@ -6,6 +6,7 @@ export type PrimaryRailAction =
   | 'open-search'
   | 'open-tag-settings'
   | 'open-preset-settings';
+export type SecondaryRailAction = 'open-account' | 'open-settings';
 
 export type PrimaryRailItem = {
   icon: IconName;
@@ -20,6 +21,7 @@ export type PrimaryRailItem = {
 export type SecondaryRailItem = {
   icon: 'user' | 'setting';
   label: string;
+  action: SecondaryRailAction;
   disabled?: boolean;
 };
 
@@ -27,16 +29,19 @@ type MiniSidebarRailProps = {
   primaryItems: readonly PrimaryRailItem[];
   secondaryItems?: readonly SecondaryRailItem[];
   onPrimaryAction?: (action: PrimaryRailAction, item: PrimaryRailItem) => void;
+  onSecondaryAction?: (action: SecondaryRailAction, item: SecondaryRailItem) => void;
 };
 
 const DEFAULT_SECONDARY_ITEMS: readonly SecondaryRailItem[] = [
   {
     icon: 'user',
     label: 'Account',
+    action: 'open-account',
   },
   {
     icon: 'setting',
     label: 'Settings',
+    action: 'open-settings',
   },
 ];
 
@@ -44,6 +49,7 @@ export function MiniSidebarRail({
   primaryItems,
   secondaryItems = DEFAULT_SECONDARY_ITEMS,
   onPrimaryAction,
+  onSecondaryAction,
 }: MiniSidebarRailProps) {
   return (
     <aside className="mini-sidebar-rail" aria-label="Primary navigation">
@@ -76,6 +82,7 @@ export function MiniSidebarRail({
             size="md"
             icon={item.icon}
             disabled={item.disabled}
+            onClick={() => onSecondaryAction?.(item.action, item)}
           />
         ))}
       </div>

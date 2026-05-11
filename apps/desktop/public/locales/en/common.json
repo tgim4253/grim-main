@@ -1,5 +1,20 @@
 {
   "app_name": "GRIM",
   "vault_name": "moa",
-  "back": ""
+  "back": "",
+  "settings.title": "Settings",
+  "settings.close": "Close settings",
+  "settings.current_version": "Current version",
+  "settings.check_for_updates": "Check for updates",
+  "settings.checking_for_updates": "Checking for updates… {{progress}}%",
+  "settings.language": "Language",
+  "settings.language_help": "Choose the display language.",
+  "settings.done": "Done",
+  "settings.update_status.unsupported": "Update checks are available in the desktop app.",
+  "settings.update_status.up_to_date": "You are already on the latest version.",
+  "settings.update_status.downloading": "Downloading update…",
+  "settings.update_status.downloading_with_progress": "Downloading update… {{progress}}%",
+  "settings.update_status.installing": "Installing update…",
+  "settings.update_status.restarting": "Restarting app…",
+  "settings.update_status.error": "Update failed."
 }

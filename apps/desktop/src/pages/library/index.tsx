@@ -52,8 +52,10 @@ import {
   MiniSidebarRail,
   type PrimaryRailAction,
   type PrimaryRailItem,
+  type SecondaryRailAction,
 } from '../../ui/Sidebar/MiniSidebarRail';
 import { SidebarPanel } from '../../ui/Sidebar/SidebarPanel';
+import { SettingsModal } from '../../features/settings';
 import './library-page.css';
 
 const SIDEBAR_COLLAPSED_WIDTH = 48;
@@ -175,6 +177,7 @@ export function LibraryPage() {
   const [isImportPreviewing, setIsImportPreviewing] = useState(false);
   const [isFilePickerOpen, setIsFilePickerOpen] = useState(false);
   const [isImportDragActive, setIsImportDragActive] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const importInFlightRef = useRef(false);
   const importPreviewInFlightRef = useRef(false);
   const filePickerOpenRef = useRef(false);
@@ -262,6 +265,16 @@ export function LibraryPage() {
         break;
       case 'open-preset-settings':
         setWorkspaceView('preset-settings');
+        break;
+    }
+  };
+
+  const handleSecondaryAction = (action: SecondaryRailAction) => {
+    switch (action) {
+      case 'open-settings':
+        setIsSettingsModalOpen(true);
+        break;
+      case 'open-account':
         break;
     }
   };
@@ -884,7 +897,11 @@ export function LibraryPage() {
         >
           <SidebarPanel
             rail={
-              <MiniSidebarRail primaryItems={primaryItems} onPrimaryAction={handlePrimaryAction} />
+              <MiniSidebarRail
+                primaryItems={primaryItems}
+                onPrimaryAction={handlePrimaryAction}
+                onSecondaryAction={handleSecondaryAction}
+              />
             }
             title="Explorer"
             collapsed={!isSidebarPanelOpen}
@@ -1000,6 +1017,12 @@ export function LibraryPage() {
         onDone={handleCloseImport}
         errorMessage={importError}
         folderDisabled
+      />
+      <SettingsModal
+        open={isSettingsModalOpen}
+        onClose={() => {
+          setIsSettingsModalOpen(false);
+        }}
       />
     </div>
   );

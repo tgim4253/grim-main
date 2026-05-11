@@ -1,5 +1,20 @@
 {
   "app_name": "GRIM",
   "vault_name": "moa",
-  "back": ""
+  "back": "",
+  "settings.title": "設定",
+  "settings.close": "設定を閉じる",
+  "settings.current_version": "現在のバージョン",
+  "settings.check_for_updates": "更新を確認",
+  "settings.checking_for_updates": "更新を確認中… {{progress}}%",
+  "settings.language": "言語",
+  "settings.language_help": "表示言語を選択します。",
+  "settings.done": "完了",
+  "settings.update_status.unsupported": "更新確認はデスクトップアプリで利用できます。",
+  "settings.update_status.up_to_date": "すでに最新バージョンです。",
+  "settings.update_status.downloading": "更新をダウンロード中…",
+  "settings.update_status.downloading_with_progress": "更新をダウンロード中… {{progress}}%",
+  "settings.update_status.installing": "更新をインストール中…",
+  "settings.update_status.restarting": "アプリを再起動中…",
+  "settings.update_status.error": "更新に失敗しました。"
 }
