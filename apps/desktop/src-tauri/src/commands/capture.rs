@@ -1,4 +1,4 @@
-use tauri::State;
+use tauri::{State, WebviewWindow};
 
 use crate::{
     errors::{CommandResult, IntoCommandResult},
@@ -12,11 +12,12 @@ use crate::{
 #[tauri::command]
 pub async fn open_capture_overlay(
     app_handle: tauri::AppHandle,
+    window: WebviewWindow,
     payload: CaptureOverlayPayload,
     capture_service: State<'_, CaptureService>,
 ) -> CommandResult<()> {
     capture_service
-        .open_capture_overlay(&app_handle, payload)
+        .open_capture_overlay(&app_handle, &window, payload)
         .await
         .into_command()
 }
