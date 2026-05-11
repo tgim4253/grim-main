@@ -21,7 +21,8 @@ import type {
 import { Button } from '../../../shared/ui';
 import { LibraryWorkspace } from '../common/LibraryWorkspace';
 import type { LibraryWorkspaceLayout } from '../common/types';
-import { FolderSearchModal } from '../import';
+import { DropImportWarningModal, FolderSearchModal } from '../import';
+import { DROP_IMAGE_WARNING_THRESHOLD } from '../import/dropFileData';
 import { AssetPreviewPanel } from './AssetPreviewPanel';
 import { createReferenceAsset } from './referenceAssets';
 import { ReferenceExplorerHeader } from './ReferenceExplorerHeader';
@@ -266,9 +267,13 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
 
   const {
     dropImportBusy,
+    dropImportPreparing,
     dropImportError,
+    dropImportWarning,
     dropImportTargetLabel,
     dropOverlayVisible,
+    cancelLargeDropImport,
+    continueLargeDropImport,
     dropShellProps,
   } = useReferenceDropImport({
     source,
@@ -850,17 +855,25 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
               <span className="reference-drop-overlay__title">
                 {dropImportBusy
                   ? t('import.importing_assets', { defaultValue: 'Importing assets...' })
-                  : t('references.drop_to_import', { defaultValue: 'Drop to import references' })}
+                  : dropImportPreparing
+                    ? t('references.drop_import.reviewing_assets', {
+                        defaultValue: 'Reviewing dropped assets...',
+                      })
+                    : t('references.drop_to_import', { defaultValue: 'Drop to import references' })}
               </span>
               <span className="reference-drop-overlay__copy">
                 {dropImportBusy
                   ? t('references.saving_dropped_assets', {
                       defaultValue: 'Saving local files and web images to the library.',
                     })
-                  : t('references.drop_supported_hint', {
-                      target: dropImportTargetLabel,
-                      defaultValue: 'Local image files and web images are supported. {{target}}',
-                    })}
+                  : dropImportPreparing
+                    ? t('references.drop_import.counting_assets', {
+                        defaultValue: 'Counting supported image files before import starts.',
+                      })
+                    : t('references.drop_supported_hint', {
+                        target: dropImportTargetLabel,
+                        defaultValue: 'Local image files and web images are supported. {{target}}',
+                      })}
               </span>
             </div>
           </div>
@@ -887,6 +900,14 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
         tagGroups={tagGroups}
         onClose={handleCloseCroquisModal}
         onStarted={handleCroquisStarted}
+      />
+      <DropImportWarningModal
+        open={dropImportWarning !== null}
+        itemCount={dropImportWarning?.itemCount}
+        countIsExact={dropImportWarning?.countIsExact}
+        threshold={DROP_IMAGE_WARNING_THRESHOLD}
+        onCancel={cancelLargeDropImport}
+        onContinue={continueLargeDropImport}
       />
       {statusError ? (
         <div className="reference-croquis-config-error" role="status">

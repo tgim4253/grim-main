@@ -37,18 +37,26 @@ import {
   TagSettingsView,
 } from '../../features/library-workspace';
 import {
+  DropImportWarningModal,
   FolderSearchModal,
   ImportAssetsModal,
   ImportCompletedModal,
   type ImportSummary,
 } from '../../features/library-workspace/import';
 import {
+  DROP_IMAGE_WARNING_THRESHOLD,
   collectSupportedDroppedImageFiles,
+  createDroppedFileDataSource,
   fileToDataImageSource,
   formatDroppedImageFileWarnings,
   hasFileDropData,
+  type DroppedFileDataSource,
   type DroppedImageFileCollection,
 } from '../../features/library-workspace/import/dropFileData';
+import {
+  getDropImportWarning,
+  useDropImportConfirmation,
+} from '../../features/library-workspace/import/lib/dropImportConfirmation';
 import { AppTopBar } from '../../ui/Header/AppTopBar';
 import {
   MiniSidebarRail,
@@ -177,6 +185,13 @@ export function LibraryPage() {
   const importPreviewInFlightRef = useRef(false);
   const filePickerOpenRef = useRef(false);
   const importDomDragDepthRef = useRef(0);
+  const {
+    warning: importDropWarning,
+    requestConfirmation: requestImportDropConfirmation,
+    clearConfirmation: clearImportDropConfirmation,
+    takePendingConfirmation: takePendingImportDropConfirmation,
+    hasPendingConfirmation: hasPendingImportDropConfirmation,
+  } = useDropImportConfirmation<DroppedFileDataSource>();
   const resizeSessionRef = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(
     null,
   );
@@ -329,11 +344,13 @@ export function LibraryPage() {
     setImportPreview(undefined);
     setImportDroppedFiles(undefined);
     setImportProgress(undefined);
+    clearImportDropConfirmation();
     setImportError(assignableFolders.length > 0 ? null : noDestinationFoldersError);
     setImportStep('folder');
     setIsImportDragActive(false);
   }, [
     assignableFolders.length,
+    clearImportDropConfirmation,
     getDefaultImportFolderId,
     isExplorerLoading,
     noDestinationFoldersError,
@@ -343,7 +360,8 @@ export function LibraryPage() {
     if (
       importInFlightRef.current ||
       importPreviewInFlightRef.current ||
-      filePickerOpenRef.current
+      filePickerOpenRef.current ||
+      hasPendingImportDropConfirmation()
     ) {
       return;
     }
@@ -355,9 +373,10 @@ export function LibraryPage() {
     setImportPreview(undefined);
     setImportDroppedFiles(undefined);
     setImportProgress(undefined);
+    clearImportDropConfirmation();
     setIsImportDragActive(false);
     importDomDragDepthRef.current = 0;
-  }, []);
+  }, [clearImportDropConfirmation, hasPendingImportDropConfirmation]);
 
   useEffect(() => {
     if (
@@ -486,9 +505,39 @@ export function LibraryPage() {
     [assignableFolderById, importFolderId, t],
   );
 
+  const applyImportDroppedFileCollection = useCallback(
+    (collection: DroppedImageFileCollection) => {
+      const warningMessage = formatDroppedImageFileWarnings(collection);
+      setImportSummary(undefined);
+      setImportPreview(undefined);
+      setImportDroppedFiles(undefined);
+      setImportProgress(undefined);
+
+      if (collection.files.length === 0) {
+        setImportError(
+          warningMessage ??
+            t('import.error.no_supported_images', {
+              defaultValue: 'No supported image files were found.',
+            }),
+        );
+        setImportStep('assets');
+        return;
+      }
+
+      setImportDroppedFiles(collection.files);
+      setImportError(warningMessage);
+      setImportStep('assets');
+    },
+    [t],
+  );
+
   const previewImportDroppedFiles = useCallback(
-    async (collectionPromise: Promise<DroppedImageFileCollection>) => {
-      if (importInFlightRef.current || importPreviewInFlightRef.current) {
+    async (source: DroppedFileDataSource) => {
+      if (
+        importInFlightRef.current ||
+        importPreviewInFlightRef.current ||
+        hasPendingImportDropConfirmation()
+      ) {
         return;
       }
 
@@ -522,22 +571,15 @@ export function LibraryPage() {
       setImportProgress(undefined);
 
       try {
-        const collection = await collectionPromise;
-        const warningMessage = formatDroppedImageFileWarnings(collection);
-        if (collection.files.length === 0) {
-          setImportError(
-            warningMessage ??
-              t('import.error.no_supported_images', {
-                defaultValue: 'No supported image files were found.',
-              }),
-          );
+        const dropWarning = await getDropImportWarning({ localSource: source });
+        if (dropWarning) {
+          requestImportDropConfirmation(source, dropWarning);
           setImportStep('assets');
           return;
         }
 
-        setImportDroppedFiles(collection.files);
-        setImportError(warningMessage);
-        setImportStep('assets');
+        const collection = await collectSupportedDroppedImageFiles(source);
+        applyImportDroppedFileCollection(collection);
       } catch (error) {
         setImportError(
           getErrorMessage(
@@ -555,8 +597,56 @@ export function LibraryPage() {
         importDomDragDepthRef.current = 0;
       }
     },
-    [assignableFolderById, importFolderId, t],
+    [
+      applyImportDroppedFileCollection,
+      assignableFolderById,
+      hasPendingImportDropConfirmation,
+      importFolderId,
+      requestImportDropConfirmation,
+      t,
+    ],
   );
+
+  const handleContinueLargeImportDrop = useCallback(() => {
+    const source = takePendingImportDropConfirmation();
+
+    if (!source || importInFlightRef.current || importPreviewInFlightRef.current) {
+      return;
+    }
+
+    importPreviewInFlightRef.current = true;
+    setIsImportPreviewing(true);
+    setImportError(null);
+    setImportProgress(undefined);
+
+    void (async () => {
+      try {
+        const collection = await collectSupportedDroppedImageFiles(source);
+        applyImportDroppedFileCollection(collection);
+      } catch (error) {
+        setImportError(
+          getErrorMessage(
+            error,
+            t('import.error.review_dropped_files', {
+              defaultValue: 'Failed to review dropped files.',
+            }),
+          ),
+        );
+        setImportStep('assets');
+      } finally {
+        importPreviewInFlightRef.current = false;
+        setIsImportPreviewing(false);
+        setIsImportDragActive(false);
+        importDomDragDepthRef.current = 0;
+      }
+    })();
+  }, [applyImportDroppedFileCollection, t, takePendingImportDropConfirmation]);
+
+  const handleCancelLargeImportDrop = useCallback(() => {
+    clearImportDropConfirmation();
+    setIsImportDragActive(false);
+    importDomDragDepthRef.current = 0;
+  }, [clearImportDropConfirmation]);
 
   const handleImportPreviewedFiles = useCallback(() => {
     if (importInFlightRef.current || importPreviewInFlightRef.current) {
@@ -785,7 +875,13 @@ export function LibraryPage() {
   }, [previewImportFilePaths, t]);
 
   useEffect(() => {
-    if (importStep !== 'assets' || isImporting || isImportPreviewing || isFilePickerOpen) {
+    if (
+      importStep !== 'assets' ||
+      isImporting ||
+      isImportPreviewing ||
+      isFilePickerOpen ||
+      importDropWarning
+    ) {
       setIsImportDragActive(false);
       importDomDragDepthRef.current = 0;
       return undefined;
@@ -837,10 +933,10 @@ export function LibraryPage() {
 
       event.preventDefault();
       event.stopPropagation();
-      const collectionPromise = collectSupportedDroppedImageFiles(dataTransfer);
+      const source = createDroppedFileDataSource(dataTransfer);
       importDomDragDepthRef.current = 0;
       setIsImportDragActive(false);
-      void previewImportDroppedFiles(collectionPromise);
+      void previewImportDroppedFiles(source);
     };
 
     document.addEventListener('dragenter', handleDocumentDragEnter, true);
@@ -855,7 +951,14 @@ export function LibraryPage() {
       document.removeEventListener('drop', handleDocumentDrop, true);
       importDomDragDepthRef.current = 0;
     };
-  }, [importStep, isFilePickerOpen, isImportPreviewing, isImporting, previewImportDroppedFiles]);
+  }, [
+    importDropWarning,
+    importStep,
+    isFilePickerOpen,
+    isImportPreviewing,
+    isImporting,
+    previewImportDroppedFiles,
+  ]);
 
   const handleSplitterPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -972,7 +1075,7 @@ export function LibraryPage() {
     width: `${String(resolvedSidebarWidth)}px`,
     minWidth: `${String(resolvedSidebarWidth)}px`,
   };
-  const importBusy = isImporting || isImportPreviewing;
+  const importBusy = isImporting || isImportPreviewing || importDropWarning !== null;
   const importFilePreview = importPreview
     ? {
         assetCount: importPreview.assetCount,
@@ -1126,6 +1229,14 @@ export function LibraryPage() {
         onDone={handleCloseImport}
         errorMessage={importError}
         folderDisabled
+      />
+      <DropImportWarningModal
+        open={importDropWarning !== null}
+        itemCount={importDropWarning?.itemCount}
+        countIsExact={importDropWarning?.countIsExact}
+        threshold={DROP_IMAGE_WARNING_THRESHOLD}
+        onCancel={handleCancelLargeImportDrop}
+        onContinue={handleContinueLargeImportDrop}
       />
       <SettingsModal
         open={isSettingsModalOpen}
