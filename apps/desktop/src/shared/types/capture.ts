@@ -5,6 +5,7 @@ export interface CaptureRect {
   height: number;
 }
 
+// Bounds are expressed in logical screen points, matching browser event coordinates.
 export interface CaptureMonitor {
   x: number;
   y: number;

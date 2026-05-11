@@ -20,7 +20,7 @@ pub struct CaptureContext {
 
 pub type CaptureOverlayPayload = CaptureContext;
 
-/// Monitor bounds reported by the renderer when preparing a capture.
+/// Logical monitor bounds reported by the renderer when preparing a capture.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CaptureMonitor {

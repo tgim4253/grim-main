@@ -17,6 +17,8 @@ type PointerPoint = {
   y: number;
 };
 
+type TauriMonitor = NonNullable<Awaited<ReturnType<typeof currentMonitor>>>;
+
 const MIN_SELECTION_SIZE = 12;
 const IDLE_OVERLAY_COLOR = 'rgba(0, 0, 0, 0.35)';
 const ACTIVE_OVERLAY_COLOR = 'rgba(0, 0, 0, 0)';
@@ -37,6 +39,50 @@ const normaliseRect = (rect: CaptureRect, monitor: CaptureMonitor): CaptureRect 
   const height = Math.max(1, Math.min(rect.height, monitor.height - y));
 
   return { x, y, width, height };
+};
+
+const normaliseScaleFactor = (scaleFactor: number): number => {
+  if (Number.isFinite(scaleFactor) && scaleFactor > 0) {
+    return scaleFactor;
+  }
+
+  const fallbackScale = window.devicePixelRatio || 1;
+  return Number.isFinite(fallbackScale) && fallbackScale > 0 ? fallbackScale : 1;
+};
+
+const createCaptureMonitor = (current: TauriMonitor): CaptureMonitor => {
+  const scaleFactor = normaliseScaleFactor(current.scaleFactor);
+  const position = current.position.toLogical(scaleFactor);
+  const size = current.size.toLogical(scaleFactor);
+
+  return {
+    x: Math.round(position.x),
+    y: Math.round(position.y),
+    width: Math.max(1, Math.round(size.width)),
+    height: Math.max(1, Math.round(size.height)),
+    scaleFactor,
+  };
+};
+
+const createViewportCaptureMonitor = (): CaptureMonitor => ({
+  x: 0,
+  y: 0,
+  width: Math.max(1, Math.round(window.innerWidth)),
+  height: Math.max(1, Math.round(window.innerHeight)),
+  scaleFactor: normaliseScaleFactor(window.devicePixelRatio || 1),
+});
+
+const resolveLogicalWindowOffset = (
+  position: Awaited<ReturnType<ReturnType<typeof getCurrentWindow>['innerPosition']>>,
+  monitor: CaptureMonitor,
+): PointerPoint => {
+  const scaleFactor = normaliseScaleFactor(monitor.scaleFactor);
+  const logicalPosition = position.toLogical(scaleFactor);
+
+  return {
+    x: logicalPosition.x - monitor.x,
+    y: logicalPosition.y - monitor.y,
+  };
 };
 
 const waitForOverlayPaint = () =>
@@ -135,38 +181,14 @@ export function CaptureOverlay() {
           return;
         }
 
-        if (current) {
-          setMonitor({
-            x: current.position.x,
-            y: current.position.y,
-            width: current.size.width,
-            height: current.size.height,
-            scaleFactor: current.scaleFactor,
-          });
-        } else {
-          const scale = window.devicePixelRatio || 1;
-          setMonitor({
-            x: 0,
-            y: 0,
-            width: Math.round(window.innerWidth * scale),
-            height: Math.round(window.innerHeight * scale),
-            scaleFactor: scale,
-          });
-        }
+        setMonitor(current ? createCaptureMonitor(current) : createViewportCaptureMonitor());
         setPhase('selecting');
       } catch (nextError) {
         if (cancelled) {
           return;
         }
 
-        const scale = window.devicePixelRatio || 1;
-        setMonitor({
-          x: 0,
-          y: 0,
-          width: Math.round(window.innerWidth * scale),
-          height: Math.round(window.innerHeight * scale),
-          scaleFactor: scale,
-        });
+        setMonitor(createViewportCaptureMonitor());
         setPhase('selecting');
         setError(
           nextError instanceof Error
@@ -196,10 +218,7 @@ export function CaptureOverlay() {
           return;
         }
 
-        setWindowOffset({
-          x: position.x - monitor.x,
-          y: position.y - monitor.y,
-        });
+        setWindowOffset(resolveLogicalWindowOffset(position, monitor));
       } catch (nextError) {
         console.warn('Failed to resolve capture window offset', nextError);
         if (!cancelled) {
@@ -267,19 +286,19 @@ export function CaptureOverlay() {
         let offsetY = windowOffset.y;
         try {
           const position = await windowRef.current.innerPosition();
-          offsetX = position.x - monitor.x;
-          offsetY = position.y - monitor.y;
+          const nextWindowOffset = resolveLogicalWindowOffset(position, monitor);
+          offsetX = nextWindowOffset.x;
+          offsetY = nextWindowOffset.y;
           setWindowOffset({ x: offsetX, y: offsetY });
         } catch (nextError) {
           console.warn('Failed to refresh capture window offset', nextError);
         }
 
-        const scale = monitor.scaleFactor > 0 ? monitor.scaleFactor : window.devicePixelRatio || 1;
         const rect = completedSelection;
         const logicalRect = normaliseRect(
           {
-            x: Math.round(rect.x + offsetX / scale),
-            y: Math.round(rect.y + offsetY / scale),
+            x: Math.round(rect.x + offsetX),
+            y: Math.round(rect.y + offsetY),
             width: Math.round(rect.width),
             height: Math.round(rect.height),
           },

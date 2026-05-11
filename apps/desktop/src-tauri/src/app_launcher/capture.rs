@@ -1,4 +1,4 @@
-use tauri::{window::Color, Manager, WebviewUrl};
+use tauri::{window::Color, Manager, Monitor, WebviewUrl, WebviewWindow};
 #[cfg(target_os = "macos")]
 use tauri_plugin_decorum::WebviewWindowExt;
 
@@ -7,6 +7,7 @@ use crate::models::capture::CaptureOverlayPayload;
 /// Launch the transparent capture overlay window used across the app.
 pub fn launch_capture_overlay(
     app: &tauri::AppHandle,
+    source_window: &WebviewWindow,
     payload: &CaptureOverlayPayload,
 ) -> Result<String, String> {
     let mut params = Vec::new();
@@ -57,8 +58,14 @@ pub fn launch_capture_overlay(
     let window_label = "library-capture".to_string();
 
     if let Some(existing) = app.get_webview_window(&window_label) {
-        let _ = existing.close();
+        existing.destroy().map_err(|err| {
+            format!("Failed to close existing capture overlay: {err}")
+        })?;
     }
+
+    let target_monitor = source_window.current_monitor().map_err(|err| {
+        format!("Failed to resolve source window monitor: {err}")
+    })?;
 
     let mut builder =
         tauri::WebviewWindowBuilder::new(app, window_label.clone(), url)
@@ -66,8 +73,16 @@ pub fn launch_capture_overlay(
             .resizable(false)
             .maximizable(false)
             .always_on_top(true)
-            .background_color(Color(0, 0, 0, 0))
-            .maximized(true);
+            .background_color(Color(0, 0, 0, 0));
+
+    if let Some(monitor) = target_monitor.as_ref() {
+        let bounds = logical_monitor_bounds(monitor);
+        builder = builder
+            .position(bounds.x, bounds.y)
+            .inner_size(bounds.width, bounds.height);
+    } else {
+        builder = builder.maximized(true);
+    }
 
     #[cfg(target_os = "macos")]
     {
@@ -91,6 +106,34 @@ pub fn launch_capture_overlay(
     }
 
     Ok(window_label)
+}
+
+struct LogicalMonitorBounds {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+}
+
+fn logical_monitor_bounds(monitor: &Monitor) -> LogicalMonitorBounds {
+    let scale_factor = normalise_scale_factor(monitor.scale_factor());
+    let position = monitor.position();
+    let size = monitor.size();
+
+    LogicalMonitorBounds {
+        x: position.x as f64 / scale_factor,
+        y: position.y as f64 / scale_factor,
+        width: (size.width as f64 / scale_factor).max(1.0),
+        height: (size.height as f64 / scale_factor).max(1.0),
+    }
+}
+
+fn normalise_scale_factor(scale_factor: f64) -> f64 {
+    if scale_factor.is_finite() && scale_factor > 0.0 {
+        scale_factor
+    } else {
+        1.0
+    }
 }
 
 fn push_query_param(params: &mut Vec<String>, key: &str, value: &str) {
