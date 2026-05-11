@@ -5,10 +5,17 @@ import { ipc } from '../../../../shared/lib/ipc';
 import type { AssetListSource, ImportFailure, ImportResult } from '../../../../shared/types';
 import {
   collectSupportedDroppedImageFiles,
+  createDroppedFileDataSource,
   fileToDataImageSource,
   formatDroppedImageFileWarnings,
   hasFileDropData,
+  type DroppedFileDataSource,
+  type DroppedImageFileCollection,
 } from '../../import/dropFileData';
+import {
+  getDropImportWarning,
+  useDropImportConfirmation,
+} from '../../import/lib/dropImportConfirmation';
 
 type UseReferenceDropImportParams = {
   source: AssetListSource;
@@ -17,6 +24,16 @@ type UseReferenceDropImportParams = {
 };
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+type DropImportPayload = {
+  imageCollection: DroppedImageFileCollection;
+  remoteSources: string[];
+};
+
+type PendingDropImport = {
+  localSource: DroppedFileDataSource | null;
+  remoteSources: string[];
+};
 
 const REMOTE_DROP_TYPES = [
   'text/html',
@@ -220,6 +237,26 @@ function formatProcessedImportMessage(result: ImportResult, t: Translate) {
   });
 }
 
+function createEmptyDroppedImageFileCollection(): DroppedImageFileCollection {
+  return {
+    files: [],
+    oversizedCount: 0,
+    unsupportedCount: 0,
+  };
+}
+
+async function collectPendingDropImport({
+  localSource,
+  remoteSources,
+}: PendingDropImport): Promise<DropImportPayload> {
+  return {
+    imageCollection: localSource
+      ? await collectSupportedDroppedImageFiles(localSource)
+      : createEmptyDroppedImageFileCollection(),
+    remoteSources,
+  };
+}
+
 export function useReferenceDropImport({
   source,
   onAssetsRefresh,
@@ -227,11 +264,19 @@ export function useReferenceDropImport({
 }: UseReferenceDropImportParams) {
   const { t } = useTranslation('common');
   const [dropImportActive, setDropImportActive] = useState(false);
+  const [dropImportPreparing, setDropImportPreparing] = useState(false);
   const [dropImportBusy, setDropImportBusy] = useState(false);
   const [dropImportError, setDropImportError] = useState<string | null>(null);
   const dropImportInFlightRef = useRef(false);
   const domDragDepthRef = useRef(0);
   const dropShellRef = useRef<HTMLDivElement | null>(null);
+  const {
+    warning: dropImportWarning,
+    requestConfirmation: requestDropImportConfirmation,
+    clearConfirmation: clearDropImportConfirmation,
+    takePendingConfirmation: takePendingDropImportConfirmation,
+    hasPendingConfirmation: hasPendingDropImportConfirmation,
+  } = useDropImportConfirmation<PendingDropImport>();
 
   const dropImportFolderIds = useMemo(() => getImportTargetFolderIds(source), [source]);
   const dropImportTargetLabel =
@@ -286,6 +331,74 @@ export function useReferenceDropImport({
     [refreshAfterDropImport, t],
   );
 
+  const runDropImport = useCallback(
+    async ({ imageCollection, remoteSources }: DropImportPayload) => {
+      dropImportInFlightRef.current = true;
+      setDropImportPreparing(false);
+      setDropImportBusy(true);
+      setDropImportActive(false);
+      clearDropImportConfirmation();
+      setDropImportError(null);
+
+      const warningMessage = formatDroppedImageFileWarnings(imageCollection);
+      const aggregateResult = createEmptyImportResult();
+
+      try {
+        for (const file of imageCollection.files) {
+          try {
+            const source = await fileToDataImageSource(file);
+            if (!source) {
+              aggregateResult.failed.push({
+                filePath: file.name,
+                error: t('import.error.dropped_file_unsupported', {
+                  defaultValue: 'Dropped file is not a supported image.',
+                }),
+              });
+              continue;
+            }
+
+            mergeImportResult(aggregateResult, await importRemoteSourceBatch([source]));
+          } catch (nextError) {
+            aggregateResult.failed.push({
+              filePath: file.name,
+              error: getErrorMessage(
+                nextError,
+                t('references.drop_import.error.read_dropped_image', {
+                  defaultValue: 'Failed to read dropped image.',
+                }),
+              ),
+            });
+          }
+        }
+
+        if (remoteSources.length > 0) {
+          mergeImportResult(aggregateResult, await importRemoteSourceBatch(remoteSources));
+        }
+
+        await completeImport(
+          aggregateResult,
+          t('references.drop_import.error.no_supported_web_image', {
+            defaultValue: 'No supported web image data was found in the drop.',
+          }),
+          warningMessage,
+        );
+      } catch (nextError) {
+        setDropImportError(
+          getErrorMessage(
+            nextError,
+            t('references.drop_import.error.read_dropped_images', {
+              defaultValue: 'Failed to read dropped images.',
+            }),
+          ),
+        );
+      } finally {
+        dropImportInFlightRef.current = false;
+        setDropImportBusy(false);
+      }
+    },
+    [clearDropImportConfirmation, completeImport, importRemoteSourceBatch, t],
+  );
+
   const importDroppedDomData = useCallback(
     (dataTransfer: DataTransfer) => {
       if (dropImportInFlightRef.current) {
@@ -293,66 +406,31 @@ export function useReferenceDropImport({
       }
 
       const remoteSources = collectRemoteDropSources(dataTransfer);
-      const imageCollectionPromise = hasFileDropData(dataTransfer)
-        ? collectSupportedDroppedImageFiles(dataTransfer)
-        : Promise.resolve({
-            files: [],
-            oversizedCount: 0,
-            skippedCount: 0,
-            truncated: false,
-            unsupportedCount: 0,
-          });
+      const localSource = hasFileDropData(dataTransfer)
+        ? createDroppedFileDataSource(dataTransfer)
+        : null;
+      const pendingDrop = { localSource, remoteSources };
 
       dropImportInFlightRef.current = true;
-      setDropImportBusy(true);
+      setDropImportPreparing(true);
       setDropImportActive(false);
+      clearDropImportConfirmation();
       setDropImportError(null);
 
       void (async () => {
-        const aggregateResult = createEmptyImportResult();
-
         try {
-          const imageCollection = await imageCollectionPromise;
-          const warningMessage = formatDroppedImageFileWarnings(imageCollection);
-
-          for (const file of imageCollection.files) {
-            try {
-              const source = await fileToDataImageSource(file);
-              if (!source) {
-                aggregateResult.failed.push({
-                  filePath: file.name,
-                  error: t('import.error.dropped_file_unsupported', {
-                    defaultValue: 'Dropped file is not a supported image.',
-                  }),
-                });
-                continue;
-              }
-
-              mergeImportResult(aggregateResult, await importRemoteSourceBatch([source]));
-            } catch (nextError) {
-              aggregateResult.failed.push({
-                filePath: file.name,
-                error: getErrorMessage(
-                  nextError,
-                  t('references.drop_import.error.read_dropped_image', {
-                    defaultValue: 'Failed to read dropped image.',
-                  }),
-                ),
-              });
-            }
+          const dropWarning = await getDropImportWarning({
+            localSource,
+            remoteItemCount: remoteSources.length,
+          });
+          if (dropWarning) {
+            requestDropImportConfirmation(pendingDrop, dropWarning);
+            setDropImportPreparing(false);
+            return;
           }
 
-          if (remoteSources.length > 0) {
-            mergeImportResult(aggregateResult, await importRemoteSourceBatch(remoteSources));
-          }
-
-          await completeImport(
-            aggregateResult,
-            t('references.drop_import.error.no_supported_web_image', {
-              defaultValue: 'No supported web image data was found in the drop.',
-            }),
-            warningMessage,
-          );
+          const payload = await collectPendingDropImport(pendingDrop);
+          await runDropImport(payload);
         } catch (nextError) {
           setDropImportError(
             getErrorMessage(
@@ -362,20 +440,61 @@ export function useReferenceDropImport({
               }),
             ),
           );
-        } finally {
           dropImportInFlightRef.current = false;
-          setDropImportBusy(false);
+        } finally {
+          setDropImportPreparing(false);
         }
       })();
     },
-    [completeImport, importRemoteSourceBatch, t],
+    [clearDropImportConfirmation, requestDropImportConfirmation, runDropImport, t],
   );
+
+  const continueLargeDropImport = useCallback(() => {
+    const payload = takePendingDropImportConfirmation();
+    if (!payload) {
+      dropImportInFlightRef.current = false;
+      return;
+    }
+
+    setDropImportPreparing(true);
+
+    void (async () => {
+      try {
+        await runDropImport(await collectPendingDropImport(payload));
+      } catch (nextError) {
+        setDropImportError(
+          getErrorMessage(
+            nextError,
+            t('references.drop_import.error.read_dropped_images', {
+              defaultValue: 'Failed to read dropped images.',
+            }),
+          ),
+        );
+        dropImportInFlightRef.current = false;
+      } finally {
+        setDropImportPreparing(false);
+      }
+    })();
+  }, [runDropImport, t, takePendingDropImportConfirmation]);
+
+  const cancelLargeDropImport = useCallback(() => {
+    clearDropImportConfirmation();
+    dropImportInFlightRef.current = false;
+    setDropImportPreparing(false);
+    setDropImportBusy(false);
+    setDropImportActive(false);
+  }, [clearDropImportConfirmation]);
 
   useEffect(() => {
     setDropImportActive(false);
     setDropImportError(null);
     domDragDepthRef.current = 0;
-  }, [source]);
+    if (hasPendingDropImportConfirmation()) {
+      dropImportInFlightRef.current = false;
+      setDropImportPreparing(false);
+    }
+    clearDropImportConfirmation();
+  }, [clearDropImportConfirmation, hasPendingDropImportConfirmation, source]);
 
   useEffect(() => {
     const isInsideDropShell = (event: DragEvent) => {
@@ -447,13 +566,17 @@ export function useReferenceDropImport({
     };
   }, [importDroppedDomData]);
 
-  const dropOverlayVisible = dropImportActive || dropImportBusy;
+  const dropOverlayVisible = dropImportActive || dropImportBusy || dropImportPreparing;
 
   return {
     dropImportBusy,
+    dropImportPreparing,
     dropImportError,
+    dropImportWarning,
     dropImportTargetLabel,
     dropOverlayVisible,
+    cancelLargeDropImport,
+    continueLargeDropImport,
     dropShellProps: {
       ref: dropShellRef,
       'data-drop-active': dropOverlayVisible ? 'true' : 'false',
