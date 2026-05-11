@@ -26,8 +26,9 @@
     min-height: 76px;
   }
 
-  .settings-modal__language-row {
-    min-height: 70px;
+  .settings-modal__language-row,
+  .settings-modal__theme-row {
+    min-height: 44px;
   }
 
   .settings-modal__copy {
@@ -121,18 +122,21 @@
     transition: width 120ms ease;
   }
 
-  .settings-modal__language-select {
+  .settings-modal__language-select,
+  .settings-modal__theme-select {
     flex: none;
     width: 320px;
   }
 
-  .settings-modal__language-select .c-select__trigger {
+  .settings-modal__language-select .c-select__trigger,
+  .settings-modal__theme-select .c-select__trigger {
     min-height: 44px;
     padding: var(--primitives-spacing-25) var(--primitives-spacing-35);
     border-radius: var(--primitives-radius-2);
   }
 
-  .settings-modal__language-select .c-select__value {
+  .settings-modal__language-select .c-select__value,
+  .settings-modal__theme-select .c-select__value {
     font-weight: var(--primitives-typography-font-weight-medium);
   }
 }
