@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppUpdate } from '../../app-update';
 import { formatBytes } from '../../../lib/format';
+import { useTheme, type Theme } from '../../../shared/hooks';
 import { Button, Modal, ModalFooter, Select, type SelectOption } from '../../../shared/ui';
 import './settings-modal.css';
 
@@ -32,6 +33,14 @@ function resolveLanguageCode(language?: string): LanguageCode {
   return 'en';
 }
 
+function resolveThemePreference(theme?: string): Theme {
+  if (theme === 'system' || theme === 'light' || theme === 'dark') {
+    return theme;
+  }
+
+  return 'dark';
+}
+
 function formatVersion(version: string) {
   return `Grim ${version}`;
 }
@@ -51,7 +60,25 @@ function looksLikeTranslationKey(message: string) {
 export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const { i18n, t } = useTranslation('common');
   const appUpdate = useAppUpdate(open);
+  const { setTheme, theme } = useTheme();
   const languageValue = resolveLanguageCode(i18n.resolvedLanguage ?? i18n.language);
+  const themeOptions = useMemo<SelectOption[]>(
+    () => [
+      {
+        value: 'system',
+        label: t('settings.theme_option.system', { defaultValue: 'System' }),
+      },
+      {
+        value: 'light',
+        label: t('settings.theme_option.light', { defaultValue: 'Light' }),
+      },
+      {
+        value: 'dark',
+        label: t('settings.theme_option.dark', { defaultValue: 'Dark' }),
+      },
+    ],
+    [t],
+  );
   const displayedVersion = appUpdate.currentVersion ?? FALLBACK_APP_VERSION;
   const updateProgress =
     appUpdate.status === 'downloading'
@@ -71,6 +98,13 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
       void i18n.changeLanguage(language);
     },
     [i18n],
+  );
+
+  const handleThemeChange = useCallback(
+    (nextTheme: string) => {
+      setTheme(resolveThemePreference(nextTheme));
+    },
+    [setTheme],
   );
 
   const updateStatusLabel = useMemo(() => {
@@ -204,9 +238,6 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
           <p className="settings-modal__label">
             {t('settings.language', { defaultValue: 'Language' })}
           </p>
-          <p className="settings-modal__supporting">
-            {t('settings.language_help', { defaultValue: 'Choose the display language.' })}
-          </p>
         </div>
 
         <Select
@@ -215,6 +246,20 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
           options={LANGUAGE_OPTIONS}
           value={languageValue}
           onValueChange={handleLanguageChange}
+        />
+      </section>
+
+      <section className="settings-modal__row settings-modal__theme-row">
+        <div className="settings-modal__copy">
+          <p className="settings-modal__label">{t('settings.theme', { defaultValue: 'Theme' })}</p>
+        </div>
+
+        <Select
+          aria-label={t('settings.theme', { defaultValue: 'Theme' })}
+          className="settings-modal__theme-select"
+          options={themeOptions}
+          value={theme}
+          onValueChange={handleThemeChange}
         />
       </section>
     </Modal>
