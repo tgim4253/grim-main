@@ -1,7 +1,13 @@
 import type { KeyboardEvent } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useTranslation } from 'react-i18next';
-import { ChipButton, CheckboxConditionalRow, CheckboxRow, Input } from '../../../shared/ui';
+import {
+  ChipButton,
+  CheckboxConditionalRow,
+  CheckboxProgressConditionalRow,
+  CheckboxRow,
+  Input,
+} from '../../../shared/ui';
 import { cx } from '../../../shared/lib/cx';
 import type { Tag, TagGroup } from '../../../shared/types';
 import type { EditableSessionStep } from '../lib/sessionPresetEditor';
@@ -9,7 +15,11 @@ import {
   DURATION_OPTIONS,
   DURATION_SLIDER_MAX_SECONDS,
   DURATION_STEP_SECONDS,
+  FILTER_PERCENT_MAX,
+  FILTER_PERCENT_MIN,
+  FILTER_PERCENT_STEP,
   clampDurationSeconds,
+  clampFilterPercent,
   composeDurationSeconds,
   formatDurationCompact,
   getDurationParts,
@@ -30,7 +40,10 @@ type SessionPresetStepEditorProps = {
   onAutoAdvanceChange: (checked: boolean) => void;
   onCaptureChange: (checked: boolean) => void;
   onRecordsSaveChange: (checked: boolean) => void;
+  onFilterChange: (checked: boolean) => void;
   onGrayscaleChange: (checked: boolean) => void;
+  onBlurChange: (checked: boolean) => void;
+  onBlurAmountChange: (value: number) => void;
   onRequireResultChange: (checked: boolean) => void;
   onResultSavePathChange: (path: string) => void;
   onAutoTagAdd?: (tag: Tag) => void;
@@ -62,7 +75,10 @@ export function SessionPresetStepEditor({
   onAutoAdvanceChange,
   onCaptureChange,
   onRecordsSaveChange,
+  onFilterChange,
   onGrayscaleChange,
+  onBlurChange,
+  onBlurAmountChange,
   onRequireResultChange,
   onResultSavePathChange,
   onAutoTagAdd,
@@ -304,13 +320,37 @@ export function SessionPresetStepEditor({
                 </span>
               </label>
             </CheckboxConditionalRow>
-            <CheckboxRow
-              label={t('croquis.grayscale', { defaultValue: 'Grayscale' })}
-              checked={step.grayscaleEnabled}
-              onCheckedChange={onGrayscaleChange}
+            <CheckboxConditionalRow
+              label={t('common.filter', { defaultValue: 'Filter' })}
+              checked={step.filterEnabled}
+              onCheckedChange={onFilterChange}
               width="full"
               disabled={disabled}
-            />
+              childrenClassName="session-preset-step-editor__nested-settings"
+            >
+              <CheckboxRow
+                label={t('croquis.grayscale', { defaultValue: 'Grayscale' })}
+                checked={step.grayscaleEnabled}
+                width="full"
+                disabled={disabled}
+                onCheckedChange={onGrayscaleChange}
+              />
+              <CheckboxProgressConditionalRow
+                label={t('croquis.blur', { defaultValue: 'Blur' })}
+                checked={step.blurEnabled}
+                value={clampFilterPercent(step.blurAmount)}
+                min={FILTER_PERCENT_MIN}
+                max={FILTER_PERCENT_MAX}
+                step={FILTER_PERCENT_STEP}
+                width="full"
+                disabled={disabled}
+                rangeAriaLabel={t('croquis.blur_amount', {
+                  defaultValue: 'Blur amount',
+                })}
+                onCheckedChange={onBlurChange}
+                onValueChange={onBlurAmountChange}
+              />
+            </CheckboxConditionalRow>
           </div>
         </section>
       </div>

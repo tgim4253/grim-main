@@ -31,6 +31,7 @@ import {
   USER_CUSTOM_STEP_VALUE,
   applyTimeStepPresetToStep,
   clampDurationSeconds,
+  clampFilterPercent,
   createCustomStep,
   createEditableSteps,
   formatDurationCompact,
@@ -39,6 +40,7 @@ import {
   normalizeOptionalString,
   normalizeStepOrders,
   normalizeWindowDimension,
+  saveRuntimeSessionFilterSettings,
   toCroquisRuntimeStep,
   type EditableSessionStep,
 } from '../lib/sessionPresetEditor';
@@ -323,6 +325,7 @@ export function CroquisStartModal({
     setError(null);
     try {
       setStoredActiveSessionPresetId(selectedPreset.id);
+      saveRuntimeSessionFilterSettings(selectedPreset.id, editableSteps);
       await startCroquisSession({
         assetIds,
         presetId: selectedPreset.id,
@@ -509,10 +512,28 @@ export function CroquisStartModal({
                         captureEnabled: checked,
                       }));
                     }}
+                    onFilterChange={checked => {
+                      updateStep(step.id, currentStep => ({
+                        ...currentStep,
+                        filterEnabled: checked,
+                      }));
+                    }}
                     onGrayscaleChange={checked => {
                       updateStep(step.id, currentStep => ({
                         ...currentStep,
                         grayscaleEnabled: checked,
+                      }));
+                    }}
+                    onBlurChange={checked => {
+                      updateStep(step.id, currentStep => ({
+                        ...currentStep,
+                        blurEnabled: checked,
+                      }));
+                    }}
+                    onBlurAmountChange={value => {
+                      updateStep(step.id, currentStep => ({
+                        ...currentStep,
+                        blurAmount: clampFilterPercent(value),
                       }));
                     }}
                     onResultSavePathChange={path => {

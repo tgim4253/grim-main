@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { CroquisSession, CroquisSessionItem } from '../../../shared/types';
+import { clampFilterPercent, getRuntimeSessionFilterSettings } from '../lib/sessionPresetEditor';
 
 type CroquisSessionSidebarProps = {
   currentItem: CroquisSessionItem;
@@ -19,8 +20,16 @@ export function CroquisSessionSidebar({
   status,
 }: CroquisSessionSidebarProps) {
   const { t } = useTranslation('common');
+  const filterSettings = getRuntimeSessionFilterSettings(session.presetId, currentItem.stepIndex, {
+    filterEnabled: currentItem.grayscaleEnabled,
+    grayscaleEnabled: currentItem.grayscaleEnabled,
+  });
   const optionValue = (value: boolean) =>
     value ? t('common.on', { defaultValue: 'On' }) : t('common.off', { defaultValue: 'Off' });
+  const grayscaleValue =
+    filterSettings.filterEnabled && filterSettings.grayscaleEnabled ? '100%' : '0%';
+  const blurValue = (enabled: boolean, value: number) =>
+    filterSettings.filterEnabled && enabled ? `${String(clampFilterPercent(value))}%` : '0%';
 
   return (
     <aside className="croquis-page__sidebar">
@@ -62,9 +71,21 @@ export function CroquisSessionSidebar({
           })}
         </span>
         <span>
+          {t('croquis.option.filter', {
+            value: optionValue(filterSettings.filterEnabled),
+            defaultValue: 'Filter: {{value}}',
+          })}
+        </span>
+        <span>
           {t('croquis.option.grayscale', {
-            value: optionValue(currentItem.grayscaleEnabled),
+            value: grayscaleValue,
             defaultValue: 'Grayscale: {{value}}',
+          })}
+        </span>
+        <span>
+          {t('croquis.option.blur', {
+            value: blurValue(filterSettings.blurEnabled, filterSettings.blurAmount),
+            defaultValue: 'Blur: {{value}}',
           })}
         </span>
         <span>

@@ -1,9 +1,39 @@
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { IconButton } from '../../../shared/ui';
+import type { CroquisSession, CroquisSessionItem } from '../../../shared/types';
+import { clampFilterPercent, getRuntimeSessionFilterSettings } from '../lib/sessionPresetEditor';
 import { useCroquisSessionController } from '../lib/useCroquisSessionController';
 import './croquis.css';
+
+const getCroquisImageStyle = (session: CroquisSession, item: CroquisSessionItem): CSSProperties => {
+  const filterSettings = getRuntimeSessionFilterSettings(session.presetId, item.stepIndex, {
+    filterEnabled: item.grayscaleEnabled,
+    grayscaleEnabled: item.grayscaleEnabled,
+  });
+
+  if (!filterSettings.filterEnabled) {
+    return {};
+  }
+
+  const filterParts: string[] = [];
+
+  if (filterSettings.grayscaleEnabled) {
+    filterParts.push('grayscale(100%)');
+  }
+
+  if (filterSettings.blurEnabled) {
+    const whiteoutAmount = clampFilterPercent(filterSettings.blurAmount);
+    filterParts.push(`contrast(${String(100 - whiteoutAmount)}%)`);
+    filterParts.push(`brightness(${String(100 + whiteoutAmount)}%)`);
+  }
+
+  return {
+    filter: filterParts.length > 0 ? filterParts.join(' ') : undefined,
+  };
+};
 
 export function CroquisWindow() {
   const { t } = useTranslation('common');
@@ -74,9 +104,7 @@ export function CroquisWindow() {
             alt={currentItem.fileName}
             className="croquis-page__image"
             data-tauri-drag-region
-            style={{
-              filter: currentItem.grayscaleEnabled ? 'grayscale(1)' : undefined,
-            }}
+            style={getCroquisImageStyle(session, currentItem)}
           />
         ) : (
           <div className="croquis-page__empty">

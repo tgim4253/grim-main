@@ -38,6 +38,26 @@ export type CheckboxConditionalRowProps = Omit<CheckboxRowProps, 'className' | '
   expanded?: boolean;
 };
 
+export type CheckboxProgressConditionalRowProps = Omit<
+  CheckboxRowProps,
+  'className' | 'style' | 'value'
+> & {
+  className?: string;
+  style?: CSSProperties;
+  rowClassName?: string;
+  childrenClassName?: string;
+  rangeClassName?: string;
+  valueClassName?: string;
+  value: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  expanded?: boolean;
+  valueFormatter?: (value: number) => ReactNode;
+  rangeAriaLabel?: string;
+  onValueChange?: (value: number) => void;
+};
+
 const SIZE_CLASS_NAMES: Record<CheckboxSize, string> = {
   sm: 'c-checkbox--sm',
   md: 'c-checkbox--md',
@@ -54,6 +74,16 @@ const ROW_WIDTH_CLASS_NAMES: Record<CheckboxRowWidth, string> = {
   hug: 'c-checkbox-row--width-hug',
   full: 'c-checkbox-row--width-full',
 };
+
+const clampProgressValue = (value: number, min: number, max: number) => {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
+  return Math.min(Math.max(value, min), max);
+};
+
+const formatProgressPercent = (value: number) => `${String(value)}%`;
 
 export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Checkbox(
   { size = 'md', className, style, onChange, onCheckedChange, disabled, ...props },
@@ -157,6 +187,94 @@ export function CheckboxConditionalRow({
           aria-hidden={!resolvedExpanded}
         >
           {children}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function CheckboxProgressConditionalRow({
+  childrenClassName,
+  className,
+  rowClassName,
+  rangeClassName,
+  valueClassName,
+  style,
+  width = 'hug',
+  checked,
+  defaultChecked,
+  onCheckedChange,
+  value,
+  min = 0,
+  max = 100,
+  step = 1,
+  expanded,
+  valueFormatter = formatProgressPercent,
+  rangeAriaLabel,
+  label,
+  disabled,
+  onValueChange,
+  ...props
+}: CheckboxProgressConditionalRowProps) {
+  const isControlled = checked !== undefined;
+  const [internalChecked, setInternalChecked] = useState(Boolean(defaultChecked));
+  const resolvedChecked = checked ?? internalChecked;
+  const resolvedExpanded = expanded ?? resolvedChecked;
+  const resolvedValue = clampProgressValue(value, min, max);
+
+  const handleCheckedChange = (nextChecked: boolean) => {
+    if (!isControlled) {
+      setInternalChecked(nextChecked);
+    }
+
+    onCheckedChange?.(nextChecked);
+  };
+
+  const handleValueChange: ChangeEventHandler<HTMLInputElement> = event => {
+    onValueChange?.(clampProgressValue(Number(event.target.value), min, max));
+  };
+
+  return (
+    <div
+      className={cx(
+        'c-checkbox-progress-conditional-row',
+        width === 'full' && 'c-checkbox-progress-conditional-row--width-full',
+        className,
+      )}
+      style={style}
+    >
+      <div className="c-checkbox-progress-conditional-row__header">
+        <CheckboxRow
+          {...props}
+          label={label}
+          width="hug"
+          checked={isControlled ? checked : undefined}
+          defaultChecked={isControlled ? undefined : defaultChecked}
+          disabled={disabled}
+          onCheckedChange={handleCheckedChange}
+          className={cx('c-checkbox-progress-conditional-row__trigger', rowClassName)}
+        />
+        {resolvedExpanded ? (
+          <span className={cx('c-checkbox-progress-conditional-row__value', valueClassName)}>
+            {valueFormatter(resolvedValue)}
+          </span>
+        ) : null}
+      </div>
+      {resolvedExpanded ? (
+        <div className={cx('c-checkbox-progress-conditional-row__children', childrenClassName)}>
+          <input
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={resolvedValue}
+            disabled={disabled}
+            aria-label={
+              rangeAriaLabel ?? (typeof label === 'string' ? `${label} amount` : 'Filter amount')
+            }
+            className={cx('c-checkbox-progress-conditional-row__range', rangeClassName)}
+            onChange={handleValueChange}
+          />
         </div>
       ) : null}
     </div>
