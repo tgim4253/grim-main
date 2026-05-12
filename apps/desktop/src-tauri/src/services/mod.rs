@@ -1,3 +1,5 @@
+#[path = "app_service.rs"]
+pub(crate) mod app_service;
 #[path = "asset_service.rs"]
 pub(crate) mod asset_service;
 #[path = "capture_service.rs"]
@@ -17,6 +19,7 @@ pub(crate) mod session_service;
 #[path = "tag_service.rs"]
 pub(crate) mod tag_service;
 
+pub use app_service::AppService;
 pub use asset_service::AssetService;
 pub use capture_service::CaptureService;
 pub use croquis_service::CroquisService;
