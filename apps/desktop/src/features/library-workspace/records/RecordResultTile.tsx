@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cx } from '../../../shared/lib/cx';
 import { ImagePlaceholder } from '../common/ImagePlaceholder';
 import type { LibraryWorkspaceLayout } from '../common/types';
@@ -23,6 +24,7 @@ export function RecordResultTile({
   selectionMode = false,
   onSelect,
 }: RecordResultTileProps) {
+  const { t } = useTranslation('common');
   const style = {
     '--record-result-tile-height': `${String(
       layout === 'grid' ? GRID_TILE_HEIGHT : record.height,
@@ -33,7 +35,7 @@ export function RecordResultTile({
   return (
     <button
       type="button"
-      aria-label={record.title || 'Croquis record'}
+      aria-label={record.title || t('records.croquis_record', { defaultValue: 'Croquis record' })}
       aria-pressed={selected}
       data-selected={selected ? 'true' : undefined}
       data-selection-mode={selectionMode ? 'true' : undefined}

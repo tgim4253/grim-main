@@ -1,0 +1,142 @@
+@layer app {
+  .settings-modal {
+    overflow: visible;
+    box-shadow: none;
+  }
+
+  .settings-modal .c-modal__body-slot {
+    overflow: visible;
+  }
+
+  .settings-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--semantic-spacing-layout-sm);
+  }
+
+  .settings-modal__row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    gap: var(--semantic-spacing-layout-sm);
+  }
+
+  .settings-modal__version-row {
+    min-height: 76px;
+  }
+
+  .settings-modal__language-row,
+  .settings-modal__theme-row {
+    min-height: 44px;
+  }
+
+  .settings-modal__copy {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+    gap: var(--semantic-spacing-component-xs);
+  }
+
+  .settings-modal__label,
+  .settings-modal__value,
+  .settings-modal__supporting,
+  .settings-modal__progress-copy {
+    margin: 0;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .settings-modal__label {
+    color: var(--semantic-colors-text-secondary);
+    font-family: var(--components-typography-control-label-font-family);
+    font-size: var(--components-typography-control-label-font-size);
+    font-weight: var(--components-typography-control-label-font-weight);
+    line-height: var(--components-typography-control-label-line-height);
+  }
+
+  .settings-modal__value {
+    color: var(--semantic-colors-text-primary);
+    font-family: var(--components-typography-control-value-font-family);
+    font-size: var(--components-typography-control-value-font-size);
+    font-weight: var(--components-typography-control-value-font-weight);
+    line-height: var(--components-typography-control-value-line-height);
+  }
+
+  .settings-modal__supporting,
+  .settings-modal__progress-copy,
+  .settings-modal__progress-meta {
+    color: var(--semantic-colors-text-tertiary);
+    font-family: var(--components-typography-control-supporting-font-family);
+    font-size: var(--components-typography-control-supporting-font-size);
+    font-weight: var(--components-typography-control-supporting-font-weight);
+    line-height: var(--components-typography-control-supporting-line-height);
+  }
+
+  .settings-modal__update-button {
+    flex: none;
+    width: 172px;
+  }
+
+  .settings-modal__update-progress {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 176px;
+    gap: var(--semantic-spacing-component-xs);
+  }
+
+  .settings-modal__progress-copy {
+    color: var(--semantic-colors-text-secondary);
+    text-align: right;
+  }
+
+  .settings-modal__progress-meta {
+    margin: 0;
+    width: 100%;
+    min-width: 0;
+    text-align: right;
+  }
+
+  .settings-modal__update-progress[data-state='error'] .settings-modal__progress-copy {
+    color: var(--semantic-colors-text-error);
+  }
+
+  .settings-modal__progress-track {
+    position: relative;
+    width: 100%;
+    height: 6px;
+    overflow: hidden;
+    border-radius: var(--primitives-radius-full);
+    background: var(--semantic-colors-surface-tertiary);
+  }
+
+  .settings-modal__progress-value {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: inherit;
+    background: var(--semantic-colors-brand-primary);
+    transition: width 120ms ease;
+  }
+
+  .settings-modal__language-select,
+  .settings-modal__theme-select {
+    flex: none;
+    width: 320px;
+  }
+
+  .settings-modal__language-select .c-select__trigger,
+  .settings-modal__theme-select .c-select__trigger {
+    min-height: 44px;
+    padding: var(--primitives-spacing-25) var(--primitives-spacing-35);
+    border-radius: var(--primitives-radius-2);
+  }
+
+  .settings-modal__language-select .c-select__value,
+  .settings-modal__theme-select .c-select__value {
+    font-weight: var(--primitives-typography-font-weight-medium);
+  }
+}

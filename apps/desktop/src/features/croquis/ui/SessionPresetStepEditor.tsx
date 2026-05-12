@@ -1,6 +1,13 @@
 import type { KeyboardEvent } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
-import { ChipButton, CheckboxConditionalRow, CheckboxRow, Input } from '../../../shared/ui';
+import { useTranslation } from 'react-i18next';
+import {
+  ChipButton,
+  CheckboxConditionalRow,
+  CheckboxProgressConditionalRow,
+  CheckboxRow,
+  Input,
+} from '../../../shared/ui';
 import { cx } from '../../../shared/lib/cx';
 import type { Tag, TagGroup } from '../../../shared/types';
 import type { EditableSessionStep } from '../lib/sessionPresetEditor';
@@ -8,7 +15,11 @@ import {
   DURATION_OPTIONS,
   DURATION_SLIDER_MAX_SECONDS,
   DURATION_STEP_SECONDS,
+  FILTER_PERCENT_MAX,
+  FILTER_PERCENT_MIN,
+  FILTER_PERCENT_STEP,
   clampDurationSeconds,
+  clampFilterPercent,
   composeDurationSeconds,
   formatDurationCompact,
   getDurationParts,
@@ -29,7 +40,10 @@ type SessionPresetStepEditorProps = {
   onAutoAdvanceChange: (checked: boolean) => void;
   onCaptureChange: (checked: boolean) => void;
   onRecordsSaveChange: (checked: boolean) => void;
+  onFilterChange: (checked: boolean) => void;
   onGrayscaleChange: (checked: boolean) => void;
+  onBlurChange: (checked: boolean) => void;
+  onBlurAmountChange: (value: number) => void;
   onRequireResultChange: (checked: boolean) => void;
   onResultSavePathChange: (path: string) => void;
   onAutoTagAdd?: (tag: Tag) => void;
@@ -61,12 +75,16 @@ export function SessionPresetStepEditor({
   onAutoAdvanceChange,
   onCaptureChange,
   onRecordsSaveChange,
+  onFilterChange,
   onGrayscaleChange,
+  onBlurChange,
+  onBlurAmountChange,
   onRequireResultChange,
   onResultSavePathChange,
   onAutoTagAdd,
   onAutoTagRemove,
 }: SessionPresetStepEditorProps) {
+  const { t } = useTranslation('common');
   const durationParts = getDurationParts(durationSeconds);
   const resultSavePathValue = step.resultSavePath ?? '';
   const handleResultSavePathPick = () => {
@@ -86,7 +104,12 @@ export function SessionPresetStepEditor({
           onResultSavePathChange(selectedPath);
         }
       } catch (error) {
-        console.error('Failed to open result save path picker.', error);
+        console.error(
+          t('croquis.error.open_result_save_path_picker', {
+            defaultValue: 'Failed to open result save path picker.',
+          }),
+          error,
+        );
       }
     })();
   };
@@ -105,13 +128,18 @@ export function SessionPresetStepEditor({
       <div className="session-preset-step-editor__column">
         <section className="session-preset-step-editor__group">
           <div className="session-preset-step-editor__group-header">
-            <span className="session-preset-step-editor__label">Duration</span>
+            <span className="session-preset-step-editor__label">
+              {t('croquis.duration', { defaultValue: 'Duration' })}
+            </span>
             <span className="session-preset-step-editor__value">
               {formatDurationCompact(durationSeconds)}
             </span>
           </div>
 
-          <div className="session-preset-step-editor__duration-row" aria-label="Step duration">
+          <div
+            className="session-preset-step-editor__duration-row"
+            aria-label={t('croquis.step_duration', { defaultValue: 'Step duration' })}
+          >
             {DURATION_OPTIONS.map(duration => (
               <ChipButton
                 key={duration.value}
@@ -135,7 +163,9 @@ export function SessionPresetStepEditor({
             max={DURATION_SLIDER_MAX_SECONDS}
             step={DURATION_STEP_SECONDS}
             value={Math.min(durationSeconds, DURATION_SLIDER_MAX_SECONDS)}
-            aria-label="Step duration in seconds"
+            aria-label={t('croquis.step_duration_seconds', {
+              defaultValue: 'Step duration in seconds',
+            })}
             disabled={disabled}
             onChange={event => {
               onTimerChange(clampDurationSeconds(Number(event.target.value)));
@@ -152,7 +182,9 @@ export function SessionPresetStepEditor({
               inputMode="numeric"
               pattern="[0-9]*"
               value={durationParts.hours}
-              aria-label="Step duration hours"
+              aria-label={t('croquis.step_duration_hours', {
+                defaultValue: 'Step duration hours',
+              })}
               disabled={disabled}
               onChange={event => {
                 onTimerChange(
@@ -173,7 +205,9 @@ export function SessionPresetStepEditor({
               inputMode="numeric"
               pattern="[0-9]*"
               value={durationParts.minutes}
-              aria-label="Step duration minutes"
+              aria-label={t('croquis.step_duration_minutes', {
+                defaultValue: 'Step duration minutes',
+              })}
               disabled={disabled}
               onChange={event => {
                 onTimerChange(
@@ -194,7 +228,9 @@ export function SessionPresetStepEditor({
               inputMode="numeric"
               pattern="[0-9]*"
               value={durationParts.seconds}
-              aria-label="Step duration seconds"
+              aria-label={t('croquis.step_duration_seconds_input', {
+                defaultValue: 'Step duration seconds',
+              })}
               disabled={disabled}
               onChange={event => {
                 onTimerChange(
@@ -210,12 +246,12 @@ export function SessionPresetStepEditor({
 
         {showTagSummary ? (
           <AutoTagPicker
-            label="Asset Tags"
+            label={t('croquis.asset_tags', { defaultValue: 'Asset Tags' })}
             tags={step.autoTags}
             availableTags={availableAutoTags}
             tagGroups={autoTagGroups}
             disabled={disabled}
-            emptyLabel="No auto tags"
+            emptyLabel={t('croquis.auto_tags.empty', { defaultValue: 'No auto tags' })}
             onTagAdd={onAutoTagAdd}
             onTagRemove={onAutoTagRemove}
           />
@@ -224,17 +260,19 @@ export function SessionPresetStepEditor({
 
       <div className="session-preset-step-editor__column">
         <section className="session-preset-step-editor__group">
-          <span className="session-preset-step-editor__label">Step Settings</span>
+          <span className="session-preset-step-editor__label">
+            {t('croquis.step_settings', { defaultValue: 'Step Settings' })}
+          </span>
           <div className="session-preset-step-editor__settings">
             <CheckboxRow
-              label="Auto-advance"
+              label={t('croquis.auto_advance', { defaultValue: 'Auto-advance' })}
               checked={step.autoAdvance}
               onCheckedChange={onAutoAdvanceChange}
               width="full"
               disabled={disabled}
             />
             <CheckboxConditionalRow
-              label="Records Save"
+              label={t('croquis.records_save', { defaultValue: 'Records Save' })}
               checked={step.recordSaveEnabled}
               onCheckedChange={onRecordsSaveChange}
               width="full"
@@ -242,14 +280,14 @@ export function SessionPresetStepEditor({
               childrenClassName="session-preset-step-editor__nested-settings"
             >
               <CheckboxRow
-                label="Require result"
+                label={t('croquis.require_result', { defaultValue: 'Require result' })}
                 checked={step.resultRequired}
                 onCheckedChange={onRequireResultChange}
                 width="full"
                 disabled={disabled}
               />
               <CheckboxRow
-                label="Capture enabled"
+                label={t('croquis.capture_enabled', { defaultValue: 'Capture enabled' })}
                 checked={step.captureEnabled}
                 onCheckedChange={onCaptureChange}
                 width="full"
@@ -263,26 +301,56 @@ export function SessionPresetStepEditor({
                 onClick={handleResultSavePathPick}
                 onKeyDown={handleResultSavePathKeyDown}
               >
-                <span className="session-preset-step-editor__label">Result save path</span>
+                <span className="session-preset-step-editor__label">
+                  {t('croquis.result_save_path', { defaultValue: 'Result save path' })}
+                </span>
                 <span className="session-preset-step-editor__path-control">
                   <input
                     className="session-preset-step-editor__path-input"
                     value={resultSavePathValue}
-                    placeholder="Click to choose folder"
+                    placeholder={t('croquis.choose_folder_placeholder', {
+                      defaultValue: 'Click to choose folder',
+                    })}
                     disabled
                     readOnly
-                    aria-label="Selected result save path"
+                    aria-label={t('croquis.selected_result_save_path', {
+                      defaultValue: 'Selected result save path',
+                    })}
                   />
                 </span>
               </label>
             </CheckboxConditionalRow>
-            <CheckboxRow
-              label="Grayscale"
-              checked={step.grayscaleEnabled}
-              onCheckedChange={onGrayscaleChange}
+            <CheckboxConditionalRow
+              label={t('common.filter', { defaultValue: 'Filter' })}
+              checked={step.filterEnabled}
+              onCheckedChange={onFilterChange}
               width="full"
               disabled={disabled}
-            />
+              childrenClassName="session-preset-step-editor__nested-settings"
+            >
+              <CheckboxRow
+                label={t('croquis.grayscale', { defaultValue: 'Grayscale' })}
+                checked={step.grayscaleEnabled}
+                width="full"
+                disabled={disabled}
+                onCheckedChange={onGrayscaleChange}
+              />
+              <CheckboxProgressConditionalRow
+                label={t('croquis.blur', { defaultValue: 'Blur' })}
+                checked={step.blurEnabled}
+                value={clampFilterPercent(step.blurAmount)}
+                min={FILTER_PERCENT_MIN}
+                max={FILTER_PERCENT_MAX}
+                step={FILTER_PERCENT_STEP}
+                width="full"
+                disabled={disabled}
+                rangeAriaLabel={t('croquis.blur_amount', {
+                  defaultValue: 'Blur amount',
+                })}
+                onCheckedChange={onBlurChange}
+                onValueChange={onBlurAmountChange}
+              />
+            </CheckboxConditionalRow>
           </div>
         </section>
       </div>

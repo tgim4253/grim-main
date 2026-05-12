@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Chip, PreviewPanel } from '../../../shared/ui';
 import { ImagePlaceholder } from '../common/ImagePlaceholder';
 import type { RecordResultItem } from './types';
@@ -21,9 +22,15 @@ type TagGroup = {
   tags: readonly RecordResultItem['tags'][number][];
 };
 
-function formatDateTime(value?: string | null) {
+type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+function formatDateTime(
+  value: string | null | undefined,
+  locale: string | undefined,
+  t: Translate,
+) {
   if (!value) {
-    return 'None';
+    return t('common.none', { defaultValue: 'None' });
   }
 
   const date = new Date(value);
@@ -31,7 +38,7 @@ function formatDateTime(value?: string | null) {
     return value;
   }
 
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(locale, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -40,9 +47,9 @@ function formatDateTime(value?: string | null) {
   }).format(date);
 }
 
-function formatDurationSeconds(value?: number | null) {
+function formatDurationSeconds(value: number | null | undefined, t: Translate) {
   if (value === null || value === undefined) {
-    return 'None';
+    return t('common.none', { defaultValue: 'None' });
   }
 
   const seconds = Math.max(0, Math.round(value));
@@ -56,19 +63,20 @@ function formatDurationSeconds(value?: number | null) {
   return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
 }
 
-function formatDurationPair(record: RecordResultItem) {
-  const actual = formatDurationSeconds(record.actualDurationSeconds);
-  const target = formatDurationSeconds(record.targetDurationSeconds);
+function formatDurationPair(record: RecordResultItem, t: Translate) {
+  const noneLabel = t('common.none', { defaultValue: 'None' });
+  const actual = formatDurationSeconds(record.actualDurationSeconds, t);
+  const target = formatDurationSeconds(record.targetDurationSeconds, t);
 
-  if (actual === 'None' && target === 'None') {
-    return 'None';
+  if (actual === noneLabel && target === noneLabel) {
+    return noneLabel;
   }
 
-  if (target === 'None') {
+  if (target === noneLabel) {
     return actual;
   }
 
-  if (actual === 'None') {
+  if (actual === noneLabel) {
     return target;
   }
 
@@ -78,6 +86,7 @@ function formatDurationPair(record: RecordResultItem) {
 function groupTags(
   record: RecordResultItem,
   tagGroupNamesById: ReadonlyMap<string, string>,
+  t: Translate,
 ): TagGroup[] {
   const groups = new Map<string, RecordResultItem['tags'][number][]>();
 
@@ -90,7 +99,10 @@ function groupTags(
 
   return [...groups.entries()].map(([id, tags]) => ({
     id,
-    label: id === 'ungrouped' ? 'Ungrouped' : (tagGroupNamesById.get(id) ?? 'Unknown Group'),
+    label:
+      id === 'ungrouped'
+        ? t('tags.ungrouped', { defaultValue: 'Ungrouped' })
+        : (tagGroupNamesById.get(id) ?? t('tags.unknown_group', { defaultValue: 'Unknown Group' })),
     tags,
   }));
 }
@@ -156,14 +168,15 @@ export function RecordResultPreviewPanel({
   tagGroupNamesById,
   onClose,
 }: RecordResultPreviewPanelProps) {
+  const { i18n, t } = useTranslation('common');
   const sourceSrc = record.sourceImageSrc ?? record.sourceThumbnailSrc;
   const resultSrc = record.resultImageSrc ?? record.resultThumbnailSrc;
-  const tagGroups = groupTags(record, tagGroupNamesById);
+  const tagGroups = groupTags(record, tagGroupNamesById, t);
 
   return (
     <PreviewPanel
-      title="Record Preview"
-      ariaLabel="Record preview"
+      title={t('records.preview.title', { defaultValue: 'Record Preview' })}
+      ariaLabel={t('records.preview.aria_label', { defaultValue: 'Record preview' })}
       className="record-result-preview"
       onClose={onClose}
     >
@@ -171,29 +184,41 @@ export function RecordResultPreviewPanel({
         <SplitPreviewImage
           src={sourceSrc}
           title={record.sourceAsset?.fileName ?? record.title}
-          badge="Original"
+          badge={t('records.preview.original', { defaultValue: 'Original' })}
           tone="source"
         />
         <SplitPreviewImage
           src={resultSrc}
           title={record.resultAsset?.fileName ?? record.title}
-          badge="Result"
+          badge={t('records.preview.result', { defaultValue: 'Result' })}
           tone="result"
         />
       </div>
 
       <div className="record-result-preview__sections">
         <section className="record-result-preview__section">
-          <PreviewSectionHeading>Metadata</PreviewSectionHeading>
+          <PreviewSectionHeading>
+            {t('common.metadata', { defaultValue: 'Metadata' })}
+          </PreviewSectionHeading>
           <dl className="record-result-preview__metadata-grid">
-            <PreviewMetadataField label="Title" value={record.title || 'Untitled'} wide />
-            <PreviewMetadataField label="Duration" value={formatDurationPair(record)} />
-            <PreviewMetadataField label="Finished" value={formatDateTime(record.finishedAt)} />
+            <PreviewMetadataField
+              label={t('common.title', { defaultValue: 'Title' })}
+              value={record.title || t('common.untitled', { defaultValue: 'Untitled' })}
+              wide
+            />
+            <PreviewMetadataField
+              label={t('records.duration', { defaultValue: 'Duration' })}
+              value={formatDurationPair(record, t)}
+            />
+            <PreviewMetadataField
+              label={t('records.finished', { defaultValue: 'Finished' })}
+              value={formatDateTime(record.finishedAt, i18n.resolvedLanguage, t)}
+            />
           </dl>
         </section>
 
         <section className="record-result-preview__section">
-          <PreviewSectionHeading>Tags</PreviewSectionHeading>
+          <PreviewSectionHeading>{t('tags.tags', { defaultValue: 'Tags' })}</PreviewSectionHeading>
           {tagGroups.length > 0 ? (
             <div className="record-result-preview__tag-groups">
               {tagGroups.map(group => (
@@ -210,14 +235,16 @@ export function RecordResultPreviewPanel({
               ))}
             </div>
           ) : (
-            <p className="record-result-preview__empty-text">No tags</p>
+            <p className="record-result-preview__empty-text">
+              {t('tags.no_tags', { defaultValue: 'No tags' })}
+            </p>
           )}
         </section>
 
         <section className="record-result-preview__section record-result-preview__section--related">
           <div className="record-result-preview__related-header">
-            <h3>Related Records</h3>
-            <span>Same Source</span>
+            <h3>{t('records.related_records', { defaultValue: 'Related Records' })}</h3>
+            <span>{t('records.same_source', { defaultValue: 'Same Source' })}</span>
           </div>
           {relatedRecords.length > 0 ? (
             <div className="record-result-preview__related-row">
@@ -226,7 +253,9 @@ export function RecordResultPreviewPanel({
               ))}
             </div>
           ) : (
-            <p className="record-result-preview__empty-text">No related records</p>
+            <p className="record-result-preview__empty-text">
+              {t('records.no_related_records', { defaultValue: 'No related records' })}
+            </p>
           )}
         </section>
       </div>

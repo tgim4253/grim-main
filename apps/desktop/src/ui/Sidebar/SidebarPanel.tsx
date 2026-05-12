@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cx } from '../../shared/lib/cx';
 import './sidebar-panel.css';
 
@@ -21,11 +22,13 @@ export function SidebarPanel({
   className,
   bodyClassName,
 }: SidebarPanelProps) {
+  const { t } = useTranslation('common');
+
   return (
     <aside
       className={cx('c-sidebar-panel', className)}
       data-collapsed={collapsed ? 'true' : undefined}
-      aria-label={title ?? 'Sidebar panel'}
+      aria-label={title ?? t('navigation.sidebar_panel', { defaultValue: 'Sidebar panel' })}
     >
       {rail ? <div className="c-sidebar-panel__rail">{rail}</div> : null}
 

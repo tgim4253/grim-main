@@ -1,7 +1,0 @@
-{
-  "start_prompt": "どのように始めますか？",
-  "new_repository": "新しいリファレンスボールトを作成",
-  "new_repository_prompt": "選択したフォルダーに新しい{{vault_name}}を作成します。",
-  "import_repository": "リファレンスボールトをインポート",
-  "import_repository_prompt": "選択したフォルダーから既存の{{vault_name}}をインポートします。\n"
-}

@@ -253,10 +253,10 @@ mod tests {
     use crate::{
         models::session::{
             DeleteTimeStepPresetPayload, SaveSessionPresetPayload,
-            SaveTimeStepPresetPayload, SessionPresetStepDraft,
+            SaveTimeStepPresetPayload, SessionPresetStepDraft, TimeStepPreset,
         },
         repositories::{SessionRepository, TagRepository},
-        state::bootstrap::{ensure_schema, open_or_create_db, seed_defaults},
+        state::bootstrap::{ensure_schema, open_or_create_db},
     };
 
     use super::SessionService;
@@ -279,26 +279,44 @@ mod tests {
         SessionService::new(SessionRepository::new(pool), tag_repository)
     }
 
-    async fn build_seeded_service(prefix: &str) -> (PathBuf, SessionService) {
+    async fn build_empty_service(prefix: &str) -> (PathBuf, SessionService) {
         let dir = make_temp_dir(prefix);
         let db_path = dir.join("grim.db");
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
         (dir, build_service(pool))
+    }
+
+    async fn create_time_step(
+        service: &SessionService,
+        name: &str,
+    ) -> TimeStepPreset {
+        service
+            .save_time_step_preset(SaveTimeStepPresetPayload {
+                id: None,
+                name: name.to_string(),
+                default_duration_seconds: Some(180),
+                auto_advance: true,
+                record_save_enabled: true,
+                capture_enabled: false,
+                grayscale_enabled: false,
+                result_required: false,
+                result_save_path: None,
+                auto_tag_ids: Vec::new(),
+                auto_tag_names: Vec::new(),
+            })
+            .await
+            .expect("failed to create time step preset")
+            .into_iter()
+            .find(|preset| preset.name == name)
+            .expect("expected created time step")
     }
 
     #[tokio::test]
     async fn save_session_preset_keeps_only_time_step_refs() {
-        let (dir, service) = build_seeded_service("refs-only").await;
-        let time_step = service
-            .list_time_step_presets()
-            .await
-            .expect("failed to list time steps")
-            .into_iter()
-            .next()
-            .expect("expected seeded time step");
+        let (dir, service) = build_empty_service("refs-only").await;
+        let time_step = create_time_step(&service, "Reference Step").await;
 
         let presets = service
             .save_session_preset(SaveSessionPresetPayload {
@@ -335,7 +353,7 @@ mod tests {
 
     #[tokio::test]
     async fn session_preset_read_hydrates_time_step_fields_and_tags() {
-        let (dir, service) = build_seeded_service("hydrate").await;
+        let (dir, service) = build_empty_service("hydrate").await;
         let time_steps = service
             .save_time_step_preset(SaveTimeStepPresetPayload {
                 id: None,
@@ -412,7 +430,7 @@ mod tests {
 
     #[tokio::test]
     async fn updating_time_step_updates_linked_session_read_result() {
-        let (dir, service) = build_seeded_service("live-hydrate").await;
+        let (dir, service) = build_empty_service("live-hydrate").await;
         let time_step = service
             .save_time_step_preset(SaveTimeStepPresetPayload {
                 id: None,
@@ -503,14 +521,27 @@ mod tests {
 
     #[tokio::test]
     async fn deleting_referenced_time_step_fails() {
-        let (dir, service) = build_seeded_service("delete-referenced").await;
-        let time_step = service
-            .list_time_step_presets()
+        let (dir, service) = build_empty_service("delete-referenced").await;
+        let time_step = create_time_step(&service, "Referenced Step").await;
+
+        service
+            .save_session_preset(SaveSessionPresetPayload {
+                id: None,
+                name: "Uses Referenced Step".to_string(),
+                description: None,
+                is_default: false,
+                window_width: None,
+                window_height: None,
+                is_shuffle: false,
+                auto_tag_ids: Vec::new(),
+                steps: vec![SessionPresetStepDraft {
+                    id: None,
+                    time_step_preset_id: time_step.id.clone(),
+                    step_order: 1,
+                }],
+            })
             .await
-            .expect("failed to list time steps")
-            .into_iter()
-            .next()
-            .expect("expected seeded time step");
+            .expect("failed to save referencing session preset");
 
         let result = service
             .delete_time_step_preset(DeleteTimeStepPresetPayload {

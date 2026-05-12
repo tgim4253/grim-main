@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   AccordionItem,
   AccordionItemBody,
-  AccordionItemHeader,
+  AccordionItemDragHeader,
   AccordionRoot,
   Button,
   CheckboxRow,
@@ -12,6 +13,8 @@ import {
   Modal,
   ModalFooter,
   Select,
+  type AccordionReorderPayload,
+  type AccordionReorderPosition,
   type SelectOption,
 } from '../../../shared/ui';
 import type {
@@ -28,6 +31,7 @@ import {
   USER_CUSTOM_STEP_VALUE,
   applyTimeStepPresetToStep,
   clampDurationSeconds,
+  clampFilterPercent,
   createCustomStep,
   createEditableSteps,
   formatDurationCompact,
@@ -36,6 +40,7 @@ import {
   normalizeOptionalString,
   normalizeStepOrders,
   normalizeWindowDimension,
+  saveRuntimeSessionFilterSettings,
   toCroquisRuntimeStep,
   type EditableSessionStep,
 } from '../lib/sessionPresetEditor';
@@ -66,6 +71,7 @@ export function CroquisStartModal({
   onStarted,
   startCroquisSession = ipc.session.start,
 }: CroquisStartModalProps) {
+  const { t } = useTranslation('common');
   const presetOptions: SelectOption[] = useMemo(
     () =>
       sessionPresets.map(preset => ({
@@ -93,7 +99,9 @@ export function CroquisStartModal({
     () => [
       {
         value: USER_CUSTOM_STEP_VALUE,
-        label: USER_CUSTOM_STEP_LABEL,
+        label: t('croquis.user_custom_step', {
+          defaultValue: USER_CUSTOM_STEP_LABEL,
+        }),
       },
       ...timeStepPresets.map(preset => ({
         value: preset.id,
@@ -101,7 +109,7 @@ export function CroquisStartModal({
         supportingText: formatDurationCompact(getStepDuration(preset)),
       })),
     ],
-    [timeStepPresets],
+    [t, timeStepPresets],
   );
 
   useEffect(() => {
@@ -116,7 +124,7 @@ export function CroquisStartModal({
     setSessionAutoTags(fallbackPreset?.autoTags ?? []);
     const nextSteps = fallbackPreset ? createEditableSteps(fallbackPreset) : [];
     setEditableSteps(nextSteps);
-    setExpandedStepId(nextSteps[0]?.id ?? null);
+    setExpandedStepId(null);
     setError(null);
   }, [fallbackPreset, open]);
 
@@ -131,7 +139,11 @@ export function CroquisStartModal({
   const totalDurationSeconds =
     assetIds.length * editableSteps.reduce((total, step) => total + getStepDuration(step), 0);
   const totalDurationLabel = hasOpenEndedStep ? '∞' : formatEstimate(totalDurationSeconds);
-  const totalAssetsLabel = `${String(assetIds.length)} ${assetIds.length === 1 ? 'Pose' : 'Poses'}`;
+  const totalAssetsLabel = t('croquis.pose_count', {
+    count: assetIds.length,
+    formattedCount: assetIds.length.toLocaleString(),
+    defaultValue: '{{formattedCount}} Poses',
+  });
 
   const handlePresetChange = (nextPresetId: string) => {
     const nextPreset = sessionPresets.find(preset => preset.id === nextPresetId) ?? null;
@@ -144,11 +156,14 @@ export function CroquisStartModal({
     setIsShuffle(nextPreset?.isShuffle ?? false);
     setSessionAutoTags(nextPreset?.autoTags ?? []);
     setEditableSteps(nextSteps);
-    setExpandedStepId(nextSteps[0]?.id ?? null);
+    setExpandedStepId(null);
   };
 
   const handleAddStep = () => {
-    const nextStep = createCustomStep(editableSteps.length + 1);
+    const nextStep = createCustomStep(
+      editableSteps.length + 1,
+      t('croquis.user_custom_step', { defaultValue: USER_CUSTOM_STEP_LABEL }),
+    );
 
     setEditableSteps(current => normalizeStepOrders([...current, nextStep]));
     setExpandedStepId(nextStep.id);
@@ -173,6 +188,38 @@ export function CroquisStartModal({
 
       return nextSteps;
     });
+  };
+
+  const reorderStep = (
+    sourceStepId: string,
+    targetStepId: string,
+    position: AccordionReorderPosition,
+  ) => {
+    setEditableSteps(current => {
+      if (sourceStepId === targetStepId) {
+        return current;
+      }
+
+      const sourceIndex = current.findIndex(step => step.id === sourceStepId);
+      const targetIndex = current.findIndex(step => step.id === targetStepId);
+      if (sourceIndex < 0 || targetIndex < 0) {
+        return current;
+      }
+
+      const nextSteps = [...current];
+      const [sourceStep] = nextSteps.splice(sourceIndex, 1);
+      const nextTargetIndex = nextSteps.findIndex(step => step.id === targetStepId);
+      if (nextTargetIndex < 0) {
+        return current;
+      }
+
+      nextSteps.splice(position === 'after' ? nextTargetIndex + 1 : nextTargetIndex, 0, sourceStep);
+      return normalizeStepOrders(nextSteps);
+    });
+  };
+
+  const handleStepReorder = ({ value, targetValue, position }: AccordionReorderPayload) => {
+    reorderStep(value, targetValue, position);
   };
 
   const handleStepPresetChange = (stepId: string, nextValue: string) => {
@@ -257,12 +304,20 @@ export function CroquisStartModal({
     }
 
     if (assetIds.length === 0) {
-      setError('Select at least one asset to start a Croquis session.');
+      setError(
+        t('croquis.error.select_asset', {
+          defaultValue: 'Select at least one asset to start a Croquis session.',
+        }),
+      );
       return;
     }
 
     if (editableSteps.length === 0) {
-      setError('Add at least one time step to start a Croquis session.');
+      setError(
+        t('croquis.error.add_time_step', {
+          defaultValue: 'Add at least one time step to start a Croquis session.',
+        }),
+      );
       return;
     }
 
@@ -270,6 +325,7 @@ export function CroquisStartModal({
     setError(null);
     try {
       setStoredActiveSessionPresetId(selectedPreset.id);
+      saveRuntimeSessionFilterSettings(selectedPreset.id, editableSteps);
       await startCroquisSession({
         assetIds,
         presetId: selectedPreset.id,
@@ -282,7 +338,11 @@ export function CroquisStartModal({
 
       await onStarted();
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : 'Failed to start croquis session');
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : t('croquis.error.start_session', { defaultValue: 'Failed to start croquis session' }),
+      );
     } finally {
       setBusy(false);
     }
@@ -292,14 +352,14 @@ export function CroquisStartModal({
     <Modal
       open={open}
       size="lg"
-      title="Start Croquis Session"
+      title={t('croquis.start_modal.title', { defaultValue: 'Start Croquis Session' })}
       onClose={onClose}
       dialogClassName="croquis-start-modal"
       bodyClassName="croquis-start-modal__body"
       footer={
         <ModalFooter alignment="end">
           <Button size="lg" variant="secondary" onClick={onClose}>
-            Cancel
+            {t('common.cancel', { defaultValue: 'Cancel' })}
           </Button>
           <Button
             size="lg"
@@ -310,44 +370,62 @@ export function CroquisStartModal({
               void handleStart();
             }}
           >
-            {busy ? 'Starting...' : 'Start Session'}
+            {busy
+              ? t('croquis.starting', { defaultValue: 'Starting...' })
+              : t('croquis.start_session', { defaultValue: 'Start Session' })}
           </Button>
         </ModalFooter>
       }
     >
       <div className="croquis-start-modal__intro">
-        <div className="app-kicker">Preset Configuration</div>
-        <p>Review and launch the selected training protocol.</p>
+        <div className="app-kicker">
+          {t('croquis.preset_configuration', { defaultValue: 'Preset Configuration' })}
+        </div>
+        <p>
+          {t('croquis.start_modal.description', {
+            defaultValue: 'Review and launch the selected training protocol.',
+          })}
+        </p>
       </div>
 
       <Select
-        label="Selected Preset"
-        placeholder="Select session preset"
+        label={t('croquis.selected_preset', { defaultValue: 'Selected Preset' })}
+        placeholder={t('croquis.select_session_preset', {
+          defaultValue: 'Select session preset',
+        })}
         options={presetOptions}
         value={selectedPresetId}
         onValueChange={handlePresetChange}
       />
 
       <AutoTagPicker
-        label="Session Auto Tags"
+        label={t('croquis.session_auto_tags', { defaultValue: 'Session Auto Tags' })}
         tags={sessionAutoTags}
         availableTags={tags}
         tagGroups={tagGroups}
         disabled={busy}
-        emptyLabel="No session auto tags"
+        emptyLabel={t('croquis.session_auto_tags.empty', {
+          defaultValue: 'No session auto tags',
+        })}
         onTagAdd={handleSessionAutoTagAdd}
         onTagRemove={handleSessionAutoTagRemove}
       />
 
       <div className="croquis-start-modal__pipeline">
         <div className="croquis-start-modal__pipeline-header">
-          <span>Time Steps Pipeline</span>
+          <span>{t('croquis.time_steps_pipeline', { defaultValue: 'Time Steps Pipeline' })}</span>
           <span className="croquis-start-modal__pipeline-actions">
-            <span>{String(editableSteps.length)} Steps Total</span>
+            <span>
+              {t('croquis.steps_total', {
+                count: editableSteps.length,
+                formattedCount: editableSteps.length.toLocaleString(),
+                defaultValue: '{{formattedCount}} Steps Total',
+              })}
+            </span>
             <IconButton
               icon="plus"
               size="md"
-              aria-label="Add time step"
+              aria-label={t('croquis.add_time_step', { defaultValue: 'Add time step' })}
               disabled={busy || selectedPreset === null}
               onClick={handleAddStep}
             />
@@ -363,19 +441,33 @@ export function CroquisStartModal({
             onValueChange={value => {
               setExpandedStepId(typeof value === 'string' ? value : null);
             }}
+            reorderable={!busy && editableSteps.length > 0}
+            onItemReorder={handleStepReorder}
             className="croquis-start-modal__accordion"
           >
             {editableSteps.map((step, index) => (
-              <AccordionItem key={step.id} value={step.id}>
-                <AccordionItemHeader
-                  index={String(index + 1).padStart(2, '0')}
-                  meta={formatDurationCompact(getStepDuration(step))}
+              <AccordionItem key={step.id} value={step.id} disabled={busy}>
+                <AccordionItemDragHeader
+                  className="croquis-start-modal__step-header"
+                  disclosureLabel={`${expandedStepId === step.id ? 'Collapse' : 'Expand'} step ${String(
+                    index + 1,
+                  )}`}
+                  dragLabel={`Drag step ${String(index + 1)} to reorder`}
                 >
-                  {step.name}
-                </AccordionItemHeader>
+                  <span className="croquis-start-modal__step-index">
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  <span className="croquis-start-modal__step-title">{step.name}</span>
+                  <span className="croquis-start-modal__step-duration">
+                    {formatDurationCompact(getStepDuration(step))}
+                  </span>
+                </AccordionItemDragHeader>
                 <AccordionItemBody className="croquis-start-modal__step-panel">
                   <Select
-                    aria-label={`${step.name} source preset`}
+                    aria-label={t('croquis.step_source_preset', {
+                      step: step.name,
+                      defaultValue: '{{step}} source preset',
+                    })}
                     options={stepPresetOptions}
                     value={step.timeStepPresetId ?? USER_CUSTOM_STEP_VALUE}
                     onValueChange={nextValue => {
@@ -420,10 +512,28 @@ export function CroquisStartModal({
                         captureEnabled: checked,
                       }));
                     }}
+                    onFilterChange={checked => {
+                      updateStep(step.id, currentStep => ({
+                        ...currentStep,
+                        filterEnabled: checked,
+                      }));
+                    }}
                     onGrayscaleChange={checked => {
                       updateStep(step.id, currentStep => ({
                         ...currentStep,
                         grayscaleEnabled: checked,
+                      }));
+                    }}
+                    onBlurChange={checked => {
+                      updateStep(step.id, currentStep => ({
+                        ...currentStep,
+                        blurEnabled: checked,
+                      }));
+                    }}
+                    onBlurAmountChange={value => {
+                      updateStep(step.id, currentStep => ({
+                        ...currentStep,
+                        blurAmount: clampFilterPercent(value),
                       }));
                     }}
                     onResultSavePathChange={path => {
@@ -447,7 +557,7 @@ export function CroquisStartModal({
                         handleDeleteStep(step.id);
                       }}
                     >
-                      Delete
+                      {t('common.delete', { defaultValue: 'Delete' })}
                     </Button>
                   </div>
                 </AccordionItemBody>
@@ -456,23 +566,28 @@ export function CroquisStartModal({
           </AccordionRoot>
         ) : (
           <div className="croquis-start-modal__pipeline-empty">
-            Add a user custom time step to build this session.
+            {t('croquis.empty_pipeline', {
+              defaultValue: 'Add a user custom time step to build this session.',
+            })}
           </div>
         )}
       </div>
 
-      <div className="croquis-start-modal__summary" aria-label="Croquis session summary">
+      <div
+        className="croquis-start-modal__summary"
+        aria-label={t('croquis.session_summary', { defaultValue: 'Croquis session summary' })}
+      >
         <div className="croquis-start-modal__summary-card">
           <Icon name="reload" size="md" color="brand" hierarchy="primary" aria-hidden />
           <div>
-            <span>Total Estimate</span>
+            <span>{t('croquis.total_estimate', { defaultValue: 'Total Estimate' })}</span>
             <strong>{totalDurationLabel}</strong>
           </div>
         </div>
         <div className="croquis-start-modal__summary-card">
           <Icon name="view-list" size="md" color="brand" hierarchy="primary" aria-hidden />
           <div>
-            <span>Total Assets</span>
+            <span>{t('croquis.total_assets', { defaultValue: 'Total Assets' })}</span>
             <strong>{totalAssetsLabel}</strong>
           </div>
         </div>
@@ -480,7 +595,7 @@ export function CroquisStartModal({
 
       <div className="croquis-start-modal__window-grid">
         <Input
-          label="Window height"
+          label={t('croquis.window_height', { defaultValue: 'Window height' })}
           type="number"
           min={0}
           step={1}
@@ -494,7 +609,7 @@ export function CroquisStartModal({
         />
 
         <Input
-          label="Window width"
+          label={t('croquis.window_width', { defaultValue: 'Window width' })}
           type="number"
           min={0}
           step={1}
@@ -509,7 +624,7 @@ export function CroquisStartModal({
       </div>
 
       <CheckboxRow
-        label="Shuffle entire queue"
+        label={t('croquis.shuffle_entire_queue', { defaultValue: 'Shuffle entire queue' })}
         checked={isShuffle}
         onCheckedChange={setIsShuffle}
       />

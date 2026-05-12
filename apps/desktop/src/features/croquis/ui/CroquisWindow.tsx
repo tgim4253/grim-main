@@ -1,10 +1,42 @@
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { IconButton } from '../../../shared/ui';
+import type { CroquisSession, CroquisSessionItem } from '../../../shared/types';
+import { clampFilterPercent, getRuntimeSessionFilterSettings } from '../lib/sessionPresetEditor';
 import { useCroquisSessionController } from '../lib/useCroquisSessionController';
 import './croquis.css';
 
+const getCroquisImageStyle = (session: CroquisSession, item: CroquisSessionItem): CSSProperties => {
+  const filterSettings = getRuntimeSessionFilterSettings(session.presetId, item.stepIndex, {
+    filterEnabled: item.grayscaleEnabled,
+    grayscaleEnabled: item.grayscaleEnabled,
+  });
+
+  if (!filterSettings.filterEnabled) {
+    return {};
+  }
+
+  const filterParts: string[] = [];
+
+  if (filterSettings.grayscaleEnabled) {
+    filterParts.push('grayscale(100%)');
+  }
+
+  if (filterSettings.blurEnabled) {
+    const whiteoutAmount = clampFilterPercent(filterSettings.blurAmount);
+    filterParts.push(`contrast(${String(100 - whiteoutAmount)}%)`);
+    filterParts.push(`brightness(${String(100 + whiteoutAmount)}%)`);
+  }
+
+  return {
+    filter: filterParts.length > 0 ? filterParts.join(' ') : undefined,
+  };
+};
+
 export function CroquisWindow() {
+  const { t } = useTranslation('common');
   const [params] = useSearchParams();
   const [isHovering, setIsHovering] = useState(false);
   const controller = useCroquisSessionController({
@@ -29,7 +61,8 @@ export function CroquisWindow() {
     return (
       <div className="croquis-page croquis-page--empty">
         <div className="croquis-page__empty">
-          {controller.status ?? 'Loading croquis session...'}
+          {controller.status ??
+            t('croquis.loading_session', { defaultValue: 'Loading croquis session...' })}
         </div>
       </div>
     );
@@ -71,12 +104,14 @@ export function CroquisWindow() {
             alt={currentItem.fileName}
             className="croquis-page__image"
             data-tauri-drag-region
-            style={{
-              filter: currentItem.grayscaleEnabled ? 'grayscale(1)' : undefined,
-            }}
+            style={getCroquisImageStyle(session, currentItem)}
           />
         ) : (
-          <div className="croquis-page__empty">Image preview unavailable.</div>
+          <div className="croquis-page__empty">
+            {t('croquis.image_preview_unavailable', {
+              defaultValue: 'Image preview unavailable.',
+            })}
+          </div>
         )}
       </main>
 
@@ -91,12 +126,16 @@ export function CroquisWindow() {
           </div>
         </div>
 
-        <div className="croquis-page__transport" role="toolbar" aria-label="Croquis controls">
+        <div
+          className="croquis-page__transport"
+          role="toolbar"
+          aria-label={t('croquis.controls', { defaultValue: 'Croquis controls' })}
+        >
           <IconButton
             icon="skip-back"
             size="lg"
-            aria-label="Previous image"
-            title="Previous"
+            aria-label={t('croquis.previous_image', { defaultValue: 'Previous image' })}
+            title={t('common.previous', { defaultValue: 'Previous' })}
             disabled={!controller.hasPrevious}
             onClick={() => {
               controller.moveToIndex(controller.currentIndex - 1);
@@ -106,8 +145,16 @@ export function CroquisWindow() {
             icon={controller.isPlaying ? 'pause' : 'play'}
             size="lg"
             active={controller.isPlaying}
-            aria-label={controller.isPlaying ? 'Pause session' : 'Resume session'}
-            title={controller.isPlaying ? 'Pause' : 'Resume'}
+            aria-label={
+              controller.isPlaying
+                ? t('croquis.pause_session', { defaultValue: 'Pause session' })
+                : t('croquis.resume_session', { defaultValue: 'Resume session' })
+            }
+            title={
+              controller.isPlaying
+                ? t('common.pause', { defaultValue: 'Pause' })
+                : t('common.resume', { defaultValue: 'Resume' })
+            }
             onClick={() => {
               controller.setIsPlaying(value => !value);
             }}
@@ -115,8 +162,8 @@ export function CroquisWindow() {
           <IconButton
             icon="skip-forward"
             size="lg"
-            aria-label="Next image"
-            title="Next"
+            aria-label={t('croquis.next_image', { defaultValue: 'Next image' })}
+            title={t('common.next', { defaultValue: 'Next' })}
             disabled={!controller.hasNext}
             onClick={() => {
               controller.moveToIndex(controller.currentIndex + 1);
@@ -127,8 +174,16 @@ export function CroquisWindow() {
               icon="check"
               size="lg"
               active={controller.isCurrentSaved}
-              aria-label={controller.isCurrentSaved ? 'Record saved' : 'Save record'}
-              title={controller.isCurrentSaved ? 'Saved' : 'Save'}
+              aria-label={
+                controller.isCurrentSaved
+                  ? t('croquis.record_saved', { defaultValue: 'Record saved' })
+                  : t('croquis.save_record', { defaultValue: 'Save record' })
+              }
+              title={
+                controller.isCurrentSaved
+                  ? t('common.saved', { defaultValue: 'Saved' })
+                  : t('common.save', { defaultValue: 'Save' })
+              }
               disabled={controller.isCurrentSaved}
               onClick={() => {
                 void controller.handleSave();
@@ -139,8 +194,8 @@ export function CroquisWindow() {
             <IconButton
               icon="camera"
               size="lg"
-              aria-label="Capture result"
-              title="Capture"
+              aria-label={t('croquis.capture_result', { defaultValue: 'Capture result' })}
+              title={t('common.capture', { defaultValue: 'Capture' })}
               disabled={captureDisabled}
               onClick={() => {
                 void controller.handleCapture();

@@ -50,6 +50,7 @@ pub fn run() {
             commands::folder_commands::delete_virtual_folder,
             commands::folder_commands::search_virtual_folders,
             commands::asset_commands::list_assets,
+            commands::asset_commands::list_asset_record_counts,
             commands::asset_commands::get_asset_detail,
             commands::asset_commands::update_asset_folders,
             commands::asset_commands::batch_update_asset_folders,
@@ -84,12 +85,24 @@ pub fn run() {
         .plugin(tauri_plugin_decorum::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
+            #[cfg(desktop)]
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())?;
+
             let handle = app.handle();
             let app_state = tauri::async_runtime::block_on(
                 state::AppState::initialize(handle),
             )
             .map_err(std::io::Error::other)?;
+            let asset_scope = app.asset_protocol_scope();
+            asset_scope
+                .allow_directory(&app_state.library_paths.asset_dir, true)
+                .map_err(std::io::Error::other)?;
+            asset_scope
+                .allow_directory(&app_state.library_paths.thumb_dir, true)
+                .map_err(std::io::Error::other)?;
             let asset_repository = AssetRepository::new(app_state.pool.clone());
             let folder_repository =
                 FolderRepository::new(app_state.pool.clone());

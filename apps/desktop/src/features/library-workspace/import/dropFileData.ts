@@ -1,6 +1,7 @@
+import i18n from '../../../i18n';
+
 export const MAX_DROP_IMAGE_BYTES = 50 * 1024 * 1024;
-export const MAX_DROP_IMAGE_COUNT = 200;
-const MAX_DROP_FILE_CANDIDATES = 1_000;
+export const DROP_IMAGE_WARNING_THRESHOLD = 200;
 
 const IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
   png: 'image/png',
@@ -38,12 +39,25 @@ type WebkitDataTransferItemLike = {
   webkitGetAsEntry?: () => DroppedFileSystemEntry | null;
 };
 
+export type DroppedFileDataSource =
+  | {
+      kind: 'entries';
+      entries: DroppedFileSystemEntry[];
+    }
+  | {
+      kind: 'files';
+      files: File[];
+    };
+
 export type DroppedImageFileCollection = {
   files: File[];
   oversizedCount: number;
-  skippedCount: number;
-  truncated: boolean;
   unsupportedCount: number;
+};
+
+export type DroppedImageFileCandidateCount = {
+  count: number;
+  exact: boolean;
 };
 
 export function hasFileDropData(dataTransfer: DataTransfer) {
@@ -66,6 +80,10 @@ export function getImageMimeType(file: File) {
   }
 
   return null;
+}
+
+function isSupportedImageFileName(fileName: string) {
+  return Object.prototype.hasOwnProperty.call(IMAGE_MIME_BY_EXTENSION, getFileExtension(fileName));
 }
 
 function isSupportedImageFile(file: File) {
@@ -92,18 +110,14 @@ function readDirectoryBatch(reader: DroppedFileSystemDirectoryReader) {
   });
 }
 
-async function readEntryFiles(entry: DroppedFileSystemEntry, files: File[]): Promise<boolean> {
-  if (files.length >= MAX_DROP_FILE_CANDIDATES) {
-    return true;
-  }
-
+async function readEntryFiles(entry: DroppedFileSystemEntry, files: File[]): Promise<void> {
   if (isFileEntry(entry)) {
     files.push(await readFileEntry(entry));
-    return files.length >= MAX_DROP_FILE_CANDIDATES;
+    return;
   }
 
   if (!isDirectoryEntry(entry)) {
-    return false;
+    return;
   }
 
   const reader = entry.createReader();
@@ -117,14 +131,9 @@ async function readEntryFiles(entry: DroppedFileSystemEntry, files: File[]): Pro
     }
 
     for (const nestedEntry of entries) {
-      const truncated = await readEntryFiles(nestedEntry, files);
-      if (truncated) {
-        return true;
-      }
+      await readEntryFiles(nestedEntry, files);
     }
   }
-
-  return false;
 }
 
 function getDroppedEntry(item: DataTransferItem) {
@@ -136,25 +145,121 @@ function getDroppedEntry(item: DataTransferItem) {
   return getAsEntry.call(item);
 }
 
-async function collectDroppedFiles(dataTransfer: DataTransfer) {
+export function createDroppedFileDataSource(dataTransfer: DataTransfer): DroppedFileDataSource {
   const entries = Array.from(dataTransfer.items)
     .filter(item => item.kind === 'file')
     .map(getDroppedEntry)
     .filter((entry): entry is DroppedFileSystemEntry => entry !== null);
 
-  const files: File[] = [];
-  let truncated = false;
+  if (entries.some(entry => entry.isDirectory)) {
+    return { kind: 'entries', entries };
+  }
 
-  if (entries.length > 0) {
-    for (const entry of entries) {
-      truncated = (await readEntryFiles(entry, files)) || truncated;
-      if (truncated) {
-        break;
+  const files = Array.from(dataTransfer.files);
+  if (files.length > 0) {
+    return { kind: 'files', files };
+  }
+
+  return entries.length > 0 ? { kind: 'entries', entries } : { kind: 'files', files };
+}
+
+function normalizeDroppedFileDataSource(source: DroppedFileDataSource | DataTransfer) {
+  return 'kind' in source ? source : createDroppedFileDataSource(source);
+}
+
+type CandidateCounter = {
+  count: number;
+  limit: number;
+};
+
+function incrementCandidateCounter(counter: CandidateCounter) {
+  counter.count += 1;
+}
+
+async function countEntryImageFileCandidates(
+  entry: DroppedFileSystemEntry,
+  counter: CandidateCounter,
+): Promise<void> {
+  if (counter.count >= counter.limit) {
+    return;
+  }
+
+  if (isFileEntry(entry)) {
+    if (isSupportedImageFileName(entry.name)) {
+      incrementCandidateCounter(counter);
+    }
+    return;
+  }
+
+  if (!isDirectoryEntry(entry)) {
+    return;
+  }
+
+  const reader = entry.createReader();
+  let hasMoreEntries = true;
+
+  while (hasMoreEntries && counter.count < counter.limit) {
+    const entries = await readDirectoryBatch(reader);
+    if (entries.length === 0) {
+      hasMoreEntries = false;
+      continue;
+    }
+
+    for (const nestedEntry of entries) {
+      await countEntryImageFileCandidates(nestedEntry, counter);
+      if (counter.count >= counter.limit) {
+        return;
       }
     }
+  }
+}
+
+export async function countDroppedImageFileCandidates(
+  source: DroppedFileDataSource,
+  limit: number,
+): Promise<DroppedImageFileCandidateCount> {
+  const counter = {
+    count: 0,
+    limit,
+  };
+
+  if (source.kind === 'files') {
+    for (const file of source.files) {
+      if (!isSupportedImageFile(file) || file.size > MAX_DROP_IMAGE_BYTES) {
+        continue;
+      }
+
+      counter.count += 1;
+    }
+
+    return {
+      count: counter.count,
+      exact: true,
+    };
+  }
+
+  for (const entry of source.entries) {
+    await countEntryImageFileCandidates(entry, counter);
+    if (counter.count >= limit) {
+      break;
+    }
+  }
+
+  return {
+    count: counter.count,
+    exact: counter.count < limit,
+  };
+}
+
+async function collectDroppedFiles(source: DroppedFileDataSource) {
+  const files: File[] = [];
+
+  if (source.kind === 'entries') {
+    for (const entry of source.entries) {
+      await readEntryFiles(entry, files);
+    }
   } else {
-    files.push(...Array.from(dataTransfer.files).slice(0, MAX_DROP_FILE_CANDIDATES));
-    truncated = dataTransfer.files.length > MAX_DROP_FILE_CANDIDATES;
+    files.push(...source.files);
   }
 
   const seen = new Set<string>();
@@ -168,16 +273,15 @@ async function collectDroppedFiles(dataTransfer: DataTransfer) {
     return true;
   });
 
-  return { files: deduped, truncated };
+  return deduped;
 }
 
 export async function collectSupportedDroppedImageFiles(
-  dataTransfer: DataTransfer,
+  source: DroppedFileDataSource | DataTransfer,
 ): Promise<DroppedImageFileCollection> {
-  const { files: droppedFiles, truncated } = await collectDroppedFiles(dataTransfer);
+  const droppedFiles = await collectDroppedFiles(normalizeDroppedFileDataSource(source));
   const files: File[] = [];
   let oversizedCount = 0;
-  let skippedCount = 0;
   let unsupportedCount = 0;
 
   for (const file of droppedFiles) {
@@ -191,19 +295,12 @@ export async function collectSupportedDroppedImageFiles(
       continue;
     }
 
-    if (files.length >= MAX_DROP_IMAGE_COUNT) {
-      skippedCount += 1;
-      continue;
-    }
-
     files.push(file);
   }
 
   return {
     files,
     oversizedCount,
-    skippedCount,
-    truncated,
     unsupportedCount,
   };
 }
@@ -229,7 +326,11 @@ export async function fileToDataImageSource(file: File) {
 
   if (file.size > MAX_DROP_IMAGE_BYTES) {
     throw new Error(
-      `${file.name} exceeds the ${String(MAX_DROP_IMAGE_BYTES / 1024 / 1024)} MB image drop limit.`,
+      i18n.t('import.error.image_drop_limit', {
+        fileName: file.name,
+        limitMb: String(MAX_DROP_IMAGE_BYTES / 1024 / 1024),
+        defaultValue: '{{fileName}} exceeds the {{limitMb}} MB image drop limit.',
+      }),
     );
   }
 
@@ -242,24 +343,30 @@ export function formatDroppedImageFileWarnings(collection: DroppedImageFileColle
   const warnings: string[] = [];
 
   if (collection.unsupportedCount > 0) {
-    warnings.push(`${collection.unsupportedCount.toLocaleString()} non-image files skipped`);
+    warnings.push(
+      i18n.t('import.warning.non_image_skipped', {
+        count: collection.unsupportedCount,
+        formattedCount: collection.unsupportedCount.toLocaleString(),
+        defaultValue: '{{formattedCount}} non-image files skipped',
+      }),
+    );
   }
 
   if (collection.oversizedCount > 0) {
     warnings.push(
-      `${collection.oversizedCount.toLocaleString()} images over ${String(MAX_DROP_IMAGE_BYTES / 1024 / 1024)} MB skipped`,
+      i18n.t('import.warning.oversized_skipped', {
+        count: collection.oversizedCount,
+        formattedCount: collection.oversizedCount.toLocaleString(),
+        limitMb: String(MAX_DROP_IMAGE_BYTES / 1024 / 1024),
+        defaultValue: '{{formattedCount}} images over {{limitMb}} MB skipped',
+      }),
     );
   }
 
-  if (collection.skippedCount > 0) {
-    warnings.push(
-      `${collection.skippedCount.toLocaleString()} images skipped after the ${MAX_DROP_IMAGE_COUNT.toLocaleString()} file limit`,
-    );
-  }
-
-  if (collection.truncated) {
-    warnings.push(`folder scan stopped after ${MAX_DROP_FILE_CANDIDATES.toLocaleString()} files`);
-  }
-
-  return warnings.length > 0 ? `${warnings.join('; ')}.` : null;
+  return warnings.length > 0
+    ? i18n.t('import.warning.joined', {
+        warnings: warnings.join('; '),
+        defaultValue: '{{warnings}}.',
+      })
+    : null;
 }

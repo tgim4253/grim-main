@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window';
+import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '../../../shared/ui';
 import { usePointerSelection } from '../../../shared/hooks';
@@ -15,6 +16,8 @@ type PointerPoint = {
   x: number;
   y: number;
 };
+
+type TauriMonitor = NonNullable<Awaited<ReturnType<typeof currentMonitor>>>;
 
 const MIN_SELECTION_SIZE = 12;
 const IDLE_OVERLAY_COLOR = 'rgba(0, 0, 0, 0.35)';
@@ -38,6 +41,50 @@ const normaliseRect = (rect: CaptureRect, monitor: CaptureMonitor): CaptureRect 
   return { x, y, width, height };
 };
 
+const normaliseScaleFactor = (scaleFactor: number): number => {
+  if (Number.isFinite(scaleFactor) && scaleFactor > 0) {
+    return scaleFactor;
+  }
+
+  const fallbackScale = window.devicePixelRatio || 1;
+  return Number.isFinite(fallbackScale) && fallbackScale > 0 ? fallbackScale : 1;
+};
+
+const createCaptureMonitor = (current: TauriMonitor): CaptureMonitor => {
+  const scaleFactor = normaliseScaleFactor(current.scaleFactor);
+  const position = current.position.toLogical(scaleFactor);
+  const size = current.size.toLogical(scaleFactor);
+
+  return {
+    x: Math.round(position.x),
+    y: Math.round(position.y),
+    width: Math.max(1, Math.round(size.width)),
+    height: Math.max(1, Math.round(size.height)),
+    scaleFactor,
+  };
+};
+
+const createViewportCaptureMonitor = (): CaptureMonitor => ({
+  x: 0,
+  y: 0,
+  width: Math.max(1, Math.round(window.innerWidth)),
+  height: Math.max(1, Math.round(window.innerHeight)),
+  scaleFactor: normaliseScaleFactor(window.devicePixelRatio || 1),
+});
+
+const resolveLogicalWindowOffset = (
+  position: Awaited<ReturnType<ReturnType<typeof getCurrentWindow>['innerPosition']>>,
+  monitor: CaptureMonitor,
+): PointerPoint => {
+  const scaleFactor = normaliseScaleFactor(monitor.scaleFactor);
+  const logicalPosition = position.toLogical(scaleFactor);
+
+  return {
+    x: logicalPosition.x - monitor.x,
+    y: logicalPosition.y - monitor.y,
+  };
+};
+
 const waitForOverlayPaint = () =>
   new Promise<void>(resolve => {
     window.requestAnimationFrame(() => {
@@ -48,6 +95,7 @@ const waitForOverlayPaint = () =>
   });
 
 export function CaptureOverlay() {
+  const { t } = useTranslation('common');
   const [params] = useSearchParams();
   const [monitor, setMonitor] = useState<CaptureMonitor | null>(null);
   const [phase, setPhase] = useState<OverlayPhase>('loading');
@@ -72,7 +120,7 @@ export function CaptureOverlay() {
     return () => {
       isMountedRef.current = false;
     };
-  }, []);
+  }, [t]);
 
   const context = useMemo<CaptureContext>(
     () => ({
@@ -133,40 +181,20 @@ export function CaptureOverlay() {
           return;
         }
 
-        if (current) {
-          setMonitor({
-            x: current.position.x,
-            y: current.position.y,
-            width: current.size.width,
-            height: current.size.height,
-            scaleFactor: current.scaleFactor,
-          });
-        } else {
-          const scale = window.devicePixelRatio || 1;
-          setMonitor({
-            x: 0,
-            y: 0,
-            width: Math.round(window.innerWidth * scale),
-            height: Math.round(window.innerHeight * scale),
-            scaleFactor: scale,
-          });
-        }
+        setMonitor(current ? createCaptureMonitor(current) : createViewportCaptureMonitor());
         setPhase('selecting');
       } catch (nextError) {
         if (cancelled) {
           return;
         }
 
-        const scale = window.devicePixelRatio || 1;
-        setMonitor({
-          x: 0,
-          y: 0,
-          width: Math.round(window.innerWidth * scale),
-          height: Math.round(window.innerHeight * scale),
-          scaleFactor: scale,
-        });
+        setMonitor(createViewportCaptureMonitor());
         setPhase('selecting');
-        setError(nextError instanceof Error ? nextError.message : 'Failed to resolve monitor');
+        setError(
+          nextError instanceof Error
+            ? nextError.message
+            : t('capture.error.resolve_monitor', { defaultValue: 'Failed to resolve monitor' }),
+        );
       }
     };
 
@@ -190,10 +218,7 @@ export function CaptureOverlay() {
           return;
         }
 
-        setWindowOffset({
-          x: position.x - monitor.x,
-          y: position.y - monitor.y,
-        });
+        setWindowOffset(resolveLogicalWindowOffset(position, monitor));
       } catch (nextError) {
         console.warn('Failed to resolve capture window offset', nextError);
         if (!cancelled) {
@@ -261,19 +286,19 @@ export function CaptureOverlay() {
         let offsetY = windowOffset.y;
         try {
           const position = await windowRef.current.innerPosition();
-          offsetX = position.x - monitor.x;
-          offsetY = position.y - monitor.y;
+          const nextWindowOffset = resolveLogicalWindowOffset(position, monitor);
+          offsetX = nextWindowOffset.x;
+          offsetY = nextWindowOffset.y;
           setWindowOffset({ x: offsetX, y: offsetY });
         } catch (nextError) {
           console.warn('Failed to refresh capture window offset', nextError);
         }
 
-        const scale = monitor.scaleFactor > 0 ? monitor.scaleFactor : window.devicePixelRatio || 1;
         const rect = completedSelection;
         const logicalRect = normaliseRect(
           {
-            x: Math.round(rect.x + offsetX / scale),
-            y: Math.round(rect.y + offsetY / scale),
+            x: Math.round(rect.x + offsetX),
+            y: Math.round(rect.y + offsetY),
             width: Math.round(rect.width),
             height: Math.round(rect.height),
           },
@@ -289,7 +314,11 @@ export function CaptureOverlay() {
         setPhase('preview');
       } catch (nextError) {
         if (isMountedRef.current) {
-          setError(nextError instanceof Error ? nextError.message : 'Failed to render preview');
+          setError(
+            nextError instanceof Error
+              ? nextError.message
+              : t('capture.error.render_preview', { defaultValue: 'Failed to render preview' }),
+          );
           resetSelection();
           setPhase('selecting');
         }
@@ -305,7 +334,7 @@ export function CaptureOverlay() {
     };
 
     void renderPreview();
-  }, [clearCompletedSelection, completedSelection, monitor, resetSelection, windowOffset]);
+  }, [clearCompletedSelection, completedSelection, monitor, resetSelection, t, windowOffset]);
 
   const handleRetake = useCallback(() => {
     resetSelection();
@@ -325,7 +354,11 @@ export function CaptureOverlay() {
     }
 
     if (!context.recordId) {
-      setError('Capture requires a saved record.');
+      setError(
+        t('capture.error.requires_saved_record', {
+          defaultValue: 'Capture requires a saved record.',
+        }),
+      );
       return;
     }
 
@@ -335,10 +368,14 @@ export function CaptureOverlay() {
       await ipc.capture.confirm({ baseUrl: previewUrl, context });
       await windowRef.current.close();
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : 'Failed to confirm capture');
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : t('capture.error.confirm_capture', { defaultValue: 'Failed to confirm capture' }),
+      );
       setBusy(false);
     }
-  }, [context, previewUrl]);
+  }, [context, previewUrl, t]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -395,9 +432,17 @@ export function CaptureOverlay() {
         <div className="capture-overlay__preview-card" onPointerDown={stopPointerPropagation}>
           <div className="capture-overlay__preview-image">
             {previewUrl ? (
-              <img src={previewUrl} alt="Capture preview" className="capture-overlay__image" />
+              <img
+                src={previewUrl}
+                alt={t('capture.preview_alt', { defaultValue: 'Capture preview' })}
+                className="capture-overlay__image"
+              />
             ) : (
-              <div className="capture-overlay__center-copy">Preparing capture preview...</div>
+              <div className="capture-overlay__center-copy">
+                {t('capture.preparing_preview', {
+                  defaultValue: 'Preparing capture preview...',
+                })}
+              </div>
             )}
           </div>
 
@@ -405,7 +450,7 @@ export function CaptureOverlay() {
 
           <div className="capture-overlay__preview-actions">
             <Button variant="secondary" disabled={busy} onClick={handleRetake}>
-              Retake
+              {t('capture.retake', { defaultValue: 'Retake' })}
             </Button>
             <Button
               variant="secondary"
@@ -414,10 +459,12 @@ export function CaptureOverlay() {
                 void handleCancel();
               }}
             >
-              Cancel
+              {t('common.cancel', { defaultValue: 'Cancel' })}
             </Button>
             <Button disabled={busy} onClick={() => void handleConfirmCapture()}>
-              {busy ? 'Saving...' : 'Confirm'}
+              {busy
+                ? t('common.saving', { defaultValue: 'Saving...' })
+                : t('common.confirm', { defaultValue: 'Confirm' })}
             </Button>
           </div>
         </div>
@@ -444,7 +491,7 @@ export function CaptureOverlay() {
               setMode('freeform');
             }}
           >
-            Freeform
+            {t('capture.mode.freeform', { defaultValue: 'Freeform' })}
           </Button>
           <Button
             variant="secondary"
@@ -455,7 +502,7 @@ export function CaptureOverlay() {
               setMode('square');
             }}
           >
-            Square
+            {t('capture.mode.square', { defaultValue: 'Square' })}
           </Button>
           <Button
             variant="secondary"
@@ -464,7 +511,7 @@ export function CaptureOverlay() {
               void handleCancel();
             }}
           >
-            Cancel
+            {t('common.cancel', { defaultValue: 'Cancel' })}
           </Button>
         </div>
       </div>
@@ -484,16 +531,20 @@ export function CaptureOverlay() {
 
       {phase === 'loading' ? (
         <div className="capture-overlay__center-copy">
-          {busy ? 'Processing capture...' : 'Preparing capture window...'}
+          {busy
+            ? t('capture.processing', { defaultValue: 'Processing capture...' })
+            : t('capture.preparing_window', { defaultValue: 'Preparing capture window...' })}
         </div>
       ) : null}
 
       <div className="capture-overlay__hint">
         {phase === 'selecting'
-          ? 'Drag to select the area to capture.'
+          ? t('capture.hint.selecting', { defaultValue: 'Drag to select the area to capture.' })
           : phase === 'preview'
-            ? 'Review the capture and confirm or retake.'
-            : 'Preparing capture window...'}
+            ? t('capture.hint.preview', {
+                defaultValue: 'Review the capture and confirm or retake.',
+              })
+            : t('capture.preparing_window', { defaultValue: 'Preparing capture window...' })}
       </div>
 
       {renderSelectionOverlay()}

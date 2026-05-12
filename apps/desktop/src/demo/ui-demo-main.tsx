@@ -1,13 +1,16 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../app/index.css';
+import i18n from '../i18n';
 import { DemoShell } from './DemoShell';
 import { UiDemoPage } from './UiDemoPage';
 
 const rootElement = document.getElementById('root');
 
 if (!rootElement) {
-  throw new Error('Root element not found');
+  throw new Error(
+    i18n.t('app.error.root_element_not_found', { defaultValue: 'Root element not found' }),
+  );
 }
 
 createRoot(rootElement).render(

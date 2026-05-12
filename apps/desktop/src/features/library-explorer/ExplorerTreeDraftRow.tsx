@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Icon } from '../../shared/ui';
 
 type ExplorerTreeDraftRowProps = {
@@ -16,6 +17,7 @@ export function ExplorerTreeDraftRow({
   onCommit,
   onCancel,
 }: ExplorerTreeDraftRowProps) {
+  const { t } = useTranslation('common');
   const [name, setName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const finalizingRef = useRef(false);
@@ -96,7 +98,7 @@ export function ExplorerTreeDraftRow({
             className="explorer-tree-row__draft-input"
             value={name}
             disabled={pending}
-            aria-label="New folder name"
+            aria-label={t('explorer.new_folder_name', { defaultValue: 'New folder name' })}
             aria-invalid={Boolean(error) || undefined}
             onChange={event => {
               setName(event.target.value);

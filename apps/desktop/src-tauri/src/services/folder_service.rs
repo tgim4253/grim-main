@@ -68,7 +68,7 @@ mod tests {
             SYSTEM_UNCATEGORIZED_FOLDER_NAME,
         },
         repositories::FolderRepository,
-        state::bootstrap::{ensure_schema, open_or_create_db, seed_defaults},
+        state::bootstrap::{ensure_schema, open_or_create_db},
     };
 
     use super::FolderService;
@@ -93,7 +93,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let service = FolderService::new(FolderRepository::new(pool.clone()));
         let root = service
@@ -179,7 +178,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let service = FolderService::new(FolderRepository::new(pool.clone()));
         let parent = service
@@ -264,7 +262,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let service = FolderService::new(FolderRepository::new(pool.clone()));
         let parent = service
@@ -329,7 +326,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let service = FolderService::new(FolderRepository::new(pool));
         let root_uncategorized = service
@@ -371,7 +367,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let service = FolderService::new(FolderRepository::new(pool.clone()));
         let parent = service

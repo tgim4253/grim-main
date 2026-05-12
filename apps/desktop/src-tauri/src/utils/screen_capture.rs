@@ -4,10 +4,20 @@ use anyhow::{anyhow, bail, Context, Result};
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use image::{DynamicImage, ImageFormat, RgbaImage};
-use screenshots::Screen;
+use screenshots::{display_info::DisplayInfo, Screen};
 use tokio::task;
 
 use crate::models::capture::{CaptureMonitor, CapturePreview, CaptureRect};
+
+const MONITOR_MATCH_TOLERANCE: u32 = 2;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct MonitorBounds {
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+}
 
 /// Capture a cropped preview of the requested monitor region.
 pub async fn render_capture_preview(
@@ -34,28 +44,11 @@ fn capture_region_as_png(
     monitor: CaptureMonitor,
 ) -> Result<Vec<u8>> {
     let screens = Screen::all()?;
-
-    let target_screen = screens
-        .into_iter()
-        .find(|screen| {
-            let info = screen.display_info;
-            info.x == monitor.x
-                && info.y == monitor.y
-                && info.width == monitor.width
-                && info.height == monitor.height
-        })
-        .or_else(|| Screen::from_point(monitor.x, monitor.y).ok())
+    let target_screen = resolve_target_screen(screens, &monitor)
         .ok_or_else(|| anyhow!("Failed to resolve monitor for capture"))?;
 
-    let (capture_x, capture_y, capture_width, capture_height) =
-        platform_capture_rect(rect, target_screen.display_info.scale_factor);
-
-    let capture = target_screen.capture_area(
-        capture_x,
-        capture_y,
-        capture_width,
-        capture_height,
-    )?;
+    let capture =
+        target_screen.capture_area(rect.x, rect.y, rect.width, rect.height)?;
     let width = capture.width();
     let height = capture.height();
     if width == 0 || height == 0 {
@@ -75,23 +68,112 @@ fn capture_region_as_png(
     Ok(buffer)
 }
 
-#[cfg_attr(not(target_os = "windows"), allow(unused_variables))]
-fn platform_capture_rect(
-    rect: CaptureRect,
-    scale_factor: f32,
-) -> (i32, i32, u32, u32) {
-    #[cfg(target_os = "windows")]
-    {
-        let scale = if scale_factor <= 0.0 { 1.0 } else { scale_factor } as f64;
-        let x = ((rect.x as f64) * scale).round() as i32;
-        let y = ((rect.y as f64) * scale).round() as i32;
-        let width = ((rect.width as f64) * scale).round().max(1.0) as u32;
-        let height = ((rect.height as f64) * scale).round().max(1.0) as u32;
-        (x, y, width, height)
+fn resolve_target_screen(
+    mut screens: Vec<Screen>,
+    monitor: &CaptureMonitor,
+) -> Option<Screen> {
+    for candidate in monitor_candidates(monitor) {
+        if let Some(index) = screens
+            .iter()
+            .position(|screen| monitor_matches(&screen.display_info, candidate))
+        {
+            return Some(screens.swap_remove(index));
+        }
     }
 
-    #[cfg(not(target_os = "windows"))]
-    {
-        (rect.x, rect.y, rect.width, rect.height)
+    for candidate in monitor_candidates(monitor) {
+        if let Ok(screen) =
+            Screen::from_point(candidate.center_x(), candidate.center_y())
+        {
+            if monitor_matches(&screen.display_info, candidate) {
+                return Some(screen);
+            }
+        }
     }
+
+    None
+}
+
+fn monitor_candidates(monitor: &CaptureMonitor) -> Vec<MonitorBounds> {
+    let provided = MonitorBounds::from_monitor(monitor);
+    let scale_factor = normalise_scale_factor(monitor.scale_factor);
+    let mut candidates = Vec::with_capacity(3);
+    push_unique_candidate(&mut candidates, provided);
+
+    if (scale_factor - 1.0).abs() > f64::EPSILON {
+        push_unique_candidate(
+            &mut candidates,
+            provided.scaled_by(1.0 / scale_factor),
+        );
+        push_unique_candidate(
+            &mut candidates,
+            provided.scaled_by(scale_factor),
+        );
+    }
+
+    candidates
+}
+
+fn monitor_matches(info: &DisplayInfo, candidate: MonitorBounds) -> bool {
+    within_tolerance(info.x, candidate.x)
+        && within_tolerance(info.y, candidate.y)
+        && info.width.abs_diff(candidate.width) <= MONITOR_MATCH_TOLERANCE
+        && info.height.abs_diff(candidate.height) <= MONITOR_MATCH_TOLERANCE
+}
+
+fn push_unique_candidate(
+    candidates: &mut Vec<MonitorBounds>,
+    candidate: MonitorBounds,
+) {
+    if !candidates.contains(&candidate) {
+        candidates.push(candidate);
+    }
+}
+
+fn normalise_scale_factor(scale_factor: f64) -> f64 {
+    if scale_factor.is_finite() && scale_factor > 0.0 {
+        scale_factor
+    } else {
+        1.0
+    }
+}
+
+fn within_tolerance(left: i32, right: i32) -> bool {
+    left.abs_diff(right) <= MONITOR_MATCH_TOLERANCE
+}
+
+impl MonitorBounds {
+    fn from_monitor(monitor: &CaptureMonitor) -> Self {
+        Self {
+            x: monitor.x,
+            y: monitor.y,
+            width: monitor.width,
+            height: monitor.height,
+        }
+    }
+
+    fn scaled_by(self, factor: f64) -> Self {
+        Self {
+            x: scale_coordinate(self.x, factor),
+            y: scale_coordinate(self.y, factor),
+            width: scale_length(self.width, factor),
+            height: scale_length(self.height, factor),
+        }
+    }
+
+    fn center_x(self) -> i32 {
+        self.x + (self.width / 2) as i32
+    }
+
+    fn center_y(self) -> i32 {
+        self.y + (self.height / 2) as i32
+    }
+}
+
+fn scale_coordinate(value: i32, factor: f64) -> i32 {
+    ((value as f64) * factor).round() as i32
+}
+
+fn scale_length(value: u32, factor: f64) -> u32 {
+    ((value as f64) * factor).round().max(1.0) as u32
 }

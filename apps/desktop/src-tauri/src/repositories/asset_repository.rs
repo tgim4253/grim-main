@@ -3,7 +3,7 @@ use sqlx::{Sqlite, SqlitePool, Transaction};
 
 use crate::{
     models::{
-        asset::{AssetDetail, AssetListSource, AssetSummary},
+        asset::{AssetDetail, AssetListSource, AssetRecordCount, AssetSummary},
         folder::VirtualFolder,
         record::CroquisRecordSummary,
     },
@@ -216,6 +216,56 @@ impl AssetRepository {
         .await?;
 
         Ok(asset_from_row(row))
+    }
+
+    pub async fn list_record_counts_by_source(
+        &self,
+        source: AssetListSource,
+    ) -> Result<Vec<AssetRecordCount>> {
+        let source_assets = self.list_by_source(source).await?;
+        if source_assets.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let asset_ids = source_assets
+            .iter()
+            .map(|asset| asset.id.clone())
+            .collect::<Vec<_>>();
+        let asset_ids_json = serde_json::to_string(&asset_ids)?;
+        let rows = sqlx::query_as!(
+            AssetRecordCount,
+            r#"
+            WITH requested_asset(id) AS (
+              SELECT CAST(value AS TEXT)
+              FROM json_each(?1)
+            ),
+            asset_record_match AS (
+              SELECT requested.id AS asset_id,
+                     cr.id AS record_id
+              FROM requested_asset requested
+              LEFT JOIN croquis_record cr
+                ON cr.source_asset_id = requested.id
+               AND cr.finished_at IS NOT NULL
+              UNION ALL
+              SELECT requested.id AS asset_id,
+                     cr.id AS record_id
+              FROM requested_asset requested
+              LEFT JOIN croquis_record cr
+                ON cr.result_asset_id = requested.id
+               AND cr.finished_at IS NOT NULL
+               AND (cr.source_asset_id IS NULL OR cr.source_asset_id != requested.id)
+            )
+            SELECT asset_id AS "asset_id!: String",
+                   COUNT(record_id) AS "related_record_count!: i64"
+            FROM asset_record_match
+            GROUP BY asset_id
+            "#,
+            asset_ids_json
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows)
     }
 
     pub async fn get_detail(&self, asset_id: &str) -> Result<AssetDetail> {

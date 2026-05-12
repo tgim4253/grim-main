@@ -194,7 +194,7 @@ mod tests {
         },
         services::LibraryStorage,
         state::{
-            bootstrap::{ensure_schema, open_or_create_db, seed_defaults},
+            bootstrap::{ensure_schema, open_or_create_db},
             LibraryPaths,
         },
     };
@@ -235,7 +235,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let asset_id = "asset-finish-1";
         let asset_repository = AssetRepository::new(pool.clone());
@@ -336,7 +335,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let storage = storage_for(&dir);
         let asset_id = "asset-1";

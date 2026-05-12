@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { SessionPreset } from '../../../shared/types';
 
 type CroquisPresetStepListProps = {
@@ -5,6 +6,8 @@ type CroquisPresetStepListProps = {
 };
 
 export function CroquisPresetStepList({ preset }: CroquisPresetStepListProps) {
+  const { t } = useTranslation('common');
+
   if (preset === null) {
     return null;
   }
@@ -18,13 +21,13 @@ export function CroquisPresetStepList({ preset }: CroquisPresetStepListProps) {
             <span>
               {step.timeStep.autoTags.length > 0
                 ? step.timeStep.autoTags.map(tag => tag.name).join(', ')
-                : 'No auto tags'}
+                : t('croquis.auto_tags.empty', { defaultValue: 'No auto tags' })}
             </span>
           </div>
           <span>
             {step.timeStep.defaultDurationSeconds
               ? `${String(step.timeStep.defaultDurationSeconds)}s`
-              : 'Free'}
+              : t('croquis.duration.free', { defaultValue: 'Free' })}
           </span>
         </div>
       ))}

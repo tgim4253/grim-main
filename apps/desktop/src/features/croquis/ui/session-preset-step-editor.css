@@ -98,9 +98,13 @@
     text-transform: none;
   }
 
+  .session-preset-step-editor__settings {
+    gap: 10px;
+  }
+
   .session-preset-step-editor__nested-settings {
     display: grid;
-    gap: var(--semantic-spacing-component-md);
+    gap: var(--semantic-spacing-component-sm);
     min-width: 0;
     padding-left: var(--primitives-spacing-5);
     border-left: 1px solid var(--semantic-colors-surface-elevated);

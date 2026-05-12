@@ -59,6 +59,7 @@ docs/                # 프로젝트 문서와 리팩토링 노트
 | 명령어              | 설명                                                 |
 | ------------------- | ---------------------------------------------------- |
 | `pnpm dev`          | 데스크톱 개발 서버 실행 (`@grim/desktop dev` 프록시) |
+| `pnpm dev:local-db` | repo-local `library/` 폴더를 DB/storage로 개발 실행  |
 | `pnpm ui:demo`      | 분리된 라이브러리 데모 페이지 엔트리 실행            |
 | `pnpm build:front`  | React/Vite 정적 프론트엔드 빌드 생성                 |
 | `pnpm build`        | `tauri build` 실행으로 전체 데스크톱 앱 번들링       |
@@ -71,6 +72,8 @@ docs/                # 프로젝트 문서와 리팩토링 노트
 | `pnpm format`       | Prettier + `cargo fmt --check` 실행                  |
 | `pnpm format:write` | Prettier + `cargo fmt`로 코드 포맷팅 적용            |
 | `pnpm translate`    | `scripts/translator.mjs`로 로케일 JSON 갱신          |
+
+`pnpm dev:local-db`는 기본으로 `./library`를 쓰고, 다른 로컬 개발 라이브러리는 `GRIM_LIBRARY_DIR=/absolute/path`로 지정할 수 있다.
 
 ---
 

@@ -34,9 +34,10 @@ impl CaptureService {
     pub async fn open_capture_overlay(
         &self,
         app_handle: &tauri::AppHandle,
+        source_window: &tauri::WebviewWindow,
         payload: CaptureOverlayPayload,
     ) -> Result<()> {
-        open_capture_overlay(app_handle, payload).await
+        open_capture_overlay(app_handle, source_window, payload).await
     }
 
     pub async fn render_capture_preview(
@@ -163,10 +164,15 @@ async fn resolve_result_destination(
 /// Launch the transparent capture overlay used to select screen regions.
 pub async fn open_capture_overlay(
     app_handle: &tauri::AppHandle,
+    source_window: &tauri::WebviewWindow,
     payload: CaptureOverlayPayload,
 ) -> Result<()> {
-    app_launcher::capture::launch_capture_overlay(app_handle, &payload)
-        .map_err(|err| anyhow!(err))?;
+    app_launcher::capture::launch_capture_overlay(
+        app_handle,
+        source_window,
+        &payload,
+    )
+    .map_err(|err| anyhow!(err))?;
 
     Ok(())
 }

@@ -1,10 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { getErrorMessage } from '../../../shared/lib/error';
 import { ipc } from '../../../shared/lib/ipc';
-import type { CroquisRecordDetail, CroquisRecordSummary } from '../../../shared/types';
+import type {
+  CroquisRecordDetail,
+  CroquisRecordSummary,
+  Tag,
+  TagGroup,
+  TagIndex,
+} from '../../../shared/types';
 import { Button } from '../../../shared/ui';
 import { LibraryWorkspace } from '../common/LibraryWorkspace';
 import type { LibraryWorkspaceLayout } from '../common/types';
-import { RecordExplorerHeader } from './RecordExplorerHeader';
+import {
+  RecordExplorerHeader,
+  type RecordExplorerFilterGroup,
+  type RecordExplorerSelectedFilters,
+} from './RecordExplorerHeader';
 import { RecordResultPreviewPanel } from './RecordResultPreviewPanel';
 import { RecordResultTile } from './RecordResultTile';
 import { RecordSelectionToolbar } from './RecordSelectionToolbar';
@@ -23,16 +35,117 @@ type RecordGridStateProps = {
   action?: ReactNode;
 };
 
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error) {
-    return error.message;
+type SelectedRecordFilters = Record<string, string[]>;
+
+const EMPTY_TAG_INDEX: TagIndex = {
+  groups: [],
+  tags: [],
+};
+
+const UNGROUPED_RECORD_FILTER_GROUP_KEY = '__record-filter-group:ungrouped__';
+
+function compareBySortOrderThenName(
+  first: Pick<Tag | TagGroup, 'name' | 'sortOrder'>,
+  second: Pick<Tag | TagGroup, 'name' | 'sortOrder'>,
+) {
+  if (first.sortOrder !== second.sortOrder) {
+    return first.sortOrder - second.sortOrder;
   }
 
-  if (typeof error === 'string') {
-    return error;
+  return first.name.localeCompare(second.name);
+}
+
+function getRecordFilterGroupKey(groupId: string | null) {
+  return groupId ?? UNGROUPED_RECORD_FILTER_GROUP_KEY;
+}
+
+function createRecordFilterGroups(tagIndex: TagIndex): RecordExplorerFilterGroup[] {
+  const tagsByGroupId = new Map<string | null, Tag[]>();
+
+  for (const tag of tagIndex.tags) {
+    const groupId = tag.groupId ?? null;
+    const groupTags = tagsByGroupId.get(groupId) ?? [];
+    groupTags.push(tag);
+    tagsByGroupId.set(groupId, groupTags);
   }
 
-  return fallback;
+  const groups = [...tagIndex.groups]
+    .sort(compareBySortOrderThenName)
+    .map<RecordExplorerFilterGroup>(group => ({
+      key: getRecordFilterGroupKey(group.id),
+      label: group.name,
+      tags: [...(tagsByGroupId.get(group.id) ?? [])].sort(compareBySortOrderThenName).map(tag => ({
+        id: tag.id,
+        name: tag.name,
+      })),
+    }))
+    .filter(group => group.tags.length > 0);
+
+  const ungroupedTags = [...(tagsByGroupId.get(null) ?? [])].sort(compareBySortOrderThenName);
+  if (ungroupedTags.length > 0) {
+    groups.push({
+      key: UNGROUPED_RECORD_FILTER_GROUP_KEY,
+      label: 'Ungrouped',
+      tags: ungroupedTags.map(tag => ({
+        id: tag.id,
+        name: tag.name,
+      })),
+    });
+  }
+
+  return groups;
+}
+
+function hasActiveSelectedRecordFilters(selectedFilters: RecordExplorerSelectedFilters) {
+  return Object.values(selectedFilters).some(tagIds => tagIds.length > 0);
+}
+
+function recordMatchesSelectedFilters(
+  record: RecordResultItem,
+  selectedFilters: RecordExplorerSelectedFilters,
+) {
+  const selectedTagGroups = Object.values(selectedFilters).filter(tagIds => tagIds.length > 0);
+  if (selectedTagGroups.length === 0) {
+    return true;
+  }
+
+  const recordTagIds = new Set(record.tags.map(tag => tag.id));
+
+  return selectedTagGroups.every(tagIds => tagIds.some(tagId => recordTagIds.has(tagId)));
+}
+
+function pruneSelectedRecordFilters(
+  selectedFilters: SelectedRecordFilters,
+  filterGroups: readonly RecordExplorerFilterGroup[],
+) {
+  const validTagsByGroupKey = new Map(
+    filterGroups.map(group => [group.key, new Set(group.tags.map(tag => tag.id))]),
+  );
+  const nextFilters: SelectedRecordFilters = {};
+  let changed = false;
+
+  for (const [groupKey, tagIds] of Object.entries(selectedFilters)) {
+    const validTagIds = validTagsByGroupKey.get(groupKey);
+    if (!validTagIds) {
+      changed = true;
+      continue;
+    }
+
+    const nextTagIds = tagIds.filter(tagId => validTagIds.has(tagId));
+    if (nextTagIds.length !== tagIds.length) {
+      changed = true;
+    }
+
+    if (nextTagIds.length > 0) {
+      nextFilters[groupKey] = nextTagIds;
+    }
+  }
+
+  if (Object.keys(nextFilters).length !== Object.keys(selectedFilters).length) {
+    changed = true;
+  }
+
+  return changed ? nextFilters : selectedFilters;
 }
 
 function RecordGridState({ title, description, action }: RecordGridStateProps) {
@@ -86,6 +199,7 @@ function getRelatedRecords(
 }
 
 export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewProps) {
+  const { t } = useTranslation('common');
   const [layout, setLayout] = useState<LibraryWorkspaceLayout>('masonry');
   const [records, setRecords] = useState<CroquisRecordSummary[]>([]);
   const [recordDetailsById, setRecordDetailsById] = useState(
@@ -99,6 +213,9 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
   const [isActionBusy, setIsActionBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [filterExpanded, setFilterExpanded] = useState(false);
+  const [selectedRecordFilters, setSelectedRecordFilters] = useState<SelectedRecordFilters>({});
+  const [tagIndex, setTagIndex] = useState<TagIndex>(EMPTY_TAG_INDEX);
   const [tagGroupNamesById, setTagGroupNamesById] = useState(() => new Map<string, string>());
   const loadSequenceRef = useRef(0);
   const selectedRecordIdRef = useRef<string | null>(null);
@@ -142,10 +259,15 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
       setSelectedRecordId(null);
       setSelectedRecordIds([]);
       setPreviewOpen(false);
-      setError(getErrorMessage(nextError, 'Failed to load records.'));
+      setError(
+        getErrorMessage(
+          nextError,
+          t('records.error.load', { defaultValue: 'Failed to load records.' }),
+        ),
+      );
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadRecords();
@@ -161,10 +283,12 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
           return;
         }
 
+        setTagIndex(tagIndex);
         setTagGroupNamesById(new Map(tagIndex.groups.map(group => [group.id, group.name])));
       })
       .catch(() => {
         if (!cancelled) {
+          setTagIndex(EMPTY_TAG_INDEX);
           setTagGroupNamesById(new Map());
         }
       });
@@ -184,23 +308,72 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
     [recordDetailsById, records],
   );
 
+  const recordFilterGroups = useMemo(() => createRecordFilterGroups(tagIndex), [tagIndex]);
+
+  useEffect(() => {
+    setSelectedRecordFilters(current => pruneSelectedRecordFilters(current, recordFilterGroups));
+  }, [recordFilterGroups]);
+
+  const filteredItems = useMemo(
+    () => items.filter(item => recordMatchesSelectedFilters(item, selectedRecordFilters)),
+    [items, selectedRecordFilters],
+  );
+  const hasActiveFilters = hasActiveSelectedRecordFilters(selectedRecordFilters);
   const recordsBySourceAssetId = useMemo(() => createRecordsBySourceAssetId(items), [items]);
 
   const gridEmptyState = isLoading ? (
-    <RecordGridState title="Loading records..." />
+    <RecordGridState title={t('records.loading', { defaultValue: 'Loading records...' })} />
   ) : error ? (
     <RecordGridState
-      title="Failed to load records"
+      title={t('records.failed_to_load', { defaultValue: 'Failed to load records' })}
       description={error}
       action={
         <Button size="sm" onClick={() => void loadRecords()}>
-          Retry
+          {t('common.retry', { defaultValue: 'Retry' })}
         </Button>
       }
     />
+  ) : hasActiveFilters ? (
+    <RecordGridState
+      title={t('records.filters.no_matches', {
+        defaultValue: 'No records match these filters',
+      })}
+      description={t('records.filters.clear_tag_hint', {
+        defaultValue: 'Try clearing a tag filter.',
+      })}
+    />
   ) : (
-    <RecordGridState title="No records yet" />
+    <RecordGridState title={t('records.empty', { defaultValue: 'No records yet' })} />
   );
+
+  useEffect(() => {
+    const itemIds = new Set(filteredItems.map(item => item.id));
+    setSelectedRecordIds(current => current.filter(recordId => itemIds.has(recordId)));
+  }, [filteredItems]);
+
+  const handleFilterTagToggle = useCallback((groupKey: string, tagId: string) => {
+    setSelectedRecordFilters(current => {
+      const currentTagIds = current[groupKey] ?? [];
+      const nextTagIds = currentTagIds.includes(tagId)
+        ? currentTagIds.filter(currentTagId => currentTagId !== tagId)
+        : [...currentTagIds, tagId];
+
+      if (nextTagIds.length > 0) {
+        return {
+          ...current,
+          [groupKey]: nextTagIds,
+        };
+      }
+
+      const nextFilters: SelectedRecordFilters = {};
+      for (const [currentGroupKey, currentTagIds] of Object.entries(current)) {
+        if (currentGroupKey !== groupKey) {
+          nextFilters[currentGroupKey] = currentTagIds;
+        }
+      }
+      return nextFilters;
+    });
+  }, []);
 
   const handleSelectedRecordChange = (recordId: string) => {
     if (selectionMode) {
@@ -231,19 +404,19 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
           return current;
         }
 
-        return selectedRecordId && records.some(record => record.id === selectedRecordId)
+        return selectedRecordId && filteredItems.some(record => record.id === selectedRecordId)
           ? [selectedRecordId]
           : [];
       });
     },
-    [records, selectedRecordId],
+    [filteredItems, selectedRecordId],
   );
 
   const handleSelectAllChange = useCallback(
     (selected: boolean) => {
-      setSelectedRecordIds(selected ? records.map(record => record.id) : []);
+      setSelectedRecordIds(selected ? filteredItems.map(record => record.id) : []);
     },
-    [records],
+    [filteredItems],
   );
 
   const handleDeleteSelected = useCallback(() => {
@@ -268,12 +441,19 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
         await onExplorerRefresh?.();
       })
       .catch((nextError: unknown) => {
-        setActionError(getErrorMessage(nextError, 'Failed to delete selected records.'));
+        setActionError(
+          getErrorMessage(
+            nextError,
+            t('records.error.delete_selected', {
+              defaultValue: 'Failed to delete selected records.',
+            }),
+          ),
+        );
       })
       .finally(() => {
         setIsActionBusy(false);
       });
-  }, [isActionBusy, loadRecords, onExplorerRefresh, selectedRecordId, selectedRecordIds]);
+  }, [isActionBusy, loadRecords, onExplorerRefresh, selectedRecordId, selectedRecordIds, t]);
 
   const statusError = actionError;
 
@@ -281,12 +461,12 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
     <>
       <LibraryWorkspace
         mode="records"
-        items={items}
+        items={filteredItems}
         layout={layout}
         selectedItemId={selectedRecordId ?? undefined}
         selectedItemIds={selectedRecordIds}
         selectionMode={selectionMode}
-        gridAriaLabel="Records"
+        gridAriaLabel={t('records.title', { defaultValue: 'Records' })}
         previewOpen={previewOpen}
         gridBusy={isLoading}
         gridEmptyState={gridEmptyState}
@@ -296,14 +476,19 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
           <RecordExplorerHeader
             itemCount={itemCount}
             layout={currentLayout}
+            filterExpanded={filterExpanded}
+            filterGroups={recordFilterGroups}
+            selectedFilters={selectedRecordFilters}
             onLayoutChange={onLayoutChange}
+            onFilterExpandedChange={setFilterExpanded}
+            onFilterTagToggle={handleFilterTagToggle}
           />
         )}
         renderToolbar={
           <RecordSelectionToolbar
             selectionMode={selectionMode}
             selectedCount={selectedRecordIds.length}
-            totalCount={records.length}
+            totalCount={filteredItems.length}
             actionBusy={isActionBusy}
             onSelectionModeChange={handleSelectionModeChange}
             onSelectAllChange={handleSelectAllChange}

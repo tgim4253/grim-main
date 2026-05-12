@@ -406,9 +406,7 @@ impl TagRepository {
 mod tests {
     use std::{env, fs, path::PathBuf};
 
-    use crate::state::bootstrap::{
-        ensure_schema, open_or_create_db, seed_defaults,
-    };
+    use crate::state::bootstrap::{ensure_schema, open_or_create_db};
 
     use super::*;
 
@@ -419,6 +417,17 @@ mod tests {
         dir
     }
 
+    async fn insert_grouped_tag(pool: &SqlitePool, tag_name: &str) -> String {
+        let repo = TagRepository::new(pool.clone());
+        let mut tx = pool.begin().await.expect("failed to begin tag tx");
+        let tags = repo
+            .ensure_tags_by_names_in_tx(&mut tx, &[tag_name.to_string()])
+            .await
+            .expect("failed to insert test tag");
+        tx.commit().await.expect("failed to commit tag tx");
+        tags[0].id.clone()
+    }
+
     #[tokio::test]
     async fn save_tag_rejects_duplicate_ungrouped_name() {
         let dir = make_temp_dir("duplicate-ungrouped");
@@ -426,7 +435,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let repo = TagRepository::new(pool.clone());
         repo.save_tag(SaveTagPayload {
@@ -476,7 +484,6 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
         let repo = TagRepository::new(pool.clone());
         repo.save_tag(SaveTagPayload {
@@ -547,21 +554,8 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
-        let tag_id = sqlx::query!(
-            r#"
-            SELECT t.id
-            FROM tag t
-            INNER JOIN tag_group tg ON tg.id = t.group_id
-            WHERE tg.name = 'Purpose'
-              AND t.name = 'Pose'
-            "#
-        )
-        .fetch_one(&pool)
-        .await
-        .expect("failed to load tag")
-        .id;
+        let tag_id = insert_grouped_tag(&pool, "Used Tag").await;
         let tag_id_ref = tag_id.as_str();
 
         sqlx::query!(
@@ -616,21 +610,8 @@ mod tests {
         let pool =
             open_or_create_db(&db_path).await.expect("failed to open db");
         ensure_schema(&pool).await.expect("failed to apply schema");
-        seed_defaults(&pool).await.expect("failed to seed defaults");
 
-        let tag_id = sqlx::query!(
-            r#"
-            SELECT t.id
-            FROM tag t
-            INNER JOIN tag_group tg ON tg.id = t.group_id
-            WHERE tg.name = 'Purpose'
-              AND t.name = 'Pose'
-            "#
-        )
-        .fetch_one(&pool)
-        .await
-        .expect("failed to load tag")
-        .id;
+        let tag_id = insert_grouped_tag(&pool, "Used Tag").await;
         let tag_id_ref = tag_id.as_str();
 
         sqlx::query!(

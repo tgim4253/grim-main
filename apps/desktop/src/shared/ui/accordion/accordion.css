@@ -9,8 +9,10 @@
   }
 
   .c-accordion-item {
+    position: relative;
     display: grid;
     border-bottom: 1px solid var(--semantic-colors-border-primary);
+    will-change: transform;
   }
 
   .c-accordion-item:last-child {
@@ -47,6 +49,66 @@
   }
 
   .c-accordion-item__header:disabled {
+    cursor: not-allowed;
+    opacity: 0.56;
+  }
+
+  .c-accordion-item[data-dragging='true'] {
+    opacity: 0.82;
+    box-shadow:
+      0 16px 36px rgba(0, 0, 0, 0.32),
+      0 0 0 1px var(--semantic-colors-border-focus);
+  }
+
+  .c-accordion-item__drag-header {
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+    min-height: 58px;
+    background: transparent;
+    color: var(--semantic-colors-text-primary);
+  }
+
+  .c-accordion-item__drag-handle,
+  .c-accordion-item__disclosure-button {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--semantic-size-icon-button-md);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--semantic-colors-icon-tertiary);
+  }
+
+  .c-accordion-item__drag-handle {
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .c-accordion-item__drag-handle:active:not(:disabled) {
+    cursor: grabbing;
+  }
+
+  .c-accordion-item__disclosure-button {
+    cursor: pointer;
+  }
+
+  .c-accordion-item__drag-handle:not(:disabled):hover,
+  .c-accordion-item__disclosure-button:not(:disabled):hover {
+    background: var(--components-icon-button-background-hover);
+    color: var(--semantic-colors-icon-primary);
+  }
+
+  .c-accordion-item__drag-handle:focus-visible,
+  .c-accordion-item__disclosure-button:focus-visible {
+    outline: 2px solid var(--semantic-colors-border-focus);
+    outline-offset: -2px;
+  }
+
+  .c-accordion-item__drag-handle:disabled,
+  .c-accordion-item__disclosure-button:disabled {
     cursor: not-allowed;
     opacity: 0.56;
   }

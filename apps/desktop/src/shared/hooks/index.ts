@@ -1,5 +1,5 @@
 export { useTheme } from './useTheme';
-export type { Theme } from './useTheme';
+export type { ResolvedTheme, Theme } from './useTheme';
 export {
   usePointerSelection,
   type PointerSelectionMode,

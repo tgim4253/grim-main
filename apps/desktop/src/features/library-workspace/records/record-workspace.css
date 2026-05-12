@@ -1,135 +1,48 @@
 @layer app {
-  .record-explorer-header {
-    display: flex;
-    flex: none;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 48px;
-    padding: 0 24px;
-    border-bottom: 1px solid var(--semantic-colors-border-secondary);
-    background: var(--semantic-colors-surface-panel);
-  }
-
-  .record-explorer-header__leading,
-  .record-explorer-header__actions {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    min-width: 0;
-  }
-
-  .record-explorer-header__leading {
+  .record-explorer-filter-panel {
+    flex-direction: column;
+    align-items: stretch;
     gap: 16px;
   }
 
-  .record-explorer-header__actions {
-    gap: 8px;
-  }
-
-  .record-explorer-header__filter {
-    display: inline-flex;
+  .record-explorer-filter-panel__row {
+    display: flex;
     align-items: center;
-    gap: 4px;
-    min-height: 24px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--semantic-colors-text-secondary);
-    font-size: 12px;
-    line-height: 16px;
-    font-weight: var(--font-weight-medium);
-    cursor: pointer;
+    gap: 24px;
+    min-width: 0;
   }
 
-  .record-explorer-header__filter:hover,
-  .record-explorer-header__filter:focus-visible {
-    color: var(--semantic-colors-text-primary);
-  }
-
-  .record-explorer-header__filter:focus-visible {
-    border-radius: var(--primitives-radius-05);
-    outline: 2px solid var(--semantic-colors-border-focus);
-    outline-offset: 2px;
-  }
-
-  .record-explorer-header__sort,
-  .record-explorer-header__count {
+  .record-explorer-filter-panel__label {
+    display: flex;
+    flex: 0 0 48px;
+    align-items: center;
+    min-width: 0;
     overflow: hidden;
     color: var(--semantic-colors-text-tertiary);
-    font-size: 12px;
-    line-height: 16px;
-    font-weight: var(--font-weight-medium);
+    font-size: 10px;
+    line-height: 15px;
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: 1px;
     text-overflow: ellipsis;
+    text-transform: uppercase;
     white-space: nowrap;
   }
 
-  .record-explorer-header__sort {
-    color: var(--semantic-colors-text-secondary);
-  }
-
-  .record-explorer-header__divider {
-    width: 1px;
-    height: 16px;
-    background: var(--semantic-colors-border-subtle);
-  }
-
-  .record-selection-toolbar {
+  .record-explorer-filter-panel__chips {
     display: flex;
-    flex: none;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 44px;
-    padding: 0 24px;
-    border-bottom: 1px solid var(--semantic-colors-border-secondary);
-    background: var(--semantic-colors-surface-panel);
-  }
-
-  .record-selection-toolbar__left,
-  .record-selection-toolbar__actions {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    min-width: 0;
-  }
-
-  .record-selection-toolbar__left {
-    gap: 16px;
-  }
-
-  .record-selection-toolbar__actions {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    align-items: flex-start;
     gap: 8px;
-  }
-
-  .record-selection-toolbar .record-selection-toolbar__button {
-    align-self: center;
-    min-width: 60px;
-  }
-
-  .record-selection-toolbar__select-all {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
     min-width: 0;
-    color: var(--semantic-colors-text-primary);
-    font-size: 12px;
-    line-height: 16px;
-    font-weight: var(--font-weight-medium);
-    white-space: nowrap;
-    cursor: pointer;
   }
 
-  .record-selection-toolbar__divider {
-    width: 1px;
-    height: 16px;
-    background: var(--semantic-colors-border-subtle);
-  }
-
-  .record-selection-toolbar__count {
+  .record-explorer-filter-panel__empty {
+    margin: 0;
     color: var(--semantic-colors-text-tertiary);
     font-size: 12px;
     line-height: 16px;
     font-weight: var(--font-weight-medium);
-    white-space: nowrap;
   }
 
   .record-result-tile {

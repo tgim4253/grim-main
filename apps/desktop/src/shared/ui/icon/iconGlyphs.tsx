@@ -18,6 +18,7 @@ export const ICON_NAMES = [
   'folder-plus',
   'gesture',
   'grid',
+  'grip',
   'help-circle',
   'layers',
   'link-2',
@@ -33,6 +34,7 @@ export const ICON_NAMES = [
   'setting',
   'skip-back',
   'skip-forward',
+  'sort-desc',
   'star',
   'tree',
   'user',
@@ -99,6 +101,16 @@ const reloadGlyph = (
   <>
     <path d="M3 12a9 9 0 1 0 2.64-6.36" />
     <path d="M3 4v5h5" />
+  </>
+);
+
+const sortDescGlyph = (
+  <>
+    <path d="M7 4v14" />
+    <path d="m4 15 3 3 3-3" />
+    <path d="M14 6h6" />
+    <path d="M14 12h4" />
+    <path d="M14 18h2" />
   </>
 );
 
@@ -186,6 +198,19 @@ export const ICON_GLYPHS = {
     </>
   ),
   grid: gridGlyph,
+  grip: (
+    <>
+      <circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="7" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="17" cy="7" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="7" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="17" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="7" cy="17" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="17" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="17" cy="17" r="1.5" fill="currentColor" stroke="none" />
+    </>
+  ),
   'help-circle': helpCircleGlyph,
   layers: (
     <>
@@ -250,6 +275,7 @@ export const ICON_GLYPHS = {
       <path d="m5 4 10 8-10 8z" />
     </>
   ),
+  'sort-desc': sortDescGlyph,
   star: (
     <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" />
   ),
