@@ -1,6 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
 import type {
-  AppStartupState,
   AssetDetail,
   AssetListSource,
   AssetRecordCount,
@@ -10,7 +9,6 @@ import type {
   CaptureOverlayPayload,
   CapturePreview,
   CapturePreviewPayload,
-  CompleteInitialLaunchPayload,
   CroquisRecordDetail,
   CroquisRecordResultsSnapshot,
   CroquisSession,
@@ -51,8 +49,6 @@ type CommandContract<TPayload, TResponse> = {
 };
 
 export type IpcCommandContract = {
-  load_app_startup_state: CommandContract<undefined, AppStartupState>;
-  complete_initial_launch: CommandContract<{ payload: CompleteInitialLaunchPayload }, void>;
   load_library_snapshot: CommandContract<undefined, LibrarySnapshot>;
   load_explorer_snapshot: CommandContract<undefined, ExplorerSnapshot>;
   save_virtual_folder: CommandContract<

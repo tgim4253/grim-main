@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT COUNT(*) AS \"count!: i64\"\n            FROM tag t\n            INNER JOIN tag_group tg ON tg.id = t.group_id\n            WHERE tg.name IN ('Time / Auto', 'Purpose', 'Format')\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "662e18a0441d8a9c4e6200e21c91a177549a0477bf109e19243219854d63c4f2"
+}

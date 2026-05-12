@@ -401,13 +401,5 @@
   "croquis.blur_amount": "Blur amount",
   "croquis.option.blur": "Blur: {{value}}",
   "croquis.option.filter": "Filter: {{value}}",
-  "presets.step_summary.blur_percent": "Blur {{value}}",
-  "template_start.title": "Start",
-  "template_start.close": "Close template start",
-  "template_start.starting": "Starting…",
-  "template_start.start": "Start",
-  "template_start.language": "Language",
-  "template_start.template_checkbox": "Start with template",
-  "template_start.template_supporting": "Create starter folders, tags, and a quick Croquis preset.",
-  "template_start.error.complete_initial_launch": "Failed to finish initial setup."
+  "presets.step_summary.blur_percent": "Blur {{value}}"
 }

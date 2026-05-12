@@ -1,6 +1,5 @@
 //! Core data models shared across services and commands.
 
-pub mod app;
 pub mod asset;
 pub mod capture;
 pub mod croquis;
