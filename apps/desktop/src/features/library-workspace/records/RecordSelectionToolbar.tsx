@@ -7,9 +7,11 @@ type RecordSelectionToolbarProps = {
   selectedCount: number;
   totalCount: number;
   actionBusy?: boolean;
+  addTagDisabled?: boolean;
   onSelectionModeChange: (selectionMode: boolean) => void;
   onSelectAllChange: (selected: boolean) => void;
   onDeleteSelected: () => void;
+  onAddTag?: () => void;
 };
 
 export function RecordSelectionToolbar({
@@ -17,9 +19,11 @@ export function RecordSelectionToolbar({
   selectedCount,
   totalCount,
   actionBusy = false,
+  addTagDisabled = false,
   onSelectionModeChange,
   onSelectAllChange,
   onDeleteSelected,
+  onAddTag,
 }: RecordSelectionToolbarProps) {
   const { t } = useTranslation('common');
   const selectedActionsDisabled = actionBusy || selectedCount === 0;
@@ -39,7 +43,7 @@ export function RecordSelectionToolbar({
       onSelectAllChange={onSelectAllChange}
       actions={
         <>
-          <Button size="sm" variant="secondary" disabled>
+          <Button size="sm" variant="secondary" disabled={addTagDisabled} onClick={onAddTag}>
             {t('common.add_tag', { defaultValue: 'Add Tag' })}
           </Button>
           <Button

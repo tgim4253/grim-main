@@ -344,6 +344,33 @@
     min-width: 0;
   }
 
+  .record-result-preview__tag-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .record-result-preview__tag-hint {
+    color: var(--semantic-colors-text-tertiary);
+    font-size: 11px;
+    line-height: 16px;
+    font-weight: var(--font-weight-medium);
+  }
+
+  .record-tag-add-modal {
+    overflow: visible;
+  }
+
+  .record-tag-add-modal .c-modal__body-slot {
+    overflow: visible;
+  }
+
+  .record-tag-add-modal__body {
+    gap: 10px;
+  }
+
   .record-result-preview__section--related {
     gap: 8px;
   }

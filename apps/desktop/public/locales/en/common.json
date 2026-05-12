@@ -409,5 +409,6 @@
   "template_start.language": "Language",
   "template_start.template_checkbox": "Start with template",
   "template_start.template_supporting": "Create starter folders, tags, and a quick Croquis preset.",
-  "template_start.error.complete_initial_launch": "Failed to finish initial setup."
+  "template_start.error.complete_initial_launch": "Failed to finish initial setup.",
+  "records.error.update_tags": "Failed to update record tags."
 }
