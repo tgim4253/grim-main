@@ -396,5 +396,10 @@
   "tags.tag_name": "태그 이름",
   "tags.tags": "태그",
   "tags.ungrouped": "미분류",
-  "tags.unknown_group": "알 수 없는 그룹"
+  "tags.unknown_group": "알 수 없는 그룹",
+  "croquis.blur": "블러",
+  "croquis.blur_amount": "블러 강도",
+  "croquis.option.blur": "블러: {{value}}",
+  "croquis.option.filter": "필터: {{value}}",
+  "presets.step_summary.blur_percent": "블러 {{value}}"
 }

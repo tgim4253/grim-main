@@ -396,5 +396,10 @@
   "tags.tag_name": "タグ名",
   "tags.tags": "タグ",
   "tags.ungrouped": "未分類",
-  "tags.unknown_group": "不明なグループ"
+  "tags.unknown_group": "不明なグループ",
+  "croquis.blur": "ぼかし",
+  "croquis.blur_amount": "ぼかし量",
+  "croquis.option.blur": "ぼかし: {{value}}",
+  "croquis.option.filter": "フィルター: {{value}}",
+  "presets.step_summary.blur_percent": "ぼかし {{value}}"
 }

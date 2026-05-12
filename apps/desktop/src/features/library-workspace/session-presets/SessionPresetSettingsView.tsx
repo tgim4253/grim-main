@@ -23,6 +23,7 @@ import { findFallbackPreset, setStoredActiveSessionPresetId } from '../../croqui
 import {
   applyTimeStepPresetToStep,
   clampDurationSeconds,
+  clampFilterPercent,
   createCustomStep,
   createEditableSteps,
   createStepFromTimeStepPreset,
@@ -31,6 +32,7 @@ import {
   normalizeOptionalString,
   normalizeStepOrders,
   normalizeWindowDimension,
+  saveStoredTimeStepFilterSettings,
   toSaveSessionPresetPayload,
   toSaveTimeStepPresetPayload,
   type EditableSessionStep,
@@ -76,7 +78,15 @@ function formatStepOptionSummary(step: EditableSessionStep, t: Translate) {
       ? t('presets.step_summary.records_save', { defaultValue: 'Records save' })
       : t('presets.step_summary.records_off', { defaultValue: 'Records off' }),
     step.captureEnabled ? t('common.capture', { defaultValue: 'Capture' }) : null,
-    step.grayscaleEnabled ? t('croquis.grayscale', { defaultValue: 'Grayscale' }) : null,
+    step.filterEnabled && step.grayscaleEnabled
+      ? t('croquis.grayscale', { defaultValue: 'Grayscale' })
+      : null,
+    step.filterEnabled && step.blurEnabled
+      ? t('presets.step_summary.blur_percent', {
+          value: `${String(step.blurAmount)}%`,
+          defaultValue: 'Blur {{value}}',
+        })
+      : null,
     step.resultRequired
       ? t('presets.step_summary.result_required', { defaultValue: 'Result required' })
       : null,
@@ -593,6 +603,7 @@ export function SessionPresetSettingsView() {
           findCreatedPreset(timeStepPresets, nextTimeStepPresets, nextName) ??
           (nextTimeStepPresets.length > 0 ? nextTimeStepPresets[0] : null));
 
+      saveStoredTimeStepFilterSettings(nextSelectedPreset?.id, editableTimeStep);
       setTimeStepPresets(nextTimeStepPresets);
       setSessionPresets(nextSessionPresets);
       setSessionSteps(currentSteps =>
@@ -951,7 +962,10 @@ export function SessionPresetSettingsView() {
                           onRecordsSaveChange={ignoreStepEditorChange}
                           onRequireResultChange={ignoreStepEditorChange}
                           onCaptureChange={ignoreStepEditorChange}
+                          onFilterChange={ignoreStepEditorChange}
                           onGrayscaleChange={ignoreStepEditorChange}
+                          onBlurChange={ignoreStepEditorChange}
+                          onBlurAmountChange={ignoreStepEditorChange}
                           onResultSavePathChange={ignoreStepEditorChange}
                         />
                         <div className="session-preset-settings__step-actions">
@@ -1170,10 +1184,28 @@ export function SessionPresetSettingsView() {
                             captureEnabled: checked,
                           }));
                         }}
+                        onFilterChange={checked => {
+                          updateEditableTimeStep(currentStep => ({
+                            ...currentStep,
+                            filterEnabled: checked,
+                          }));
+                        }}
                         onGrayscaleChange={checked => {
                           updateEditableTimeStep(currentStep => ({
                             ...currentStep,
                             grayscaleEnabled: checked,
+                          }));
+                        }}
+                        onBlurChange={checked => {
+                          updateEditableTimeStep(currentStep => ({
+                            ...currentStep,
+                            blurEnabled: checked,
+                          }));
+                        }}
+                        onBlurAmountChange={value => {
+                          updateEditableTimeStep(currentStep => ({
+                            ...currentStep,
+                            blurAmount: clampFilterPercent(value),
                           }));
                         }}
                         onResultSavePathChange={path => {

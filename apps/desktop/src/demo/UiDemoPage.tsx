@@ -12,6 +12,7 @@ import {
   CHECKBOX_SIZES,
   Checkbox,
   CheckboxConditionalRow,
+  CheckboxProgressConditionalRow,
   CHECKBOX_ROW_WIDTHS,
   CheckboxRow,
   Chip,
@@ -428,6 +429,22 @@ function ToggleableChipButtonDemo() {
         {pressed ? 'pressed' : 'rest'} · click to toggle
       </span>
     </div>
+  );
+}
+
+function CheckboxProgressRowDemo() {
+  const [blurEnabled, setBlurEnabled] = useState(true);
+  const [blurAmount, setBlurAmount] = useState(35);
+
+  return (
+    <CheckboxProgressConditionalRow
+      width="full"
+      label="Blur"
+      checked={blurEnabled}
+      value={blurAmount}
+      onCheckedChange={setBlurEnabled}
+      onValueChange={setBlurAmount}
+    />
   );
 }
 
@@ -1056,6 +1073,7 @@ export function UiDemoPage() {
                 <CheckboxRow width="full" size="sm" label="Keep the current canvas framing" />
                 <CheckboxRow width="full" size="sm" label="Reuse the active prompt seed" />
               </CheckboxConditionalRow>
+              <CheckboxProgressRowDemo />
             </div>
           </DemoCard>
         </DemoSection>

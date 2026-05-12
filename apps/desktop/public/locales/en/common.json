@@ -396,5 +396,10 @@
   "tags.tag_name": "Tag Name",
   "tags.tags": "Tags",
   "tags.ungrouped": "Ungrouped",
-  "tags.unknown_group": "Unknown Group"
+  "tags.unknown_group": "Unknown Group",
+  "croquis.blur": "Blur",
+  "croquis.blur_amount": "Blur amount",
+  "croquis.option.blur": "Blur: {{value}}",
+  "croquis.option.filter": "Filter: {{value}}",
+  "presets.step_summary.blur_percent": "Blur {{value}}"
 }
