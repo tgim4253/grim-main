@@ -409,5 +409,6 @@
   "template_start.language": "言語",
   "template_start.template_checkbox": "テンプレートで開始",
   "template_start.template_supporting": "スターター用フォルダー、タグ、クイッククロッキープリセットを作成します。",
-  "template_start.error.complete_initial_launch": "初期設定を完了できませんでした。"
+  "template_start.error.complete_initial_launch": "初期設定を完了できませんでした。",
+  "records.error.update_tags": "記録タグの更新に失敗しました。"
 }

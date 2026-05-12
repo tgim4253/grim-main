@@ -187,6 +187,7 @@ mod tests {
     use crate::{
         models::record::{
             FinishCroquisRecordPayload, SaveCroquisRecordPayload,
+            UpdateCroquisRecordTagsPayload,
         },
         repositories::{
             AssetRepository, NewImportedAssetInput, RecordRepository,
@@ -324,6 +325,85 @@ mod tests {
             .expect("failed to list recent records");
         assert_eq!(recent.len(), 1);
         assert_eq!(recent[0].id, finished.record.id);
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn update_record_tags_adds_and_removes_persisted_tags() {
+        let dir = make_temp_dir("tag-update");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+
+        let now = "2026-01-01T00:00:00Z";
+        sqlx::query!(
+            r#"
+            INSERT INTO tag_group (id, name, sort_order, created_at, updated_at)
+            VALUES ('group-finish', 'Finish', 0, ?1, ?1)
+            "#,
+            now
+        )
+        .execute(&pool)
+        .await
+        .expect("failed to insert tag group");
+        sqlx::query!(
+            r#"
+            INSERT INTO tag (id, group_id, name, color, sort_order, created_at, updated_at)
+            VALUES ('tag-finish', 'group-finish', 'Timed', '#ff0000', 0, ?1, ?1)
+            "#,
+            now
+        )
+        .execute(&pool)
+        .await
+        .expect("failed to insert tag");
+
+        let service = RecordService::new(
+            RecordRepository::new(pool.clone()),
+            AssetRepository::new(pool),
+            storage_for(&dir),
+        );
+        let saved = service
+            .save_record(SaveCroquisRecordPayload {
+                title: Some("Tagged record".to_string()),
+                ..Default::default()
+            })
+            .await
+            .expect("failed to save record");
+        assert!(saved.tags.is_empty());
+
+        let updated = service
+            .update_record_tags(UpdateCroquisRecordTagsPayload {
+                record_id: saved.record.id.clone(),
+                tag_ids: vec!["tag-finish".to_string()],
+            })
+            .await
+            .expect("failed to add record tag");
+        assert_eq!(updated.tags.len(), 1);
+        assert_eq!(updated.tags[0].id, "tag-finish");
+
+        let reloaded = service
+            .get_record(&saved.record.id)
+            .await
+            .expect("failed to reload tagged record");
+        assert_eq!(reloaded.tags.len(), 1);
+        assert_eq!(reloaded.tags[0].id, "tag-finish");
+
+        let removed = service
+            .update_record_tags(UpdateCroquisRecordTagsPayload {
+                record_id: saved.record.id.clone(),
+                tag_ids: Vec::new(),
+            })
+            .await
+            .expect("failed to remove record tags");
+        assert!(removed.tags.is_empty());
+
+        let reloaded = service
+            .get_record(&saved.record.id)
+            .await
+            .expect("failed to reload untagged record");
+        assert!(reloaded.tags.is_empty());
 
         let _ = fs::remove_dir_all(dir);
     }
