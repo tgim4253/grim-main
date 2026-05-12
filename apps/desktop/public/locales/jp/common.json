@@ -401,5 +401,13 @@
   "croquis.blur_amount": "ぼかし量",
   "croquis.option.blur": "ぼかし: {{value}}",
   "croquis.option.filter": "フィルター: {{value}}",
-  "presets.step_summary.blur_percent": "ぼかし {{value}}"
+  "presets.step_summary.blur_percent": "ぼかし {{value}}",
+  "template_start.title": "開始",
+  "template_start.close": "初期設定を閉じる",
+  "template_start.starting": "開始中…",
+  "template_start.start": "開始",
+  "template_start.language": "言語",
+  "template_start.template_checkbox": "テンプレートで開始",
+  "template_start.template_supporting": "スターター用フォルダー、タグ、クイッククロッキープリセットを作成します。",
+  "template_start.error.complete_initial_launch": "初期設定を完了できませんでした。"
 }
