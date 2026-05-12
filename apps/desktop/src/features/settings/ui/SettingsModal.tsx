@@ -3,10 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { useAppUpdate } from '../../app-update';
 import { formatBytes } from '../../../lib/format';
 import { useTheme, type Theme } from '../../../shared/hooks';
+import { LANGUAGE_OPTIONS, resolveLanguageCode } from '../../../shared/lib/language';
 import { Button, Modal, ModalFooter, Select, type SelectOption } from '../../../shared/ui';
 import './settings-modal.css';
-
-type LanguageCode = 'en' | 'ko' | 'jp';
 
 export type SettingsModalProps = {
   open: boolean;
@@ -15,24 +14,6 @@ export type SettingsModalProps = {
 
 const FALLBACK_APP_VERSION = '0.1.0';
 const CHECKING_PROGRESS_TARGET = 64;
-const LANGUAGE_OPTIONS: SelectOption[] = [
-  { value: 'en', label: 'English' },
-  { value: 'ko', label: '한국어' },
-  { value: 'jp', label: '日本語' },
-];
-
-function resolveLanguageCode(language?: string): LanguageCode {
-  if (language?.startsWith('ko')) {
-    return 'ko';
-  }
-
-  if (language?.startsWith('jp') || language?.startsWith('ja')) {
-    return 'jp';
-  }
-
-  return 'en';
-}
-
 function resolveThemePreference(theme?: string): Theme {
   if (theme === 'system' || theme === 'light' || theme === 'dark') {
     return theme;
