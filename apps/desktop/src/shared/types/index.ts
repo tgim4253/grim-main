@@ -1,3 +1,4 @@
+export type { AppStartupState } from './app';
 export type {
   CaptureContext,
   CaptureMonitor,

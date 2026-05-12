@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO app_setting (key, value)\n            VALUES (?1, ?2)\n            ON CONFLICT(key) DO UPDATE SET\n              value = excluded.value,\n              updated_at = datetime('now')\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "a37d5af137a46d3a926e846d61c46e272b57a35e9c17726cead9d97926a310e7"
+}

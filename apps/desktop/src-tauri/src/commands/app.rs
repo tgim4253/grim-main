@@ -1,0 +1,21 @@
+use tauri::State;
+
+use crate::{
+    errors::{CommandResult, IntoCommandResult},
+    models::app::AppStartupState,
+    services::AppService,
+};
+
+#[tauri::command]
+pub async fn load_app_startup_state(
+    app_service: State<'_, AppService>,
+) -> CommandResult<AppStartupState> {
+    app_service.load_startup_state().await.into_command()
+}
+
+#[tauri::command]
+pub async fn complete_initial_launch(
+    app_service: State<'_, AppService>,
+) -> CommandResult<()> {
+    app_service.complete_initial_launch().await.into_command()
+}

@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type {
+  AppStartupState,
   AssetDetail,
   AssetListSource,
   AssetRecordCount,
@@ -49,6 +50,8 @@ type CommandContract<TPayload, TResponse> = {
 };
 
 export type IpcCommandContract = {
+  load_app_startup_state: CommandContract<undefined, AppStartupState>;
+  complete_initial_launch: CommandContract<undefined, void>;
   load_library_snapshot: CommandContract<undefined, LibrarySnapshot>;
   load_explorer_snapshot: CommandContract<undefined, ExplorerSnapshot>;
   save_virtual_folder: CommandContract<

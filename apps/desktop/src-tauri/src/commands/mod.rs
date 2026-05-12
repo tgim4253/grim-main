@@ -1,3 +1,5 @@
+#[path = "app.rs"]
+pub(crate) mod app_commands;
 #[path = "asset.rs"]
 pub(crate) mod asset_commands;
 #[path = "capture.rs"]

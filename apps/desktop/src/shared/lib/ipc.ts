@@ -1,3 +1,4 @@
+import { appIpc } from './ipc/app';
 import { assetIpc } from './ipc/asset';
 import { captureIpc } from './ipc/capture';
 import { folderIpc } from './ipc/folder';
@@ -9,6 +10,7 @@ import { tagIpc } from './ipc/tag';
 import { windowIpc } from './ipc/window';
 
 export const ipc = {
+  app: appIpc,
   window: windowIpc,
   library: libraryIpc,
   folder: folderIpc,
