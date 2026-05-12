@@ -1,7 +1,7 @@
 [package]
-name = "tauri-app"
-version = "0.1.0"
-description = "A Tauri App"
+name = "grim-app"
+version = "0.2.0"
+description = "A grim App"
 authors = ["you"]
 edition = "2021"
 
@@ -16,7 +16,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["protocol-asset"] }
+tauri = { version = "=2.10.3", features = ["protocol-asset"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

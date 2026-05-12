@@ -2156,6 +2156,55 @@ dependencies = [
 ]
 
 [[package]]
+name = "grim-app"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "async-recursion",
+ "base64 0.22.1",
+ "bytes 1.10.1",
+ "chrono",
+ "dialog",
+ "dirs-next",
+ "dunce",
+ "fast_image_resize",
+ "fs",
+ "futures 0.3.31",
+ "image 0.25.6",
+ "infer",
+ "log",
+ "mountpoints",
+ "num_cpus",
+ "once_cell",
+ "plist",
+ "regex",
+ "reqwest 0.12.22",
+ "screenshots",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sha256",
+ "sqlx",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-decorum",
+ "tauri-plugin-dialog",
+ "tauri-plugin-http",
+ "tauri-plugin-opener",
+ "tauri-plugin-os",
+ "tauri-plugin-process",
+ "tauri-plugin-updater",
+ "tauri-utils",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "twox-hash",
+ "uuid",
+ "winapi 0.3.9",
+ "windows 0.61.3",
+]
+
+[[package]]
 name = "gtk"
 version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6013,55 +6062,6 @@ dependencies = [
  "webkit2gtk",
  "webview2-com",
  "window-vibrancy",
- "windows 0.61.3",
-]
-
-[[package]]
-name = "tauri-app"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-recursion",
- "base64 0.22.1",
- "bytes 1.10.1",
- "chrono",
- "dialog",
- "dirs-next",
- "dunce",
- "fast_image_resize",
- "fs",
- "futures 0.3.31",
- "image 0.25.6",
- "infer",
- "log",
- "mountpoints",
- "num_cpus",
- "once_cell",
- "plist",
- "regex",
- "reqwest 0.12.22",
- "screenshots",
- "serde",
- "serde_json",
- "sha2",
- "sha256",
- "sqlx",
- "tauri",
- "tauri-build",
- "tauri-plugin-decorum",
- "tauri-plugin-dialog",
- "tauri-plugin-http",
- "tauri-plugin-opener",
- "tauri-plugin-os",
- "tauri-plugin-process",
- "tauri-plugin-updater",
- "tauri-utils",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "twox-hash",
- "uuid",
- "winapi 0.3.9",
  "windows 0.61.3",
 ]
 
