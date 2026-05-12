@@ -87,9 +87,9 @@ const BUTTON_ICON_BUTTON_ROWS: Array<{
 ];
 const SIDEBAR_ICON_BUTTON_ROWS: IconName[] = [
   'folder-open',
-  'search',
-  'grid',
-  'star',
+  'history',
+  'tag',
+  'sliders-horizontal',
   'setting',
   'user',
   'tree',
