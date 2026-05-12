@@ -20,6 +20,7 @@ export const ICON_NAMES = [
   'grid',
   'grip',
   'help-circle',
+  'history',
   'layers',
   'link-2',
   'link-2-off',
@@ -35,7 +36,9 @@ export const ICON_NAMES = [
   'skip-back',
   'skip-forward',
   'sort-desc',
+  'sliders-horizontal',
   'star',
+  'tag',
   'tree',
   'user',
   'user-round-plus',
@@ -212,6 +215,13 @@ export const ICON_GLYPHS = {
     </>
   ),
   'help-circle': helpCircleGlyph,
+  history: (
+    <>
+      <path d="M3 12a9 9 0 1 0 2.64-6.36" />
+      <path d="M3 4v5h5" />
+      <path d="M12 7v5l4 2" />
+    </>
+  ),
   layers: (
     <>
       <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" />
@@ -276,8 +286,27 @@ export const ICON_GLYPHS = {
     </>
   ),
   'sort-desc': sortDescGlyph,
+  'sliders-horizontal': (
+    <>
+      <path d="M21 4h-7" />
+      <path d="M10 4H3" />
+      <path d="M21 12h-9" />
+      <path d="M8 12H3" />
+      <path d="M21 20h-5" />
+      <path d="M12 20H3" />
+      <path d="M14 2v4" />
+      <path d="M8 10v4" />
+      <path d="M16 18v4" />
+    </>
+  ),
   star: (
     <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" />
+  ),
+  tag: (
+    <>
+      <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />
+      <path d="M7.5 7.5h.01" />
+    </>
   ),
   tree: treeGlyph,
   user: (

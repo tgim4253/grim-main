@@ -254,18 +254,18 @@ export function LibraryPage() {
       active: isSidebarPanelOpen,
     },
     {
-      icon: 'search',
+      icon: 'history',
       label: t('library.result_preview', { defaultValue: 'Result Preview' }),
       action: 'open-search',
     },
     {
-      icon: 'grid',
+      icon: 'tag',
       label: t('tags.settings.title', { defaultValue: 'Tag Settings' }),
       action: 'open-tag-settings',
       active: workspaceView === 'tag-settings',
     },
     {
-      icon: 'layers',
+      icon: 'sliders-horizontal',
       label: t('presets.settings.title', { defaultValue: 'Preset Settings' }),
       action: 'open-preset-settings',
       active: workspaceView === 'preset-settings',

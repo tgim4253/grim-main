@@ -25,9 +25,9 @@ use crate::{
         TagRepository,
     },
     services::{
-        AssetService, CaptureService, CroquisService, FolderService,
-        LibraryService, LibraryStorage, RecordService, SessionService,
-        TagService,
+        AppService, AssetService, CaptureService, CroquisService,
+        FolderService, LibraryService, LibraryStorage, RecordService,
+        SessionService, TagService,
     },
 };
 
@@ -44,6 +44,8 @@ pub fn run() {
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
+            commands::app_commands::load_app_startup_state,
+            commands::app_commands::complete_initial_launch,
             commands::library_commands::load_library_snapshot,
             commands::library_commands::load_explorer_snapshot,
             commands::folder_commands::save_virtual_folder,
@@ -103,6 +105,7 @@ pub fn run() {
             asset_scope
                 .allow_directory(&app_state.library_paths.thumb_dir, true)
                 .map_err(std::io::Error::other)?;
+            let app_service = AppService::new(app_state.pool.clone());
             let asset_repository = AssetRepository::new(app_state.pool.clone());
             let folder_repository =
                 FolderRepository::new(app_state.pool.clone());
@@ -144,6 +147,7 @@ pub fn run() {
             );
 
             app.manage(app_state);
+            app.manage(app_service);
             app.manage(asset_service);
             app.manage(folder_service);
             app.manage(tag_service);

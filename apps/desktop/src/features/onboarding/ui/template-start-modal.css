@@ -1,0 +1,96 @@
+@layer app {
+  .template-start-modal {
+    overflow: visible;
+    box-shadow: none;
+  }
+
+  .template-start-modal .c-modal__body-slot {
+    overflow: visible;
+  }
+
+  .template-start-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--semantic-spacing-layout-sm);
+  }
+
+  .template-start-modal__row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    gap: var(--semantic-spacing-layout-sm);
+  }
+
+  .template-start-modal__language-row {
+    min-height: 44px;
+  }
+
+  .template-start-modal__copy {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+    gap: var(--semantic-spacing-component-xs);
+  }
+
+  .template-start-modal__label,
+  .template-start-modal__supporting,
+  .template-start-modal__error {
+    margin: 0;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .template-start-modal__label {
+    color: var(--semantic-colors-text-secondary);
+    font-family: var(--components-typography-control-label-font-family);
+    font-size: var(--components-typography-control-label-font-size);
+    font-weight: var(--components-typography-control-label-font-weight);
+    line-height: var(--components-typography-control-label-line-height);
+  }
+
+  .template-start-modal__supporting,
+  .template-start-modal__error {
+    font-family: var(--components-typography-control-supporting-font-family);
+    font-size: var(--components-typography-control-supporting-font-size);
+    font-weight: var(--components-typography-control-supporting-font-weight);
+    line-height: var(--components-typography-control-supporting-line-height);
+  }
+
+  .template-start-modal__supporting {
+    padding-left: calc(var(--semantic-spacing-component-lg) + var(--primitives-spacing-35));
+    color: var(--semantic-colors-text-tertiary);
+  }
+
+  .template-start-modal__error {
+    color: var(--semantic-colors-text-error);
+  }
+
+  .template-start-modal__language-select {
+    flex: none;
+    width: 320px;
+  }
+
+  .template-start-modal__language-select .c-select__trigger {
+    min-height: 44px;
+    padding: var(--primitives-spacing-25) var(--primitives-spacing-35);
+    border-radius: var(--primitives-radius-2);
+  }
+
+  .template-start-modal__language-select .c-select__value {
+    font-weight: var(--primitives-typography-font-weight-medium);
+  }
+
+  .template-start-modal__template-section {
+    display: grid;
+    gap: var(--semantic-spacing-component-xs);
+    width: 100%;
+    min-width: 0;
+  }
+
+  .template-start-modal__checkbox-row {
+    min-height: 36px;
+  }
+}

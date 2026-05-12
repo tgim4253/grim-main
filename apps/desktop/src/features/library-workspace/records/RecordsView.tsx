@@ -20,6 +20,7 @@ import {
 import { RecordResultPreviewPanel } from './RecordResultPreviewPanel';
 import { RecordResultTile } from './RecordResultTile';
 import { RecordSelectionToolbar } from './RecordSelectionToolbar';
+import { RecordTagAddModal } from './RecordTagAddModal';
 import { createRecordResultItem } from './recordResultItems';
 import type { RecordResultItem } from './types';
 import './record-workspace.css';
@@ -36,6 +37,15 @@ type RecordGridStateProps = {
 };
 
 type SelectedRecordFilters = Record<string, string[]>;
+
+type RecordTagAddTarget =
+  | {
+      kind: 'selection';
+    }
+  | {
+      kind: 'record';
+      recordId: string;
+    };
 
 const EMPTY_TAG_INDEX: TagIndex = {
   groups: [],
@@ -170,6 +180,34 @@ function createDetailMap(details: readonly CroquisRecordDetail[]) {
   return detailsById;
 }
 
+function getTagIds(tags: readonly Tag[]) {
+  return tags.reduce<string[]>((tagIds, tag) => {
+    if (tag.id && !tagIds.includes(tag.id)) {
+      tagIds.push(tag.id);
+    }
+
+    return tagIds;
+  }, []);
+}
+
+function isDefined<T>(value: T | null | undefined): value is T {
+  return value !== null && value !== undefined;
+}
+
+function recordSummaryFromDetail(detail: CroquisRecordDetail): CroquisRecordSummary {
+  return {
+    id: detail.id,
+    title: detail.title,
+    sourceAssetId: detail.sourceAssetId,
+    resultAssetId: detail.resultAssetId,
+    targetDurationSeconds: detail.targetDurationSeconds,
+    actualDurationSeconds: detail.actualDurationSeconds,
+    finishedAt: detail.finishedAt,
+    createdAt: detail.createdAt,
+    updatedAt: detail.updatedAt,
+  };
+}
+
 function createRecordsBySourceAssetId(items: readonly RecordResultItem[]) {
   const itemsBySourceAssetId = new Map<string, RecordResultItem[]>();
 
@@ -215,6 +253,7 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
   const [actionError, setActionError] = useState<string | null>(null);
   const [filterExpanded, setFilterExpanded] = useState(false);
   const [selectedRecordFilters, setSelectedRecordFilters] = useState<SelectedRecordFilters>({});
+  const [tagAddTarget, setTagAddTarget] = useState<RecordTagAddTarget | null>(null);
   const [tagIndex, setTagIndex] = useState<TagIndex>(EMPTY_TAG_INDEX);
   const [tagGroupNamesById, setTagGroupNamesById] = useState(() => new Map<string, string>());
   const loadSequenceRef = useRef(0);
@@ -320,6 +359,202 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
   );
   const hasActiveFilters = hasActiveSelectedRecordFilters(selectedRecordFilters);
   const recordsBySourceAssetId = useMemo(() => createRecordsBySourceAssetId(items), [items]);
+  const selectedRecordItems = useMemo(
+    () => selectedRecordIds.map(recordId => recordDetailsById.get(recordId)).filter(isDefined),
+    [recordDetailsById, selectedRecordIds],
+  );
+  const selectableTagsForSelectedRecords = useMemo(() => {
+    if (selectedRecordItems.length === 0) {
+      return [];
+    }
+
+    return tagIndex.tags.filter(tag =>
+      selectedRecordItems.some(detail => !detail.tags.some(recordTag => recordTag.id === tag.id)),
+    );
+  }, [selectedRecordItems, tagIndex.tags]);
+  const tagAddModalRecordDetail =
+    tagAddTarget?.kind === 'record' ? recordDetailsById.get(tagAddTarget.recordId) : undefined;
+  const tagAddModalTags = useMemo(() => {
+    if (tagAddTarget?.kind === 'selection') {
+      return selectableTagsForSelectedRecords;
+    }
+
+    if (tagAddTarget?.kind === 'record' && tagAddModalRecordDetail) {
+      return tagIndex.tags.filter(
+        tag => !tagAddModalRecordDetail.tags.some(recordTag => recordTag.id === tag.id),
+      );
+    }
+
+    return [];
+  }, [selectableTagsForSelectedRecords, tagAddModalRecordDetail, tagAddTarget, tagIndex.tags]);
+  const tagAddModalEmptyMessage =
+    tagIndex.tags.length > 0 && tagAddModalTags.length === 0
+      ? t('croquis.auto_tags.all_linked', { defaultValue: 'All tags are linked' })
+      : t('tags.no_tags_found', { defaultValue: 'No tags found' });
+
+  const applyUpdatedRecordDetails = useCallback(
+    (updatedDetails: readonly CroquisRecordDetail[]) => {
+      if (updatedDetails.length === 0) {
+        return;
+      }
+
+      setRecords(currentRecords =>
+        currentRecords.map(record => {
+          const updatedDetail = updatedDetails.find(detail => detail.id === record.id);
+          return updatedDetail ? recordSummaryFromDetail(updatedDetail) : record;
+        }),
+      );
+      setRecordDetailsById(currentDetailsById => {
+        const nextDetailsById = new Map(currentDetailsById);
+        updatedDetails.forEach(detail => {
+          nextDetailsById.set(detail.id, detail);
+        });
+        return nextDetailsById;
+      });
+    },
+    [],
+  );
+
+  const loadDetailForTagUpdate = useCallback(
+    async (recordId: string) => recordDetailsById.get(recordId) ?? ipc.record.getDetail(recordId),
+    [recordDetailsById],
+  );
+
+  const handleRecordTagAdd = useCallback(
+    async (recordId: string, tag: Tag) => {
+      if (isActionBusy) {
+        return;
+      }
+
+      setIsActionBusy(true);
+      setActionError(null);
+
+      try {
+        const detail = await loadDetailForTagUpdate(recordId);
+        const tagIds = getTagIds(detail.tags);
+        if (tagIds.includes(tag.id)) {
+          return;
+        }
+
+        const updatedDetail = await ipc.record.updateTags({
+          recordId,
+          tagIds: [...tagIds, tag.id],
+        });
+        applyUpdatedRecordDetails([updatedDetail]);
+      } catch (nextError) {
+        setActionError(
+          getErrorMessage(
+            nextError,
+            t('records.error.update_tags', { defaultValue: 'Failed to update record tags.' }),
+          ),
+        );
+        throw nextError;
+      } finally {
+        setIsActionBusy(false);
+      }
+    },
+    [applyUpdatedRecordDetails, isActionBusy, loadDetailForTagUpdate, t],
+  );
+
+  const handleRecordTagRemove = useCallback(
+    async (recordId: string, tagId: string) => {
+      if (isActionBusy) {
+        return;
+      }
+
+      setIsActionBusy(true);
+      setActionError(null);
+
+      try {
+        const detail = await loadDetailForTagUpdate(recordId);
+        const tagIds = getTagIds(detail.tags);
+        const nextTagIds = tagIds.filter(currentTagId => currentTagId !== tagId);
+        if (nextTagIds.length === tagIds.length) {
+          return;
+        }
+
+        const updatedDetail = await ipc.record.updateTags({ recordId, tagIds: nextTagIds });
+        applyUpdatedRecordDetails([updatedDetail]);
+      } catch (nextError) {
+        setActionError(
+          getErrorMessage(
+            nextError,
+            t('records.error.update_tags', { defaultValue: 'Failed to update record tags.' }),
+          ),
+        );
+        throw nextError;
+      } finally {
+        setIsActionBusy(false);
+      }
+    },
+    [applyUpdatedRecordDetails, isActionBusy, loadDetailForTagUpdate, t],
+  );
+
+  const handleSelectedRecordsTagAdd = useCallback(
+    async (tag: Tag) => {
+      if (selectedRecordIds.length === 0 || isActionBusy) {
+        return;
+      }
+
+      setIsActionBusy(true);
+      setActionError(null);
+
+      try {
+        const updateResults = await Promise.allSettled(
+          selectedRecordIds.map(async recordId => {
+            const detail = await loadDetailForTagUpdate(recordId);
+            const tagIds = getTagIds(detail.tags);
+            if (tagIds.includes(tag.id)) {
+              return null;
+            }
+
+            return ipc.record.updateTags({
+              recordId,
+              tagIds: [...tagIds, tag.id],
+            });
+          }),
+        );
+        const updatedDetails = updateResults
+          .filter(
+            (result): result is PromiseFulfilledResult<CroquisRecordDetail | null> =>
+              result.status === 'fulfilled',
+          )
+          .map(result => result.value)
+          .filter(isDefined);
+
+        applyUpdatedRecordDetails(updatedDetails);
+
+        const failedUpdate = updateResults.find(
+          (result): result is PromiseRejectedResult => result.status === 'rejected',
+        );
+        if (failedUpdate) {
+          const errorMessage = getErrorMessage(
+            failedUpdate.reason,
+            t('records.error.update_tags', { defaultValue: 'Failed to update record tags.' }),
+          );
+          setActionError(errorMessage);
+          throw new Error(errorMessage);
+        }
+      } finally {
+        setIsActionBusy(false);
+      }
+    },
+    [applyUpdatedRecordDetails, isActionBusy, loadDetailForTagUpdate, selectedRecordIds, t],
+  );
+
+  const handleTagAddModalAdd = useCallback(
+    async (tag: Tag) => {
+      if (tagAddTarget?.kind === 'selection') {
+        await handleSelectedRecordsTagAdd(tag);
+        return;
+      }
+
+      if (tagAddTarget?.kind === 'record') {
+        await handleRecordTagAdd(tagAddTarget.recordId, tag);
+      }
+    },
+    [handleRecordTagAdd, handleSelectedRecordsTagAdd, tagAddTarget],
+  );
 
   const gridEmptyState = isLoading ? (
     <RecordGridState title={t('records.loading', { defaultValue: 'Loading records...' })} />
@@ -490,9 +725,17 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
             selectedCount={selectedRecordIds.length}
             totalCount={filteredItems.length}
             actionBusy={isActionBusy}
+            addTagDisabled={
+              isActionBusy ||
+              selectedRecordIds.length === 0 ||
+              selectableTagsForSelectedRecords.length === 0
+            }
             onSelectionModeChange={handleSelectionModeChange}
             onSelectAllChange={handleSelectAllChange}
             onDeleteSelected={handleDeleteSelected}
+            onAddTag={() => {
+              setTagAddTarget({ kind: 'selection' });
+            }}
           />
         }
         renderTile={(record, tileState) => (
@@ -510,11 +753,28 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
             record={record}
             relatedRecords={getRelatedRecords(record, recordsBySourceAssetId)}
             tagGroupNamesById={tagGroupNamesById}
+            availableTags={tagIndex.tags}
+            tagEditDisabled={isActionBusy}
+            onTagAddRequest={recordId => {
+              setTagAddTarget({ kind: 'record', recordId });
+            }}
+            onTagRemove={handleRecordTagRemove}
             onClose={() => {
               setPreviewOpen(false);
             }}
           />
         )}
+      />
+      <RecordTagAddModal
+        open={tagAddTarget !== null}
+        tags={tagAddModalTags}
+        tagGroups={tagIndex.groups}
+        disabled={isActionBusy}
+        emptyMessage={tagAddModalEmptyMessage}
+        onClose={() => {
+          setTagAddTarget(null);
+        }}
+        onAddTag={handleTagAddModalAdd}
       />
       {statusError ? (
         <div className="record-action-error" role="status">

@@ -15,7 +15,6 @@ import './preview-panel.css';
 
 const PREVIEW_PANEL_DEFAULT_WIDTH = 320;
 const PREVIEW_PANEL_MIN_WIDTH = 280;
-const PREVIEW_PANEL_MAX_WIDTH = 560;
 const PREVIEW_PANEL_RESIZE_STEP = 24;
 const PREVIEW_PANEL_CONTAINER_REMAINDER = 320;
 
@@ -40,11 +39,14 @@ export function PreviewPanel({
 }: PreviewPanelProps) {
   const { t } = useTranslation('common');
   const panelRef = useRef<HTMLElement | null>(null);
-  const resizeSessionRef = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(
-    null,
-  );
+  const resizeSessionRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startWidth: number;
+    maxWidth: number;
+  } | null>(null);
   const [panelWidth, setPanelWidth] = useState(PREVIEW_PANEL_DEFAULT_WIDTH);
-  const [maxPanelWidth, setMaxPanelWidth] = useState(PREVIEW_PANEL_MAX_WIDTH);
+  const [maxPanelWidth, setMaxPanelWidth] = useState(PREVIEW_PANEL_DEFAULT_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
 
   const getAvailableMaxWidth = useCallback(() => {
@@ -55,9 +57,11 @@ export function PreviewPanel({
     const availableWidth =
       typeof containerWidth === 'number' && containerWidth > 0
         ? containerWidth - PREVIEW_PANEL_CONTAINER_REMAINDER
-        : PREVIEW_PANEL_MAX_WIDTH;
+        : typeof window === 'undefined'
+          ? PREVIEW_PANEL_DEFAULT_WIDTH
+          : window.innerWidth - PREVIEW_PANEL_CONTAINER_REMAINDER;
 
-    return Math.max(PREVIEW_PANEL_MIN_WIDTH, Math.min(PREVIEW_PANEL_MAX_WIDTH, availableWidth));
+    return Math.max(PREVIEW_PANEL_MIN_WIDTH, availableWidth);
   }, []);
 
   const syncMaxWidth = useCallback(() => {
@@ -79,6 +83,7 @@ export function PreviewPanel({
         pointerId: event.pointerId,
         startX: event.clientX,
         startWidth: clampPreviewPanelWidth(panelWidth, nextMaxWidth),
+        maxWidth: nextMaxWidth,
       };
       event.currentTarget.setPointerCapture(event.pointerId);
       setIsResizing(true);
@@ -87,18 +92,20 @@ export function PreviewPanel({
     [panelWidth, syncMaxWidth],
   );
 
-  const handleSplitterPointerMove = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      const session = resizeSessionRef.current;
-      if (!session || session.pointerId !== event.pointerId) {
-        return;
-      }
+  const handleSplitterPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const session = resizeSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) {
+      return;
+    }
 
-      setPanelWidth(clampPanelWidth(session.startWidth + (session.startX - event.clientX)));
-      event.preventDefault();
-    },
-    [clampPanelWidth],
-  );
+    setPanelWidth(
+      clampPreviewPanelWidth(
+        session.startWidth + (session.startX - event.clientX),
+        session.maxWidth,
+      ),
+    );
+    event.preventDefault();
+  }, []);
 
   const handleSplitterPointerEnd = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     const session = resizeSessionRef.current;
@@ -151,11 +158,23 @@ export function PreviewPanel({
       syncMaxWidth();
     };
 
+    const panelElement = panelRef.current;
+    const containerElement =
+      panelElement?.parentElement?.parentElement ?? panelElement?.parentElement;
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined' || !containerElement
+        ? null
+        : new ResizeObserver(handleResize);
+
     syncMaxWidth();
     window.addEventListener('resize', handleResize);
+    if (containerElement) {
+      resizeObserver?.observe(containerElement);
+    }
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      resizeObserver?.disconnect();
     };
   }, [syncMaxWidth]);
 
