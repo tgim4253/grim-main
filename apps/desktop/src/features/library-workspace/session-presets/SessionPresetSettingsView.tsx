@@ -5,9 +5,6 @@ import {
   AccordionItemBody,
   AccordionItemDragHeader,
   AccordionRoot,
-  type AccordionReorderPayload,
-  type AccordionReorderPosition,
-  type AccordionRootValue,
   Button,
   CheckboxRow,
   Icon,
@@ -21,23 +18,16 @@ import type { SessionPreset, Tag, TagGroup, TimeStepPreset } from '../../../shar
 import {
   AutoTagPicker,
   SessionPresetStepEditor,
-  applyTimeStepPresetToStep,
   clampDurationSeconds,
   clampFilterPercent,
-  createCustomStep,
-  createEditableSteps,
-  createStepFromTimeStepPreset,
   findFallbackPreset,
   formatDurationCompact,
   getStepDuration,
   normalizeOptionalString,
-  normalizeStepOrders,
-  normalizeWindowDimension,
   saveStoredTimeStepFilterSettings,
   setStoredActiveSessionPresetId,
   toSaveSessionPresetPayload,
   toSaveTimeStepPresetPayload,
-  type EditableSessionStep,
 } from '@/entities/session-preset';
 import {
   formatAutoTagSummary,
@@ -45,10 +35,8 @@ import {
   formatStepOptionSummary,
 } from './model/presetSettingsFormat';
 import { findCreatedPreset, getDuplicateName } from './model/presetSettingsSelection';
-import {
-  createStepFromFirstTimeStepPreset,
-  refreshSessionStepsFromTimeStepPresets,
-} from './model/sessionStepList';
+import { useSessionPresetDraft } from './model/useSessionPresetDraft';
+import { useTimeStepPresetDraft } from './model/useTimeStepPresetDraft';
 import { PresetNavigationPanel } from './ui/PresetNavigationPanel';
 import { PresetSettingsFooter } from './ui/PresetSettingsFooter';
 import { PresetSettingsMessage } from './ui/PresetSettingsMessage';
@@ -67,24 +55,32 @@ export function SessionPresetSettingsView() {
   const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [editorMode, setEditorMode] = useState<EditorMode>('session');
-  const [selectedSessionPresetId, setSelectedSessionPresetId] = useState('');
-  const [selectedTimeStepPresetId, setSelectedTimeStepPresetId] = useState('');
-  const [sessionName, setSessionName] = useState('');
-  const [sessionDescription, setSessionDescription] = useState('');
-  const [sessionWindowWidth, setSessionWindowWidth] = useState('');
-  const [sessionWindowHeight, setSessionWindowHeight] = useState('');
-  const [sessionIsShuffle, setSessionIsShuffle] = useState(false);
-  const [sessionAutoTags, setSessionAutoTags] = useState<Tag[]>([]);
-  const [sessionSteps, setSessionSteps] = useState<EditableSessionStep[]>([]);
-  const [collapsedSessionStepIds, setCollapsedSessionStepIds] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const [timeStepName, setTimeStepName] = useState('');
-  const [editableTimeStep, setEditableTimeStep] = useState<EditableSessionStep | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const clearStatus = useCallback(() => {
+    setStatus(null);
+  }, []);
+  const sessionDraft = useSessionPresetDraft({
+    timeStepPresets,
+    onDirty: clearStatus,
+    onError: setError,
+  });
+  const timeStepDraft = useTimeStepPresetDraft({ onDirty: clearStatus });
+  const selectedSessionPresetId = sessionDraft.draft.presetId;
+  const selectedTimeStepPresetId = timeStepDraft.draft.presetId;
+  const sessionName = sessionDraft.draft.name;
+  const sessionDescription = sessionDraft.draft.description;
+  const sessionWindowWidth = sessionDraft.draft.windowWidth;
+  const sessionWindowHeight = sessionDraft.draft.windowHeight;
+  const sessionIsShuffle = sessionDraft.draft.isShuffle;
+  const sessionAutoTags = sessionDraft.draft.autoTags;
+  const sessionSteps = sessionDraft.draft.steps;
+  const collapsedSessionStepIds = sessionDraft.draft.collapsedStepIds;
+  const expandedSessionStepIds = sessionDraft.expandedStepIds;
+  const timeStepName = timeStepDraft.draft.name;
+  const editableTimeStep = timeStepDraft.draft.step;
 
   const selectedSessionPreset = useMemo(
     () => sessionPresets.find(preset => preset.id === selectedSessionPresetId) ?? null,
@@ -95,11 +91,6 @@ export function SessionPresetSettingsView() {
     [timeStepPresets, selectedTimeStepPresetId],
   );
   const editorDisabled = loading || busy;
-  const expandedSessionStepIds = useMemo(
-    () => sessionSteps.filter(step => !collapsedSessionStepIds.has(step.id)).map(step => step.id),
-    [collapsedSessionStepIds, sessionSteps],
-  );
-
   const timeStepPresetOptions: SelectOption[] = useMemo(
     () =>
       timeStepPresets.map(preset => ({
@@ -110,25 +101,8 @@ export function SessionPresetSettingsView() {
     [timeStepPresets],
   );
 
-  const applySessionPresetToEditor = useCallback((preset: SessionPreset | null) => {
-    const nextSteps = preset ? createEditableSteps(preset) : [];
-
-    setSelectedSessionPresetId(preset?.id ?? '');
-    setSessionName(preset?.name ?? '');
-    setSessionDescription(preset?.description ?? '');
-    setSessionWindowWidth(preset?.windowWidth ?? '');
-    setSessionWindowHeight(preset?.windowHeight ?? '');
-    setSessionIsShuffle(preset?.isShuffle ?? false);
-    setSessionAutoTags(preset?.autoTags ?? []);
-    setSessionSteps(nextSteps);
-    setCollapsedSessionStepIds(new Set(nextSteps.map(step => step.id)));
-  }, []);
-
-  const applyTimeStepPresetToEditor = useCallback((preset: TimeStepPreset | null) => {
-    setSelectedTimeStepPresetId(preset?.id ?? '');
-    setTimeStepName(preset?.name ?? '');
-    setEditableTimeStep(preset ? createStepFromTimeStepPreset(preset, 1) : null);
-  }, []);
+  const applySessionPresetToEditor = sessionDraft.applyPreset;
+  const applyTimeStepPresetToEditor = timeStepDraft.applyPreset;
 
   const loadPresetSettings = useCallback(async () => {
     setLoading(true);
@@ -174,18 +148,6 @@ export function SessionPresetSettingsView() {
     void loadPresetSettings();
   }, [loadPresetSettings]);
 
-  useEffect(() => {
-    const sessionStepIds = new Set(sessionSteps.map(step => step.id));
-
-    setCollapsedSessionStepIds(current => {
-      const nextCollapsedStepIds = new Set(
-        [...current].filter(stepId => sessionStepIds.has(stepId)),
-      );
-
-      return nextCollapsedStepIds.size === current.size ? current : nextCollapsedStepIds;
-    });
-  }, [sessionSteps]);
-
   const handleSessionPresetSelect = (presetId: string) => {
     const nextPreset = sessionPresets.find(preset => preset.id === presetId) ?? null;
     setError(null);
@@ -204,189 +166,30 @@ export function SessionPresetSettingsView() {
   };
 
   const handleCreateSessionPreset = () => {
-    const nextStep = createStepFromFirstTimeStepPreset(timeStepPresets, 1);
-
     setError(null);
     setStatus(null);
     setEditorMode('session');
-    setSelectedSessionPresetId('');
-    setSessionName(t('presets.untitled_session', { defaultValue: NEW_SESSION_PRESET_NAME }));
-    setSessionDescription('');
-    setSessionWindowWidth('240');
-    setSessionWindowHeight('');
-    setSessionIsShuffle(false);
-    setSessionAutoTags([]);
-    setSessionSteps(nextStep ? [nextStep] : []);
-    setCollapsedSessionStepIds(new Set());
+    sessionDraft.createPreset();
   };
 
   const handleCreateTimeStepPreset = () => {
-    const nextStep = createCustomStep(
-      1,
-      t('croquis.user_custom_step', { defaultValue: 'User Custom Step' }),
-    );
-
     setError(null);
     setStatus(null);
     setEditorMode('time-step');
-    setSelectedTimeStepPresetId('');
-    setTimeStepName(t('presets.untitled_time_step', { defaultValue: NEW_TIME_STEP_PRESET_NAME }));
-    setEditableTimeStep(nextStep);
+    timeStepDraft.createPreset();
   };
 
-  const handleAddSessionStep = () => {
-    const nextStep = createStepFromFirstTimeStepPreset(timeStepPresets, sessionSteps.length + 1);
-    if (!nextStep) {
-      setError(
-        t('presets.error.create_time_step_before_append', {
-          defaultValue: 'Create a time step preset before appending session steps.',
-        }),
-      );
-      return;
-    }
-
-    setSessionSteps(normalizeStepOrders([...sessionSteps, nextStep]));
-    setCollapsedSessionStepIds(current => {
-      if (!current.has(nextStep.id)) {
-        return current;
-      }
-
-      const nextCollapsedStepIds = new Set(current);
-      nextCollapsedStepIds.delete(nextStep.id);
-      return nextCollapsedStepIds;
-    });
-    setStatus(null);
-  };
-
-  const handleDeleteSessionStep = (stepId: string) => {
-    setSessionSteps(current => normalizeStepOrders(current.filter(step => step.id !== stepId)));
-    setCollapsedSessionStepIds(current => {
-      if (!current.has(stepId)) {
-        return current;
-      }
-
-      const nextCollapsedStepIds = new Set(current);
-      nextCollapsedStepIds.delete(stepId);
-      return nextCollapsedStepIds;
-    });
-    setStatus(null);
-  };
-
-  const reorderSessionStep = (
-    sourceStepId: string,
-    targetStepId: string,
-    position: AccordionReorderPosition,
-  ) => {
-    setSessionSteps(current => {
-      if (sourceStepId === targetStepId) {
-        return current;
-      }
-
-      const sourceIndex = current.findIndex(step => step.id === sourceStepId);
-      const targetIndex = current.findIndex(step => step.id === targetStepId);
-      if (sourceIndex < 0 || targetIndex < 0) {
-        return current;
-      }
-
-      const nextSteps = [...current];
-      const [sourceStep] = nextSteps.splice(sourceIndex, 1);
-      const nextTargetIndex = nextSteps.findIndex(step => step.id === targetStepId);
-      if (nextTargetIndex < 0) {
-        return current;
-      }
-
-      nextSteps.splice(position === 'after' ? nextTargetIndex + 1 : nextTargetIndex, 0, sourceStep);
-      return normalizeStepOrders(nextSteps);
-    });
-    setStatus(null);
-  };
-
-  const handleMoveSessionStep = (stepId: string, direction: -1 | 1) => {
-    setSessionSteps(current => {
-      const index = current.findIndex(step => step.id === stepId);
-      const nextIndex = index + direction;
-      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) {
-        return current;
-      }
-
-      const nextSteps = [...current];
-      const [step] = nextSteps.splice(index, 1);
-      nextSteps.splice(nextIndex, 0, step);
-      return normalizeStepOrders(nextSteps);
-    });
-    setStatus(null);
-  };
-
-  const handleSessionStepAccordionValueChange = (value: AccordionRootValue) => {
-    const expandedStepIds = new Set(
-      Array.isArray(value) ? value : typeof value === 'string' ? [value] : [],
-    );
-
-    setCollapsedSessionStepIds(
-      new Set(sessionSteps.map(step => step.id).filter(stepId => !expandedStepIds.has(stepId))),
-    );
-  };
-
-  const handleSessionStepReorder = ({ value, targetValue, position }: AccordionReorderPayload) => {
-    reorderSessionStep(value, targetValue, position);
-  };
-
-  const handleSessionStepPresetChange = (stepId: string, nextValue: string) => {
-    setSessionSteps(current =>
-      normalizeStepOrders(
-        current.map(step => {
-          if (step.id !== stepId) {
-            return step;
-          }
-
-          const nextPreset = timeStepPresets.find(preset => preset.id === nextValue);
-          return nextPreset ? applyTimeStepPresetToStep(step, nextPreset) : step;
-        }),
-      ),
-    );
-    setStatus(null);
-  };
-
-  const handleSessionAutoTagAdd = (tag: Tag) => {
-    setSessionAutoTags(current => {
-      if (current.some(autoTag => autoTag.id === tag.id)) {
-        return current;
-      }
-
-      return [...current, tag];
-    });
-    setStatus(null);
-  };
-
-  const handleSessionAutoTagRemove = (tagId: string) => {
-    setSessionAutoTags(current => current.filter(tag => tag.id !== tagId));
-    setStatus(null);
-  };
-
-  const updateEditableTimeStep = (updater: (step: EditableSessionStep) => EditableSessionStep) => {
-    setEditableTimeStep(current => (current === null ? current : updater(current)));
-    setStatus(null);
-  };
-
-  const handleEditableTimeStepTagAdd = (tag: Tag) => {
-    updateEditableTimeStep(currentStep => {
-      if (currentStep.autoTags.some(autoTag => autoTag.id === tag.id)) {
-        return currentStep;
-      }
-
-      return {
-        ...currentStep,
-        autoTags: [...currentStep.autoTags, tag],
-      };
-    });
-  };
-
-  const handleEditableTimeStepTagRemove = (tagId: string) => {
-    updateEditableTimeStep(currentStep => ({
-      ...currentStep,
-      autoTags: currentStep.autoTags.filter(tag => tag.id !== tagId),
-    }));
-  };
+  const handleAddSessionStep = sessionDraft.addStep;
+  const handleDeleteSessionStep = sessionDraft.deleteStep;
+  const handleMoveSessionStep = sessionDraft.moveStep;
+  const handleSessionStepAccordionValueChange = sessionDraft.setAccordionValue;
+  const handleSessionStepReorder = sessionDraft.reorderFromAccordion;
+  const handleSessionStepPresetChange = sessionDraft.updateStepPreset;
+  const handleSessionAutoTagAdd = sessionDraft.addAutoTag;
+  const handleSessionAutoTagRemove = sessionDraft.removeAutoTag;
+  const updateEditableTimeStep = timeStepDraft.updateStep;
+  const handleEditableTimeStepTagAdd = timeStepDraft.addAutoTag;
+  const handleEditableTimeStepTagRemove = timeStepDraft.removeAutoTag;
 
   const persistSessionPreset = async (duplicate = false) => {
     const trimmedName = sessionName.trim();
@@ -520,9 +323,7 @@ export function SessionPresetSettingsView() {
       saveStoredTimeStepFilterSettings(nextSelectedPreset?.id, editableTimeStep);
       setTimeStepPresets(nextTimeStepPresets);
       setSessionPresets(nextSessionPresets);
-      setSessionSteps(currentSteps =>
-        refreshSessionStepsFromTimeStepPresets(currentSteps, nextTimeStepPresets),
-      );
+      sessionDraft.refreshStepsFromTimeStepPresets(nextTimeStepPresets);
       applyTimeStepPresetToEditor(nextSelectedPreset);
       setEditorMode('time-step');
       setStatus(
@@ -627,8 +428,7 @@ export function SessionPresetSettingsView() {
                   value={sessionName}
                   disabled={editorDisabled}
                   onChange={event => {
-                    setSessionName(event.target.value);
-                    setStatus(null);
+                    sessionDraft.setName(event.target.value);
                   }}
                 />
                 <label className="session-preset-settings__textarea-field">
@@ -638,8 +438,7 @@ export function SessionPresetSettingsView() {
                     disabled={editorDisabled}
                     className="session-preset-settings__textarea"
                     onChange={event => {
-                      setSessionDescription(event.target.value);
-                      setStatus(null);
+                      sessionDraft.setDescription(event.target.value);
                     }}
                   />
                 </label>
@@ -828,8 +627,7 @@ export function SessionPresetSettingsView() {
                     placeholder="180"
                     disabled={editorDisabled}
                     onChange={event => {
-                      setSessionWindowHeight(normalizeWindowDimension(event.target.value));
-                      setStatus(null);
+                      sessionDraft.setWindowHeight(event.target.value);
                     }}
                   />
                   <Input
@@ -843,8 +641,7 @@ export function SessionPresetSettingsView() {
                     placeholder="1080"
                     disabled={editorDisabled}
                     onChange={event => {
-                      setSessionWindowWidth(normalizeWindowDimension(event.target.value));
-                      setStatus(null);
+                      sessionDraft.setWindowWidth(event.target.value);
                     }}
                   />
                 </div>
@@ -855,8 +652,7 @@ export function SessionPresetSettingsView() {
                   checked={sessionIsShuffle}
                   disabled={editorDisabled}
                   onCheckedChange={checked => {
-                    setSessionIsShuffle(checked);
-                    setStatus(null);
+                    sessionDraft.setShuffle(checked);
                   }}
                 />
               </section>
@@ -898,11 +694,7 @@ export function SessionPresetSettingsView() {
                   value={timeStepName}
                   disabled={editorDisabled}
                   onChange={event => {
-                    setTimeStepName(event.target.value);
-                    setEditableTimeStep(current =>
-                      current ? { ...current, name: event.target.value } : current,
-                    );
-                    setStatus(null);
+                    timeStepDraft.setName(event.target.value);
                   }}
                 />
               </div>
