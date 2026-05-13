@@ -1,19 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CroquisStartModal } from '@/features/croquis';
-import { getErrorMessage } from '../../../shared/lib/error';
-import { ipc } from '../../../shared/lib/ipc';
-import type {
-  AssetDetail,
-  AssetListSource,
-  BatchUpdateAssetFoldersMode,
-  CroquisRecordDetail,
-  SessionPreset,
-  Tag,
-  TagGroup,
-  TimeStepPreset,
-  VirtualFolder,
-} from '../../../shared/types';
+import type { AssetDetail, AssetListSource } from '../../../shared/types';
 import { Button } from '../../../shared/ui';
 import { LibraryWorkspace } from '../common/LibraryWorkspace';
 import type { LibraryWorkspaceLayout } from '../common/types';
@@ -25,14 +13,11 @@ import { ReferenceExplorerHeader } from './ReferenceExplorerHeader';
 import { ReferenceMasonryTile } from './ReferenceMasonryTile';
 import { ReferenceSelectionToolbar } from './ReferenceSelectionToolbar';
 import { useReferenceDropImport } from './lib/useReferenceDropImport';
-import {
-  createAssetRecordCountMap,
-  createRelatedRecordDetailMap,
-  mergeCachedAssetDetails,
-  mergeCachedAssetRecordCounts,
-} from './model/assetCache';
-import { getSelectableFolders } from './model/folderAction';
+import { useAssetFolderAction } from './model/useAssetFolderAction';
+import { useNoRecordFilter } from './model/useNoRecordFilter';
 import { useReferenceAssets } from './model/useReferenceAssets';
+import { useReferenceCroquisLauncher } from './model/useReferenceCroquisLauncher';
+import { useSelectedAssetDetail } from './model/useSelectedAssetDetail';
 import { ReferenceDropOverlay } from './ui/ReferenceDropOverlay';
 import { ReferenceFolderActionModal } from './ui/ReferenceFolderActionModal';
 import { ReferenceGridState } from './ui/ReferenceGridState';
@@ -44,95 +29,87 @@ type ReferencesViewProps = {
   onExplorerRefresh?: () => Promise<void> | void;
 };
 
-type FolderAction = {
-  assetIds: string[];
-  mode: BatchUpdateAssetFoldersMode;
-};
-
 export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: ReferencesViewProps) {
   const { i18n, t } = useTranslation('common');
   const [layout, setLayout] = useState<LibraryWorkspaceLayout>('masonry');
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
-  const [selectedAssetDetail, setSelectedAssetDetail] = useState<AssetDetail | null>(null);
-  const [assetDetailsById, setAssetDetailsById] = useState(() => new Map<string, AssetDetail>());
-  const [assetRecordCountsById, setAssetRecordCountsById] = useState(
-    () => new Map<string, number>(),
-  );
-  const [relatedRecordDetailsById, setRelatedRecordDetailsById] = useState(
-    () => new Map<string, CroquisRecordDetail>(),
-  );
   const [previewOpen, setPreviewOpen] = useState(false);
   const [filterExpanded, setFilterExpanded] = useState(false);
-  const [noRecordFilterSelected, setNoRecordFilterSelected] = useState(false);
-  const [noRecordFilterLoading, setNoRecordFilterLoading] = useState(false);
-  const [noRecordFilterError, setNoRecordFilterError] = useState<string | null>(null);
-  const [noRecordFilterRefreshKey, setNoRecordFilterRefreshKey] = useState(0);
-  const [croquisModalOpen, setCroquisModalOpen] = useState(false);
-  const [croquisAssetIds, setCroquisAssetIds] = useState<string[]>([]);
-  const [sessionPresets, setSessionPresets] = useState<SessionPreset[]>([]);
-  const [timeStepPresets, setTimeStepPresets] = useState<TimeStepPreset[]>([]);
-  const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [isCroquisConfigLoading, setIsCroquisConfigLoading] = useState(false);
-  const [croquisConfigError, setCroquisConfigError] = useState<string | null>(null);
-  const [folderAction, setFolderAction] = useState<FolderAction | null>(null);
-  const [folderActionFolders, setFolderActionFolders] = useState<VirtualFolder[]>([]);
-  const [folderActionFolderId, setFolderActionFolderId] = useState('');
-  const [folderActionBusy, setFolderActionBusy] = useState(false);
-  const [folderActionLoading, setFolderActionLoading] = useState(false);
-  const [folderActionError, setFolderActionError] = useState<string | null>(null);
-  const [assetActionBusy, setAssetActionBusy] = useState(false);
-  const [assetActionError, setAssetActionError] = useState<string | null>(null);
-  const selectedAssetDetailLoadSequenceRef = useRef(0);
-  const noRecordFilterLoadSequenceRef = useRef(0);
-  const croquisConfigLoadSequenceRef = useRef(0);
-  const folderActionLoadSequenceRef = useRef(0);
-
   const { assets, isLoading, error, loadAssets } = useReferenceAssets({ source, refreshKey });
+  const noRecordFilter = useNoRecordFilter({ assets, source });
+  const selectedAsset = useSelectedAssetDetail({
+    assets,
+    selectedAssetId,
+    onPreviewClose: () => {
+      setPreviewOpen(false);
+    },
+    onRecordCountChange: noRecordFilter.updateRecordCount,
+  });
 
-  useEffect(() => {
-    if (!error) {
-      return;
+  const items = useMemo(
+    () =>
+      assets.map(asset => {
+        const detail =
+          selectedAsset.assetDetailsById.get(asset.id) ??
+          (selectedAsset.selectedAssetDetail?.id === asset.id
+            ? selectedAsset.selectedAssetDetail
+            : undefined);
+
+        return createReferenceAsset(
+          asset,
+          detail,
+          selectedAsset.selectedAssetDetail?.id === asset.id
+            ? selectedAsset.relatedRecordDetailsById
+            : undefined,
+          t,
+          i18n.resolvedLanguage,
+        );
+      }),
+    [
+      assets,
+      i18n.resolvedLanguage,
+      selectedAsset.assetDetailsById,
+      selectedAsset.relatedRecordDetailsById,
+      selectedAsset.selectedAssetDetail,
+      t,
+    ],
+  );
+
+  const filteredItems = useMemo(() => {
+    if (!noRecordFilter.selected) {
+      return items;
     }
 
-    setSelectedAssetId(null);
-    setPreviewOpen(false);
-  }, [error]);
+    if (noRecordFilter.loading || noRecordFilter.error) {
+      return [];
+    }
 
-  useEffect(() => {
-    const assetIds = new Set(assets.map(asset => asset.id));
-    setSelectedAssetIds(current => current.filter(assetId => assetIds.has(assetId)));
-    setAssetDetailsById(current => {
-      let changed = false;
-      const nextDetailsById = new Map<string, AssetDetail>();
+    return items.filter(item => noRecordFilter.assetRecordCountsById.get(item.id) === 0);
+  }, [items, noRecordFilter]);
 
-      for (const [assetId, detail] of current.entries()) {
-        if (assetIds.has(assetId)) {
-          nextDetailsById.set(assetId, detail);
-        } else {
-          changed = true;
-        }
-      }
+  const handleAssetsUpdated = useCallback(
+    (updatedDetails: readonly AssetDetail[]) => {
+      selectedAsset.mergeAssetDetails(updatedDetails);
+      noRecordFilter.mergeRecordCounts(updatedDetails);
+    },
+    [noRecordFilter, selectedAsset],
+  );
 
-      return changed || nextDetailsById.size !== current.size ? nextDetailsById : current;
-    });
-    setAssetRecordCountsById(current => {
-      let changed = false;
-      const nextRecordCountsById = new Map<string, number>();
+  const folderAction = useAssetFolderAction({
+    loadAssets,
+    onExplorerRefresh,
+    onAssetsUpdated: handleAssetsUpdated,
+  });
 
-      for (const [assetId, recordCount] of current.entries()) {
-        if (assetIds.has(assetId)) {
-          nextRecordCountsById.set(assetId, recordCount);
-        } else {
-          changed = true;
-        }
-      }
-
-      return changed || nextRecordCountsById.size !== current.size ? nextRecordCountsById : current;
-    });
-  }, [assets]);
+  const croquisLauncher = useReferenceCroquisLauncher({
+    selectedAssetIds,
+    onStarted: () => {
+      setSelectionMode(false);
+      setSelectedAssetIds([]);
+    },
+  });
 
   const {
     dropImportBusy,
@@ -151,217 +128,29 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
   });
 
   useEffect(() => {
-    const detailLoadSequence = selectedAssetDetailLoadSequenceRef.current + 1;
-    selectedAssetDetailLoadSequenceRef.current = detailLoadSequence;
-    const isCurrentDetailLoad = () =>
-      selectedAssetDetailLoadSequenceRef.current === detailLoadSequence;
-
-    if (!selectedAssetId) {
-      setSelectedAssetDetail(null);
-      setRelatedRecordDetailsById(new Map());
-      setPreviewOpen(false);
+    if (!error) {
       return;
     }
 
-    const loadDetail = async () => {
-      try {
-        const detail = await ipc.asset.getDetail(selectedAssetId);
-        if (!isCurrentDetailLoad()) {
-          return;
-        }
-
-        setSelectedAssetDetail(detail);
-        setAssetDetailsById(current => new Map(current).set(detail.id, detail));
-        setAssetRecordCountsById(current => {
-          if (!current.has(detail.id)) {
-            return current;
-          }
-
-          return new Map(current).set(detail.id, detail.relatedRecords.length);
-        });
-        setRelatedRecordDetailsById(new Map());
-
-        const detailResults = await Promise.allSettled(
-          detail.relatedRecords.map(record => ipc.record.getDetail(record.id)),
-        );
-
-        if (!isCurrentDetailLoad()) {
-          return;
-        }
-
-        setRelatedRecordDetailsById(
-          createRelatedRecordDetailMap(detail.relatedRecords, detailResults),
-        );
-      } catch {
-        if (isCurrentDetailLoad()) {
-          setSelectedAssetDetail(null);
-          setRelatedRecordDetailsById(new Map());
-        }
-      }
-    };
-
-    void loadDetail();
-
-    return () => {
-      selectedAssetDetailLoadSequenceRef.current += 1;
-    };
-  }, [selectedAssetId]);
-
-  const items = useMemo(
-    () =>
-      assets.map(asset => {
-        const detail =
-          assetDetailsById.get(asset.id) ??
-          (selectedAssetDetail?.id === asset.id ? selectedAssetDetail : undefined);
-
-        return createReferenceAsset(
-          asset,
-          detail,
-          selectedAssetDetail?.id === asset.id ? relatedRecordDetailsById : undefined,
-          t,
-          i18n.resolvedLanguage,
-        );
-      }),
-    [
-      assetDetailsById,
-      assets,
-      i18n.resolvedLanguage,
-      relatedRecordDetailsById,
-      selectedAssetDetail,
-      t,
-    ],
-  );
+    setSelectedAssetId(null);
+    setPreviewOpen(false);
+  }, [error]);
 
   useEffect(() => {
-    if (!noRecordFilterSelected) {
-      noRecordFilterLoadSequenceRef.current += 1;
-      setNoRecordFilterLoading(false);
-      setNoRecordFilterError(null);
-      return;
-    }
-
-    if (assets.length === 0) {
-      setAssetRecordCountsById(new Map());
-      setNoRecordFilterLoading(false);
-      setNoRecordFilterError(null);
-      return;
-    }
-
-    const loadSequence = noRecordFilterLoadSequenceRef.current + 1;
-    noRecordFilterLoadSequenceRef.current = loadSequence;
-    setNoRecordFilterLoading(true);
-    setNoRecordFilterError(null);
-
-    void ipc.asset
-      .listRecordCounts(source)
-      .then(recordCounts => {
-        if (noRecordFilterLoadSequenceRef.current !== loadSequence) {
-          return;
-        }
-
-        setAssetRecordCountsById(createAssetRecordCountMap(assets, recordCounts));
-      })
-      .catch((nextError: unknown) => {
-        if (noRecordFilterLoadSequenceRef.current !== loadSequence) {
-          return;
-        }
-
-        setAssetRecordCountsById(new Map());
-        setNoRecordFilterError(getErrorMessage(nextError, 'Failed to load reference filter data.'));
-      })
-      .finally(() => {
-        if (noRecordFilterLoadSequenceRef.current === loadSequence) {
-          setNoRecordFilterLoading(false);
-        }
-      });
-  }, [assets, noRecordFilterRefreshKey, noRecordFilterSelected, source]);
-
-  const filteredItems = useMemo(() => {
-    if (!noRecordFilterSelected) {
-      return items;
-    }
-
-    if (noRecordFilterLoading || noRecordFilterError) {
-      return [];
-    }
-
-    return items.filter(item => assetRecordCountsById.get(item.id) === 0);
-  }, [
-    assetRecordCountsById,
-    items,
-    noRecordFilterError,
-    noRecordFilterLoading,
-    noRecordFilterSelected,
-  ]);
-
-  const gridEmptyState = isLoading ? (
-    <ReferenceGridState
-      title={t('references.loading_assets', { defaultValue: 'Loading assets...' })}
-    />
-  ) : error ? (
-    <ReferenceGridState
-      title={t('references.failed_to_load_assets', { defaultValue: 'Failed to load assets' })}
-      description={error}
-      action={
-        <Button size="sm" onClick={() => void loadAssets()}>
-          {t('common.retry', { defaultValue: 'Retry' })}
-        </Button>
-      }
-    />
-  ) : noRecordFilterLoading ? (
-    <ReferenceGridState
-      title={t('references.filters.loading', { defaultValue: 'Loading filter data...' })}
-    />
-  ) : noRecordFilterError ? (
-    <ReferenceGridState
-      title={t('references.filters.failed_to_load', {
-        defaultValue: 'Failed to load filter data',
-      })}
-      description={noRecordFilterError}
-      action={
-        <Button
-          size="sm"
-          onClick={() => {
-            setNoRecordFilterLoading(true);
-            setNoRecordFilterError(null);
-            setNoRecordFilterRefreshKey(current => current + 1);
-          }}
-        >
-          {t('common.retry', { defaultValue: 'Retry' })}
-        </Button>
-      }
-    />
-  ) : noRecordFilterSelected ? (
-    <ReferenceGridState
-      title={t('references.filters.no_references_without_records', {
-        defaultValue: 'No references without records',
-      })}
-    />
-  ) : (
-    <ReferenceGridState title={t('references.empty', { defaultValue: 'No assets in this view' })} />
-  );
+    const assetIds = new Set(assets.map(asset => asset.id));
+    setSelectedAssetIds(current => current.filter(assetId => assetIds.has(assetId)));
+  }, [assets]);
 
   useEffect(() => {
     const itemIds = new Set(filteredItems.map(item => item.id));
     setSelectedAssetIds(current => current.filter(assetId => itemIds.has(assetId)));
-    if (selectedAssetId && noRecordFilterSelected && !noRecordFilterLoading) {
+    if (selectedAssetId && noRecordFilter.selected && !noRecordFilter.loading) {
       if (!itemIds.has(selectedAssetId)) {
         setSelectedAssetId(null);
         setPreviewOpen(false);
       }
     }
-  }, [filteredItems, noRecordFilterLoading, noRecordFilterSelected, selectedAssetId]);
-
-  const handleNoRecordFilterChange = useCallback((selected: boolean) => {
-    setNoRecordFilterSelected(selected);
-    if (!selected) {
-      setNoRecordFilterError(null);
-      return;
-    }
-
-    setNoRecordFilterLoading(true);
-    setNoRecordFilterRefreshKey(current => current + 1);
-  }, []);
+  }, [filteredItems, noRecordFilter.loading, noRecordFilter.selected, selectedAssetId]);
 
   const handleSelectedAssetChange = (assetId: string) => {
     if (selectionMode) {
@@ -378,53 +167,6 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
     setSelectedAssetId(assetId);
     setPreviewOpen(true);
   };
-
-  const loadCroquisConfiguration = useCallback(async () => {
-    const loadSequence = croquisConfigLoadSequenceRef.current + 1;
-    croquisConfigLoadSequenceRef.current = loadSequence;
-    setIsCroquisConfigLoading(true);
-    setCroquisConfigError(null);
-
-    try {
-      const [nextPresets, nextTimeStepPresets, nextTagIndex] = await Promise.all([
-        ipc.session.listPresets(),
-        ipc.session.listTimeStepPresets(),
-        ipc.tag.loadIndex(),
-      ]);
-
-      if (croquisConfigLoadSequenceRef.current !== loadSequence) {
-        return false;
-      }
-
-      setSessionPresets(nextPresets);
-      setTimeStepPresets(nextTimeStepPresets);
-      setTagGroups(nextTagIndex.groups);
-      setTags(nextTagIndex.tags);
-      return true;
-    } catch (nextError) {
-      if (croquisConfigLoadSequenceRef.current !== loadSequence) {
-        return false;
-      }
-
-      setSessionPresets([]);
-      setTimeStepPresets([]);
-      setTagGroups([]);
-      setTags([]);
-      setCroquisConfigError(
-        getErrorMessage(
-          nextError,
-          t('croquis.error.load_configuration', {
-            defaultValue: 'Failed to load Croquis session configuration.',
-          }),
-        ),
-      );
-      return false;
-    } finally {
-      if (croquisConfigLoadSequenceRef.current === loadSequence) {
-        setIsCroquisConfigLoading(false);
-      }
-    }
-  }, [t]);
 
   const handleSelectionModeChange = useCallback(
     (nextSelectionMode: boolean) => {
@@ -454,155 +196,25 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
     [filteredItems],
   );
 
-  const applyAssetFolderUpdate = useCallback(
-    async (assetIds: string[], virtualFolderIds: string[], mode: BatchUpdateAssetFoldersMode) => {
-      setAssetActionBusy(true);
-      setAssetActionError(null);
-
-      try {
-        const updatedDetails = await ipc.asset.batchUpdateFolders({
-          assetIds,
-          virtualFolderIds,
-          mode,
-        });
-        const updatedDetailsById = new Map(updatedDetails.map(detail => [detail.id, detail]));
-
-        setSelectedAssetDetail(current => {
-          if (!selectedAssetId && !current) {
-            return current;
-          }
-
-          const targetId = current?.id ?? selectedAssetId;
-          const updatedDetail = targetId ? updatedDetailsById.get(targetId) : undefined;
-          return updatedDetail ?? current;
-        });
-        setAssetDetailsById(current => mergeCachedAssetDetails(current, updatedDetails));
-        setAssetRecordCountsById(current => mergeCachedAssetRecordCounts(current, updatedDetails));
-        await loadAssets();
-        try {
-          await onExplorerRefresh?.();
-        } catch (refreshError) {
-          setAssetActionError(
-            getErrorMessage(
-              refreshError,
-              t('explorer.error.refresh', { defaultValue: 'Failed to refresh explorer.' }),
-            ),
-          );
-        }
-        return true;
-      } catch (nextError) {
-        setAssetActionError(
-          getErrorMessage(
-            nextError,
-            t('references.error.update_asset_folders', {
-              defaultValue: 'Failed to update asset folders.',
-            }),
-          ),
-        );
-        return false;
-      } finally {
-        setAssetActionBusy(false);
-      }
-    },
-    [loadAssets, onExplorerRefresh, selectedAssetId, t],
-  );
-
-  const openFolderAction = useCallback(
-    (action: FolderAction) => {
-      const loadSequence = folderActionLoadSequenceRef.current + 1;
-      folderActionLoadSequenceRef.current = loadSequence;
-
-      setFolderAction(action);
-      setFolderActionFolderId('');
-      setFolderActionFolders([]);
-      setFolderActionError(null);
-      setFolderActionLoading(true);
-
-      void ipc.library
-        .loadExplorerSnapshot()
-        .then(snapshot => {
-          if (folderActionLoadSequenceRef.current !== loadSequence) {
-            return;
-          }
-
-          setFolderActionFolders(getSelectableFolders(snapshot));
-        })
-        .catch((nextError: unknown) => {
-          if (folderActionLoadSequenceRef.current !== loadSequence) {
-            return;
-          }
-
-          setFolderActionError(
-            getErrorMessage(
-              nextError,
-              t('folders.error.load', { defaultValue: 'Failed to load folders.' }),
-            ),
-          );
-        })
-        .finally(() => {
-          if (folderActionLoadSequenceRef.current === loadSequence) {
-            setFolderActionLoading(false);
-          }
-        });
-    },
-    [t],
-  );
-
-  const handleCloseFolderAction = useCallback(() => {
-    folderActionLoadSequenceRef.current += 1;
-    setFolderAction(null);
-    setFolderActionFolderId('');
-    setFolderActionError(null);
-    setFolderActionBusy(false);
-    setFolderActionLoading(false);
-  }, []);
-
-  const handleApplyFolderAction = useCallback(() => {
-    if (!folderAction || !folderActionFolderId) {
-      return;
-    }
-
-    setFolderActionBusy(true);
-    setFolderActionError(null);
-
-    void applyAssetFolderUpdate(
-      folderAction.assetIds,
-      [folderActionFolderId],
-      folderAction.mode,
-    ).then(updated => {
-      setFolderActionBusy(false);
-      if (updated) {
-        handleCloseFolderAction();
-        return;
-      }
-
-      setFolderActionError(
-        t('references.error.update_asset_folders', {
-          defaultValue: 'Failed to update asset folders.',
-        }),
-      );
-    });
-  }, [applyAssetFolderUpdate, folderAction, folderActionFolderId, handleCloseFolderAction, t]);
-
   const handlePreviewAddFolder = useCallback(
     (assetId: string) => {
-      openFolderAction({ assetIds: [assetId], mode: 'append' });
+      folderAction.openFolderAction({ assetIds: [assetId], mode: 'append' });
     },
-    [openFolderAction],
+    [folderAction],
   );
 
   const handlePreviewRemoveFolder = useCallback(
     (assetId: string, folderId: string) => {
       const nextFolderIds =
-        selectedAssetDetail?.id === assetId
-          ? selectedAssetDetail.virtualFolders
+        selectedAsset.selectedAssetDetail?.id === assetId
+          ? selectedAsset.selectedAssetDetail.virtualFolders
               .filter(folder => folder.id !== folderId)
               .map(folder => folder.id)
           : [];
 
-      void applyAssetFolderUpdate([assetId], nextFolderIds, 'replace');
+      void folderAction.applyAssetFolderUpdate([assetId], nextFolderIds, 'replace');
     },
-    [applyAssetFolderUpdate, selectedAssetDetail],
+    [folderAction, selectedAsset.selectedAssetDetail],
   );
 
   const handleAddSelectedToFolder = useCallback(() => {
@@ -610,57 +222,29 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
       return;
     }
 
-    openFolderAction({ assetIds: selectedAssetIds, mode: 'append' });
-  }, [openFolderAction, selectedAssetIds]);
+    folderAction.openFolderAction({ assetIds: selectedAssetIds, mode: 'append' });
+  }, [folderAction, selectedAssetIds]);
 
   const handleMoveSelectedToFolder = useCallback(() => {
     if (selectedAssetIds.length === 0) {
       return;
     }
 
-    openFolderAction({ assetIds: selectedAssetIds, mode: 'replace' });
-  }, [openFolderAction, selectedAssetIds]);
+    folderAction.openFolderAction({ assetIds: selectedAssetIds, mode: 'replace' });
+  }, [folderAction, selectedAssetIds]);
 
-  const openCroquisForAssets = useCallback(
-    (assetIds: string[]) => {
-      if (assetIds.length === 0 || isCroquisConfigLoading) {
-        return;
-      }
-
-      void loadCroquisConfiguration().then(configurationLoaded => {
-        if (configurationLoaded) {
-          setCroquisAssetIds(assetIds);
-          setCroquisModalOpen(true);
-        }
-      });
-    },
-    [isCroquisConfigLoading, loadCroquisConfiguration],
-  );
-
-  const handleStartCroquis = useCallback(() => {
-    if (selectedAssetIds.length === 0) {
-      return;
-    }
-
-    openCroquisForAssets(selectedAssetIds);
-  }, [openCroquisForAssets, selectedAssetIds]);
-
-  const handleCloseCroquisModal = useCallback(() => {
-    setCroquisModalOpen(false);
-    setCroquisAssetIds([]);
-  }, []);
-
-  const handleCroquisStarted = useCallback(() => {
-    setCroquisModalOpen(false);
-    setCroquisAssetIds([]);
-    setSelectionMode(false);
-    setSelectedAssetIds([]);
-  }, []);
-
-  const folderActionModalBusy = folderActionBusy || folderActionLoading || assetActionBusy;
-  const folderActionSelectDisabled =
-    folderActionModalBusy || !folderActionFolderId || folderActionFolders.length === 0;
-  const statusError = dropImportError ?? assetActionError ?? croquisConfigError;
+  const gridEmptyState = getReferenceGridEmptyState({
+    isLoading,
+    error,
+    noRecordFilterLoading: noRecordFilter.loading,
+    noRecordFilterError: noRecordFilter.error,
+    noRecordFilterSelected: noRecordFilter.selected,
+    onLoadAssets: loadAssets,
+    onNoRecordFilterRetry: noRecordFilter.retry,
+    t,
+  });
+  const statusError =
+    dropImportError ?? folderAction.assetActionError ?? croquisLauncher.croquisConfigError;
 
   return (
     <>
@@ -674,7 +258,7 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
           selectionMode={selectionMode}
           gridAriaLabel={t('references.title', { defaultValue: 'References' })}
           previewOpen={previewOpen}
-          gridBusy={isLoading || noRecordFilterLoading}
+          gridBusy={isLoading || noRecordFilter.loading}
           gridEmptyState={gridEmptyState}
           onLayoutChange={setLayout}
           onSelectedItemChange={handleSelectedAssetChange}
@@ -682,9 +266,9 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
             <ReferenceExplorerHeader
               {...headerProps}
               filterExpanded={filterExpanded}
-              noRecordFilterSelected={noRecordFilterSelected}
+              noRecordFilterSelected={noRecordFilter.selected}
               onFilterExpandedChange={setFilterExpanded}
-              onNoRecordFilterChange={handleNoRecordFilterChange}
+              onNoRecordFilterChange={noRecordFilter.changeSelected}
             />
           )}
           renderToolbar={
@@ -692,13 +276,15 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
               selectionMode={selectionMode}
               selectedCount={selectedAssetIds.length}
               totalCount={filteredItems.length}
-              croquisDisabled={isCroquisConfigLoading}
-              folderActionsDisabled={assetActionBusy || folderActionModalBusy}
+              croquisDisabled={croquisLauncher.isCroquisConfigLoading}
+              folderActionsDisabled={
+                folderAction.assetActionBusy || folderAction.folderActionModalBusy
+              }
               onSelectionModeChange={handleSelectionModeChange}
               onSelectAllChange={handleSelectAllChange}
               onAddToFolder={handleAddSelectedToFolder}
               onMoveToFolder={handleMoveSelectedToFolder}
-              onStartCroquis={handleStartCroquis}
+              onStartCroquis={croquisLauncher.startCroquisForSelectedAssets}
             />
           }
           renderTile={(asset, tileState) => (
@@ -714,14 +300,14 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
           renderPreview={asset => (
             <AssetPreviewPanel
               asset={asset}
-              busy={assetActionBusy || isCroquisConfigLoading}
+              busy={folderAction.assetActionBusy || croquisLauncher.isCroquisConfigLoading}
               onClose={() => {
                 setPreviewOpen(false);
               }}
               onAddFolder={handlePreviewAddFolder}
               onRemoveFolder={handlePreviewRemoveFolder}
               onStartCroquis={assetId => {
-                openCroquisForAssets([assetId]);
+                croquisLauncher.openCroquisForAssets([assetId]);
               }}
             />
           )}
@@ -734,25 +320,25 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
         />
       </div>
       <ReferenceFolderActionModal
-        open={folderAction !== null}
-        folders={folderActionFolders}
-        folderId={folderActionFolderId}
-        busy={folderActionModalBusy}
-        error={folderActionError}
-        selectDisabled={folderActionSelectDisabled}
-        onClose={handleCloseFolderAction}
-        onFolderChange={setFolderActionFolderId}
-        onSelectFolder={handleApplyFolderAction}
+        open={folderAction.folderAction !== null}
+        folders={folderAction.folderActionFolders}
+        folderId={folderAction.folderActionFolderId}
+        busy={folderAction.folderActionModalBusy}
+        error={folderAction.folderActionError}
+        selectDisabled={folderAction.folderActionSelectDisabled}
+        onClose={folderAction.closeFolderAction}
+        onFolderChange={folderAction.setFolderActionFolderId}
+        onSelectFolder={folderAction.applyFolderAction}
       />
       <CroquisStartModal
-        open={croquisModalOpen}
-        assetIds={croquisAssetIds}
-        sessionPresets={sessionPresets}
-        timeStepPresets={timeStepPresets}
-        tags={tags}
-        tagGroups={tagGroups}
-        onClose={handleCloseCroquisModal}
-        onStarted={handleCroquisStarted}
+        open={croquisLauncher.croquisModalOpen}
+        assetIds={croquisLauncher.croquisAssetIds}
+        sessionPresets={croquisLauncher.sessionPresets}
+        timeStepPresets={croquisLauncher.timeStepPresets}
+        tags={croquisLauncher.tags}
+        tagGroups={croquisLauncher.tagGroups}
+        onClose={croquisLauncher.closeCroquisModal}
+        onStarted={croquisLauncher.handleCroquisStarted}
       />
       <DropImportWarningModal
         open={dropImportWarning !== null}
@@ -768,5 +354,87 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
         </div>
       ) : null}
     </>
+  );
+}
+
+type ReferenceGridEmptyStateOptions = {
+  isLoading: boolean;
+  error: string | null;
+  noRecordFilterLoading: boolean;
+  noRecordFilterError: string | null;
+  noRecordFilterSelected: boolean;
+  onLoadAssets: () => Promise<void> | void;
+  onNoRecordFilterRetry: () => void;
+  t: (key: string, options?: Record<string, unknown>) => string;
+};
+
+function getReferenceGridEmptyState({
+  isLoading,
+  error,
+  noRecordFilterLoading,
+  noRecordFilterError,
+  noRecordFilterSelected,
+  onLoadAssets,
+  onNoRecordFilterRetry,
+  t,
+}: ReferenceGridEmptyStateOptions) {
+  if (isLoading) {
+    return (
+      <ReferenceGridState
+        title={t('references.loading_assets', { defaultValue: 'Loading assets...' })}
+      />
+    );
+  }
+
+  if (error) {
+    return (
+      <ReferenceGridState
+        title={t('references.failed_to_load_assets', { defaultValue: 'Failed to load assets' })}
+        description={error}
+        action={
+          <Button size="sm" onClick={() => void onLoadAssets()}>
+            {t('common.retry', { defaultValue: 'Retry' })}
+          </Button>
+        }
+      />
+    );
+  }
+
+  if (noRecordFilterLoading) {
+    return (
+      <ReferenceGridState
+        title={t('references.filters.loading', { defaultValue: 'Loading filter data...' })}
+      />
+    );
+  }
+
+  if (noRecordFilterError) {
+    return (
+      <ReferenceGridState
+        title={t('references.filters.failed_to_load', {
+          defaultValue: 'Failed to load filter data',
+        })}
+        description={noRecordFilterError}
+        action={
+          <Button size="sm" onClick={onNoRecordFilterRetry}>
+            {t('common.retry', { defaultValue: 'Retry' })}
+          </Button>
+        }
+      />
+    );
+  }
+
+  if (noRecordFilterSelected) {
+    return (
+      <ReferenceGridState
+        title={t('references.filters.no_references_without_records', {
+          defaultValue: 'No references without records',
+        })}
+      />
+    );
+  }
+
+  return (
+    <ReferenceGridState title={t('references.empty', { defaultValue: 'No assets in this view' })} />
   );
 }
