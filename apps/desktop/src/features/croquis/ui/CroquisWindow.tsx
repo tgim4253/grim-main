@@ -2,11 +2,23 @@ import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
+import { cx } from '../../../shared/lib/cx';
+import { ipc } from '../../../shared/lib/ipc';
 import { IconButton } from '../../../shared/ui';
 import type { CroquisSession, CroquisSessionItem } from '../../../shared/types';
 import { clampFilterPercent, getRuntimeSessionFilterSettings } from '../lib/sessionPresetEditor';
 import { useCroquisSessionController } from '../lib/useCroquisSessionController';
 import './croquis.css';
+
+const MAC_PLATFORM_PATTERN = /Mac|iPhone|iPad|iPod/i;
+
+const shouldShowCustomWindowControls = () => {
+  if (typeof navigator === 'undefined') {
+    return false;
+  }
+
+  return !MAC_PLATFORM_PATTERN.test(navigator.userAgent);
+};
 
 const getCroquisImageStyle = (session: CroquisSession, item: CroquisSessionItem): CSSProperties => {
   const filterSettings = getRuntimeSessionFilterSettings(session.presetId, item.stepIndex, {
@@ -35,10 +47,44 @@ const getCroquisImageStyle = (session: CroquisSession, item: CroquisSessionItem)
   };
 };
 
+function CroquisWindowControls() {
+  const { t } = useTranslation('common');
+
+  return (
+    <div
+      className="croquis-page__frame-controls"
+      role="toolbar"
+      aria-label={t('croquis.window_controls', { defaultValue: 'Window controls' })}
+    >
+      <IconButton
+        icon="minus"
+        size="sm"
+        className="croquis-page__frame-button"
+        aria-label={t('common.minimize', { defaultValue: 'Minimize' })}
+        title={t('common.minimize', { defaultValue: 'Minimize' })}
+        onClick={() => {
+          void ipc.window.minimize();
+        }}
+      />
+      <IconButton
+        icon="close"
+        size="sm"
+        className="croquis-page__frame-button croquis-page__frame-button--close"
+        aria-label={t('common.close', { defaultValue: 'Close' })}
+        title={t('common.close', { defaultValue: 'Close' })}
+        onClick={() => {
+          void ipc.window.close();
+        }}
+      />
+    </div>
+  );
+}
+
 export function CroquisWindow() {
   const { t } = useTranslation('common');
   const [params] = useSearchParams();
   const [isHovering, setIsHovering] = useState(false);
+  const hasCustomWindowControls = shouldShowCustomWindowControls();
   const controller = useCroquisSessionController({
     sessionId: params.get('session_id'),
   });
@@ -59,7 +105,14 @@ export function CroquisWindow() {
 
   if (!session || !currentItem) {
     return (
-      <div className="croquis-page croquis-page--empty">
+      <div
+        className={cx(
+          'croquis-page',
+          'croquis-page--empty',
+          hasCustomWindowControls && 'croquis-page--custom-frame',
+        )}
+      >
+        {hasCustomWindowControls ? <CroquisWindowControls /> : null}
         <div className="croquis-page__empty">
           {controller.status ??
             t('croquis.loading_session', { defaultValue: 'Loading croquis session...' })}
@@ -81,7 +134,7 @@ export function CroquisWindow() {
 
   return (
     <div
-      className="croquis-page"
+      className={cx('croquis-page', hasCustomWindowControls && 'croquis-page--custom-frame')}
       onMouseEnter={() => {
         setIsHovering(true);
       }}
@@ -95,6 +148,7 @@ export function CroquisWindow() {
         setIsHovering(false);
       }}
     >
+      {hasCustomWindowControls ? <CroquisWindowControls /> : null}
       <div className="croquis-page__drag-region" data-tauri-drag-region aria-hidden />
 
       <main className="croquis-page__stage" data-tauri-drag-region>

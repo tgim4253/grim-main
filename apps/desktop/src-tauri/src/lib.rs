@@ -5,7 +5,6 @@
 #![allow(clippy::unnecessary_cast)]
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::useless_conversion)]
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 pub mod app_launcher;
 pub mod commands;

@@ -32,7 +32,7 @@ pub fn launch_main_window(app: &tauri::AppHandle) -> Result<(), String> {
     let web_builder =
         web_builder.title_bar_style(tauri::TitleBarStyle::Overlay);
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     let web_builder = web_builder.decorations(false);
 
     let window = web_builder.build().map_err(|err| err.to_string())?;
