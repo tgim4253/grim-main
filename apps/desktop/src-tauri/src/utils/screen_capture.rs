@@ -4,7 +4,9 @@ use anyhow::{anyhow, bail, Context, Result};
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use image::{DynamicImage, ImageFormat, RgbaImage};
-use screenshots::{display_info::DisplayInfo, Screen};
+use screenshots::{
+    display_info::DisplayInfo, image as screenshot_image, Screen,
+};
 use tokio::task;
 
 use crate::models::capture::{CaptureMonitor, CapturePreview, CaptureRect};
@@ -47,8 +49,7 @@ fn capture_region_as_png(
     let target_screen = resolve_target_screen(screens, &monitor)
         .ok_or_else(|| anyhow!("Failed to resolve monitor for capture"))?;
 
-    let capture =
-        target_screen.capture_area(rect.x, rect.y, rect.width, rect.height)?;
+    let capture = capture_region_image(&target_screen, rect, &monitor)?;
     let width = capture.width();
     let height = capture.height();
     if width == 0 || height == 0 {
@@ -66,6 +67,42 @@ fn capture_region_as_png(
         .context("Failed to encode capture preview as PNG")?;
 
     Ok(buffer)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn capture_region_image(
+    screen: &Screen,
+    rect: CaptureRect,
+    _monitor: &CaptureMonitor,
+) -> Result<screenshot_image::RgbaImage> {
+    screen.capture_area(rect.x, rect.y, rect.width, rect.height)
+}
+
+#[cfg(target_os = "windows")]
+fn capture_region_image(
+    screen: &Screen,
+    rect: CaptureRect,
+    monitor: &CaptureMonitor,
+) -> Result<screenshot_image::RgbaImage> {
+    // On Windows, mixed-DPI monitor setups can make area capture APIs mix
+    // logical coordinates and physical pixels. A full-monitor capture is
+    // reliable, so crop it using the renderer's logical monitor bounds.
+    let full_capture = screen.capture()?;
+    let bounds = map_logical_rect_to_image_bounds(
+        rect,
+        monitor,
+        full_capture.width(),
+        full_capture.height(),
+    )?;
+
+    Ok(screenshot_image::imageops::crop_imm(
+        &full_capture,
+        bounds.x,
+        bounds.y,
+        bounds.width,
+        bounds.height,
+    )
+    .to_image())
 }
 
 fn resolve_target_screen(
@@ -176,4 +213,115 @@ fn scale_coordinate(value: i32, factor: f64) -> i32 {
 
 fn scale_length(value: u32, factor: f64) -> u32 {
     ((value as f64) * factor).round().max(1.0) as u32
+}
+
+#[cfg(any(target_os = "windows", test))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ImageCropBounds {
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn map_logical_rect_to_image_bounds(
+    rect: CaptureRect,
+    monitor: &CaptureMonitor,
+    image_width: u32,
+    image_height: u32,
+) -> Result<ImageCropBounds> {
+    if image_width == 0 || image_height == 0 {
+        bail!("Captured monitor image has zero dimensions");
+    }
+    if monitor.width == 0 || monitor.height == 0 {
+        bail!("Capture monitor bounds must be larger than zero");
+    }
+
+    let scale_x = image_width as f64 / monitor.width as f64;
+    let scale_y = image_height as f64 / monitor.height as f64;
+    let logical_left = rect.x as f64;
+    let logical_top = rect.y as f64;
+    let logical_right = logical_left + rect.width as f64;
+    let logical_bottom = logical_top + rect.height as f64;
+
+    let left = scaled_floor_clamped(logical_left, scale_x, image_width);
+    let top = scaled_floor_clamped(logical_top, scale_y, image_height);
+    let right = scaled_ceil_clamped(logical_right, scale_x, image_width);
+    let bottom = scaled_ceil_clamped(logical_bottom, scale_y, image_height);
+
+    if left >= right || top >= bottom {
+        bail!("Mapped capture area is outside monitor bounds");
+    }
+
+    Ok(ImageCropBounds {
+        x: left,
+        y: top,
+        width: right - left,
+        height: bottom - top,
+    })
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn scaled_floor_clamped(value: f64, scale: f64, upper_bound: u32) -> u32 {
+    clamp_scaled_coordinate((value * scale).floor(), upper_bound)
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn scaled_ceil_clamped(value: f64, scale: f64, upper_bound: u32) -> u32 {
+    clamp_scaled_coordinate((value * scale).ceil(), upper_bound)
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn clamp_scaled_coordinate(value: f64, upper_bound: u32) -> u32 {
+    if !value.is_finite() || value <= 0.0 {
+        return 0;
+    }
+
+    if value >= upper_bound as f64 {
+        return upper_bound;
+    }
+
+    value as u32
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn monitor(width: u32, height: u32, scale_factor: f64) -> CaptureMonitor {
+        CaptureMonitor { x: 0, y: 0, width, height, scale_factor }
+    }
+
+    #[test]
+    fn maps_logical_capture_rect_to_physical_image_bounds() {
+        let bounds = map_logical_rect_to_image_bounds(
+            CaptureRect { x: 100, y: 40, width: 200, height: 80 },
+            &monitor(1536, 864, 1.25),
+            1920,
+            1080,
+        )
+        .expect("expected mapped bounds");
+
+        assert_eq!(
+            bounds,
+            ImageCropBounds { x: 125, y: 50, width: 250, height: 100 }
+        );
+    }
+
+    #[test]
+    fn clamps_mapped_capture_rect_to_image_bounds() {
+        let bounds = map_logical_rect_to_image_bounds(
+            CaptureRect { x: 1535, y: 860, width: 10, height: 10 },
+            &monitor(1536, 864, 1.25),
+            1920,
+            1080,
+        )
+        .expect("expected clamped bounds");
+
+        assert_eq!(
+            bounds,
+            ImageCropBounds { x: 1918, y: 1075, width: 2, height: 5 }
+        );
+    }
 }
