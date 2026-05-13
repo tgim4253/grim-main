@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAppUpdate } from '../../app-update';
+import { useAppUpdate } from '@/features/app-update';
 import { formatBytes } from '../../../lib/format';
 import { useTheme, type Theme } from '../../../shared/hooks';
 import { LANGUAGE_OPTIONS, resolveLanguageCode } from '../../../shared/lib/language';
