@@ -23,7 +23,8 @@
     "lint:check": "eslint . && cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings",
     "format:check": "prettier --check . && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check",
     "translate": "pnpm --filter @grim/scripts translate",
-    "format:write": "prettier --write . && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml"
+    "format:write": "prettier --write . && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml",
+    "version:bump": "node scripts/bump-version.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.31.0",
