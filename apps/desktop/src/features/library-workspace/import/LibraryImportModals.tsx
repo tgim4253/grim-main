@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Button, Icon, Modal, ModalBody, ModalFooter } from '../../../shared/ui';
 import { cx } from '../../../shared/lib/cx';
-import { FolderSearchSelect } from '../../library/components';
+import { FolderSearchSelect } from '@/entities/folder';
 import type { VirtualFolder } from '../../../shared/types';
 import './library-import-modal.css';
 

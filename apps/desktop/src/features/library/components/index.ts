@@ -1,13 +1,4 @@
-export {
-  FolderSearchSelect,
-  filterFolderSearchOptions,
-  type FolderSearchFilter,
-  type FolderSearchSelectProps,
-} from './FolderSearchSelect';
-
-export {
-  TagSearchSelect,
-  filterTagSearchOptions,
-  type TagSearchFilter,
-  type TagSearchSelectProps,
-} from './TagSearchSelect';
+export { FolderSearchSelect, filterFolderSearchOptions } from '@/entities/folder';
+export type { FolderSearchFilter, FolderSearchSelectProps } from '@/entities/folder';
+export { TagSearchSelect, filterTagSearchOptions } from '@/entities/tag';
+export type { TagSearchFilter, TagSearchSelectProps } from '@/entities/tag';
