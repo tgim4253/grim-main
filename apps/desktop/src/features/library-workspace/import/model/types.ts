@@ -1,3 +1,5 @@
+export type ImportStep = 'folder' | 'assets' | 'completed';
+
 export type ImportSummary = {
   importedCount: number;
   reusedCount: number;

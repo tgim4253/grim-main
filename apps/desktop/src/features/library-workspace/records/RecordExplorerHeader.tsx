@@ -2,10 +2,7 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChipButton, Icon, IconButton } from '../../../shared/ui';
 import type { LibraryWorkspaceLayout } from '../common/types';
-import type {
-  RecordExplorerFilterGroup,
-  RecordExplorerSelectedFilters,
-} from './model/filterTypes';
+import type { RecordExplorerFilterGroup, RecordExplorerSelectedFilters } from './model/filterTypes';
 
 type RecordExplorerHeaderProps = {
   itemCount: number;
