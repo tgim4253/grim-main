@@ -298,7 +298,7 @@ export function SessionPresetSettingsView() {
     setSelectedSessionPresetId('');
     setSessionName(t('presets.untitled_session', { defaultValue: NEW_SESSION_PRESET_NAME }));
     setSessionDescription('');
-    setSessionWindowWidth('960');
+    setSessionWindowWidth('240');
     setSessionWindowHeight('');
     setSessionIsShuffle(false);
     setSessionAutoTags([]);

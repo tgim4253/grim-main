@@ -118,7 +118,7 @@ export function CroquisStartModal({
     }
 
     setSelectedPresetId(fallbackPreset?.id ?? '');
-    setWindowWidth(fallbackPreset?.windowWidth ?? '960');
+    setWindowWidth(fallbackPreset?.windowWidth ?? '240');
     setWindowHeight(fallbackPreset?.windowHeight ?? '');
     setIsShuffle(fallbackPreset?.isShuffle ?? false);
     setSessionAutoTags(fallbackPreset?.autoTags ?? []);
@@ -151,7 +151,7 @@ export function CroquisStartModal({
 
     setSelectedPresetId(nextPresetId);
     setStoredActiveSessionPresetId(nextPreset?.id ?? null);
-    setWindowWidth(nextPreset?.windowWidth ?? '960');
+    setWindowWidth(nextPreset?.windowWidth ?? '240');
     setWindowHeight(nextPreset?.windowHeight ?? '');
     setIsShuffle(nextPreset?.isShuffle ?? false);
     setSessionAutoTags(nextPreset?.autoTags ?? []);
