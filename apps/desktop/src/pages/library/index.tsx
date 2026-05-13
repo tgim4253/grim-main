@@ -1,12 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useTranslation } from 'react-i18next';
 import { formatBytes } from '../../lib/format';
@@ -66,13 +58,9 @@ import {
 } from '../../ui/Sidebar/MiniSidebarRail';
 import { SidebarPanel } from '../../ui/Sidebar/SidebarPanel';
 import { SettingsModal } from '../../features/settings';
+import { useLibrarySidebarResize } from './model/useLibrarySidebarResize';
 import './library-page.css';
 
-const SIDEBAR_COLLAPSED_WIDTH = 48;
-const SIDEBAR_DEFAULT_WIDTH = 343;
-const SIDEBAR_MIN_WIDTH = 240;
-const SIDEBAR_RESIZE_STEP = 24;
-const MAIN_CONTAINER_MIN_WIDTH = 320;
 const SUPPORTED_IMPORT_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif', 'tif', 'tiff'];
 
 type ImportStep = 'folder' | 'assets' | 'completed';
@@ -82,18 +70,6 @@ type ImportProgressState = {
   completed: number;
   total: number;
 };
-
-function getSidebarMaxWidth() {
-  if (typeof window === 'undefined') {
-    return SIDEBAR_DEFAULT_WIDTH;
-  }
-
-  return Math.max(SIDEBAR_MIN_WIDTH, window.innerWidth - MAIN_CONTAINER_MIN_WIDTH);
-}
-
-function clampSidebarWidth(width: number) {
-  return Math.min(Math.max(width, SIDEBAR_MIN_WIDTH), getSidebarMaxWidth());
-}
 
 function getSourceFolderId(source: AssetListSource) {
   return source.kind === 'folder' ? source.folderId : null;
@@ -159,9 +135,7 @@ function mergeImportResult(target: ImportResult, source: ImportResult) {
 
 export function LibraryPage() {
   const { t } = useTranslation('common');
-  const [isSidebarPanelOpen, setIsSidebarPanelOpen] = useState(true);
-  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
-  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const sidebarResize = useLibrarySidebarResize();
   const [explorerSnapshot, setExplorerSnapshot] = useState<ExplorerSnapshot | null>(null);
   const [explorerError, setExplorerError] = useState<string | null>(null);
   const [isExplorerLoading, setIsExplorerLoading] = useState(true);
@@ -192,9 +166,6 @@ export function LibraryPage() {
     takePendingConfirmation: takePendingImportDropConfirmation,
     hasPendingConfirmation: hasPendingImportDropConfirmation,
   } = useDropImportConfirmation<DroppedFileDataSource>();
-  const resizeSessionRef = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(
-    null,
-  );
   const noDestinationFoldersError = t('import.error.no_destination_folders', {
     defaultValue: 'No destination folders are available for import.',
   });
@@ -251,7 +222,7 @@ export function LibraryPage() {
       icon: 'folder-open',
       label: t('library.title', { defaultValue: 'Library' }),
       action: 'toggle-sidebar-panel',
-      active: isSidebarPanelOpen,
+      active: sidebarResize.isSidebarPanelOpen,
     },
     {
       icon: 'history',
@@ -275,7 +246,7 @@ export function LibraryPage() {
   const handlePrimaryAction = (action: PrimaryRailAction) => {
     switch (action) {
       case 'toggle-sidebar-panel':
-        setIsSidebarPanelOpen(open => !open);
+        sidebarResize.setIsSidebarPanelOpen(open => !open);
         break;
       case 'open-search':
         setActiveExplorerNodeId(RECENT_RECORDS_NODE_ID);
@@ -960,121 +931,6 @@ export function LibraryPage() {
     previewImportDroppedFiles,
   ]);
 
-  const handleSplitterPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (!isSidebarPanelOpen) {
-        return;
-      }
-
-      resizeSessionRef.current = {
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startWidth: sidebarWidth,
-      };
-      event.currentTarget.setPointerCapture(event.pointerId);
-      setIsResizingSidebar(true);
-      event.preventDefault();
-    },
-    [isSidebarPanelOpen, sidebarWidth],
-  );
-
-  const handleSplitterPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    const session = resizeSessionRef.current;
-    if (!session || session.pointerId !== event.pointerId) {
-      return;
-    }
-
-    const nextWidth = clampSidebarWidth(session.startWidth + (event.clientX - session.startX));
-    setSidebarWidth(nextWidth);
-    event.preventDefault();
-  }, []);
-
-  const handleSplitterPointerEnd = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    const session = resizeSessionRef.current;
-    if (!session || session.pointerId !== event.pointerId) {
-      return;
-    }
-
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-
-    resizeSessionRef.current = null;
-    setIsResizingSidebar(false);
-  }, []);
-
-  const handleSplitterKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLDivElement>) => {
-      if (!isSidebarPanelOpen) {
-        return;
-      }
-
-      if (event.key === 'ArrowLeft') {
-        event.preventDefault();
-        setSidebarWidth(current => clampSidebarWidth(current - SIDEBAR_RESIZE_STEP));
-        return;
-      }
-
-      if (event.key === 'ArrowRight') {
-        event.preventDefault();
-        setSidebarWidth(current => clampSidebarWidth(current + SIDEBAR_RESIZE_STEP));
-        return;
-      }
-
-      if (event.key === 'Home') {
-        event.preventDefault();
-        setSidebarWidth(SIDEBAR_MIN_WIDTH);
-        return;
-      }
-
-      if (event.key === 'End') {
-        event.preventDefault();
-        setSidebarWidth(getSidebarMaxWidth());
-      }
-    },
-    [isSidebarPanelOpen],
-  );
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !isSidebarPanelOpen) {
-      return;
-    }
-
-    const handleResize = () => {
-      setSidebarWidth(current => clampSidebarWidth(current));
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [isSidebarPanelOpen]);
-
-  useEffect(() => {
-    if (!isResizingSidebar) {
-      return;
-    }
-
-    const previousCursor = document.body.style.cursor;
-    const previousUserSelect = document.body.style.userSelect;
-
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-
-    return () => {
-      document.body.style.cursor = previousCursor;
-      document.body.style.userSelect = previousUserSelect;
-    };
-  }, [isResizingSidebar]);
-
-  const resolvedSidebarWidth = isSidebarPanelOpen
-    ? clampSidebarWidth(sidebarWidth)
-    : SIDEBAR_COLLAPSED_WIDTH;
-  const sidebarMaxWidth = getSidebarMaxWidth();
-  const sidebarStyle = {
-    width: `${String(resolvedSidebarWidth)}px`,
-    minWidth: `${String(resolvedSidebarWidth)}px`,
-  };
   const importBusy = isImporting || isImportPreviewing || importDropWarning !== null;
   const importFilePreview = importPreview
     ? {
@@ -1097,9 +953,9 @@ export function LibraryPage() {
           className={cx(
             'app-sidebar',
             'library-page__sidebar',
-            !isSidebarPanelOpen && 'library-page__sidebar--collapsed',
+            !sidebarResize.isSidebarPanelOpen && 'library-page__sidebar--collapsed',
           )}
-          style={sidebarStyle}
+          style={sidebarResize.sidebarStyle}
         >
           <SidebarPanel
             rail={
@@ -1110,7 +966,7 @@ export function LibraryPage() {
               />
             }
             title={t('explorer.title', { defaultValue: 'Explorer' })}
-            collapsed={!isSidebarPanelOpen}
+            collapsed={!sidebarResize.isSidebarPanelOpen}
           >
             <ExplorerPanel
               nodes={explorerNodes}
@@ -1127,24 +983,13 @@ export function LibraryPage() {
           </SidebarPanel>
         </div>
 
-        {isSidebarPanelOpen ? (
+        {sidebarResize.isSidebarPanelOpen ? (
           <div
-            role="separator"
-            tabIndex={0}
+            {...sidebarResize.splitterProps}
             aria-label={t('library.resize_sidebar_panel', {
               defaultValue: 'Resize sidebar panel',
             })}
-            aria-orientation="vertical"
-            aria-valuemin={SIDEBAR_MIN_WIDTH}
-            aria-valuemax={sidebarMaxWidth}
-            aria-valuenow={Math.round(resolvedSidebarWidth)}
             className="library-page__splitter"
-            data-dragging={isResizingSidebar ? 'true' : undefined}
-            onPointerDown={handleSplitterPointerDown}
-            onPointerMove={handleSplitterPointerMove}
-            onPointerUp={handleSplitterPointerEnd}
-            onPointerCancel={handleSplitterPointerEnd}
-            onKeyDown={handleSplitterKeyDown}
           />
         ) : null}
 
