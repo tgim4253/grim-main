@@ -1,8 +1,5 @@
 import {
-  Children,
-  createContext,
   forwardRef,
-  isValidElement,
   useEffect,
   useContext,
   useId,
@@ -11,9 +8,6 @@ import {
   useState,
   type ButtonHTMLAttributes,
   type CSSProperties,
-  type ForwardedRef,
-  type HTMLAttributes,
-  type ReactNode,
 } from 'react';
 import {
   DndContext,
@@ -33,175 +27,44 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { cx } from '../../lib/cx';
 import { Icon } from '../icon/Icon';
+import { AccordionDisclosure } from './AccordionDisclosure';
+import {
+  AccordionItemContext,
+  AccordionRootContext,
+  type AccordionItemContextValue,
+  type AccordionRootContextValue,
+} from './accordionContext';
+import {
+  POINTER_SENSOR_OPTIONS,
+  getAccordionItemValues,
+  isExpandedInRoot,
+  normalizeRootValue,
+  setForwardedRef,
+} from './accordionModel';
+import type {
+  AccordionItemDragHeaderProps,
+  AccordionItemHeaderProps,
+  AccordionItemProps,
+  AccordionRootProps,
+  AccordionRootValue,
+} from './types';
 import './accordion.css';
 
-export const ACCORDION_ROOT_TYPES = ['single', 'multiple'] as const;
-
-export type AccordionRootType = (typeof ACCORDION_ROOT_TYPES)[number];
-export type AccordionRootValue = string | string[] | null;
-export type AccordionReorderPosition = 'before' | 'after';
-export type AccordionReorderPayload = {
-  value: string;
-  targetValue: string;
-  position: AccordionReorderPosition;
-};
-
-export type AccordionRootProps = Omit<HTMLAttributes<HTMLDivElement>, 'defaultValue' | 'value'> & {
-  type?: AccordionRootType;
-  value?: AccordionRootValue;
-  defaultValue?: AccordionRootValue;
-  onValueChange?: (value: AccordionRootValue) => void;
-  collapsible?: boolean;
-  reorderable?: boolean;
-  onItemReorder?: (payload: AccordionReorderPayload) => void;
-};
-
-export type AccordionItemProps = Omit<HTMLAttributes<HTMLDivElement>, 'value'> & {
-  value: string;
-  expanded?: boolean;
-  defaultExpanded?: boolean;
-  onExpandedChange?: (expanded: boolean) => void;
-  disabled?: boolean;
-};
-
-export type AccordionItemHeaderProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> & {
-  children: ReactNode;
-  index?: ReactNode;
-  meta?: ReactNode;
-  trailing?: ReactNode;
-  expanded?: boolean;
-  controlsId?: string;
-  onToggle?: () => void;
-};
-
-export type AccordionItemDragHeaderProps = HTMLAttributes<HTMLDivElement> & {
-  children: ReactNode;
-  controlsId?: string;
-  disabled?: boolean;
-  disclosureLabel?: string;
-  dragLabel?: string;
-  dragTitle?: string;
-  expanded?: boolean;
-  onToggle?: () => void;
-  reorderable?: boolean;
-  showDisclosure?: boolean;
-};
-
-export type AccordionItemBodyProps = HTMLAttributes<HTMLDivElement> & {
-  expanded?: boolean;
-  labelledBy?: string;
-  keepMounted?: boolean;
-};
-
-export type AccordionDisclosureProps = HTMLAttributes<HTMLSpanElement> & {
-  children?: ReactNode;
-  expanded?: boolean;
-};
-
-type AccordionRootContextValue = {
-  type: AccordionRootType;
-  collapsible: boolean;
-  reorderable: boolean;
-  isExpanded: (value: string) => boolean;
-  setExpanded: (value: string, nextExpanded: boolean) => void;
-};
-
-type AccordionSortableReturn = ReturnType<typeof useSortable>;
-
-type AccordionItemContextValue = {
-  value: string;
-  expanded: boolean;
-  disabled: boolean;
-  triggerId: string;
-  bodyId: string;
-  hasBody: boolean;
-  setHasBody: (hasBody: boolean) => void;
-  setDragActivatorNodeRef: AccordionSortableReturn['setActivatorNodeRef'];
-  dragAttributes: AccordionSortableReturn['attributes'];
-  dragListeners: AccordionSortableReturn['listeners'];
-  toggle: () => void;
-};
-
-const AccordionRootContext = createContext<AccordionRootContextValue | null>(null);
-const AccordionItemContext = createContext<AccordionItemContextValue | null>(null);
-
-type AccordionElementProps = {
-  children?: ReactNode;
-  value?: unknown;
-};
-
-const POINTER_SENSOR_OPTIONS = {
-  activationConstraint: {
-    distance: 6,
-  },
-};
-
-const normalizeRootValue = (
-  type: AccordionRootType,
-  value: AccordionRootValue | undefined,
-): AccordionRootValue => {
-  if (type === 'multiple') {
-    if (Array.isArray(value)) {
-      return value;
-    }
-
-    if (typeof value === 'string') {
-      return [value];
-    }
-
-    return [];
-  }
-
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  return null;
-};
-
-const isExpandedInRoot = (
-  type: AccordionRootType,
-  value: AccordionRootValue,
-  itemValue: string,
-) => {
-  if (type === 'multiple') {
-    return Array.isArray(value) && value.includes(itemValue);
-  }
-
-  return value === itemValue;
-};
-
-const getAccordionItemValues = (children: ReactNode): string[] => {
-  const values: string[] = [];
-
-  Children.forEach(children, child => {
-    if (!isValidElement<AccordionElementProps>(child)) {
-      return;
-    }
-
-    if (typeof child.props.value === 'string') {
-      values.push(child.props.value);
-      return;
-    }
-
-    if (child.props.children) {
-      values.push(...getAccordionItemValues(child.props.children));
-    }
-  });
-
-  return values;
-};
-
-const setForwardedRef = <T,>(ref: ForwardedRef<T>, value: T | null) => {
-  if (typeof ref === 'function') {
-    ref(value);
-    return;
-  }
-
-  if (ref) {
-    (ref as { current: T | null }).current = value;
-  }
-};
+export { AccordionDisclosure } from './AccordionDisclosure';
+export { AccordionItemBody } from './AccordionItemBody';
+export { ACCORDION_ROOT_TYPES } from './types';
+export type {
+  AccordionDisclosureProps,
+  AccordionItemBodyProps,
+  AccordionItemDragHeaderProps,
+  AccordionItemHeaderProps,
+  AccordionItemProps,
+  AccordionReorderPayload,
+  AccordionReorderPosition,
+  AccordionRootProps,
+  AccordionRootType,
+  AccordionRootValue,
+} from './types';
 
 export const AccordionRoot = forwardRef<HTMLDivElement, AccordionRootProps>(function AccordionRoot(
   {
@@ -565,76 +428,6 @@ export const AccordionItemDragHeader = forwardRef<HTMLDivElement, AccordionItemD
           </button>
         ) : null}
       </div>
-    );
-  },
-);
-
-export const AccordionItemBody = forwardRef<HTMLDivElement, AccordionItemBodyProps>(
-  function AccordionItemBody(
-    { expanded, labelledBy, keepMounted = true, className, children, id, ...props },
-    ref,
-  ) {
-    const itemContext = useContext(AccordionItemContext);
-    const resolvedExpanded = expanded ?? itemContext?.expanded ?? true;
-    const resolvedId = id ?? itemContext?.bodyId;
-    const resolvedLabelledBy = labelledBy ?? itemContext?.triggerId;
-    const isRendered = keepMounted || resolvedExpanded;
-    const registerBody = itemContext?.setHasBody;
-
-    useEffect(() => {
-      if (!registerBody) {
-        return;
-      }
-
-      registerBody(isRendered);
-
-      return () => {
-        registerBody(false);
-      };
-    }, [isRendered, registerBody]);
-
-    if (!isRendered) {
-      return null;
-    }
-
-    return (
-      <div
-        {...props}
-        ref={ref}
-        id={resolvedId}
-        role={resolvedLabelledBy ? 'region' : undefined}
-        aria-labelledby={resolvedLabelledBy}
-        aria-hidden={!resolvedExpanded}
-        data-expanded={resolvedExpanded ? 'true' : 'false'}
-        className={cx('c-accordion-item__body', className)}
-      >
-        {children}
-      </div>
-    );
-  },
-);
-
-export const AccordionDisclosure = forwardRef<HTMLSpanElement, AccordionDisclosureProps>(
-  function AccordionDisclosure({ expanded, className, children, ...props }, ref) {
-    const itemContext = useContext(AccordionItemContext);
-    const resolvedExpanded = expanded ?? itemContext?.expanded ?? false;
-
-    return (
-      <span
-        {...props}
-        ref={ref}
-        data-expanded={resolvedExpanded ? 'true' : 'false'}
-        className={cx('c-accordion-disclosure', className)}
-      >
-        {children ? <span className="c-accordion-disclosure__value">{children}</span> : null}
-        <Icon
-          name={resolvedExpanded ? 'chevron-up' : 'chevron-down'}
-          size="xs"
-          color={resolvedExpanded ? 'brand' : 'text'}
-          hierarchy={resolvedExpanded ? 'primary' : 'tertiary'}
-          aria-hidden
-        />
-      </span>
     );
   },
 );
