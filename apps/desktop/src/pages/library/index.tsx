@@ -7,21 +7,12 @@ import { getErrorMessage } from '../../shared/lib/error';
 import { ipc } from '../../shared/lib/ipc';
 import type {
   AssetListSource,
-  ExplorerSnapshot,
   ImportFailure,
   ImportPreviewResult,
   ImportResult,
   VirtualFolder,
 } from '../../shared/types';
-import {
-  ALL_ASSETS_NODE_ID,
-  DEFAULT_ASSET_SOURCE,
-  ExplorerPanel,
-  RECENT_RECORDS_NODE_ID,
-  buildExplorerNodes,
-  type ExplorerCreateFolderRequest,
-  type ExplorerNode,
-} from '../../features/library-explorer';
+import { ExplorerPanel } from '../../features/library-explorer';
 import {
   RecordsView,
   ReferencesView,
@@ -59,13 +50,12 @@ import {
 import { SidebarPanel } from '../../ui/Sidebar/SidebarPanel';
 import { SettingsModal } from '../../features/settings';
 import { useLibrarySidebarResize } from './model/useLibrarySidebarResize';
+import { useLibraryExplorer } from './model/useLibraryExplorer';
 import './library-page.css';
 
 const SUPPORTED_IMPORT_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif', 'tif', 'tiff'];
 
 type ImportStep = 'folder' | 'assets' | 'completed';
-type WorkspaceView = 'references' | 'records' | 'tag-settings' | 'preset-settings';
-
 type ImportProgressState = {
   completed: number;
   total: number;
@@ -136,12 +126,7 @@ function mergeImportResult(target: ImportResult, source: ImportResult) {
 export function LibraryPage() {
   const { t } = useTranslation('common');
   const sidebarResize = useLibrarySidebarResize();
-  const [explorerSnapshot, setExplorerSnapshot] = useState<ExplorerSnapshot | null>(null);
-  const [explorerError, setExplorerError] = useState<string | null>(null);
-  const [isExplorerLoading, setIsExplorerLoading] = useState(true);
-  const [activeExplorerNodeId, setActiveExplorerNodeId] = useState(ALL_ASSETS_NODE_ID);
-  const [assetSource, setAssetSource] = useState<AssetListSource>(DEFAULT_ASSET_SOURCE);
-  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('references');
+  const explorer = useLibraryExplorer();
   const [workspaceRefreshKey, setWorkspaceRefreshKey] = useState(0);
   const [importStep, setImportStep] = useState<ImportStep | null>(null);
   const [importFolderId, setImportFolderId] = useState<string | undefined>();
@@ -169,54 +154,6 @@ export function LibraryPage() {
   const noDestinationFoldersError = t('import.error.no_destination_folders', {
     defaultValue: 'No destination folders are available for import.',
   });
-  const explorerNodes = useMemo(
-    () => buildExplorerNodes(explorerSnapshot, t),
-    [explorerSnapshot, t],
-  );
-  const assignableFolderIds = useMemo(() => {
-    const nextIds = new Set<string>();
-
-    for (const stats of explorerSnapshot?.folderStats ?? []) {
-      if (stats.childCount === 0) {
-        nextIds.add(stats.folderId);
-      }
-    }
-
-    return nextIds;
-  }, [explorerSnapshot]);
-  const assignableFolders = useMemo(
-    () =>
-      (explorerSnapshot?.virtualFolders ?? []).filter(folder => assignableFolderIds.has(folder.id)),
-    [assignableFolderIds, explorerSnapshot],
-  );
-  const assignableFolderById = useMemo(
-    () => new Map(assignableFolders.map(folder => [folder.id, folder])),
-    [assignableFolders],
-  );
-
-  const loadExplorerSnapshot = useCallback(async () => {
-    setIsExplorerLoading(true);
-    setExplorerError(null);
-
-    try {
-      const snapshot = await ipc.library.loadExplorerSnapshot();
-      setExplorerSnapshot(snapshot);
-    } catch (error) {
-      setExplorerError(
-        getErrorMessage(
-          error,
-          t('explorer.error.load', { defaultValue: 'Failed to load explorer.' }),
-        ),
-      );
-    } finally {
-      setIsExplorerLoading(false);
-    }
-  }, [t]);
-
-  useEffect(() => {
-    void loadExplorerSnapshot();
-  }, [loadExplorerSnapshot]);
-
   const primaryItems: readonly PrimaryRailItem[] = [
     {
       icon: 'folder-open',
@@ -233,13 +170,13 @@ export function LibraryPage() {
       icon: 'tag',
       label: t('tags.settings.title', { defaultValue: 'Tag Settings' }),
       action: 'open-tag-settings',
-      active: workspaceView === 'tag-settings',
+      active: explorer.workspaceView === 'tag-settings',
     },
     {
       icon: 'sliders-horizontal',
       label: t('presets.settings.title', { defaultValue: 'Preset Settings' }),
       action: 'open-preset-settings',
-      active: workspaceView === 'preset-settings',
+      active: explorer.workspaceView === 'preset-settings',
     },
   ];
 
@@ -249,14 +186,13 @@ export function LibraryPage() {
         sidebarResize.setIsSidebarPanelOpen(open => !open);
         break;
       case 'open-search':
-        setActiveExplorerNodeId(RECENT_RECORDS_NODE_ID);
-        setWorkspaceView('records');
+        explorer.openRecentRecords();
         break;
       case 'open-tag-settings':
-        setWorkspaceView('tag-settings');
+        explorer.setWorkspaceView('tag-settings');
         break;
       case 'open-preset-settings':
-        setWorkspaceView('preset-settings');
+        explorer.setWorkspaceView('preset-settings');
         break;
     }
   };
@@ -271,42 +207,18 @@ export function LibraryPage() {
     }
   };
 
-  const handleExplorerNodeSelect = useCallback((node: ExplorerNode) => {
-    if (node.view === 'records') {
-      setActiveExplorerNodeId(node.id);
-      setWorkspaceView('records');
-      return;
-    }
-
-    if (!node.source) {
-      return;
-    }
-
-    setActiveExplorerNodeId(node.id);
-    setAssetSource(node.source);
-    setWorkspaceView('references');
-  }, []);
-
-  const handleCreateExplorerFolder = useCallback(
-    async ({ parentId, name }: ExplorerCreateFolderRequest) => {
-      await ipc.folder.save({ name, parentId });
-      await loadExplorerSnapshot();
-    },
-    [loadExplorerSnapshot],
-  );
-
   const getDefaultImportFolderId = useCallback(() => {
-    const activeFolderId = getSourceFolderId(assetSource);
+    const activeFolderId = getSourceFolderId(explorer.assetSource);
 
-    if (activeFolderId && assignableFolderById.has(activeFolderId)) {
+    if (activeFolderId && explorer.assignableFolderById.has(activeFolderId)) {
       return activeFolderId;
     }
 
     return undefined;
-  }, [assetSource, assignableFolderById]);
+  }, [explorer.assetSource, explorer.assignableFolderById]);
 
   const handleOpenImport = useCallback(() => {
-    if (isExplorerLoading) {
+    if (explorer.isExplorerLoading) {
       return;
     }
 
@@ -316,14 +228,14 @@ export function LibraryPage() {
     setImportDroppedFiles(undefined);
     setImportProgress(undefined);
     clearImportDropConfirmation();
-    setImportError(assignableFolders.length > 0 ? null : noDestinationFoldersError);
+    setImportError(explorer.assignableFolders.length > 0 ? null : noDestinationFoldersError);
     setImportStep('folder');
     setIsImportDragActive(false);
   }, [
-    assignableFolders.length,
+    explorer.assignableFolders.length,
     clearImportDropConfirmation,
     getDefaultImportFolderId,
-    isExplorerLoading,
+    explorer.isExplorerLoading,
     noDestinationFoldersError,
   ]);
 
@@ -353,13 +265,13 @@ export function LibraryPage() {
     if (
       importStep !== 'folder' ||
       importError !== noDestinationFoldersError ||
-      assignableFolders.length === 0
+      explorer.assignableFolders.length === 0
     ) {
       return;
     }
 
     setImportError(null);
-  }, [assignableFolders.length, importError, importStep, noDestinationFoldersError]);
+  }, [explorer.assignableFolders.length, importError, importStep, noDestinationFoldersError]);
 
   const handleImportFolderChange = useCallback((folderId: string) => {
     setImportFolderId(folderId);
@@ -367,7 +279,7 @@ export function LibraryPage() {
   }, []);
 
   const handleSelectImportFolder = useCallback(() => {
-    if (!importFolderId || !assignableFolderById.has(importFolderId)) {
+    if (!importFolderId || !explorer.assignableFolderById.has(importFolderId)) {
       setImportError(
         t('import.error.select_destination_before_files', {
           defaultValue: 'Select a destination folder before choosing files.',
@@ -378,7 +290,7 @@ export function LibraryPage() {
 
     setImportError(null);
     setImportStep('assets');
-  }, [assignableFolderById, importFolderId]);
+  }, [explorer.assignableFolderById, importFolderId]);
 
   const previewImportFilePaths = useCallback(
     async (filePaths: readonly string[]) => {
@@ -396,7 +308,7 @@ export function LibraryPage() {
         return;
       }
 
-      const destinationFolder = assignableFolderById.get(importFolderId);
+      const destinationFolder = explorer.assignableFolderById.get(importFolderId);
       if (!destinationFolder) {
         setImportError(
           t('import.error.destination_cannot_receive_assets', {
@@ -473,7 +385,7 @@ export function LibraryPage() {
         setIsImportDragActive(false);
       }
     },
-    [assignableFolderById, importFolderId, t],
+    [explorer.assignableFolderById, importFolderId, t],
   );
 
   const applyImportDroppedFileCollection = useCallback(
@@ -522,7 +434,7 @@ export function LibraryPage() {
         return;
       }
 
-      const destinationFolder = assignableFolderById.get(importFolderId);
+      const destinationFolder = explorer.assignableFolderById.get(importFolderId);
       if (!destinationFolder) {
         setImportError(
           t('import.error.destination_cannot_receive_assets', {
@@ -570,7 +482,7 @@ export function LibraryPage() {
     },
     [
       applyImportDroppedFileCollection,
-      assignableFolderById,
+      explorer.assignableFolderById,
       hasPendingImportDropConfirmation,
       importFolderId,
       requestImportDropConfirmation,
@@ -634,7 +546,7 @@ export function LibraryPage() {
       return;
     }
 
-    const destinationFolder = assignableFolderById.get(importFolderId);
+    const destinationFolder = explorer.assignableFolderById.get(importFolderId);
     if (!destinationFolder) {
       setImportError(
         t('import.error.destination_cannot_receive_assets', {
@@ -742,7 +654,7 @@ export function LibraryPage() {
         setImportProgress(undefined);
         setImportStep('completed');
         setWorkspaceRefreshKey(current => current + 1);
-        void loadExplorerSnapshot();
+        void explorer.loadExplorerSnapshot();
       } catch (error) {
         setImportError(
           getErrorMessage(
@@ -760,11 +672,11 @@ export function LibraryPage() {
       }
     })();
   }, [
-    assignableFolderById,
+    explorer.assignableFolderById,
     importDroppedFiles,
     importFolderId,
     importPreview,
-    loadExplorerSnapshot,
+    explorer.loadExplorerSnapshot,
     t,
   ]);
 
@@ -969,16 +881,16 @@ export function LibraryPage() {
             collapsed={!sidebarResize.isSidebarPanelOpen}
           >
             <ExplorerPanel
-              nodes={explorerNodes}
-              activeNodeId={activeExplorerNodeId}
-              loading={isExplorerLoading}
-              error={explorerError}
-              importDisabled={isExplorerLoading}
-              createFolderDisabled={isExplorerLoading}
-              onNodeSelect={handleExplorerNodeSelect}
+              nodes={explorer.explorerNodes}
+              activeNodeId={explorer.activeExplorerNodeId}
+              loading={explorer.isExplorerLoading}
+              error={explorer.explorerError}
+              importDisabled={explorer.isExplorerLoading}
+              createFolderDisabled={explorer.isExplorerLoading}
+              onNodeSelect={explorer.handleExplorerNodeSelect}
               onImport={handleOpenImport}
-              onCreateFolder={handleCreateExplorerFolder}
-              onRetry={() => void loadExplorerSnapshot()}
+              onCreateFolder={explorer.handleCreateExplorerFolder}
+              onRetry={() => void explorer.loadExplorerSnapshot()}
             />
           </SidebarPanel>
         </div>
@@ -994,20 +906,20 @@ export function LibraryPage() {
         ) : null}
 
         <main className="app-workspace library-page__workspace library-page__main-container">
-          {workspaceView === 'records' ? (
+          {explorer.workspaceView === 'records' ? (
             <RecordsView
               refreshKey={workspaceRefreshKey}
-              onExplorerRefresh={loadExplorerSnapshot}
+              onExplorerRefresh={explorer.loadExplorerSnapshot}
             />
-          ) : workspaceView === 'tag-settings' ? (
+          ) : explorer.workspaceView === 'tag-settings' ? (
             <TagSettingsView />
-          ) : workspaceView === 'preset-settings' ? (
+          ) : explorer.workspaceView === 'preset-settings' ? (
             <SessionPresetSettingsView />
           ) : (
             <ReferencesView
-              source={assetSource}
+              source={explorer.assetSource}
               refreshKey={workspaceRefreshKey}
-              onExplorerRefresh={loadExplorerSnapshot}
+              onExplorerRefresh={explorer.loadExplorerSnapshot}
             />
           )}
         </main>
@@ -1015,19 +927,19 @@ export function LibraryPage() {
 
       <FolderSearchModal
         open={importStep === 'folder'}
-        folders={assignableFolders}
+        folders={explorer.assignableFolders}
         folderId={importFolderId}
         onFolderChange={handleImportFolderChange}
         onClose={handleCloseImport}
         busy={isImporting}
         errorMessage={importError}
         onSelectFolder={handleSelectImportFolder}
-        selectFolderDisabled={!importFolderId || !assignableFolderById.has(importFolderId)}
-        folderDisabled={assignableFolders.length === 0}
+        selectFolderDisabled={!importFolderId || !explorer.assignableFolderById.has(importFolderId)}
+        folderDisabled={explorer.assignableFolders.length === 0}
       />
       <ImportAssetsModal
         open={importStep === 'assets'}
-        folders={assignableFolders}
+        folders={explorer.assignableFolders}
         folderId={importFolderId}
         onFolderChange={handleImportFolderChange}
         onClose={handleCloseImport}
@@ -1048,26 +960,26 @@ export function LibraryPage() {
           isImportPreviewing ||
           isImporting ||
           !importFolderId ||
-          !assignableFolderById.has(importFolderId)
+          !explorer.assignableFolderById.has(importFolderId)
         }
         selectFoldersDisabled={
           isFilePickerOpen ||
           isImportPreviewing ||
           isImporting ||
           !importFolderId ||
-          !assignableFolderById.has(importFolderId)
+          !explorer.assignableFolderById.has(importFolderId)
         }
         importDisabled={
           (!importPreview && !importDroppedFiles?.length) ||
           !importFolderId ||
-          !assignableFolderById.has(importFolderId)
+          !explorer.assignableFolderById.has(importFolderId)
         }
         dragActive={isImportDragActive}
       />
       <ImportCompletedModal
         open={importStep === 'completed'}
         summary={importSummary}
-        folders={assignableFolders}
+        folders={explorer.assignableFolders}
         folderId={importFolderId}
         onFolderChange={handleImportFolderChange}
         onClose={handleCloseImport}
