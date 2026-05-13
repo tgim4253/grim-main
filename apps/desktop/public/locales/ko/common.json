@@ -408,7 +408,9 @@
   "template_start.start": "시작",
   "template_start.language": "언어",
   "template_start.template_checkbox": "템플릿으로 시작",
-  "template_start.template_supporting": "시작용 폴더, 태그, 빠른 크로키 프리셋을 만듭니다.",
-  "template_start.error.complete_initial_launch": "초기 설정을 완료하지 못했습니다.",
-  "records.error.update_tags": "기록 태그 업데이트에 실패했습니다."
+  "template_start.template_supporting": "시작용 폴더, 태그, 빠른 크로키 프리셋을 만든다.",
+  "template_start.error.complete_initial_launch": "초기 설정을 완료하지 못했다.",
+  "records.error.update_tags": "기록 태그 업데이트에 실패했습니다.",
+  "common.minimize": "최소화",
+  "croquis.window_controls": "창 컨트롤"
 }
