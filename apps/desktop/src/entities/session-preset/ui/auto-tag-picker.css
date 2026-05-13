@@ -1,0 +1,49 @@
+@layer app {
+  .auto-tag-picker {
+    display: grid;
+    align-content: start;
+    gap: var(--semantic-spacing-component-md);
+    min-width: 0;
+  }
+
+  .auto-tag-picker__label {
+    color: var(--semantic-colors-text-secondary);
+    font-family: var(--components-typography-chip-accent-font-family);
+    font-size: var(--components-typography-chip-accent-font-size);
+    font-weight: var(--components-typography-chip-accent-font-weight);
+    line-height: var(--components-typography-chip-accent-line-height);
+    text-transform: uppercase;
+  }
+
+  .auto-tag-picker__tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--semantic-spacing-component-xs);
+    min-width: 0;
+  }
+
+  .auto-tag-picker__tag-hint {
+    color: var(--semantic-colors-text-tertiary);
+    font-family: var(--components-typography-control-supporting-font-family);
+    font-size: var(--components-typography-control-supporting-font-size);
+    font-weight: var(--components-typography-control-supporting-font-weight);
+    line-height: var(--components-typography-control-supporting-line-height);
+  }
+
+  .auto-tag-picker__tag-modal {
+    overflow: visible;
+  }
+
+  .auto-tag-picker__tag-modal .c-modal__body-slot {
+    overflow: visible;
+  }
+
+  .auto-tag-picker__tag-modal-body {
+    gap: var(--semantic-spacing-component-md);
+  }
+
+  .auto-tag-picker__tag-modal-body .c-select__menu {
+    z-index: 1002;
+  }
+}

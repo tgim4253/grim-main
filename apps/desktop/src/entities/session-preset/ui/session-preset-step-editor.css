@@ -42,37 +42,12 @@
     white-space: nowrap;
   }
 
-  .session-preset-step-editor__duration-row,
-  .session-preset-step-editor__tag-row {
+  .session-preset-step-editor__duration-row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--semantic-spacing-component-xs);
     min-width: 0;
-  }
-
-  .session-preset-step-editor__tag-hint {
-    color: var(--semantic-colors-text-tertiary);
-    font-family: var(--components-typography-control-supporting-font-family);
-    font-size: var(--components-typography-control-supporting-font-size);
-    font-weight: var(--components-typography-control-supporting-font-weight);
-    line-height: var(--components-typography-control-supporting-line-height);
-  }
-
-  .session-preset-step-editor__tag-modal {
-    overflow: visible;
-  }
-
-  .session-preset-step-editor__tag-modal .c-modal__body-slot {
-    overflow: visible;
-  }
-
-  .session-preset-step-editor__tag-modal-body {
-    gap: var(--semantic-spacing-component-md);
-  }
-
-  .session-preset-step-editor__tag-modal-body .c-select__menu {
-    z-index: 1002;
   }
 
   .session-preset-step-editor__duration-slider {

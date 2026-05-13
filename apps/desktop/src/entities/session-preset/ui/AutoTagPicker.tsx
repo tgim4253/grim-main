@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Chip, ChipButton, Modal, ModalFooter } from '@/shared/ui';
 import type { Tag, TagGroup } from '@/shared/types';
 import { TagSearchSelect } from '@/entities/tag';
-import './session-preset-step-editor.css';
+import './auto-tag-picker.css';
 
 export type AutoTagPickerProps = {
   label: string;
@@ -89,9 +89,9 @@ export function AutoTagPicker({
   };
 
   return (
-    <section className="session-preset-step-editor__group">
-      <span className="session-preset-step-editor__label">{label}</span>
-      <div className="session-preset-step-editor__tag-row">
+    <section className="auto-tag-picker">
+      <span className="auto-tag-picker__label">{label}</span>
+      <div className="auto-tag-picker__tag-row">
         {tags.map(tag =>
           canEditTags ? (
             <ChipButton
@@ -138,7 +138,7 @@ export function AutoTagPicker({
         ) : null}
       </div>
       {canEditTags && availableTags.length === 0 ? (
-        <span className="session-preset-step-editor__tag-hint">
+        <span className="auto-tag-picker__tag-hint">
           {t('croquis.auto_tags.create_tags_first', {
             defaultValue: 'Create tags in Tag Settings first.',
           })}
@@ -153,8 +153,8 @@ export function AutoTagPicker({
         })}
         onClose={handleModalClose}
         closeOnEscape={false}
-        dialogClassName="session-preset-step-editor__tag-modal"
-        bodyClassName="session-preset-step-editor__tag-modal-body"
+        dialogClassName="auto-tag-picker__tag-modal"
+        bodyClassName="auto-tag-picker__tag-modal-body"
         footer={
           <ModalFooter alignment="end">
             <Button size="sm" variant="secondary" onClick={handleModalClose}>
@@ -181,7 +181,7 @@ export function AutoTagPicker({
             setSelectedTagId(nextTagId);
           }}
         />
-        <span className="session-preset-step-editor__tag-hint">
+        <span className="auto-tag-picker__tag-hint">
           {t('croquis.auto_tags.existing_only_hint', {
             defaultValue: 'Existing tags only. Use Tag Settings to create or edit tags.',
           })}
