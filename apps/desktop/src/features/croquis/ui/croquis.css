@@ -424,6 +424,44 @@
     height: 32px;
   }
 
+  .croquis-page--custom-frame .croquis-page__drag-region {
+    right: 92px;
+  }
+
+  .croquis-page__frame-controls {
+    position: absolute;
+    z-index: 15;
+    top: 8px;
+    right: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(16, 20, 18, 0.72);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+    backdrop-filter: blur(12px);
+    pointer-events: auto;
+  }
+
+  .croquis-page__frame-button {
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .croquis-page__frame-button:hover:not(:disabled),
+  .croquis-page__frame-button:focus-visible:not(:disabled) {
+    background: rgba(255, 255, 255, 0.12);
+    color: white;
+  }
+
+  .croquis-page__frame-button--close:hover:not(:disabled),
+  .croquis-page__frame-button--close:focus-visible:not(:disabled) {
+    background: color-mix(in srgb, var(--components-input-text-error) 76%, transparent);
+    color: white;
+  }
+
   .croquis-page__stage {
     position: absolute;
     inset: 0;
@@ -465,6 +503,10 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
+  }
+
+  .croquis-page--custom-frame .croquis-page__topbar {
+    right: 92px;
   }
 
   .croquis-page__meta,
