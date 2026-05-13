@@ -40,111 +40,22 @@ import {
   toSaveTimeStepPresetPayload,
   type EditableSessionStep,
 } from '@/entities/session-preset';
+import {
+  formatAutoTagSummary,
+  formatStepCount,
+  formatStepOptionSummary,
+} from './model/presetSettingsFormat';
+import { findCreatedPreset, getDuplicateName } from './model/presetSettingsSelection';
+import {
+  createStepFromFirstTimeStepPreset,
+  refreshSessionStepsFromTimeStepPresets,
+} from './model/sessionStepList';
 import './session-preset-settings.css';
 
 const NEW_SESSION_PRESET_NAME = 'Untitled Preset';
 const NEW_TIME_STEP_PRESET_NAME = 'Untitled Time Step';
 
 type EditorMode = 'session' | 'time-step';
-type NamedPreset = { id: string; name: string };
-type Translate = (key: string, options?: Record<string, unknown>) => string;
-
-function formatStepCount(stepCount: number, t: Translate) {
-  return t('presets.step_count', {
-    count: stepCount,
-    formattedCount: stepCount.toLocaleString(),
-    defaultValue: '{{formattedCount}} steps',
-  });
-}
-
-function formatAutoTagSummary(autoTags: readonly Tag[], t: Translate) {
-  if (autoTags.length === 0) {
-    return t('croquis.auto_tags.empty', { defaultValue: 'No auto tags' });
-  }
-
-  const visibleTagNames = autoTags.slice(0, 3).map(tag => tag.name);
-  const hiddenTagCount = autoTags.length - visibleTagNames.length;
-
-  return hiddenTagCount > 0
-    ? `${visibleTagNames.join(', ')} +${String(hiddenTagCount)}`
-    : visibleTagNames.join(', ');
-}
-
-function formatStepOptionSummary(step: EditableSessionStep, t: Translate) {
-  const enabledOptions = [
-    step.autoAdvance
-      ? t('presets.step_summary.auto_advance', { defaultValue: 'Auto-advance' })
-      : t('presets.step_summary.manual_advance', { defaultValue: 'Manual advance' }),
-    step.recordSaveEnabled
-      ? t('presets.step_summary.records_save', { defaultValue: 'Records save' })
-      : t('presets.step_summary.records_off', { defaultValue: 'Records off' }),
-    step.captureEnabled ? t('common.capture', { defaultValue: 'Capture' }) : null,
-    step.filterEnabled && step.grayscaleEnabled
-      ? t('croquis.grayscale', { defaultValue: 'Grayscale' })
-      : null,
-    step.filterEnabled && step.blurEnabled
-      ? t('presets.step_summary.blur_percent', {
-          value: `${String(step.blurAmount)}%`,
-          defaultValue: 'Blur {{value}}',
-        })
-      : null,
-    step.resultRequired
-      ? t('presets.step_summary.result_required', { defaultValue: 'Result required' })
-      : null,
-  ].filter((option): option is string => Boolean(option));
-
-  return enabledOptions.join(' · ');
-}
-
-function getDuplicateName(name: string, fallbackName: string, t: Translate) {
-  const trimmedName = name.trim() || fallbackName;
-  return t('presets.duplicate_name', {
-    name: trimmedName,
-    defaultValue: '{{name}} Copy',
-  });
-}
-
-function findCreatedPreset<TPreset extends NamedPreset>(
-  previousPresets: readonly TPreset[],
-  nextPresets: readonly TPreset[],
-  name: string,
-) {
-  const previousIds = new Set(previousPresets.map(preset => preset.id));
-  return (
-    nextPresets.find(preset => !previousIds.has(preset.id) && preset.name === name) ??
-    nextPresets.find(preset => !previousIds.has(preset.id)) ??
-    null
-  );
-}
-
-function createStepFromFirstTimeStepPreset(
-  timeStepPresets: readonly TimeStepPreset[],
-  stepOrder: number,
-) {
-  if (timeStepPresets.length === 0) {
-    return null;
-  }
-
-  return createStepFromTimeStepPreset(timeStepPresets[0], stepOrder);
-}
-
-function refreshSessionStepsFromTimeStepPresets(
-  steps: readonly EditableSessionStep[],
-  timeStepPresets: readonly TimeStepPreset[],
-) {
-  const timeStepPresetsById = new Map(timeStepPresets.map(preset => [preset.id, preset]));
-
-  return normalizeStepOrders(
-    steps.map(step => {
-      const timeStepPreset = step.timeStepPresetId
-        ? timeStepPresetsById.get(step.timeStepPresetId)
-        : null;
-
-      return timeStepPreset ? applyTimeStepPresetToStep(step, timeStepPreset) : step;
-    }),
-  );
-}
-
 const ignoreStepEditorChange = () => {};
 
 export function SessionPresetSettingsView() {
