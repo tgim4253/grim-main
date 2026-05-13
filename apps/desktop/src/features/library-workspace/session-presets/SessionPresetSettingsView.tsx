@@ -19,26 +19,27 @@ import {
 import { getErrorMessage } from '../../../shared/lib/error';
 import { ipc } from '../../../shared/lib/ipc';
 import type { SessionPreset, Tag, TagGroup, TimeStepPreset } from '../../../shared/types';
-import { findFallbackPreset, setStoredActiveSessionPresetId } from '../../croquis/lib/startModal';
 import {
+  AutoTagPicker,
+  SessionPresetStepEditor,
   applyTimeStepPresetToStep,
   clampDurationSeconds,
   clampFilterPercent,
   createCustomStep,
   createEditableSteps,
   createStepFromTimeStepPreset,
+  findFallbackPreset,
   formatDurationCompact,
   getStepDuration,
   normalizeOptionalString,
   normalizeStepOrders,
   normalizeWindowDimension,
   saveStoredTimeStepFilterSettings,
+  setStoredActiveSessionPresetId,
   toSaveSessionPresetPayload,
   toSaveTimeStepPresetPayload,
   type EditableSessionStep,
-} from '../../croquis/lib/sessionPresetEditor';
-import { SessionPresetStepEditor } from '../../croquis/ui/SessionPresetStepEditor';
-import { AutoTagPicker } from '../../croquis/ui/AutoTagPicker';
+} from '@/entities/session-preset';
 import './session-preset-settings.css';
 
 const NEW_SESSION_PRESET_NAME = 'Untitled Preset';

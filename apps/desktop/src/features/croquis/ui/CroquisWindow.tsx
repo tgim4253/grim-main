@@ -6,7 +6,7 @@ import { cx } from '../../../shared/lib/cx';
 import { ipc } from '../../../shared/lib/ipc';
 import { IconButton } from '../../../shared/ui';
 import type { CroquisSession, CroquisSessionItem } from '../../../shared/types';
-import { clampFilterPercent, getRuntimeSessionFilterSettings } from '../lib/sessionPresetEditor';
+import { clampFilterPercent, getRuntimeSessionFilterSettings } from '@/entities/session-preset';
 import { useCroquisSessionController } from '../lib/useCroquisSessionController';
 import './croquis.css';
 
