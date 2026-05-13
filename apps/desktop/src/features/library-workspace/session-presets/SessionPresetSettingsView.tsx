@@ -50,6 +50,8 @@ import {
   refreshSessionStepsFromTimeStepPresets,
 } from './model/sessionStepList';
 import { PresetNavigationPanel } from './ui/PresetNavigationPanel';
+import { PresetSettingsFooter } from './ui/PresetSettingsFooter';
+import { PresetSettingsMessage } from './ui/PresetSettingsMessage';
 import './session-preset-settings.css';
 
 const NEW_SESSION_PRESET_NAME = 'Untitled Preset';
@@ -859,39 +861,33 @@ export function SessionPresetSettingsView() {
                 />
               </section>
 
-              {error ? (
-                <div className="session-preset-settings__message is-error">{error}</div>
-              ) : null}
-              {status ? (
-                <div className="session-preset-settings__message" role="status">
-                  {status}
-                </div>
-              ) : null}
+              <PresetSettingsMessage error={error} status={status} />
             </main>
 
-            <footer className="session-preset-settings__footer">
-              <Button
-                size="sm"
-                disabled={!canSaveSession}
-                onClick={() => {
-                  void persistSessionPreset(false);
-                }}
-              >
-                {busy
-                  ? t('common.saving', { defaultValue: 'Saving...' })
-                  : t('presets.save_session', { defaultValue: 'Save Session' })}
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={!canDuplicateSession}
-                onClick={() => {
-                  void persistSessionPreset(true);
-                }}
-              >
-                {t('presets.duplicate_session', { defaultValue: 'Duplicate Session' })}
-              </Button>
-            </footer>
+            <PresetSettingsFooter
+              mode="session"
+              busy={busy}
+              canSaveSession={canSaveSession}
+              canDuplicateSession={canDuplicateSession}
+              canSaveTimeStep={canSaveTimeStep}
+              canDuplicateTimeStep={canDuplicateTimeStep}
+              canDeleteTimeStep={canDeleteTimeStep}
+              onSaveSession={() => {
+                void persistSessionPreset(false);
+              }}
+              onDuplicateSession={() => {
+                void persistSessionPreset(true);
+              }}
+              onSaveTimeStep={() => {
+                void persistTimeStepPreset(false);
+              }}
+              onDuplicateTimeStep={() => {
+                void persistTimeStepPreset(true);
+              }}
+              onDeleteTimeStep={() => {
+                void deleteTimeStepPreset();
+              }}
+            />
           </>
         ) : (
           <>
@@ -1021,49 +1017,33 @@ export function SessionPresetSettingsView() {
                 )}
               </div>
 
-              {error ? (
-                <div className="session-preset-settings__message is-error">{error}</div>
-              ) : null}
-              {status ? (
-                <div className="session-preset-settings__message" role="status">
-                  {status}
-                </div>
-              ) : null}
+              <PresetSettingsMessage error={error} status={status} />
             </main>
 
-            <footer className="session-preset-settings__footer">
-              <Button
-                size="sm"
-                disabled={!canSaveTimeStep}
-                onClick={() => {
-                  void persistTimeStepPreset(false);
-                }}
-              >
-                {busy
-                  ? t('common.saving', { defaultValue: 'Saving...' })
-                  : t('presets.save_time_step', { defaultValue: 'Save Time Step' })}
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={!canDuplicateTimeStep}
-                onClick={() => {
-                  void persistTimeStepPreset(true);
-                }}
-              >
-                {t('presets.duplicate_time_step', { defaultValue: 'Duplicate Time Step' })}
-              </Button>
-              <Button
-                size="sm"
-                variant="destructive"
-                disabled={!canDeleteTimeStep}
-                onClick={() => {
-                  void deleteTimeStepPreset();
-                }}
-              >
-                {t('presets.delete_time_step', { defaultValue: 'Delete Time Step' })}
-              </Button>
-            </footer>
+            <PresetSettingsFooter
+              mode="time-step"
+              busy={busy}
+              canSaveSession={canSaveSession}
+              canDuplicateSession={canDuplicateSession}
+              canSaveTimeStep={canSaveTimeStep}
+              canDuplicateTimeStep={canDuplicateTimeStep}
+              canDeleteTimeStep={canDeleteTimeStep}
+              onSaveSession={() => {
+                void persistSessionPreset(false);
+              }}
+              onDuplicateSession={() => {
+                void persistSessionPreset(true);
+              }}
+              onSaveTimeStep={() => {
+                void persistTimeStepPreset(false);
+              }}
+              onDuplicateTimeStep={() => {
+                void persistTimeStepPreset(true);
+              }}
+              onDeleteTimeStep={() => {
+                void deleteTimeStepPreset();
+              }}
+            />
           </>
         )}
       </div>
