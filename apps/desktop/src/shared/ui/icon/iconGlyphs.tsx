@@ -25,11 +25,14 @@ export const ICON_NAMES = [
   'link-2',
   'link-2-off',
   'link-to',
+  'more-horizontal',
   'masonry-item',
   'minus',
   'pause',
+  'pie-chart',
   'play',
   'plus',
+  'radar',
   'reload',
   'search',
   'setting',
@@ -244,12 +247,25 @@ export const ICON_GLYPHS = {
       <path d="M15 3h6v6" />
     </>
   ),
+  'more-horizontal': (
+    <>
+      <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    </>
+  ),
   'masonry-item': masonryItemGlyph,
   minus: <path d="M5 12h14" />,
   pause: (
     <>
       <rect x="6" y="4" width="4" height="16" rx="1" />
       <rect x="14" y="4" width="4" height="16" rx="1" />
+    </>
+  ),
+  'pie-chart': (
+    <>
+      <path d="M11 3a9 9 0 1 0 9 9h-9z" />
+      <path d="M13 3.24A9 9 0 0 1 20.76 11H13z" />
     </>
   ),
   play: <polygon points="6 3 20 12 6 21 6 3" />,
@@ -259,6 +275,18 @@ export const ICON_GLYPHS = {
       stroke="none"
       d="M10.56 13.44H0v-2.88h10.56V0h2.88v10.56H24v2.88H13.44V24h-2.88z"
     />
+  ),
+  radar: (
+    <>
+      <path d="M12 3 20 8.5v7L12 21l-8-5.5v-7z" />
+      <path d="M12 7 16 10v4l-4 3-4-3v-4z" />
+      <path d="M12 3v4" />
+      <path d="M20 8.5 16 10" />
+      <path d="M20 15.5 16 14" />
+      <path d="M12 21v-4" />
+      <path d="M4 15.5 8 14" />
+      <path d="M4 8.5 8 10" />
+    </>
   ),
   reload: reloadGlyph,
   search: (

@@ -50,6 +50,16 @@ import {
 } from '../features/library-workspace/import';
 import { FolderSearchSelect } from '../features/library/components';
 import { CroquisStartModal } from '../features/croquis/ui/CroquisStartModal';
+import {
+  AnalyticsGraphWrapper,
+  ContributionGraph,
+  PieChart,
+  RadarChart,
+  TagBar,
+  type AnalyticsContributionDayDatum,
+  type AnalyticsPieDatum,
+  type AnalyticsRadarDatum,
+} from '../features/analytics';
 import type { SessionPreset, TimeStepPreset, VirtualFolder } from '../shared/types';
 import './uiDemo.css';
 
@@ -363,6 +373,58 @@ const MEMBER_SELECT_OPTIONS: SelectOption[] = [
   },
 ];
 
+const ANALYTICS_TAG_COLORS = ['#4edea3', '#45c79b', '#3da583', '#2f7564', '#245c50'];
+
+const ANALYTICS_TAG_TIME_DATA: AnalyticsPieDatum[] = [
+  { id: 'gesture', label: 'Gesture', value: 4.8, unit: 'h', color: ANALYTICS_TAG_COLORS[0] },
+  { id: 'anatomy', label: 'Anatomy', value: 3.1, unit: 'h', color: ANALYTICS_TAG_COLORS[1] },
+  { id: 'portrait', label: 'Portrait', value: 2.2, unit: 'h', color: ANALYTICS_TAG_COLORS[2] },
+  { id: 'other', label: 'Other', value: 1.9, unit: 'h', color: ANALYTICS_TAG_COLORS[3] },
+];
+
+const ANALYTICS_RADAR_DATA: AnalyticsRadarDatum[] = [
+  { id: 'gesture', label: 'Gesture', value: 4.8, unit: 'h', color: ANALYTICS_TAG_COLORS[0] },
+  { id: 'anatomy', label: 'Anatomy', value: 3.1, unit: 'h', color: ANALYTICS_TAG_COLORS[1] },
+  { id: 'portrait', label: 'Portrait', value: 2.2, unit: 'h', color: ANALYTICS_TAG_COLORS[2] },
+  { id: 'pose', label: 'Pose', value: 3.7, unit: 'h', color: ANALYTICS_TAG_COLORS[3] },
+  { id: 'study', label: 'Study', value: 2.8, unit: 'h', color: ANALYTICS_TAG_COLORS[4] },
+];
+
+const DEMO_DAY_IN_MS = 86_400_000;
+
+const startOfDemoDay = (date: Date) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const addDemoDays = (date: Date, days: number) => new Date(date.getTime() + days * DEMO_DAY_IN_MS);
+
+const formatDemoDateKey = (date: Date) => {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${String(date.getFullYear())}-${month}-${day}`;
+};
+
+const createContributionData = (endDate = new Date()): AnalyticsContributionDayDatum[] => {
+  const end = startOfDemoDay(endDate);
+  const currentWeekStart = addDemoDays(end, -end.getDay());
+  const start = addDemoDays(currentWeekStart, -52 * 7);
+  const days = Math.round((end.getTime() - start.getTime()) / DEMO_DAY_IN_MS) + 1;
+
+  return Array.from({ length: days }, (_, index) => {
+    const currentDate = addDemoDays(start, index);
+    const wave = Math.sin(index / 6) + Math.cos(index / 17);
+    const isWeekend = currentDate.getDay() === 0 || currentDate.getDay() === 6;
+    const count = Math.max(0, Math.round(wave * 2.2 + (isWeekend ? 1 : 3)));
+
+    return {
+      date: formatDemoDateKey(currentDate),
+      count,
+    };
+  });
+};
+
+const ANALYTICS_CONTRIBUTION_DATA = createContributionData();
+
 const filterSelectOptions: SelectFilterOptions = (query, options) => {
   const normalizedQuery = query.trim().toLocaleLowerCase();
   if (!normalizedQuery) {
@@ -384,13 +446,15 @@ function DemoSection({
   title,
   description,
   children,
+  className,
 }: {
   title: string;
   description: string;
   children: ReactNode;
+  className?: string;
 }) {
   return (
-    <section className="ui-demo__section">
+    <section className={['ui-demo__section', className].filter(Boolean).join(' ')}>
       <header className="ui-demo__section-header">
         <div className="app-kicker">Shared UI</div>
         <h2 className="ui-demo__section-title">{title}</h2>
@@ -896,6 +960,46 @@ export function UiDemoPage() {
       </header>
 
       <div className="ui-demo__grid">
+        <DemoSection
+          className="ui-demo__section--analytics"
+          title="Analytics Graph"
+          description="Tag group charts and aggregate contribution graph samples. Component data is passed through props, while the demo uses generated sample records."
+        >
+          <div className="analytics-demo-grid">
+            <AnalyticsGraphWrapper title="Gesture" icon="pie-chart">
+              <div className="analytics-graph-layout">
+                <div className="analytics-graph-layout__visual">
+                  <PieChart data={ANALYTICS_TAG_TIME_DATA} ariaLabel="Gesture tag pie graph" />
+                </div>
+                <TagBar data={ANALYTICS_TAG_TIME_DATA} ariaLabel="Gesture tag hours" />
+              </div>
+            </AnalyticsGraphWrapper>
+
+            <AnalyticsGraphWrapper title="Gesture" icon="radar">
+              <div className="analytics-graph-layout">
+                <div className="analytics-graph-layout__visual">
+                  <RadarChart data={ANALYTICS_RADAR_DATA} ariaLabel="Gesture tag radar graph" />
+                </div>
+                <TagBar data={ANALYTICS_TAG_TIME_DATA} ariaLabel="Gesture tag hours" />
+              </div>
+            </AnalyticsGraphWrapper>
+
+            <div className="analytics-demo-grid__wide">
+              <AnalyticsGraphWrapper
+                title="Month"
+                icon="grid"
+                ratio="1:2"
+                className="analytics-graph-wrapper--contribution"
+              >
+                <ContributionGraph
+                  data={ANALYTICS_CONTRIBUTION_DATA}
+                  ariaLabel="Month contribution activity graph"
+                />
+              </AnalyticsGraphWrapper>
+            </div>
+          </div>
+        </DemoSection>
+
         <DemoSection
           title="Accordion"
           description="Shared accordion shells translated from the updated Section 8 family. Single mode closes sibling items, while multiple mode allows independent expansion."
