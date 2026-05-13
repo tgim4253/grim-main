@@ -5,7 +5,6 @@ import { formatBytes } from '@/lib/format';
 import { getErrorMessage } from '@/shared/lib/error';
 import { ipc } from '@/shared/lib/ipc';
 import type { AssetListSource, ImportPreviewResult, VirtualFolder } from '@/shared/types';
-import type { ImportFilePreview, ImportProgress, ImportSummary } from '../LibraryImportModals';
 import {
   DROP_IMAGE_WARNING_THRESHOLD,
   collectSupportedDroppedImageFiles,
@@ -29,6 +28,7 @@ import {
   normalizeDialogSelection,
   normalizeSelectedFilePaths,
 } from './importSelection';
+import type { ImportFilePreview, ImportProgress, ImportSummary } from './types';
 
 export type ImportStep = 'folder' | 'assets' | 'completed';
 

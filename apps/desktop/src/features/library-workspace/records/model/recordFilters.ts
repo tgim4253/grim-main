@@ -2,10 +2,11 @@ import type { Tag, TagGroup, TagIndex } from '@/shared/types';
 import type {
   RecordExplorerFilterGroup,
   RecordExplorerSelectedFilters,
-} from '../RecordExplorerHeader';
+  SelectedRecordFilters,
+} from './filterTypes';
 import type { RecordResultItem } from '../types';
 
-export type SelectedRecordFilters = Record<string, string[]>;
+export type { SelectedRecordFilters } from './filterTypes';
 
 export const EMPTY_TAG_INDEX: TagIndex = {
   groups: [],

@@ -3,26 +3,8 @@ import { Button, Icon, Modal, ModalBody, ModalFooter } from '../../../shared/ui'
 import { cx } from '../../../shared/lib/cx';
 import { FolderSearchSelect } from '@/entities/folder';
 import type { VirtualFolder } from '../../../shared/types';
+import type { ImportFilePreview, ImportProgress, ImportSummary } from './model/types';
 import './library-import-modal.css';
-
-export type ImportSummary = {
-  importedCount: number;
-  reusedCount: number;
-  processedCount: number;
-  failedCount: number;
-  totalSize: string;
-  destinationFolder: string;
-};
-
-export type ImportFilePreview = {
-  assetCount: number;
-  totalSize: string;
-};
-
-export type ImportProgress = {
-  completed: number;
-  total: number;
-};
 
 type ImportModalBaseProps = {
   open: boolean;

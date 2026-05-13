@@ -1,6 +1,6 @@
 import { formatBytes } from '@/lib/format';
 import type { ImportFailure, ImportResult, VirtualFolder } from '@/shared/types';
-import type { ImportSummary } from '../LibraryImportModals';
+import type { ImportSummary } from './types';
 
 export type Translate = (key: string, options?: Record<string, unknown>) => string;
 

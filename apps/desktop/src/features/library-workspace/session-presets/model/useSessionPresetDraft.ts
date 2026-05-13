@@ -8,14 +8,17 @@ import {
   normalizeWindowDimension,
   type EditableSessionStep,
 } from '@/entities/session-preset';
-import type {
-  AccordionReorderPayload,
-  AccordionReorderPosition,
-  AccordionRootValue,
-} from '@/shared/ui';
 import { createStepFromFirstTimeStepPreset } from './sessionStepList';
 
 const NEW_SESSION_PRESET_NAME = 'Untitled Preset';
+
+type SessionStepAccordionValue = string | string[] | null;
+type SessionStepReorderPosition = 'before' | 'after';
+type SessionStepReorderPayload = {
+  value: string;
+  targetValue: string;
+  position: SessionStepReorderPosition;
+};
 
 export type SessionPresetDraft = {
   presetId: string;
@@ -188,7 +191,7 @@ export function useSessionPresetDraft({
   );
 
   const reorderStep = useCallback(
-    (sourceStepId: string, targetStepId: string, position: AccordionReorderPosition) => {
+    (sourceStepId: string, targetStepId: string, position: SessionStepReorderPosition) => {
       setDraft(current => {
         if (sourceStepId === targetStepId) {
           return current;
@@ -238,7 +241,7 @@ export function useSessionPresetDraft({
     [markDirty],
   );
 
-  const setAccordionValue = useCallback((value: AccordionRootValue) => {
+  const setAccordionValue = useCallback((value: SessionStepAccordionValue) => {
     setDraft(current => {
       const expandedStepIds = new Set(
         Array.isArray(value) ? value : typeof value === 'string' ? [value] : [],
@@ -254,7 +257,7 @@ export function useSessionPresetDraft({
   }, []);
 
   const reorderFromAccordion = useCallback(
-    ({ value, targetValue, position }: AccordionReorderPayload) => {
+    ({ value, targetValue, position }: SessionStepReorderPayload) => {
       reorderStep(value, targetValue, position);
     },
     [reorderStep],

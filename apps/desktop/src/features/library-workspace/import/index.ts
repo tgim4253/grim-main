@@ -5,9 +5,9 @@ export {
   type FolderSearchModalProps,
   type ImportAssetsModalProps,
   type ImportCompletedModalProps,
-  type ImportSummary,
 } from './LibraryImportModals';
 export { DropImportWarningModal, type DropImportWarningModalProps } from './DropImportWarningModal';
+export type { ImportFilePreview, ImportProgress, ImportSummary } from './model/types';
 export { useLibraryImportFlow, type LibraryImportFlow } from './model/useLibraryImportFlow';
 export {
   LibraryImportFlowModals,
