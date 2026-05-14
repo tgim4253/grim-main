@@ -110,7 +110,21 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
     [mergeAssetDetails, mergeRecordCounts],
   );
 
-  const folderAction = useAssetFolderAction({
+  const {
+    assetActionBusy,
+    assetActionError,
+    folderAction,
+    folderActionFolders,
+    folderActionFolderId,
+    folderActionModalBusy,
+    folderActionSelectDisabled,
+    folderActionError,
+    applyAssetFolderUpdate,
+    openFolderAction,
+    closeFolderAction,
+    applyFolderAction,
+    setFolderActionFolderId,
+  } = useAssetFolderAction({
     loadAssets,
     onExplorerRefresh,
     onAssetsUpdated: handleAssetsUpdated,
@@ -121,7 +135,20 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
     setSelectedAssetIds([]);
   }, []);
 
-  const croquisLauncher = useReferenceCroquisLauncher({
+  const {
+    croquisModalOpen,
+    croquisAssetIds,
+    sessionPresets,
+    timeStepPresets,
+    tags,
+    tagGroups,
+    isCroquisConfigLoading,
+    croquisConfigError,
+    openCroquisForAssets,
+    startCroquisForSelectedAssets,
+    closeCroquisModal,
+    handleCroquisStarted: handleCroquisModalStarted,
+  } = useReferenceCroquisLauncher({
     selectedAssetIds,
     onStarted: handleCroquisStarted,
   });
@@ -213,9 +240,9 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
 
   const handlePreviewAddFolder = useCallback(
     (assetId: string) => {
-      folderAction.openFolderAction({ assetIds: [assetId], mode: 'append' });
+      openFolderAction({ assetIds: [assetId], mode: 'append' });
     },
-    [folderAction],
+    [openFolderAction],
   );
 
   const handlePreviewRemoveFolder = useCallback(
@@ -227,9 +254,9 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
               .map(folder => folder.id)
           : [];
 
-      void folderAction.applyAssetFolderUpdate([assetId], nextFolderIds, 'replace');
+      void applyAssetFolderUpdate([assetId], nextFolderIds, 'replace');
     },
-    [folderAction, selectedAssetDetail],
+    [applyAssetFolderUpdate, selectedAssetDetail],
   );
 
   const handleAddSelectedToFolder = useCallback(() => {
@@ -237,16 +264,16 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
       return;
     }
 
-    folderAction.openFolderAction({ assetIds: selectedAssetIds, mode: 'append' });
-  }, [folderAction, selectedAssetIds]);
+    openFolderAction({ assetIds: selectedAssetIds, mode: 'append' });
+  }, [openFolderAction, selectedAssetIds]);
 
   const handleMoveSelectedToFolder = useCallback(() => {
     if (selectedAssetIds.length === 0) {
       return;
     }
 
-    folderAction.openFolderAction({ assetIds: selectedAssetIds, mode: 'replace' });
-  }, [folderAction, selectedAssetIds]);
+    openFolderAction({ assetIds: selectedAssetIds, mode: 'replace' });
+  }, [openFolderAction, selectedAssetIds]);
 
   const gridEmptyState = getReferenceGridEmptyState({
     isLoading,
@@ -258,8 +285,7 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
     onNoRecordFilterRetry: retryNoRecordFilter,
     t,
   });
-  const statusError =
-    dropImportError ?? folderAction.assetActionError ?? croquisLauncher.croquisConfigError;
+  const statusError = dropImportError ?? assetActionError ?? croquisConfigError;
 
   return (
     <>
@@ -291,15 +317,13 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
               selectionMode={selectionMode}
               selectedCount={selectedAssetIds.length}
               totalCount={filteredItems.length}
-              croquisDisabled={croquisLauncher.isCroquisConfigLoading}
-              folderActionsDisabled={
-                folderAction.assetActionBusy || folderAction.folderActionModalBusy
-              }
+              croquisDisabled={isCroquisConfigLoading}
+              folderActionsDisabled={assetActionBusy || folderActionModalBusy}
               onSelectionModeChange={handleSelectionModeChange}
               onSelectAllChange={handleSelectAllChange}
               onAddToFolder={handleAddSelectedToFolder}
               onMoveToFolder={handleMoveSelectedToFolder}
-              onStartCroquis={croquisLauncher.startCroquisForSelectedAssets}
+              onStartCroquis={startCroquisForSelectedAssets}
             />
           }
           renderTile={(asset, tileState) => (
@@ -315,12 +339,12 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
           renderPreview={asset => (
             <AssetPreviewPanel
               asset={asset}
-              busy={folderAction.assetActionBusy || croquisLauncher.isCroquisConfigLoading}
+              busy={assetActionBusy || isCroquisConfigLoading}
               onClose={handlePreviewClose}
               onAddFolder={handlePreviewAddFolder}
               onRemoveFolder={handlePreviewRemoveFolder}
               onStartCroquis={assetId => {
-                croquisLauncher.openCroquisForAssets([assetId]);
+                openCroquisForAssets([assetId]);
               }}
             />
           )}
@@ -333,25 +357,25 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
         />
       </div>
       <ReferenceFolderActionModal
-        open={folderAction.folderAction !== null}
-        folders={folderAction.folderActionFolders}
-        folderId={folderAction.folderActionFolderId}
-        busy={folderAction.folderActionModalBusy}
-        error={folderAction.folderActionError}
-        selectDisabled={folderAction.folderActionSelectDisabled}
-        onClose={folderAction.closeFolderAction}
-        onFolderChange={folderAction.setFolderActionFolderId}
-        onSelectFolder={folderAction.applyFolderAction}
+        open={folderAction !== null}
+        folders={folderActionFolders}
+        folderId={folderActionFolderId}
+        busy={folderActionModalBusy}
+        error={folderActionError}
+        selectDisabled={folderActionSelectDisabled}
+        onClose={closeFolderAction}
+        onFolderChange={setFolderActionFolderId}
+        onSelectFolder={applyFolderAction}
       />
       <CroquisStartModal
-        open={croquisLauncher.croquisModalOpen}
-        assetIds={croquisLauncher.croquisAssetIds}
-        sessionPresets={croquisLauncher.sessionPresets}
-        timeStepPresets={croquisLauncher.timeStepPresets}
-        tags={croquisLauncher.tags}
-        tagGroups={croquisLauncher.tagGroups}
-        onClose={croquisLauncher.closeCroquisModal}
-        onStarted={croquisLauncher.handleCroquisStarted}
+        open={croquisModalOpen}
+        assetIds={croquisAssetIds}
+        sessionPresets={sessionPresets}
+        timeStepPresets={timeStepPresets}
+        tags={tags}
+        tagGroups={tagGroups}
+        onClose={closeCroquisModal}
+        onStarted={handleCroquisModalStarted}
       />
       <DropImportWarningModal
         open={dropImportWarning !== null}
