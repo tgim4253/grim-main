@@ -46,7 +46,7 @@ describe('getDropImportWarning', () => {
           name: 'a.png',
           file: (success: (file: File) => void) => success(file('a.png')),
         },
-      ] as DroppedFileDataSource['entries'],
+      ] as unknown as Extract<DroppedFileDataSource, { kind: 'entries' }>['entries'],
     };
 
     await expect(

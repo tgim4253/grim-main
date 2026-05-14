@@ -1,4 +1,4 @@
-import { createRef } from 'react';
+import { createRef, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   getAccordionItemValues,
@@ -6,6 +6,15 @@ import {
   normalizeRootValue,
   setForwardedRef,
 } from './accordionModel';
+
+type TestItemProps = {
+  children?: ReactNode;
+  value?: string;
+};
+
+function TestItem({ children }: TestItemProps) {
+  return <div>{children}</div>;
+}
 
 describe('accordion model helpers', () => {
   it('normalizes root values for single and multiple accordions', () => {
@@ -26,9 +35,9 @@ describe('accordion model helpers', () => {
     expect(
       getAccordionItemValues(
         <div>
-          <section value="first" />
+          <TestItem value="first" />
           <div>
-            <article value="nested" />
+            <TestItem value="nested" />
           </div>
           text
         </div>,

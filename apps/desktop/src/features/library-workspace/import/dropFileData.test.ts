@@ -72,8 +72,8 @@ function directoryEntry(name: string, batches: TestEntry[][]): TestEntry {
 
 describe('drop file data helpers', () => {
   it('detects file drops from DataTransfer types', () => {
-    expect(hasFileDropData({ types: ['Files'] } as DataTransfer)).toBe(true);
-    expect(hasFileDropData({ types: ['text/plain'] } as DataTransfer)).toBe(false);
+    expect(hasFileDropData({ types: ['Files'] } as unknown as DataTransfer)).toBe(true);
+    expect(hasFileDropData({ types: ['text/plain'] } as unknown as DataTransfer)).toBe(false);
   });
 
   it('detects image MIME from extension first, then file type fallback', () => {
@@ -106,7 +106,7 @@ describe('drop file data helpers', () => {
           [fileEntry(file('a.png')), fileEntry(file('b.jpg')), fileEntry(file('c.txt'))],
           [fileEntry(file('d.webp'))],
         ]),
-      ] as DroppedFileDataSource['entries'],
+      ] as unknown as Extract<DroppedFileDataSource, { kind: 'entries' }>['entries'],
     };
 
     await expect(countDroppedImageFileCandidates(source, 2)).resolves.toEqual({
