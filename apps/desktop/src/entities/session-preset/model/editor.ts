@@ -413,7 +413,7 @@ export const toSaveTimeStepPresetPayload = ({
   grayscaleEnabled: step.filterEnabled && step.grayscaleEnabled,
   resultRequired: step.resultRequired,
   resultSavePath: step.resultSavePath,
-  autoTagIds: step.autoTags.map(tag => tag.id).filter(Boolean),
+  autoTagIds: getUniqueTagIds(step.autoTags),
 });
 
 export const toCroquisRuntimeStep = (
