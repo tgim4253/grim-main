@@ -2,19 +2,7 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChipButton, Icon, IconButton } from '../../../shared/ui';
 import type { LibraryWorkspaceLayout } from '../common/types';
-
-export type RecordExplorerFilterTag = {
-  id: string;
-  name: string;
-};
-
-export type RecordExplorerFilterGroup = {
-  key: string;
-  label: string;
-  tags: readonly RecordExplorerFilterTag[];
-};
-
-export type RecordExplorerSelectedFilters = Readonly<Record<string, readonly string[]>>;
+import type { RecordExplorerFilterGroup, RecordExplorerSelectedFilters } from './model/filterTypes';
 
 type RecordExplorerHeaderProps = {
   itemCount: number;

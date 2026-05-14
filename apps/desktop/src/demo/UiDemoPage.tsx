@@ -48,8 +48,8 @@ import {
   ImportAssetsModal,
   ImportCompletedModal,
 } from '../features/library-workspace/import';
-import { FolderSearchSelect } from '../features/library/components';
-import { CroquisStartModal } from '../features/croquis/ui/CroquisStartModal';
+import { FolderSearchSelect } from '@/entities/folder';
+import { CroquisStartModal } from '@/features/croquis';
 import {
   AnalyticsGraphWrapper,
   ContributionGraph,

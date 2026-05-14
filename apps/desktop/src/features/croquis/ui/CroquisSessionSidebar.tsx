@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { CroquisSession, CroquisSessionItem } from '../../../shared/types';
-import { clampFilterPercent, getRuntimeSessionFilterSettings } from '../lib/sessionPresetEditor';
+import { clampFilterPercent, getRuntimeSessionFilterSettings } from '@/entities/session-preset';
 
 type CroquisSessionSidebarProps = {
   currentItem: CroquisSessionItem;

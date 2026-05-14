@@ -14,13 +14,13 @@
     "db:prepare": "node ../../scripts/backend-sqlx-prepare.mjs",
     "previte": "node scripts/build-theme.mjs",
     "vite": "vite",
-    "demo:library": "node scripts/build-theme.mjs && vite --open /library-demo/",
+    "demo:library": "node scripts/build-theme.mjs && vite --config vite.demo.config.ts --open /library-demo/",
     "prebuild": "node scripts/build-theme.mjs",
-    "build": "tsc && pnpm run ipc:check && vite build",
+    "build": "tsc --noEmit && pnpm run ipc:check && vite build",
     "ipc:check": "node scripts/check-ipc-contract.mjs",
     "prepreview": "node scripts/build-theme.mjs",
     "preview": "vite preview",
-    "ui:demo": "node scripts/build-theme.mjs && vite --open /ui-demo/",
+    "ui:demo": "node scripts/build-theme.mjs && vite --config vite.demo.config.ts --open /ui-demo/",
     "tauri": "tauri"
   },
   "dependencies": {

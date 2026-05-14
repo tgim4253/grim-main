@@ -1,6 +1,5 @@
 #[path = "app_service.rs"]
 pub(crate) mod app_service;
-#[path = "asset_service.rs"]
 pub(crate) mod asset_service;
 #[path = "capture_service.rs"]
 pub(crate) mod capture_service;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getErrorMessage } from '../../../shared/lib/error';
 import { ipc } from '../../../shared/lib/ipc';
@@ -6,37 +6,39 @@ import type {
   CroquisRecordDetail,
   CroquisRecordSummary,
   Tag,
-  TagGroup,
   TagIndex,
 } from '../../../shared/types';
 import { Button } from '../../../shared/ui';
 import { LibraryWorkspace } from '../common/LibraryWorkspace';
 import type { LibraryWorkspaceLayout } from '../common/types';
-import {
-  RecordExplorerHeader,
-  type RecordExplorerFilterGroup,
-  type RecordExplorerSelectedFilters,
-} from './RecordExplorerHeader';
+import { RecordExplorerHeader } from './RecordExplorerHeader';
 import { RecordResultPreviewPanel } from './RecordResultPreviewPanel';
 import { RecordResultTile } from './RecordResultTile';
 import { RecordSelectionToolbar } from './RecordSelectionToolbar';
 import { RecordTagAddModal } from './RecordTagAddModal';
+import {
+  EMPTY_TAG_INDEX,
+  createRecordFilterGroups,
+  hasActiveSelectedRecordFilters,
+  pruneSelectedRecordFilters,
+  recordMatchesSelectedFilters,
+  type SelectedRecordFilters,
+} from './model/recordFilters';
+import {
+  createDetailMap,
+  getTagIds,
+  isDefined,
+  recordSummaryFromDetail,
+} from './model/recordDetails';
+import { createRecordsBySourceAssetId, getRelatedRecords } from './model/recordRelations';
+import { RecordGridState } from './ui/RecordGridState';
 import { createRecordResultItem } from './recordResultItems';
-import type { RecordResultItem } from './types';
 import './record-workspace.css';
 
 type RecordsViewProps = {
   refreshKey?: number;
   onExplorerRefresh?: () => Promise<void> | void;
 };
-
-type RecordGridStateProps = {
-  title: string;
-  description?: string;
-  action?: ReactNode;
-};
-
-type SelectedRecordFilters = Record<string, string[]>;
 
 type RecordTagAddTarget =
   | {
@@ -46,195 +48,6 @@ type RecordTagAddTarget =
       kind: 'record';
       recordId: string;
     };
-
-const EMPTY_TAG_INDEX: TagIndex = {
-  groups: [],
-  tags: [],
-};
-
-const UNGROUPED_RECORD_FILTER_GROUP_KEY = '__record-filter-group:ungrouped__';
-
-function compareBySortOrderThenName(
-  first: Pick<Tag | TagGroup, 'name' | 'sortOrder'>,
-  second: Pick<Tag | TagGroup, 'name' | 'sortOrder'>,
-) {
-  if (first.sortOrder !== second.sortOrder) {
-    return first.sortOrder - second.sortOrder;
-  }
-
-  return first.name.localeCompare(second.name);
-}
-
-function getRecordFilterGroupKey(groupId: string | null) {
-  return groupId ?? UNGROUPED_RECORD_FILTER_GROUP_KEY;
-}
-
-function createRecordFilterGroups(tagIndex: TagIndex): RecordExplorerFilterGroup[] {
-  const tagsByGroupId = new Map<string | null, Tag[]>();
-
-  for (const tag of tagIndex.tags) {
-    const groupId = tag.groupId ?? null;
-    const groupTags = tagsByGroupId.get(groupId) ?? [];
-    groupTags.push(tag);
-    tagsByGroupId.set(groupId, groupTags);
-  }
-
-  const groups = [...tagIndex.groups]
-    .sort(compareBySortOrderThenName)
-    .map<RecordExplorerFilterGroup>(group => ({
-      key: getRecordFilterGroupKey(group.id),
-      label: group.name,
-      tags: [...(tagsByGroupId.get(group.id) ?? [])].sort(compareBySortOrderThenName).map(tag => ({
-        id: tag.id,
-        name: tag.name,
-      })),
-    }))
-    .filter(group => group.tags.length > 0);
-
-  const ungroupedTags = [...(tagsByGroupId.get(null) ?? [])].sort(compareBySortOrderThenName);
-  if (ungroupedTags.length > 0) {
-    groups.push({
-      key: UNGROUPED_RECORD_FILTER_GROUP_KEY,
-      label: 'Ungrouped',
-      tags: ungroupedTags.map(tag => ({
-        id: tag.id,
-        name: tag.name,
-      })),
-    });
-  }
-
-  return groups;
-}
-
-function hasActiveSelectedRecordFilters(selectedFilters: RecordExplorerSelectedFilters) {
-  return Object.values(selectedFilters).some(tagIds => tagIds.length > 0);
-}
-
-function recordMatchesSelectedFilters(
-  record: RecordResultItem,
-  selectedFilters: RecordExplorerSelectedFilters,
-) {
-  const selectedTagGroups = Object.values(selectedFilters).filter(tagIds => tagIds.length > 0);
-  if (selectedTagGroups.length === 0) {
-    return true;
-  }
-
-  const recordTagIds = new Set(record.tags.map(tag => tag.id));
-
-  return selectedTagGroups.every(tagIds => tagIds.some(tagId => recordTagIds.has(tagId)));
-}
-
-function pruneSelectedRecordFilters(
-  selectedFilters: SelectedRecordFilters,
-  filterGroups: readonly RecordExplorerFilterGroup[],
-) {
-  const validTagsByGroupKey = new Map(
-    filterGroups.map(group => [group.key, new Set(group.tags.map(tag => tag.id))]),
-  );
-  const nextFilters: SelectedRecordFilters = {};
-  let changed = false;
-
-  for (const [groupKey, tagIds] of Object.entries(selectedFilters)) {
-    const validTagIds = validTagsByGroupKey.get(groupKey);
-    if (!validTagIds) {
-      changed = true;
-      continue;
-    }
-
-    const nextTagIds = tagIds.filter(tagId => validTagIds.has(tagId));
-    if (nextTagIds.length !== tagIds.length) {
-      changed = true;
-    }
-
-    if (nextTagIds.length > 0) {
-      nextFilters[groupKey] = nextTagIds;
-    }
-  }
-
-  if (Object.keys(nextFilters).length !== Object.keys(selectedFilters).length) {
-    changed = true;
-  }
-
-  return changed ? nextFilters : selectedFilters;
-}
-
-function RecordGridState({ title, description, action }: RecordGridStateProps) {
-  return (
-    <div className="masonry-grid__empty">
-      <div className="record-grid-state">
-        <p className="record-grid-state__title">{title}</p>
-        {description ? <p className="record-grid-state__description">{description}</p> : null}
-        {action ? <div className="record-grid-state__action">{action}</div> : null}
-      </div>
-    </div>
-  );
-}
-
-function createDetailMap(details: readonly CroquisRecordDetail[]) {
-  const detailsById = new Map<string, CroquisRecordDetail>();
-
-  details.forEach(detail => {
-    detailsById.set(detail.id, detail);
-  });
-
-  return detailsById;
-}
-
-function getTagIds(tags: readonly Tag[]) {
-  return tags.reduce<string[]>((tagIds, tag) => {
-    if (tag.id && !tagIds.includes(tag.id)) {
-      tagIds.push(tag.id);
-    }
-
-    return tagIds;
-  }, []);
-}
-
-function isDefined<T>(value: T | null | undefined): value is T {
-  return value !== null && value !== undefined;
-}
-
-function recordSummaryFromDetail(detail: CroquisRecordDetail): CroquisRecordSummary {
-  return {
-    id: detail.id,
-    title: detail.title,
-    sourceAssetId: detail.sourceAssetId,
-    resultAssetId: detail.resultAssetId,
-    targetDurationSeconds: detail.targetDurationSeconds,
-    actualDurationSeconds: detail.actualDurationSeconds,
-    finishedAt: detail.finishedAt,
-    createdAt: detail.createdAt,
-    updatedAt: detail.updatedAt,
-  };
-}
-
-function createRecordsBySourceAssetId(items: readonly RecordResultItem[]) {
-  const itemsBySourceAssetId = new Map<string, RecordResultItem[]>();
-
-  for (const item of items) {
-    if (!item.sourceAssetId) {
-      continue;
-    }
-
-    const sourceItems = itemsBySourceAssetId.get(item.sourceAssetId) ?? [];
-    sourceItems.push(item);
-    itemsBySourceAssetId.set(item.sourceAssetId, sourceItems);
-  }
-
-  return itemsBySourceAssetId;
-}
-
-function getRelatedRecords(
-  item: RecordResultItem,
-  itemsBySourceAssetId: ReadonlyMap<string, readonly RecordResultItem[]>,
-) {
-  if (!item.sourceAssetId) {
-    return [];
-  }
-
-  const sourceItems = itemsBySourceAssetId.get(item.sourceAssetId) ?? [];
-  return sourceItems.filter(candidate => candidate.id !== item.id);
-}
 
 export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewProps) {
   const { t } = useTranslation('common');
