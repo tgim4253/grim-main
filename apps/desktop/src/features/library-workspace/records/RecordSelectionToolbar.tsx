@@ -8,10 +8,12 @@ type RecordSelectionToolbarProps = {
   totalCount: number;
   actionBusy?: boolean;
   addTagDisabled?: boolean;
+  exportDisabled?: boolean;
   onSelectionModeChange: (selectionMode: boolean) => void;
   onSelectAllChange: (selected: boolean) => void;
   onDeleteSelected: () => void;
   onAddTag?: () => void;
+  onExport?: () => void;
 };
 
 export function RecordSelectionToolbar({
@@ -20,13 +22,16 @@ export function RecordSelectionToolbar({
   totalCount,
   actionBusy = false,
   addTagDisabled = false,
+  exportDisabled,
   onSelectionModeChange,
   onSelectAllChange,
   onDeleteSelected,
   onAddTag,
+  onExport,
 }: RecordSelectionToolbarProps) {
   const { t } = useTranslation('common');
   const selectedActionsDisabled = actionBusy || selectedCount === 0;
+  const resolvedExportDisabled = exportDisabled ?? selectedActionsDisabled;
 
   return (
     <SelectionToolbar
@@ -54,7 +59,7 @@ export function RecordSelectionToolbar({
           >
             {t('common.delete', { defaultValue: 'Delete' })}
           </Button>
-          <Button size="sm" disabled>
+          <Button size="sm" disabled={resolvedExportDisabled} onClick={onExport}>
             {t('common.export', { defaultValue: 'Export' })}
           </Button>
         </>
