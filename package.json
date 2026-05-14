@@ -24,7 +24,11 @@
     "format:check": "prettier --check . && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check",
     "translate": "pnpm --filter @grim/scripts translate",
     "format:write": "prettier --write . && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml",
-    "version:bump": "node scripts/bump-version.mjs"
+    "version:bump": "node scripts/bump-version.mjs",
+    "test:front": "pnpm --filter @grim/desktop test:run",
+    "test:ipc": "node apps/desktop/scripts/check-ipc-contract.mjs",
+    "test:rs": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets",
+    "test": "pnpm test:front && pnpm test:ipc && pnpm test:rs"
   },
   "devDependencies": {
     "@eslint/js": "^9.31.0",
