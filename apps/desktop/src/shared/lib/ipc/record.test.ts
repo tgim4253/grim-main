@@ -12,9 +12,9 @@ const invokeRawMock = vi.mocked(invokeRaw);
 
 describe('recordIpc', () => {
   it('calls list/detail/tag wrappers with the expected commands and payload shape', () => {
-    recordIpc.listResults(12);
-    recordIpc.getDetail('record-1');
-    recordIpc.updateTags({ recordId: 'record-2', tagIds: ['tag-a'] });
+    void recordIpc.listResults(12);
+    void recordIpc.getDetail('record-1');
+    void recordIpc.updateTags({ recordId: 'record-2', tagIds: ['tag-a'] });
 
     expect(invokeCamelMock).toHaveBeenNthCalledWith(1, 'list_recent_record_results', { limit: 12 });
     expect(invokeCamelMock).toHaveBeenNthCalledWith(2, 'get_record_detail', {
@@ -46,13 +46,13 @@ describe('recordIpc', () => {
       },
     };
 
-    recordIpc.exportRecords(payload);
+    void recordIpc.exportRecords(payload);
 
     expect(invokeCamelMock).toHaveBeenCalledWith('export_croquis_records', { payload });
   });
 
   it('uses raw invoke for delete commands', () => {
-    recordIpc.delete({ recordId: 'record-1' });
+    void recordIpc.delete({ recordId: 'record-1' });
 
     expect(invokeRawMock).toHaveBeenCalledWith('delete_croquis_record', {
       payload: { recordId: 'record-1' },

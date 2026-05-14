@@ -1,10 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { findCreatedPreset, getDuplicateName } from './presetSettingsSelection';
 
-const t = (_key: string, options?: Record<string, unknown>) =>
-  String(options?.defaultValue ?? '').replace(/{{(\w+)}}/g, (_match, name: string) =>
-    String(options?.[name] ?? _match),
+const stringifyOption = (value: unknown, fallback: string) => {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  return fallback;
+};
+
+const t = (_key: string, options?: Record<string, unknown>) => {
+  const template = typeof options?.defaultValue === 'string' ? options.defaultValue : '';
+  return template.replace(/{{(\w+)}}/g, (_match, name: string) =>
+    stringifyOption(options?.[name], _match),
   );
+};
 
 describe('preset settings selection helpers', () => {
   it('creates duplicate names from trimmed names or fallback names', () => {

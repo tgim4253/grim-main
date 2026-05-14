@@ -72,7 +72,6 @@ describe('createRecordFilterGroups', () => {
 
 describe('recordMatchesSelectedFilters', () => {
   const red = tag('red', 'Red', 1, 'color');
-  const blue = tag('blue', 'Blue', 2, 'color');
   const portrait = tag('portrait', 'Portrait', 1, 'kind');
 
   it('matches OR within a group and AND across groups', () => {

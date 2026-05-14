@@ -9,10 +9,18 @@ import {
 
 const now = '2026-01-01T00:00:00.000Z';
 
+const stringifyOption = (value: unknown, fallback: string) => {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  return fallback;
+};
+
 const t = (key: string, options?: Record<string, unknown>) => {
   const template = typeof options?.defaultValue === 'string' ? options.defaultValue : key;
   return template.replace(/{{(\w+)}}/g, (_match, name: string) =>
-    String(options?.[name] ?? _match),
+    stringifyOption(options?.[name], _match),
   );
 };
 

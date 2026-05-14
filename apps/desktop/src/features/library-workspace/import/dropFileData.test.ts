@@ -1,11 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
 
+const stringifyOption = (value: unknown, fallback: string) => {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  return fallback;
+};
+
 vi.mock('../../../i18n', () => ({
   default: {
     t: (_key: string, options?: Record<string, unknown>) => {
       const template = typeof options?.defaultValue === 'string' ? options.defaultValue : _key;
       return template.replace(/{{(\w+)}}/g, (_match, key: string) =>
-        String(options?.[key] ?? _match),
+        stringifyOption(options?.[key], _match),
       );
     },
   },
@@ -50,7 +58,9 @@ function fileEntry(imageFile: File): TestEntry {
     isFile: true,
     isDirectory: false,
     name: imageFile.name,
-    file: success => success(imageFile),
+    file: success => {
+      success(imageFile);
+    },
   };
 }
 

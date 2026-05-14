@@ -44,7 +44,9 @@ describe('getDropImportWarning', () => {
           isFile: true,
           isDirectory: false,
           name: 'a.png',
-          file: (success: (file: File) => void) => success(file('a.png')),
+          file: (success: (file: File) => void) => {
+            success(file('a.png'));
+          },
         },
       ] as unknown as Extract<DroppedFileDataSource, { kind: 'entries' }>['entries'],
     };
