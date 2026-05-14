@@ -22,6 +22,8 @@ import type {
   DeleteTagPayload,
   DeleteTimeStepPresetPayload,
   DeleteVirtualFolderPayload,
+  ExportCroquisRecordsPayload,
+  ExportCroquisRecordsResult,
   ExplorerSnapshot,
   FinishCroquisRecordPayload,
   ImportPreviewResult,
@@ -87,6 +89,10 @@ export type IpcCommandContract = {
   update_croquis_record_tags: CommandContract<
     { payload: UpdateCroquisRecordTagsPayload },
     CroquisRecordDetail
+  >;
+  export_croquis_records: CommandContract<
+    { payload: ExportCroquisRecordsPayload },
+    ExportCroquisRecordsResult
   >;
 
   list_session_presets: CommandContract<undefined, SessionPreset[]>;

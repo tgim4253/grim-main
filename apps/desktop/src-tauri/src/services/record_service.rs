@@ -1,6 +1,9 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 
 use crate::{
     models::{
@@ -8,12 +11,14 @@ use crate::{
         record::{
             CroquisRecordDetail, CroquisRecordResultsSnapshot,
             CroquisRecordSummary, DeleteCroquisRecordPayload,
+            ExportCroquisRecordsPayload, ExportCroquisRecordsResult,
             FinishCroquisRecordPayload, SaveCroquisRecordPayload,
             UpdateCroquisRecordTagsPayload,
         },
     },
     repositories::{AssetRepository, RecordRepository},
     services::LibraryStorage,
+    utils::record_export::{render_record_export, RecordExportInput},
 };
 
 #[derive(Clone)]
@@ -159,6 +164,89 @@ impl RecordService {
         self.get_record(&record_id).await
     }
 
+    pub async fn export_croquis_records(
+        &self,
+        payload: ExportCroquisRecordsPayload,
+    ) -> Result<ExportCroquisRecordsResult> {
+        if payload.record_ids.is_empty() {
+            bail!("No records selected for export");
+        }
+
+        let output_directory = payload.output_directory.trim().to_string();
+        if output_directory.is_empty() {
+            bail!("Output directory is required");
+        }
+
+        let mut details = self
+            .record_repository
+            .list_details_by_ids(&payload.record_ids)
+            .await?;
+        self.hydrate_detail_assets_batch(&mut details).await?;
+
+        let details_by_id = details
+            .into_iter()
+            .map(|detail| (detail.record.id.clone(), detail))
+            .collect::<HashMap<_, _>>();
+        let mut export_inputs = Vec::new();
+        let mut skipped_record_ids = Vec::new();
+
+        for record_id in &payload.record_ids {
+            let Some(detail) = details_by_id.get(record_id) else {
+                skipped_record_ids.push(record_id.clone());
+                continue;
+            };
+            let source_path = detail
+                .source_asset
+                .as_ref()
+                .and_then(|asset| asset.storage_path.as_deref());
+            let result_path = detail
+                .result_asset
+                .as_ref()
+                .and_then(|asset| asset.storage_path.as_deref());
+
+            match (source_path, result_path) {
+                (Some(source_path), Some(result_path))
+                    if !source_path.trim().is_empty()
+                        && !result_path.trim().is_empty() =>
+                {
+                    export_inputs.push(RecordExportInput {
+                        record_id: record_id.clone(),
+                        source_path: PathBuf::from(source_path),
+                        result_path: PathBuf::from(result_path),
+                    });
+                }
+                _ if payload.skip_incomplete => {
+                    skipped_record_ids.push(record_id.clone());
+                }
+                _ => {
+                    bail!(
+                        "Record {record_id} is missing a source or result image"
+                    );
+                }
+            }
+        }
+
+        if export_inputs.is_empty() {
+            bail!("No complete records to export");
+        }
+
+        let exported_count = export_inputs.len();
+        let file_path = render_record_export(
+            export_inputs,
+            payload.pair_layout,
+            payload.grid_layout,
+            PathBuf::from(output_directory),
+            payload.file_name,
+        )
+        .await?;
+
+        Ok(ExportCroquisRecordsResult {
+            file_path: file_path.to_string_lossy().into_owned(),
+            exported_count,
+            skipped_record_ids,
+        })
+    }
+
     pub async fn attach_result_asset(
         &self,
         record_id: &str,
@@ -186,12 +274,14 @@ mod tests {
 
     use crate::{
         models::record::{
-            FinishCroquisRecordPayload, SaveCroquisRecordPayload,
+            ExportCroquisRecordsPayload, FinishCroquisRecordPayload,
+            RecordExportGridLayoutConfig, RecordExportImageConfig,
+            RecordExportPairLayoutConfig, SaveCroquisRecordPayload,
             UpdateCroquisRecordTagsPayload,
         },
         repositories::{
             AssetRepository, NewImportedAssetInput, RecordRepository,
-            IMPORTED_ASSET_SOURCE,
+            CROQUIS_RESULT_ASSET_SOURCE, IMPORTED_ASSET_SOURCE,
         },
         services::LibraryStorage,
         state::{
@@ -476,6 +566,136 @@ mod tests {
         assert_eq!(
             source_asset.thumbnail_path.as_deref(),
             Some(thumb_path.to_string_lossy().as_ref())
+        );
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn export_croquis_records_writes_merged_png() {
+        let dir = make_temp_dir("export");
+        let db_path = dir.join("grim.db");
+        let pool =
+            open_or_create_db(&db_path).await.expect("failed to open db");
+        ensure_schema(&pool).await.expect("failed to apply schema");
+
+        let storage = storage_for(&dir);
+        let source_asset_id = "asset-export-source";
+        let source_hash = "exportsourcehash1";
+        let source_file_name = "source.bmp";
+        let source_path = storage.asset_path(source_hash, source_file_name);
+        let result_asset_id = "asset-export-result";
+        let result_hash = "exportresulthash1";
+        let result_file_name = "result.bmp";
+        let result_path = storage.asset_path(result_hash, result_file_name);
+        fs::create_dir_all(
+            source_path.parent().expect("missing source parent"),
+        )
+        .expect("failed to create source parent");
+        fs::create_dir_all(
+            result_path.parent().expect("missing result parent"),
+        )
+        .expect("failed to create result parent");
+        fs::write(&source_path, BMP_1X1).expect("failed to write source");
+        fs::write(&result_path, BMP_1X1).expect("failed to write result");
+
+        let asset_repository = AssetRepository::new(pool.clone());
+        let mut tx =
+            asset_repository.begin().await.expect("failed to begin tx");
+        asset_repository
+            .insert_imported_in_tx(
+                &mut tx,
+                &NewImportedAssetInput {
+                    id: source_asset_id,
+                    hash: source_hash,
+                    file_name: source_file_name,
+                    file_size: BMP_1X1.len() as i64,
+                    mime_type: "image/bmp",
+                    width: 1,
+                    height: 1,
+                    modified_at: None,
+                    source_type: IMPORTED_ASSET_SOURCE,
+                    created_at: "2026-01-01T00:00:00Z",
+                },
+            )
+            .await
+            .expect("failed to insert source asset");
+        asset_repository
+            .insert_imported_in_tx(
+                &mut tx,
+                &NewImportedAssetInput {
+                    id: result_asset_id,
+                    hash: result_hash,
+                    file_name: result_file_name,
+                    file_size: BMP_1X1.len() as i64,
+                    mime_type: "image/bmp",
+                    width: 1,
+                    height: 1,
+                    modified_at: None,
+                    source_type: CROQUIS_RESULT_ASSET_SOURCE,
+                    created_at: "2026-01-01T00:00:00Z",
+                },
+            )
+            .await
+            .expect("failed to insert result asset");
+        tx.commit().await.expect("failed to commit assets");
+
+        let service = RecordService::new(
+            RecordRepository::new(pool),
+            asset_repository,
+            storage,
+        );
+        let saved = service
+            .save_record(SaveCroquisRecordPayload {
+                source_asset_id: Some(source_asset_id.to_string()),
+                result_asset_id: Some(result_asset_id.to_string()),
+                title: Some("Exportable record".to_string()),
+                ..Default::default()
+            })
+            .await
+            .expect("failed to save exportable record");
+
+        let output_dir = dir.join("exports");
+        let exported = service
+            .export_croquis_records(ExportCroquisRecordsPayload {
+                record_ids: vec![saved.record.id],
+                output_directory: output_dir.to_string_lossy().into_owned(),
+                file_name: Some("merged-test".to_string()),
+                pair_layout: RecordExportPairLayoutConfig {
+                    source: RecordExportImageConfig {
+                        width: 10,
+                        height: 10,
+                        use_ratio: false,
+                        ratio: None,
+                    },
+                    result: RecordExportImageConfig {
+                        width: 10,
+                        height: 10,
+                        use_ratio: false,
+                        ratio: None,
+                    },
+                    gap: 2,
+                    padding: 1,
+                    horizontal: true,
+                },
+                grid_layout: RecordExportGridLayoutConfig {
+                    h_gap: 4,
+                    v_gap: 4,
+                    padding: 3,
+                    limit_per_line: 1,
+                },
+                skip_incomplete: true,
+            })
+            .await
+            .expect("failed to export record");
+
+        assert_eq!(exported.exported_count, 1);
+        assert!(exported.skipped_record_ids.is_empty());
+        assert!(Path::new(&exported.file_path).is_file());
+        assert_eq!(
+            image::image_dimensions(&exported.file_path)
+                .expect("failed to read exported PNG dimensions"),
+            (30, 18)
         );
 
         let _ = fs::remove_dir_all(dir);

@@ -15,6 +15,8 @@ import { RecordExplorerHeader } from './RecordExplorerHeader';
 import { RecordResultPreviewPanel } from './RecordResultPreviewPanel';
 import { RecordResultTile } from './RecordResultTile';
 import { RecordSelectionToolbar } from './RecordSelectionToolbar';
+import { isExportableRecord } from './export/model/types';
+import { RecordExportModal } from './export/ui/RecordExportModal';
 import { RecordTagAddModal } from './RecordTagAddModal';
 import {
   EMPTY_TAG_INDEX,
@@ -66,6 +68,7 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
   const [actionError, setActionError] = useState<string | null>(null);
   const [filterExpanded, setFilterExpanded] = useState(false);
   const [selectedRecordFilters, setSelectedRecordFilters] = useState<SelectedRecordFilters>({});
+  const [recordExportOpen, setRecordExportOpen] = useState(false);
   const [tagAddTarget, setTagAddTarget] = useState<RecordTagAddTarget | null>(null);
   const [tagIndex, setTagIndex] = useState<TagIndex>(EMPTY_TAG_INDEX);
   const [tagGroupNamesById, setTagGroupNamesById] = useState(() => new Map<string, string>());
@@ -175,6 +178,10 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
   const selectedRecordItems = useMemo(
     () => selectedRecordIds.map(recordId => recordDetailsById.get(recordId)).filter(isDefined),
     [recordDetailsById, selectedRecordIds],
+  );
+  const exportableSelectedRecordCount = useMemo(
+    () => selectedRecordItems.filter(isExportableRecord).length,
+    [selectedRecordItems],
   );
   const selectableTagsForSelectedRecords = useMemo(() => {
     if (selectedRecordItems.length === 0) {
@@ -543,11 +550,18 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
               selectedRecordIds.length === 0 ||
               selectableTagsForSelectedRecords.length === 0
             }
+            exportDisabled={
+              isActionBusy || selectedRecordIds.length === 0 || exportableSelectedRecordCount === 0
+            }
             onSelectionModeChange={handleSelectionModeChange}
             onSelectAllChange={handleSelectAllChange}
             onDeleteSelected={handleDeleteSelected}
             onAddTag={() => {
               setTagAddTarget({ kind: 'selection' });
+            }}
+            onExport={() => {
+              setActionError(null);
+              setRecordExportOpen(true);
             }}
           />
         }
@@ -577,6 +591,13 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
             }}
           />
         )}
+      />
+      <RecordExportModal
+        open={recordExportOpen}
+        records={selectedRecordItems}
+        onClose={() => {
+          setRecordExportOpen(false);
+        }}
       />
       <RecordTagAddModal
         open={tagAddTarget !== null}
