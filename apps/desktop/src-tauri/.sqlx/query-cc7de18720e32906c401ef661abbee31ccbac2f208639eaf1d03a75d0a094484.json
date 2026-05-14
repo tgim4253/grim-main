@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            WITH requested_record(id, sort_order) AS (\n              SELECT CAST(value AS TEXT), key\n              FROM json_each(?1)\n            )\n            SELECT cr.id,\n                   cr.title,\n                   cr.note,\n                   cr.source_asset_id,\n                   cr.result_asset_id,\n                   cr.target_duration_seconds,\n                   cr.actual_duration_seconds,\n                   cr.finished_at,\n                   cr.created_at,\n                   cr.updated_at\n            FROM requested_record requested\n            INNER JOIN croquis_record cr ON cr.id = requested.id\n            ORDER BY requested.sort_order ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "title",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "note",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "source_asset_id",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "result_asset_id",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "target_duration_seconds",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "actual_duration_seconds",
+        "ordinal": 6,
+        "type_info": "Float"
+      },
+      {
+        "name": "finished_at",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 9,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "cc7de18720e32906c401ef661abbee31ccbac2f208639eaf1d03a75d0a094484"
+}

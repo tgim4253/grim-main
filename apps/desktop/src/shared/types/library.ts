@@ -217,6 +217,43 @@ export interface UpdateCroquisRecordTagsPayload {
   tagIds: string[];
 }
 
+export interface RecordExportImageConfig {
+  width: number;
+  height: number;
+  useRatio: boolean;
+  ratio?: number | null;
+}
+
+export interface RecordExportPairLayoutConfig {
+  source: RecordExportImageConfig;
+  result: RecordExportImageConfig;
+  gap: number;
+  padding: number;
+  horizontal: boolean;
+}
+
+export interface RecordExportGridLayoutConfig {
+  hGap: number;
+  vGap: number;
+  padding: number;
+  limitPerLine: number;
+}
+
+export interface ExportCroquisRecordsPayload {
+  recordIds: string[];
+  outputDirectory: string;
+  fileName?: string;
+  pairLayout: RecordExportPairLayoutConfig;
+  gridLayout: RecordExportGridLayoutConfig;
+  skipIncomplete?: boolean;
+}
+
+export interface ExportCroquisRecordsResult {
+  filePath: string;
+  exportedCount: number;
+  skippedRecordIds: string[];
+}
+
 export interface TimeStepPreset {
   id: string;
   name: string;

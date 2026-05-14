@@ -2,6 +2,8 @@ import type {
   CroquisRecordDetail,
   CroquisRecordResultsSnapshot,
   DeleteCroquisRecordPayload,
+  ExportCroquisRecordsPayload,
+  ExportCroquisRecordsResult,
   FinishCroquisRecordPayload,
   SaveCroquisRecordPayload,
   UpdateCroquisRecordTagsPayload,
@@ -19,4 +21,6 @@ export const recordIpc = {
     invokeCamel('finish_croquis_record', { payload }),
   updateTags: (payload: UpdateCroquisRecordTagsPayload) =>
     invokeCamel('update_croquis_record_tags', { payload }),
+  exportRecords: (payload: ExportCroquisRecordsPayload): Promise<ExportCroquisRecordsResult> =>
+    invokeCamel('export_croquis_records', { payload }),
 };
