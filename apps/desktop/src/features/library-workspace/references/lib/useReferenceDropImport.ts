@@ -189,6 +189,41 @@ function hasDroppableData(dataTransfer: DataTransfer) {
   return hasFileDropData(dataTransfer) || types.some(type => REMOTE_DROP_TYPES.includes(type));
 }
 
+function describeDroppedFileDataSource(source: DroppedFileDataSource | null) {
+  if (!source) {
+    return null;
+  }
+
+  if (source.kind === 'entries') {
+    return {
+      kind: source.kind,
+      entries: source.entries.map(entry => ({
+        name: entry.name,
+        isFile: entry.isFile,
+        isDirectory: entry.isDirectory,
+      })),
+    };
+  }
+
+  return {
+    kind: source.kind,
+    files: source.files.map(file => ({
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      lastModified: file.lastModified,
+    })),
+  };
+}
+
+function describeDataTransferItems(dataTransfer: DataTransfer) {
+  return Array.from(dataTransfer.items).map((item, index) => ({
+    index,
+    kind: item.kind,
+    type: item.type,
+  }));
+}
+
 function createEmptyImportResult(failed: ImportFailure[] = []): ImportResult {
   return {
     imported: 0,
@@ -410,6 +445,13 @@ export function useReferenceDropImport({
         ? createDroppedFileDataSource(dataTransfer)
         : null;
       const pendingDrop = { localSource, remoteSources };
+
+      console.log('[useReferenceDropImport] dropped item', {
+        types: Array.from(dataTransfer.types),
+        items: describeDataTransferItems(dataTransfer),
+        localSource: describeDroppedFileDataSource(localSource),
+        remoteSources,
+      });
 
       dropImportInFlightRef.current = true;
       setDropImportPreparing(true);
