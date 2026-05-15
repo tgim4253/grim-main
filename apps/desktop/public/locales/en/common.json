@@ -486,5 +486,9 @@
   "record_export.export_summary": "Export summary",
   "record_export.export_summary_hint": "Only complete records are included in the PNG merge",
   "record_export.merged_png_preview": "Merged PNG preview",
-  "record_export.merged_png_preview_hint": "Masonry columns place each record block in the shortest column"
+  "record_export.merged_png_preview_hint": "Masonry columns place each record block in the shortest column",
+  "croquis.quick_actions.copy_image": "Copy Image",
+  "croquis.quick_actions.copy_image_success": "Image copied.",
+  "croquis.quick_actions.copy_image_unavailable": "Copy image is unavailable.",
+  "croquis.quick_actions.menu_label": "Croquis quick actions"
 }

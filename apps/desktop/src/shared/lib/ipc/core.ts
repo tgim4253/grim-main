@@ -116,6 +116,7 @@ export type IpcCommandContract = {
   open_capture_overlay: CommandContract<{ payload: CaptureOverlayPayload }, void>;
   render_capture_preview: CommandContract<CapturePreviewPayload, CapturePreview>;
   confirm_capture: CommandContract<{ baseUrl: string; context: CaptureContext }, void>;
+  copy_image_to_clipboard: CommandContract<{ path: string; grayscale: boolean }, void>;
 };
 
 type IpcCommand = keyof IpcCommandContract;

@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import type { CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { CSSProperties, MouseEvent } from 'react';
+import { isTauri } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { cx } from '../../../shared/lib/cx';
@@ -8,9 +9,31 @@ import { IconButton } from '../../../shared/ui';
 import type { CroquisSession, CroquisSessionItem } from '../../../shared/types';
 import { clampFilterPercent, getRuntimeSessionFilterSettings } from '@/entities/session-preset';
 import { useCroquisSessionController } from '../lib/useCroquisSessionController';
+import { CroquisQuickActionMenu, type CroquisQuickAction } from './CroquisQuickActionMenu';
 import './croquis.css';
 
 const MAC_PLATFORM_PATTERN = /Mac|iPhone|iPad|iPod/i;
+const QUICK_ACTION_MENU_MARGIN = 8;
+const QUICK_ACTION_MENU_WIDTH = 160;
+const QUICK_ACTION_MENU_ROW_HEIGHT = 36;
+const QUICK_ACTION_MENU_VERTICAL_PADDING = 8;
+const QUICK_ACTION_STATUS_DISMISS_MS = 2200;
+
+type CroquisQuickActionTarget = 'image';
+
+type CroquisQuickActionMenuState = {
+  grayscale: boolean;
+  imageSrc: string;
+  sourcePath: string;
+  target: CroquisQuickActionTarget;
+  x: number;
+  y: number;
+};
+
+type QuickActionMenuPosition = {
+  x: number;
+  y: number;
+};
 
 const shouldShowCustomWindowControls = () => {
   if (typeof navigator === 'undefined') {
@@ -21,10 +44,7 @@ const shouldShowCustomWindowControls = () => {
 };
 
 const getCroquisImageStyle = (session: CroquisSession, item: CroquisSessionItem): CSSProperties => {
-  const filterSettings = getRuntimeSessionFilterSettings(session.presetId, item.stepIndex, {
-    filterEnabled: item.grayscaleEnabled,
-    grayscaleEnabled: item.grayscaleEnabled,
-  });
+  const filterSettings = getCroquisImageFilterSettings(session, item);
 
   if (!filterSettings.filterEnabled) {
     return {};
@@ -46,6 +66,104 @@ const getCroquisImageStyle = (session: CroquisSession, item: CroquisSessionItem)
     filter: filterParts.length > 0 ? filterParts.join(' ') : undefined,
   };
 };
+
+const getCroquisImageFilterSettings = (session: CroquisSession, item: CroquisSessionItem) =>
+  getRuntimeSessionFilterSettings(session.presetId, item.stepIndex, {
+    filterEnabled: item.grayscaleEnabled,
+    grayscaleEnabled: item.grayscaleEnabled,
+  });
+
+function getQuickActionMenuPosition(
+  clientX: number,
+  clientY: number,
+  actionCount: number,
+): QuickActionMenuPosition {
+  const menuHeight =
+    actionCount * QUICK_ACTION_MENU_ROW_HEIGHT + QUICK_ACTION_MENU_VERTICAL_PADDING;
+  const maxX = Math.max(QUICK_ACTION_MENU_MARGIN, window.innerWidth - QUICK_ACTION_MENU_WIDTH);
+  const maxY = Math.max(QUICK_ACTION_MENU_MARGIN, window.innerHeight - menuHeight);
+
+  return {
+    x: Math.min(Math.max(clientX, QUICK_ACTION_MENU_MARGIN), maxX),
+    y: Math.min(Math.max(clientY, QUICK_ACTION_MENU_MARGIN), maxY),
+  };
+}
+
+type CopyImageToClipboardOptions = {
+  grayscale: boolean;
+  imageSrc: string;
+  sourcePath: string;
+};
+
+async function createGrayscaleImageBlob(blob: Blob) {
+  const bitmap = await createImageBitmap(blob);
+
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      throw new Error('Failed to prepare image for clipboard.');
+    }
+
+    context.drawImage(bitmap, 0, 0);
+
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+    const { data } = imageData;
+    for (let index = 0; index < data.length; index += 4) {
+      const grayscale = Math.round(
+        data[index] * 0.299 + data[index + 1] * 0.587 + data[index + 2] * 0.114,
+      );
+      data[index] = grayscale;
+      data[index + 1] = grayscale;
+      data[index + 2] = grayscale;
+    }
+    context.putImageData(imageData, 0, 0);
+
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(nextBlob => {
+        if (nextBlob) {
+          resolve(nextBlob);
+          return;
+        }
+
+        reject(new Error('Failed to prepare image for clipboard.'));
+      }, 'image/png');
+    });
+  } finally {
+    bitmap.close();
+  }
+}
+
+async function copyImageToClipboard({
+  grayscale,
+  imageSrc,
+  sourcePath,
+}: CopyImageToClipboardOptions) {
+  if (isTauri()) {
+    await ipc.clipboard.copyImage(sourcePath, { grayscale });
+    return;
+  }
+
+  const clipboard = navigator.clipboard as Clipboard | undefined;
+
+  if (typeof ClipboardItem === 'undefined' || typeof clipboard?.write !== 'function') {
+    throw new Error('Image clipboard writes are unavailable.');
+  }
+
+  const response = await fetch(imageSrc);
+  if (!response.ok) {
+    throw new Error('Failed to load image for clipboard.');
+  }
+
+  const blob = await response.blob();
+  const clipboardBlob = grayscale ? await createGrayscaleImageBlob(blob) : blob;
+  const mimeType = clipboardBlob.type.startsWith('image/') ? clipboardBlob.type : 'image/png';
+
+  await clipboard.write([new ClipboardItem({ [mimeType]: clipboardBlob })]);
+}
 
 function CroquisWindowControls() {
   const { t } = useTranslation('common');
@@ -84,11 +202,14 @@ export function CroquisWindow() {
   const { t } = useTranslation('common');
   const [params] = useSearchParams();
   const [isHovering, setIsHovering] = useState(false);
+  const [quickActionMenu, setQuickActionMenu] = useState<CroquisQuickActionMenuState | null>(null);
+  const [quickActionStatus, setQuickActionStatus] = useState<string | null>(null);
   const hasCustomWindowControls = shouldShowCustomWindowControls();
   const controller = useCroquisSessionController({
     sessionId: params.get('session_id'),
   });
   const { currentItem, session } = controller;
+  const visibleStatus = quickActionStatus ?? controller.status;
 
   useEffect(() => {
     const previousBodyBackground = document.body.style.background;
@@ -102,6 +223,91 @@ export function CroquisWindow() {
       document.documentElement.style.background = previousHtmlBackground;
     };
   }, []);
+
+  useEffect(() => {
+    if (quickActionStatus === null) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setQuickActionStatus(null);
+    }, QUICK_ACTION_STATUS_DISMISS_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [quickActionStatus]);
+
+  const handleCopyImage = useCallback(() => {
+    const target = quickActionMenu?.target === 'image' ? quickActionMenu : null;
+    if (!target) {
+      return;
+    }
+
+    setQuickActionMenu(null);
+    void copyImageToClipboard({
+      grayscale: target.grayscale,
+      imageSrc: target.imageSrc,
+      sourcePath: target.sourcePath,
+    })
+      .then(() => {
+        setQuickActionStatus(
+          t('croquis.quick_actions.copy_image_success', { defaultValue: 'Image copied.' }),
+        );
+      })
+      .catch((error: unknown) => {
+        console.error('Failed to copy croquis image.', error);
+        setQuickActionStatus(
+          t('croquis.quick_actions.copy_image_unavailable', {
+            defaultValue: 'Copy image is unavailable.',
+          }),
+        );
+      });
+  }, [quickActionMenu, t]);
+
+  const quickActions = useMemo<CroquisQuickAction[]>(() => {
+    if (quickActionMenu?.target !== 'image') {
+      return [];
+    }
+
+    return [
+      {
+        id: 'copy-image',
+        label: t('croquis.quick_actions.copy_image', { defaultValue: 'Copy Image' }),
+        onSelect: handleCopyImage,
+      },
+    ];
+  }, [handleCopyImage, quickActionMenu?.target, t]);
+
+  const handleImageContextMenu = useCallback(
+    (event: MouseEvent<HTMLImageElement>) => {
+      if (session === null || currentItem === null) {
+        return;
+      }
+
+      const imageSrc = event.currentTarget.currentSrc || controller.currentImageSrc;
+      const { sourcePath } = currentItem;
+      if (!imageSrc) {
+        return;
+      }
+
+      const filterSettings = getCroquisImageFilterSettings(session, currentItem);
+
+      event.preventDefault();
+      event.stopPropagation();
+      setIsHovering(true);
+
+      const position = getQuickActionMenuPosition(event.clientX, event.clientY, 1);
+      setQuickActionMenu({
+        grayscale: filterSettings.filterEnabled && filterSettings.grayscaleEnabled,
+        imageSrc,
+        sourcePath,
+        target: 'image',
+        ...position,
+      });
+    },
+    [controller.currentImageSrc, currentItem, session],
+  );
 
   if (!session || !currentItem) {
     return (
@@ -159,6 +365,7 @@ export function CroquisWindow() {
             className="croquis-page__image"
             data-tauri-drag-region
             style={getCroquisImageStyle(session, currentItem)}
+            onContextMenu={handleImageContextMenu}
           />
         ) : (
           <div className="croquis-page__empty">
@@ -266,10 +473,24 @@ export function CroquisWindow() {
         />
       </div>
 
-      {controller.status ? (
+      {visibleStatus ? (
         <div className="croquis-page__status" role="status">
-          {controller.status}
+          {visibleStatus}
         </div>
+      ) : null}
+
+      {quickActionMenu && quickActions.length > 0 ? (
+        <CroquisQuickActionMenu
+          actions={quickActions}
+          ariaLabel={t('croquis.quick_actions.menu_label', {
+            defaultValue: 'Croquis quick actions',
+          })}
+          x={quickActionMenu.x}
+          y={quickActionMenu.y}
+          onClose={() => {
+            setQuickActionMenu(null);
+          }}
+        />
       ) : null}
     </div>
   );

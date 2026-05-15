@@ -486,5 +486,9 @@
   "record_export.export_summary": "Export summary",
   "record_export.export_summary_hint": "완성된 기록만 PNG 병합에 포함된다.",
   "record_export.merged_png_preview": "Merged PNG preview",
-  "record_export.merged_png_preview_hint": "Masonry 열은 각 기록 블록을 가장 짧은 열에 배치한다."
+  "record_export.merged_png_preview_hint": "Masonry 열은 각 기록 블록을 가장 짧은 열에 배치한다.",
+  "croquis.quick_actions.copy_image": "이미지 복사",
+  "croquis.quick_actions.copy_image_success": "이미지를 복사했습니다.",
+  "croquis.quick_actions.copy_image_unavailable": "이미지를 복사할 수 없습니다.",
+  "croquis.quick_actions.menu_label": "크로키 퀵액션"
 }

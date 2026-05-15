@@ -615,6 +615,47 @@
     line-height: var(--type-text-sm-line-height);
   }
 
+  .croquis-page__quick-action-menu {
+    position: fixed;
+    z-index: 24;
+    min-width: 160px;
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 10px;
+    background: rgba(16, 20, 18, 0.84);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
+    backdrop-filter: blur(16px);
+    pointer-events: auto;
+  }
+
+  .croquis-page__quick-action-item {
+    width: 100%;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    border: 0;
+    border-radius: 7px;
+    padding: 8px 10px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.88);
+    cursor: default;
+    font-size: var(--type-text-sm-size);
+    line-height: var(--type-text-sm-line-height);
+    text-align: left;
+  }
+
+  .croquis-page__quick-action-item:hover:not(:disabled),
+  .croquis-page__quick-action-item:focus-visible:not(:disabled) {
+    background: rgba(255, 255, 255, 0.12);
+    color: white;
+    outline: none;
+  }
+
+  .croquis-page__quick-action-item:disabled {
+    color: rgba(255, 255, 255, 0.38);
+  }
+
   .croquis-page__empty {
     display: flex;
     align-items: center;

@@ -4,6 +4,8 @@ pub(crate) mod app_commands;
 pub(crate) mod asset_commands;
 #[path = "capture.rs"]
 pub(crate) mod capture_commands;
+#[path = "clipboard.rs"]
+pub(crate) mod clipboard_commands;
 #[path = "folder.rs"]
 pub(crate) mod folder_commands;
 #[path = "import.rs"]
