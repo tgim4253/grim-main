@@ -1,6 +1,21 @@
-use tauri::{Manager, WebviewUrl};
+use tauri::{Manager, Url, WebviewUrl};
 #[cfg(target_os = "macos")]
 use tauri_plugin_decorum::WebviewWindowExt;
+
+fn is_allowed_grim_navigation(url: &Url) -> bool {
+    if url.scheme() == "tauri" {
+        return true;
+    }
+
+    if url.scheme() == "http" && url.host_str() == Some("tauri.localhost") {
+        return true;
+    }
+
+    cfg!(debug_assertions)
+        && url.scheme() == "http"
+        && matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "::1"))
+        && url.port_or_known_default() == Some(1420)
+}
 
 /// Launch the primary library window.
 pub fn launch_main_window(app: &tauri::AppHandle) -> Result<(), String> {
@@ -26,7 +41,9 @@ pub fn launch_main_window(app: &tauri::AppHandle) -> Result<(), String> {
         tauri::WebviewWindowBuilder::new(app, window_label.clone(), url)
             .title("Grim")
             .inner_size(1440.0, 920.0)
-            .disable_drag_drop_handler();
+            .disable_drag_drop_handler()
+            .on_navigation(is_allowed_grim_navigation)
+            .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny);
 
     #[cfg(target_os = "macos")]
     let web_builder =
