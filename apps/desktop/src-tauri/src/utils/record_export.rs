@@ -452,3 +452,222 @@ fn default_export_file_name() -> String {
         .unwrap_or_default();
     format!("grim-record-export-{timestamp}.png")
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        fs,
+        path::{Path, PathBuf},
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    use image::{Rgba, RgbaImage};
+
+    use super::*;
+
+    fn temp_dir(prefix: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock should be after unix epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "grim-record-export-{prefix}-{}-{nanos}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&dir).expect("failed to create temp dir");
+        dir
+    }
+
+    fn write_png(path: &Path, width: u32, height: u32) {
+        let image = RgbaImage::from_pixel(width, height, Rgba([0, 0, 0, 255]));
+        image.save(path).expect("failed to write fixture image");
+    }
+
+    fn input(dir: &Path, id: &str) -> RecordExportInput {
+        let source_path = dir.join(format!("{id}-source.png"));
+        let result_path = dir.join(format!("{id}-result.png"));
+        write_png(&source_path, 100, 200);
+        write_png(&result_path, 300, 150);
+
+        RecordExportInput {
+            record_id: id.to_string(),
+            source_path,
+            result_path,
+        }
+    }
+
+    fn image_config(
+        width: u32,
+        height: u32,
+        use_ratio: bool,
+        ratio: Option<f64>,
+    ) -> RecordExportImageConfig {
+        RecordExportImageConfig { width, height, use_ratio, ratio }
+    }
+
+    fn pair_layout(horizontal: bool) -> RecordExportPairLayoutConfig {
+        RecordExportPairLayoutConfig {
+            source: image_config(100, 100, true, None),
+            result: image_config(100, 100, true, None),
+            gap: 10,
+            padding: 5,
+            horizontal,
+        }
+    }
+
+    fn grid_layout(limit_per_line: u32) -> RecordExportGridLayoutConfig {
+        RecordExportGridLayoutConfig {
+            h_gap: 10,
+            v_gap: 10,
+            padding: 20,
+            limit_per_line,
+        }
+    }
+
+    #[test]
+    fn render_rejects_empty_records() {
+        let dir = temp_dir("empty");
+        let error = render_record_export_sync(
+            Vec::new(),
+            pair_layout(true),
+            grid_layout(1),
+            dir.clone(),
+            Some("empty.png".to_string()),
+        )
+        .expect_err("empty record export should fail");
+
+        assert!(error.to_string().contains("No records to export"));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn builds_horizontal_layout_with_original_ratios() {
+        let dir = temp_dir("horizontal");
+        let records = vec![input(&dir, "r1"), input(&dir, "r2")];
+        let layout =
+            build_final_layout(&records, &pair_layout(true), &grid_layout(2))
+                .expect("failed to build layout");
+
+        assert_eq!((layout.width, layout.height), (490, 250));
+        assert_eq!(layout.blocks[0].x, 20);
+        assert_eq!(layout.blocks[0].y, 20);
+        assert_eq!(layout.blocks[1].x, 250);
+        assert_eq!(layout.blocks[0].block.width, 220);
+        assert_eq!(layout.blocks[0].block.height, 210);
+        assert_eq!(layout.blocks[0].block.source.width, 100);
+        assert_eq!(layout.blocks[0].block.source.height, 200);
+        assert_eq!(layout.blocks[0].block.result.width, 100);
+        assert_eq!(layout.blocks[0].block.result.height, 50);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn builds_vertical_layout_with_center_offsets() {
+        let dir = temp_dir("vertical");
+        let record = input(&dir, "r1");
+        let layout = RecordExportPairLayoutConfig {
+            source: image_config(100, 300, false, None),
+            result: image_config(160, 80, false, None),
+            gap: 10,
+            padding: 5,
+            horizontal: false,
+        };
+        let block =
+            build_pair_block(&record, &layout).expect("failed to build block");
+
+        assert_eq!((block.width, block.height), (170, 400));
+        assert_eq!((block.source.x, block.source.y), (35, 5));
+        assert_eq!((block.result.x, block.result.y), (5, 315));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn ratio_config_takes_priority_over_image_dimensions() {
+        let dir = temp_dir("ratio");
+        let record = input(&dir, "r1");
+        let layout = RecordExportPairLayoutConfig {
+            source: image_config(120, 1, true, Some(1.5)),
+            result: image_config(100, 1, true, Some(0.5)),
+            gap: 0,
+            padding: 0,
+            horizontal: true,
+        };
+        let block =
+            build_pair_block(&record, &layout).expect("failed to build block");
+
+        assert_eq!((block.source.width, block.source.height), (120, 80));
+        assert_eq!((block.result.width, block.result.height), (100, 200));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn invalid_ratio_falls_back_to_original_dimensions() {
+        let dir = temp_dir("ratio-fallback");
+        let record = input(&dir, "r1");
+        let layout = RecordExportPairLayoutConfig {
+            source: image_config(100, 999, true, Some(f64::NAN)),
+            result: image_config(100, 999, true, Some(-1.0)),
+            gap: 0,
+            padding: 0,
+            horizontal: true,
+        };
+        let block =
+            build_pair_block(&record, &layout).expect("failed to build block");
+
+        assert_eq!((block.source.width, block.source.height), (100, 200));
+        assert_eq!((block.result.width, block.result.height), (100, 50));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn canvas_bounds_reject_large_dimensions_and_pixel_counts() {
+        assert!(ensure_canvas_bounds(100_001, 1).is_err());
+        assert!(ensure_canvas_bounds(10_000, 9_000).is_err());
+        assert!(ensure_canvas_bounds(8_000, 10_000).is_ok());
+    }
+
+    #[test]
+    fn output_file_names_are_sanitized_normalized_and_deduped() {
+        let dir = temp_dir("file-name");
+        fs::write(dir.join("unsafe.png"), b"existing")
+            .expect("failed to seed first path");
+
+        assert_eq!(
+            unique_output_path(&dir, Some("../unsafe.jpg".to_string()))
+                .expect("failed to create unique path")
+                .file_name()
+                .and_then(|name| name.to_str()),
+            Some("unsafe-1.png")
+        );
+        assert_eq!(
+            sanitize_output_file_name(Some("foo.jpg".to_string())),
+            OsString::from("foo.png")
+        );
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn render_writes_png_with_expected_dimensions() {
+        let dir = temp_dir("render");
+        let output_dir = dir.join("out");
+        let output_path = render_record_export_sync(
+            vec![input(&dir, "r1")],
+            pair_layout(true),
+            grid_layout(1),
+            output_dir,
+            Some("rendered.jpg".to_string()),
+        )
+        .expect("failed to render export");
+
+        assert_eq!(
+            output_path.file_name().and_then(|name| name.to_str()),
+            Some("rendered.png")
+        );
+        assert_eq!(
+            image::image_dimensions(&output_path)
+                .expect("failed to read output image dimensions"),
+            (260, 250)
+        );
+        let _ = fs::remove_dir_all(dir);
+    }
+}
