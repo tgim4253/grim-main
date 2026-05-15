@@ -35,12 +35,16 @@ type QuickActionMenuPosition = {
   y: number;
 };
 
-const shouldShowCustomWindowControls = () => {
+const isMacPlatform = () => {
   if (typeof navigator === 'undefined') {
     return false;
   }
 
-  return !MAC_PLATFORM_PATTERN.test(navigator.userAgent);
+  return MAC_PLATFORM_PATTERN.test(navigator.userAgent);
+};
+
+const shouldShowCustomWindowControls = () => {
+  return !isMacPlatform();
 };
 
 const getCroquisImageStyle = (session: CroquisSession, item: CroquisSessionItem): CSSProperties => {
@@ -204,6 +208,7 @@ export function CroquisWindow() {
   const [isHovering, setIsHovering] = useState(false);
   const [quickActionMenu, setQuickActionMenu] = useState<CroquisQuickActionMenuState | null>(null);
   const [quickActionStatus, setQuickActionStatus] = useState<string | null>(null);
+  const hasMacWindowControls = isMacPlatform();
   const hasCustomWindowControls = shouldShowCustomWindowControls();
   const controller = useCroquisSessionController({
     sessionId: params.get('session_id'),
@@ -315,6 +320,7 @@ export function CroquisWindow() {
         className={cx(
           'croquis-page',
           'croquis-page--empty',
+          hasMacWindowControls && 'croquis-page--mac-frame',
           hasCustomWindowControls && 'croquis-page--custom-frame',
         )}
       >
@@ -340,7 +346,11 @@ export function CroquisWindow() {
 
   return (
     <div
-      className={cx('croquis-page', hasCustomWindowControls && 'croquis-page--custom-frame')}
+      className={cx(
+        'croquis-page',
+        hasMacWindowControls && 'croquis-page--mac-frame',
+        hasCustomWindowControls && 'croquis-page--custom-frame',
+      )}
       onMouseEnter={() => {
         setIsHovering(true);
       }}
