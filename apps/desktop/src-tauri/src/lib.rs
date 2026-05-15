@@ -82,6 +82,7 @@ pub fn run() {
             commands::capture_commands::open_capture_overlay,
             commands::capture_commands::render_capture_preview,
             commands::capture_commands::confirm_capture,
+            commands::clipboard_commands::copy_image_to_clipboard,
         ])
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_decorum::init())

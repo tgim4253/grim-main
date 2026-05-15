@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client';
 import './app/index.css';
 import i18n from './i18n';
 import App from './app';
+import { installWebviewGuards } from './shared/lib/installWebviewGuards';
+
+installWebviewGuards();
 
 const rootElement = document.getElementById('root');
 

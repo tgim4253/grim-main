@@ -486,5 +486,9 @@
   "record_export.export_summary": "Export summary",
   "record_export.export_summary_hint": "完全な記録のみPNG結合に含まれます。",
   "record_export.merged_png_preview": "Merged PNG preview",
-  "record_export.merged_png_preview_hint": "Masonry列は各記録ブロックを最も短い列に配置します。"
+  "record_export.merged_png_preview_hint": "Masonry列は各記録ブロックを最も短い列に配置します。",
+  "croquis.quick_actions.copy_image": "画像をコピー",
+  "croquis.quick_actions.copy_image_success": "画像をコピーしました。",
+  "croquis.quick_actions.copy_image_unavailable": "画像をコピーできません。",
+  "croquis.quick_actions.menu_label": "クロッキークイックアクション"
 }
