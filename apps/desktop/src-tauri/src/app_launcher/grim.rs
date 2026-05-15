@@ -35,17 +35,21 @@ pub fn launch_main_window(app: &tauri::AppHandle) -> Result<(), String> {
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     let web_builder = web_builder.decorations(false);
 
-    let window = web_builder.build().map_err(|err| err.to_string())?;
-
-    #[cfg(target_os = "macos")]
-    window.create_overlay_titlebar().map_err(|err| err.to_string())?;
-
     #[cfg(target_os = "macos")]
     {
+        let window = web_builder.build().map_err(|err| err.to_string())?;
+
+        window.create_overlay_titlebar().map_err(|err| err.to_string())?;
+
         window
             .set_traffic_lights_inset(12.0, 16.0)
             .and_then(|current| current.make_transparent())
             .map_err(|err| err.to_string())?;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        web_builder.build().map_err(|err| err.to_string())?;
     }
 
     Ok(())

@@ -25,8 +25,9 @@ import type {
   TimeStepPreset,
 } from '../../../shared/types';
 import { ipc } from '../../../shared/lib/ipc';
-import { findFallbackPreset, setStoredActiveSessionPresetId } from '../lib/startModal';
 import {
+  AutoTagPicker,
+  SessionPresetStepEditor,
   USER_CUSTOM_STEP_LABEL,
   USER_CUSTOM_STEP_VALUE,
   applyTimeStepPresetToStep,
@@ -34,6 +35,7 @@ import {
   clampFilterPercent,
   createCustomStep,
   createEditableSteps,
+  findFallbackPreset,
   formatDurationCompact,
   formatEstimate,
   getStepDuration,
@@ -41,11 +43,10 @@ import {
   normalizeStepOrders,
   normalizeWindowDimension,
   saveRuntimeSessionFilterSettings,
+  setStoredActiveSessionPresetId,
   toCroquisRuntimeStep,
   type EditableSessionStep,
-} from '../lib/sessionPresetEditor';
-import { AutoTagPicker } from './AutoTagPicker';
-import { SessionPresetStepEditor } from './SessionPresetStepEditor';
+} from '@/entities/session-preset';
 import './croquis.css';
 
 type CroquisStartModalProps = {

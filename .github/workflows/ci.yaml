@@ -1,0 +1,87 @@
+name: ci
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint, test, and build
+    runs-on: ubuntu-latest
+    env:
+      SQLX_OFFLINE: 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            curl \
+            file \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            patchelf \
+            pkg-config \
+            wget
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.13.1
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@1.88.0
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Rust artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            apps/desktop/src-tauri -> target
+          cache-on-failure: true
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint TypeScript and Rust
+        run: pnpm lint:check
+
+      - name: Run frontend tests
+        run: pnpm test:front
+
+      - name: Check IPC command contract
+        run: pnpm test:ipc
+
+      - name: Run Rust tests
+        run: pnpm test:rs
+
+      - name: Build desktop frontend
+        run: pnpm --filter @grim/desktop build

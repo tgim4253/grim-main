@@ -4,7 +4,8 @@ use crate::{
     errors::{CommandResult, IntoCommandResult},
     models::record::{
         CroquisRecordDetail, CroquisRecordResultsSnapshot,
-        DeleteCroquisRecordPayload, FinishCroquisRecordPayload,
+        DeleteCroquisRecordPayload, ExportCroquisRecordsPayload,
+        ExportCroquisRecordsResult, FinishCroquisRecordPayload,
         SaveCroquisRecordPayload, UpdateCroquisRecordTagsPayload,
     },
     services::RecordService,
@@ -56,4 +57,12 @@ pub async fn update_croquis_record_tags(
     record_service: State<'_, RecordService>,
 ) -> CommandResult<CroquisRecordDetail> {
     record_service.update_record_tags(payload).await.into_command()
+}
+
+#[tauri::command]
+pub async fn export_croquis_records(
+    payload: ExportCroquisRecordsPayload,
+    record_service: State<'_, RecordService>,
+) -> CommandResult<ExportCroquisRecordsResult> {
+    record_service.export_croquis_records(payload).await.into_command()
 }

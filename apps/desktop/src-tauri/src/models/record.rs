@@ -91,3 +91,66 @@ pub struct UpdateCroquisRecordTagsPayload {
     #[serde(default)]
     pub tag_ids: Vec<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecordExportImageConfig {
+    pub width: u32,
+    pub height: u32,
+    #[serde(default)]
+    pub use_ratio: bool,
+    #[serde(default)]
+    pub ratio: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecordExportPairLayoutConfig {
+    pub source: RecordExportImageConfig,
+    pub result: RecordExportImageConfig,
+    #[serde(default)]
+    pub gap: u32,
+    #[serde(default)]
+    pub padding: u32,
+    #[serde(default)]
+    pub horizontal: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecordExportGridLayoutConfig {
+    #[serde(default)]
+    pub h_gap: u32,
+    #[serde(default)]
+    pub v_gap: u32,
+    #[serde(default)]
+    pub padding: u32,
+    pub limit_per_line: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportCroquisRecordsPayload {
+    #[serde(default)]
+    pub record_ids: Vec<String>,
+    pub output_directory: String,
+    #[serde(default)]
+    pub file_name: Option<String>,
+    pub pair_layout: RecordExportPairLayoutConfig,
+    pub grid_layout: RecordExportGridLayoutConfig,
+    #[serde(default = "default_skip_incomplete_records")]
+    pub skip_incomplete: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportCroquisRecordsResult {
+    pub file_path: String,
+    pub exported_count: usize,
+    #[serde(default)]
+    pub skipped_record_ids: Vec<String>,
+}
+
+fn default_skip_incomplete_records() -> bool {
+    true
+}

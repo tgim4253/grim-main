@@ -56,6 +56,7 @@ export default [
       'eslint.config.js',
       'prettier.config.js',
       '**/vite.config.ts',
+      '**/vite.*.config.ts',
       '**/tailwind.config.ts',
       '**/postcss.config.ts',
       '**/postcss.config.cjs',

@@ -6,93 +6,24 @@ import {
   useMemo,
   useRef,
   useState,
-  type ButtonHTMLAttributes,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
-  type ReactNode,
-  type Ref,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '../../lib/cx';
 import { Icon } from '../icon/Icon';
+import { SelectMenu } from './SelectMenu';
+import {
+  assignRef,
+  getFirstEnabledIndex,
+  getNextEnabledIndex,
+  getOptionDisplayText,
+} from './selectOptions';
+import { SELECT_TYPES, type SelectOption, type SelectProps } from './types';
 import './select.css';
 
-export const SELECT_TYPES = ['default', 'icon-leading', 'search'] as const;
-
-export type SelectType = (typeof SELECT_TYPES)[number];
-export type SelectFilterOptions = (query: string, options: SelectOption[]) => SelectOption[];
-
-export type SelectOption = {
-  value: string;
-  label: ReactNode;
-  supportingText?: ReactNode;
-  disabled?: boolean;
-  menuLeading?: ReactNode;
-  valueLeading?: ReactNode;
-};
-
-export type SelectProps = Omit<
-  ButtonHTMLAttributes<HTMLButtonElement>,
-  'children' | 'defaultValue' | 'onChange' | 'type' | 'value'
-> & {
-  options: SelectOption[];
-  value?: string;
-  defaultValue?: string;
-  onValueChange?: (value: string) => void;
-  open?: boolean;
-  defaultOpen?: boolean;
-  onOpenChange?: (open: boolean) => void;
-  type?: SelectType;
-  label?: ReactNode;
-  placeholder?: ReactNode;
-  placeholderLeading?: ReactNode;
-  triggerClassName?: string;
-  menuClassName?: string;
-  listClassName?: string;
-  searchValue?: string;
-  defaultSearchValue?: string;
-  onSearchValueChange?: (value: string) => void;
-  filterOptions?: SelectFilterOptions;
-  emptyMessage?: ReactNode;
-};
-
-const assignRef = <T,>(ref: Ref<T> | undefined, value: T) => {
-  if (typeof ref === 'function') {
-    ref(value);
-    return;
-  }
-
-  if (ref && 'current' in ref) {
-    (ref as { current: T }).current = value;
-  }
-};
-
-const getOptionDisplayText = (option: SelectOption) => {
-  if (typeof option.label === 'string' || typeof option.label === 'number') {
-    return String(option.label);
-  }
-
-  return option.value;
-};
-
-const getFirstEnabledIndex = (options: SelectOption[]) =>
-  options.findIndex(option => !option.disabled);
-
-const getNextEnabledIndex = (options: SelectOption[], currentIndex: number, direction: 1 | -1) => {
-  if (options.length === 0) {
-    return -1;
-  }
-
-  let cursor = currentIndex;
-  for (let step = 0; step < options.length; step += 1) {
-    cursor = (cursor + direction + options.length) % options.length;
-    if (!options[cursor]?.disabled) {
-      return cursor;
-    }
-  }
-
-  return -1;
-};
+export { SELECT_TYPES };
+export type { SelectFilterOptions, SelectOption, SelectProps, SelectType } from './types';
 
 export const Select = forwardRef<HTMLButtonElement | HTMLInputElement, SelectProps>(function Select(
   {
@@ -563,92 +494,19 @@ export const Select = forwardRef<HTMLButtonElement | HTMLInputElement, SelectPro
       )}
 
       {resolvedOpen ? (
-        <div className={cx('c-select__menu', menuClassName)}>
-          <div
-            id={listboxId}
-            role="listbox"
-            aria-labelledby={label ? labelId : undefined}
-            className={cx('c-select__list', listClassName)}
-          >
-            {displayedOptions.length > 0 ? (
-              displayedOptions.map((option, index) => {
-                const isSelected = option.value === resolvedValue;
-                const isHighlighted = highlightedIndex === index && !option.disabled;
-                const leading =
-                  option.menuLeading ??
-                  (type === 'icon-leading' ? (
-                    <Icon
-                      name="user"
-                      size="md"
-                      hierarchy="tertiary"
-                      aria-hidden
-                      className="c-select__glyph"
-                    />
-                  ) : null);
-
-                return (
-                  <div
-                    key={option.value}
-                    id={`${listboxId}-option-${String(index)}`}
-                    role="option"
-                    aria-selected={isSelected}
-                    aria-disabled={option.disabled || undefined}
-                    className={cx(
-                      'c-select__option',
-                      Boolean(leading) && 'c-select__option--with-leading',
-                      Boolean(option.supportingText) && 'c-select__option--with-supporting',
-                    )}
-                    data-selected={isSelected ? 'true' : undefined}
-                    data-highlighted={isHighlighted ? 'true' : undefined}
-                    data-disabled={option.disabled ? 'true' : undefined}
-                    onMouseEnter={() => {
-                      if (!option.disabled) {
-                        setHighlightedIndex(index);
-                      }
-                    }}
-                    onMouseDown={event => {
-                      event.preventDefault();
-                    }}
-                    onClick={() => {
-                      if (!option.disabled) {
-                        commitSelection(option);
-                      }
-                    }}
-                  >
-                    <span className="c-select__option-content">
-                      {leading ? <span className="c-select__option-leading">{leading}</span> : null}
-
-                      <span className="c-select__option-text-group">
-                        <span className="c-select__option-label">{option.label}</span>
-                        {option.supportingText ? (
-                          <span className="c-select__option-supporting">
-                            {option.supportingText}
-                          </span>
-                        ) : null}
-                      </span>
-                    </span>
-
-                    {isSelected ? (
-                      <span className="c-select__option-check">
-                        <Icon
-                          name="check"
-                          size="md"
-                          hierarchy="primary"
-                          aria-hidden
-                          className="c-select__glyph"
-                        />
-                      </span>
-                    ) : null}
-                  </div>
-                );
-              })
-            ) : (
-              <div className="c-select__empty" role="status">
-                {resolvedEmptyMessage}
-              </div>
-            )}
-          </div>
-        </div>
+        <SelectMenu
+          listboxId={listboxId}
+          labelId={label ? labelId : undefined}
+          type={type}
+          options={displayedOptions}
+          value={resolvedValue}
+          highlightedIndex={highlightedIndex}
+          emptyMessage={resolvedEmptyMessage}
+          menuClassName={menuClassName}
+          listClassName={listClassName}
+          onHighlight={setHighlightedIndex}
+          onCommit={commitSelection}
+        />
       ) : null}
     </div>
   );

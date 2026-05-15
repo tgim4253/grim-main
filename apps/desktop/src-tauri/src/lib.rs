@@ -65,6 +65,7 @@ pub fn run() {
             commands::record_commands::delete_croquis_record,
             commands::record_commands::finish_croquis_record,
             commands::record_commands::update_croquis_record_tags,
+            commands::record_commands::export_croquis_records,
             commands::session_commands::list_session_presets,
             commands::session_commands::list_time_step_presets,
             commands::session_commands::save_session_preset,

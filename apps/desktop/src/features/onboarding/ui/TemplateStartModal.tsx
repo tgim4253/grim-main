@@ -17,7 +17,6 @@ export type TemplateStartModalProps = {
   open: boolean;
   busy?: boolean;
   error?: string | null;
-  onClose: () => void;
   onStart: (options: TemplateStartOptions) => void;
 };
 
@@ -25,7 +24,6 @@ export function TemplateStartModal({
   open,
   busy = false,
   error = null,
-  onClose,
   onStart,
 }: TemplateStartModalProps) {
   const { i18n, t } = useTranslation('common');
@@ -57,10 +55,9 @@ export function TemplateStartModal({
       open={open}
       size="lg"
       title={t('template_start.title', { defaultValue: 'Start' })}
-      onClose={busy ? undefined : onClose}
-      closeOnEscape={!busy}
-      closeOnOverlayClick={!busy}
-      closeButtonLabel={t('template_start.close', { defaultValue: 'Close template start' })}
+      closeOnEscape={false}
+      closeOnOverlayClick={false}
+      hideCloseButton
       dialogClassName="template-start-modal"
       bodyClassName="template-start-modal__body"
       footer={

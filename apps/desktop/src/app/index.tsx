@@ -9,10 +9,9 @@ import { TemplateStartModal, type TemplateStartOptions } from '../features/onboa
 import { useTheme } from '../shared/hooks';
 import { getErrorMessage } from '../shared/lib/error';
 import { ipc } from '../shared/lib/ipc';
-import { resolveLanguageCode } from '../shared/lib/language';
 
 export default function App() {
-  const { i18n, t } = useTranslation('common');
+  const { t } = useTranslation('common');
   const [showTemplateStartModal, setShowTemplateStartModal] = useState(false);
   const [templateStartBusy, setTemplateStartBusy] = useState(false);
   const [templateStartError, setTemplateStartError] = useState<string | null>(null);
@@ -81,13 +80,6 @@ export default function App() {
     [completeInitialLaunch],
   );
 
-  const handleTemplateStartClose = useCallback(() => {
-    void completeInitialLaunch({
-      language: resolveLanguageCode(i18n.resolvedLanguage ?? i18n.language),
-      templateStartEnabled: false,
-    });
-  }, [completeInitialLaunch, i18n]);
-
   return (
     <>
       <HashRouter>
@@ -102,7 +94,6 @@ export default function App() {
         open={showTemplateStartModal}
         busy={templateStartBusy}
         error={templateStartError}
-        onClose={handleTemplateStartClose}
         onStart={handleTemplateStart}
       />
     </>

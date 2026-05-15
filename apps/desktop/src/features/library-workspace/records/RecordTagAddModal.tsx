@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, ModalFooter } from '../../../shared/ui';
 import type { Tag, TagGroup } from '../../../shared/types';
-import { TagSearchSelect } from '../../library/components';
+import { TagSearchSelect } from '@/entities/tag';
 
 type RecordTagAddModalProps = {
   open: boolean;

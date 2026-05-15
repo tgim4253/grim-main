@@ -1,7 +1,11 @@
 {
   "extends": "../../tsconfig.base.json",
-  "include": ["src"],
+  "include": ["src", "vitest.config.ts"],
   "compilerOptions": {
-    "outDir": "dist"
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "noEmit": true
   }
 }
