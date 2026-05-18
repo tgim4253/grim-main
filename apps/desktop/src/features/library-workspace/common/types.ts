@@ -17,6 +17,7 @@ export type LibraryWorkspaceRenderTileState = {
   selected: boolean;
   selectionIndex?: number;
   selectionMode?: boolean;
+  onFocus: () => void;
   onSelect: () => void;
 };
 

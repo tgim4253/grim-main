@@ -98,6 +98,7 @@ export function SessionPresetEditorPanel({
       <div className="session-preset-settings__header">
         <div className="session-preset-settings__session-panel">
           <Input
+            data-shortcut-target="preset-name"
             label={t('presets.session_name', { defaultValue: 'Session Name' })}
             value={sessionName}
             disabled={editorDisabled}

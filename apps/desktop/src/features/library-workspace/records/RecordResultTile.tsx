@@ -13,6 +13,7 @@ type RecordResultTileProps = {
   selected: boolean;
   selectionIndex?: number;
   selectionMode?: boolean;
+  onFocus?: () => void;
   onSelect: () => void;
 };
 
@@ -22,6 +23,7 @@ export function RecordResultTile({
   selected,
   selectionIndex,
   selectionMode = false,
+  onFocus,
   onSelect,
 }: RecordResultTileProps) {
   const { t } = useTranslation('common');
@@ -46,6 +48,7 @@ export function RecordResultTile({
       )}
       style={style}
       onClick={onSelect}
+      onFocus={onFocus}
     >
       {imageSrc ? (
         <img src={imageSrc} alt="" draggable={false} className="record-result-tile__image" />

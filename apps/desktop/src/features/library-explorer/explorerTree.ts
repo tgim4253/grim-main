@@ -66,6 +66,7 @@ function createFolderNode(
     icon: hasChildren ? 'folder-open' : 'folder',
     meta: formatCount(stats?.descendantAssetCount ?? 0),
     source: hasChildren ? undefined : { kind: 'folder', folderId: folder.id },
+    folder,
     children,
     defaultExpanded: folder.parentId === null,
   };

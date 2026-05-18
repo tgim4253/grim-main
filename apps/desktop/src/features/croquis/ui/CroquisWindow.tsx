@@ -4,7 +4,9 @@ import { isTauri } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { cx } from '../../../shared/lib/cx';
+import { useKeybindings } from '../../../shared/hooks';
 import { ipc } from '../../../shared/lib/ipc';
+import { isMacPlatform } from '../../../shared/lib/platform';
 import { IconButton } from '../../../shared/ui';
 import type { CroquisSession, CroquisSessionItem } from '../../../shared/types';
 import { clampFilterPercent, getRuntimeSessionFilterSettings } from '@/entities/session-preset';
@@ -12,7 +14,6 @@ import { useCroquisSessionController } from '../lib/useCroquisSessionController'
 import { CroquisQuickActionMenu, type CroquisQuickAction } from './CroquisQuickActionMenu';
 import './croquis.css';
 
-const MAC_PLATFORM_PATTERN = /Mac|iPhone|iPad|iPod/i;
 const QUICK_ACTION_MENU_MARGIN = 8;
 const QUICK_ACTION_MENU_WIDTH = 160;
 const QUICK_ACTION_MENU_ROW_HEIGHT = 36;
@@ -33,14 +34,6 @@ type CroquisQuickActionMenuState = {
 type QuickActionMenuPosition = {
   x: number;
   y: number;
-};
-
-const isMacPlatform = () => {
-  if (typeof navigator === 'undefined') {
-    return false;
-  }
-
-  return MAC_PLATFORM_PATTERN.test(navigator.userAgent);
 };
 
 const shouldShowCustomWindowControls = () => {
@@ -243,6 +236,30 @@ export function CroquisWindow() {
     };
   }, [quickActionStatus]);
 
+  const copyCroquisImage = useCallback(
+    ({ grayscale, imageSrc, sourcePath }: CopyImageToClipboardOptions) => {
+      void copyImageToClipboard({
+        grayscale,
+        imageSrc,
+        sourcePath,
+      })
+        .then(() => {
+          setQuickActionStatus(
+            t('croquis.quick_actions.copy_image_success', { defaultValue: 'Image copied.' }),
+          );
+        })
+        .catch((error: unknown) => {
+          console.error('Failed to copy croquis image.', error);
+          setQuickActionStatus(
+            t('croquis.quick_actions.copy_image_unavailable', {
+              defaultValue: 'Copy image is unavailable.',
+            }),
+          );
+        });
+    },
+    [t],
+  );
+
   const handleCopyImage = useCallback(() => {
     const target = quickActionMenu?.target === 'image' ? quickActionMenu : null;
     if (!target) {
@@ -250,25 +267,21 @@ export function CroquisWindow() {
     }
 
     setQuickActionMenu(null);
-    void copyImageToClipboard({
-      grayscale: target.grayscale,
-      imageSrc: target.imageSrc,
-      sourcePath: target.sourcePath,
-    })
-      .then(() => {
-        setQuickActionStatus(
-          t('croquis.quick_actions.copy_image_success', { defaultValue: 'Image copied.' }),
-        );
-      })
-      .catch((error: unknown) => {
-        console.error('Failed to copy croquis image.', error);
-        setQuickActionStatus(
-          t('croquis.quick_actions.copy_image_unavailable', {
-            defaultValue: 'Copy image is unavailable.',
-          }),
-        );
-      });
-  }, [quickActionMenu, t]);
+    copyCroquisImage(target);
+  }, [copyCroquisImage, quickActionMenu]);
+
+  const handleCopyCurrentImage = useCallback(() => {
+    if (session === null || currentItem === null || !controller.currentImageSrc) {
+      return;
+    }
+
+    const filterSettings = getCroquisImageFilterSettings(session, currentItem);
+    copyCroquisImage({
+      grayscale: filterSettings.filterEnabled && filterSettings.grayscaleEnabled,
+      imageSrc: controller.currentImageSrc,
+      sourcePath: currentItem.sourcePath,
+    });
+  }, [controller.currentImageSrc, copyCroquisImage, currentItem, session]);
 
   const quickActions = useMemo<CroquisQuickAction[]>(() => {
     if (quickActionMenu?.target !== 'image') {
@@ -313,6 +326,44 @@ export function CroquisWindow() {
     },
     [controller.currentImageSrc, currentItem, session],
   );
+
+  useKeybindings({
+    context: {
+      captureEnabled: controller.isCaptureEnabled,
+      captureOverlayOpen: false,
+      croquisWindow: Boolean(session && currentItem),
+      currentRecordSaved: controller.isCurrentSaved,
+      hasNext: controller.hasNext,
+      hasPrevious: controller.hasPrevious,
+      imageFocused: Boolean(controller.currentImageSrc && currentItem),
+      quickActionMenuOpen: quickActionMenu !== null,
+      recordSaveEnabled: controller.isRecordSaveEnabled,
+    },
+    handlers: {
+      'grim.croquis.capture': () => {
+        void controller.handleCapture();
+      },
+      'grim.croquis.copyImage': handleCopyCurrentImage,
+      'grim.croquis.next': () => {
+        controller.moveToIndex(controller.currentIndex + 1);
+      },
+      'grim.croquis.playback.toggle': () => {
+        controller.setIsPlaying(value => !value);
+      },
+      'grim.croquis.previous': () => {
+        controller.moveToIndex(controller.currentIndex - 1);
+      },
+      'grim.croquis.quickAction.close': () => {
+        setQuickActionMenu(null);
+      },
+      'grim.croquis.saveRecord': () => {
+        void controller.handleSave();
+      },
+      'grim.croquis.window.close': () => {
+        void ipc.window.close();
+      },
+    },
+  });
 
   if (!session || !currentItem) {
     return (

@@ -1,8 +1,12 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type FocusEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useKeybindings } from '@/shared/hooks';
+import { getErrorMessage } from '@/shared/lib/error';
+import { ipc } from '@/shared/lib/ipc';
 import type { SelectOption } from '../../../shared/ui';
 import type { SessionPreset, Tag, TagGroup, TimeStepPreset } from '../../../shared/types';
 import {
+  findFallbackPreset,
   formatDurationCompact,
   getStepDuration,
   setStoredActiveSessionPresetId,
@@ -18,7 +22,11 @@ import { SessionPresetEditorPanel } from './ui/SessionPresetEditorPanel';
 import { TimeStepPresetEditorPanel } from './ui/TimeStepPresetEditorPanel';
 import './session-preset-settings.css';
 
-export function SessionPresetSettingsView() {
+type SessionPresetSettingsViewProps = {
+  modalOpen?: boolean;
+};
+
+export function SessionPresetSettingsView({ modalOpen = false }: SessionPresetSettingsViewProps) {
   const { t } = useTranslation('common');
   const [sessionPresets, setSessionPresets] = useState<SessionPreset[]>([]);
   const [timeStepPresets, setTimeStepPresets] = useState<TimeStepPreset[]>([]);
@@ -28,6 +36,7 @@ export function SessionPresetSettingsView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [presetNameEditing, setPresetNameEditing] = useState(false);
   const clearStatus = useCallback(() => {
     setStatus(null);
   }, []);
@@ -137,10 +146,135 @@ export function SessionPresetSettingsView() {
     timeStepDraft.createPreset();
   };
 
+  const handleSavePreset = useCallback(() => {
+    if (editorMode === 'session') {
+      void persistSessionPreset(false);
+      return;
+    }
+
+    void persistTimeStepPreset(false);
+  }, [editorMode, persistSessionPreset, persistTimeStepPreset]);
+
+  const handleDeletePreset = useCallback(() => {
+    if (editorMode === 'time-step') {
+      void deleteTimeStepPreset();
+      return;
+    }
+
+    if (!selectedSessionPreset) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      t('presets.confirm_delete_session_preset', {
+        presetName: selectedSessionPreset.name,
+        defaultValue: 'Delete this session preset?',
+      }),
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    void (async () => {
+      setError(null);
+      setStatus(null);
+
+      try {
+        const nextSessionPresets = await ipc.session.deletePreset({
+          presetId: selectedSessionPreset.id,
+        });
+        const nextSelectedPreset = findFallbackPreset(nextSessionPresets);
+
+        setSessionPresets(nextSessionPresets);
+        applySessionPresetToEditor(nextSelectedPreset);
+        setStoredActiveSessionPresetId(nextSelectedPreset?.id ?? null);
+        setEditorMode('session');
+        setStatus(t('presets.status.session_deleted', { defaultValue: 'Session preset deleted.' }));
+      } catch (nextError) {
+        setError(
+          getErrorMessage(
+            nextError,
+            t('presets.error.delete_session', {
+              defaultValue: 'Failed to delete session preset.',
+            }),
+          ),
+        );
+      }
+    })();
+  }, [applySessionPresetToEditor, deleteTimeStepPreset, editorMode, selectedSessionPreset, t]);
+
+  const handleFocusPresetName = useCallback(() => {
+    document
+      .querySelector<HTMLInputElement>(
+        '.session-preset-settings [data-shortcut-target="preset-name"]',
+      )
+      ?.focus();
+  }, []);
+  const handleCancelPresetEdit = useCallback(() => {
+    const activeElement = document.activeElement;
+    if (
+      activeElement instanceof HTMLElement &&
+      activeElement.closest('.session-preset-settings [data-shortcut-target="preset-name"]')
+    ) {
+      activeElement.blur();
+    }
+  }, []);
+  const handleCommitPresetEdit = useCallback(() => {
+    if (editorMode === 'session' ? canSaveSession : canSaveTimeStep) {
+      handleSavePreset();
+    }
+
+    handleCancelPresetEdit();
+  }, [canSaveSession, canSaveTimeStep, editorMode, handleCancelPresetEdit, handleSavePreset]);
+  const handlePresetSettingsFocus = useCallback((event: FocusEvent<HTMLElement>) => {
+    if (event.target instanceof HTMLElement) {
+      setPresetNameEditing(Boolean(event.target.closest('[data-shortcut-target="preset-name"]')));
+    }
+  }, []);
+  const handlePresetSettingsBlur = useCallback((event: FocusEvent<HTMLElement>) => {
+    const nextFocusedElement = event.relatedTarget;
+    setPresetNameEditing(
+      nextFocusedElement instanceof HTMLElement &&
+        Boolean(nextFocusedElement.closest('[data-shortcut-target="preset-name"]')),
+    );
+  }, []);
+
+  useKeybindings({
+    context: {
+      dirty: editorMode === 'session' ? canSaveSession : canSaveTimeStep,
+      editing: presetNameEditing,
+      editorFocus: true,
+      inputFocus: false,
+      itemSelected:
+        editorMode === 'session' ? Boolean(sessionDraft.draft.name) : Boolean(timeStepName),
+      libraryPage: true,
+      modalOpen,
+      presetSettingsView: true,
+    },
+    enabled: !modalOpen,
+    handlers: {
+      'grim.presets.cancelEdit': handleCancelPresetEdit,
+      'grim.presets.commitEdit': handleCommitPresetEdit,
+      'grim.presets.delete': handleDeletePreset,
+      'grim.presets.rename': handleFocusPresetName,
+      'grim.presets.save': handleSavePreset,
+      'grim.presets.session.new': handleCreateSessionPreset,
+      'grim.presets.step.add': () => {
+        if (editorMode === 'session') {
+          sessionDraft.addStep();
+        }
+      },
+      'grim.presets.timeStep.new': handleCreateTimeStepPreset,
+    },
+  });
+
   return (
     <section
       className="session-preset-settings"
       aria-label={t('presets.settings.title', { defaultValue: 'Preset Settings' })}
+      onBlurCapture={handlePresetSettingsBlur}
+      onFocusCapture={handlePresetSettingsFocus}
     >
       <PresetNavigationPanel
         loading={loading}

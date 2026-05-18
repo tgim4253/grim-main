@@ -7,3 +7,8 @@ export {
   type UsePointerSelectionOptions,
   type UsePointerSelectionResult,
 } from './usePointerSelection';
+export {
+  useKeybindings,
+  type KeybindingEventTarget,
+  type UseKeybindingsOptions,
+} from './useKeybindings';

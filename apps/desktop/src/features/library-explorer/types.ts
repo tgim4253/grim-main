@@ -1,4 +1,4 @@
-import type { AssetListSource } from '../../shared/types';
+import type { AssetListSource, VirtualFolder } from '../../shared/types';
 
 export type ExplorerNodeIcon = 'anatomy' | 'gesture' | 'folder' | 'folder-open' | 'grid';
 export type ExplorerNodeView = 'records';
@@ -10,6 +10,7 @@ export type ExplorerNode = {
   meta: string;
   source?: AssetListSource;
   view?: ExplorerNodeView;
+  folder?: VirtualFolder;
   children?: ExplorerNode[];
   defaultExpanded?: boolean;
   showActions?: boolean;

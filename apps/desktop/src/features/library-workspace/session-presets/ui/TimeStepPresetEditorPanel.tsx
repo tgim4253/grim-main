@@ -48,6 +48,7 @@ export function TimeStepPresetEditorPanel({
       <div className="session-preset-settings__header">
         <div className="session-preset-settings__session-panel session-preset-settings__session-panel--time-step">
           <Input
+            data-shortcut-target="preset-name"
             label={t('presets.time_step_name', { defaultValue: 'Time Step Name' })}
             value={timeStepName}
             disabled={editorDisabled}

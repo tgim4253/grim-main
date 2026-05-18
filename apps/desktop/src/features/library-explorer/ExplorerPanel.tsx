@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getErrorMessage } from '../../shared/lib/error';
+import { ipc } from '../../shared/lib/ipc';
+import { useKeybindings } from '../../shared/hooks';
+import { useShortcutFocusStore } from '../../shared/lib/keybindings';
 import { Button } from '../../shared/ui';
 import { ExplorerTreeGroup } from './ExplorerTreeGroup';
 import { FOLDERS_NODE_ID } from './explorerTree';
@@ -38,6 +41,21 @@ function resolveCreateFolderParentNodeId(focusedNodeId: string) {
   return focusedNodeId;
 }
 
+function findExplorerNodeById(nodes: readonly ExplorerNode[], nodeId: string): ExplorerNode | null {
+  for (const node of nodes) {
+    if (node.id === nodeId) {
+      return node;
+    }
+
+    const childNode = node.children ? findExplorerNodeById(node.children, nodeId) : null;
+    if (childNode) {
+      return childNode;
+    }
+  }
+
+  return null;
+}
+
 type ExplorerPanelProps = {
   nodes: ExplorerNode[];
   activeNodeId: string;
@@ -64,23 +82,29 @@ export function ExplorerPanel({
   onRetry,
 }: ExplorerPanelProps) {
   const { t } = useTranslation('common');
+  const shortcutFocusArea = useShortcutFocusStore(state => state.area);
+  const shortcutExplorerNodeId = useShortcutFocusStore(state => state.explorerNodeId);
+  const setExplorerNodeId = useShortcutFocusStore(state => state.setExplorerNodeId);
+  const focusExplorerNode = useShortcutFocusStore(state => state.focusExplorerNode);
   const [expandedById, setExpandedById] = useState<Record<string, boolean>>(() =>
     buildDefaultExpandedState(nodes),
   );
-  const [focusedNodeId, setFocusedNodeId] = useState(activeNodeId);
   const [folderDraft, setFolderDraft] = useState<ExplorerFolderDraft | null>(null);
+  const focusedNodeId = shortcutExplorerNodeId ?? activeNodeId;
 
   useEffect(() => {
     setExpandedById(current => ({ ...buildDefaultExpandedState(nodes), ...current }));
   }, [nodes]);
 
   useEffect(() => {
-    setFocusedNodeId(activeNodeId);
-  }, [activeNodeId]);
+    if (!shortcutExplorerNodeId) {
+      setExplorerNodeId(activeNodeId);
+    }
+  }, [activeNodeId, setExplorerNodeId, shortcutExplorerNodeId]);
 
   const handleNodeSelect = useCallback(
     (node: ExplorerNode) => {
-      setFocusedNodeId(node.id);
+      focusExplorerNode(node.id);
 
       if (node.source || node.view) {
         onNodeSelect(node);
@@ -90,12 +114,15 @@ export function ExplorerPanel({
         setExpandedById(current => ({ ...current, [node.id]: !current[node.id] }));
       }
     },
-    [onNodeSelect],
+    [focusExplorerNode, onNodeSelect],
   );
 
-  const handleNodeFocus = useCallback((node: ExplorerNode) => {
-    setFocusedNodeId(node.id);
-  }, []);
+  const handleNodeFocus = useCallback(
+    (node: ExplorerNode) => {
+      focusExplorerNode(node.id);
+    },
+    [focusExplorerNode],
+  );
 
   const handleAddFolder = useCallback(() => {
     if (!onCreateFolder || loading || createFolderDisabled) {
@@ -107,6 +134,90 @@ export function ExplorerPanel({
     setFolderDraft({ parentNodeId });
     setExpandedById(current => ({ ...current, [parentNodeId]: true }));
   }, [createFolderDisabled, focusedNodeId, loading, onCreateFolder]);
+
+  const handleNodeExpand = useCallback(() => {
+    const focusedNode = findExplorerNodeById(nodes, focusedNodeId);
+    if (!focusedNode?.children?.length) {
+      return;
+    }
+
+    setExpandedById(current => ({ ...current, [focusedNode.id]: true }));
+  }, [focusedNodeId, nodes]);
+
+  const handleNodeCollapse = useCallback(() => {
+    const focusedNode = findExplorerNodeById(nodes, focusedNodeId);
+    if (!focusedNode?.children?.length) {
+      return;
+    }
+
+    setExpandedById(current => ({ ...current, [focusedNode.id]: false }));
+  }, [focusedNodeId, nodes]);
+
+  const handleNodeOpen = useCallback(() => {
+    const focusedNode = findExplorerNodeById(nodes, focusedNodeId);
+    if (focusedNode) {
+      handleNodeSelect(focusedNode);
+    }
+  }, [focusedNodeId, handleNodeSelect, nodes]);
+
+  const handleNodeRename = useCallback(() => {
+    const focusedNode = findExplorerNodeById(nodes, focusedNodeId);
+    const folder = focusedNode?.folder;
+    if (!folder || folder.kind !== 'user') {
+      return;
+    }
+
+    const nextName = window.prompt(
+      t('explorer.rename_folder_prompt', { defaultValue: 'Rename folder' }),
+      folder.name,
+    );
+
+    if (!nextName?.trim() || nextName.trim() === folder.name) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        await ipc.folder.save({
+          id: folder.id,
+          name: nextName.trim(),
+          parentId: folder.parentId ?? null,
+          alias: folder.alias ?? null,
+        });
+        onRetry?.();
+      } catch (nextError) {
+        console.error('Failed to rename folder.', nextError);
+      }
+    })();
+  }, [focusedNodeId, nodes, onRetry, t]);
+
+  const handleNodeDelete = useCallback(() => {
+    const focusedNode = findExplorerNodeById(nodes, focusedNodeId);
+    const folder = focusedNode?.folder;
+    if (!folder || folder.kind !== 'user') {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      t('explorer.delete_folder_confirm', {
+        folderName: folder.alias?.trim() || folder.name,
+        defaultValue: 'Delete this folder?',
+      }),
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        await ipc.folder.delete({ folderId: folder.id });
+        onRetry?.();
+      } catch (nextError) {
+        console.error('Failed to delete folder.', nextError);
+      }
+    })();
+  }, [focusedNodeId, nodes, onRetry, t]);
 
   const handleDraftCancel = useCallback(() => {
     setFolderDraft(current => (current?.pending ? current : null));
@@ -151,6 +262,24 @@ export function ExplorerPanel({
   );
 
   const folderActionsDisabled = loading || createFolderDisabled || Boolean(folderDraft);
+  const focusedNode = findExplorerNodeById(nodes, focusedNodeId);
+
+  useKeybindings({
+    context: {
+      explorerFocus: shortcutFocusArea === 'explorer',
+      folderSelected: focusedNode?.folder?.kind === 'user',
+      inputFocus: Boolean(folderDraft),
+      libraryPage: true,
+    },
+    handlers: {
+      'grim.explorer.folder.new': handleAddFolder,
+      'grim.explorer.node.collapse': handleNodeCollapse,
+      'grim.explorer.node.delete': handleNodeDelete,
+      'grim.explorer.node.expand': handleNodeExpand,
+      'grim.explorer.node.open': handleNodeOpen,
+      'grim.explorer.node.rename': handleNodeRename,
+    },
+  });
 
   return (
     <div className="library-explorer">
