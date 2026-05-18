@@ -4,7 +4,7 @@ import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '../../../shared/ui';
-import { usePointerSelection } from '../../../shared/hooks';
+import { useKeybindings, usePointerSelection } from '../../../shared/hooks';
 import type { CaptureContext, CaptureMonitor, CaptureRect } from '../../../shared/types';
 import { ipc } from '../../../shared/lib/ipc';
 import './capture.css';
@@ -93,6 +93,22 @@ const waitForOverlayPaint = () =>
       });
     });
   });
+
+async function copyPreviewImageToClipboard(previewUrl: string) {
+  const clipboard = navigator.clipboard as Clipboard | undefined;
+  if (typeof ClipboardItem === 'undefined' || typeof clipboard?.write !== 'function') {
+    throw new Error('Image clipboard writes are unavailable.');
+  }
+
+  const response = await fetch(previewUrl);
+  if (!response.ok) {
+    throw new Error('Failed to load capture preview for clipboard.');
+  }
+
+  const blob = await response.blob();
+  const mimeType = blob.type.startsWith('image/') ? blob.type : 'image/png';
+  await clipboard.write([new ClipboardItem({ [mimeType]: blob })]);
+}
 
 export function CaptureOverlay() {
   const { t } = useTranslation('common');
@@ -377,24 +393,51 @@ export function CaptureOverlay() {
     }
   }, [context, previewUrl, t]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
+  const handleResetSelection = useCallback(() => {
+    if (phase === 'preview') {
+      handleRetake();
+      return;
+    }
+
+    resetSelection();
+    clearCompletedSelection();
+    setError(null);
+    document.body.style.background = IDLE_OVERLAY_COLOR;
+  }, [clearCompletedSelection, handleRetake, phase, resetSelection]);
+
+  const handleCopyPreview = useCallback(() => {
+    if (!previewUrl) {
+      return;
+    }
+
+    void copyPreviewImageToClipboard(previewUrl).catch((nextError: unknown) => {
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : t('capture.error.copy_preview', {
+              defaultValue: 'Failed to copy capture preview.',
+            }),
+      );
+    });
+  }, [previewUrl, t]);
+
+  useKeybindings({
+    context: {
+      captureOverlayOpen: true,
+      capturePreview: phase === 'preview' && previewUrl !== null,
+      hasSelection: Boolean(selection || completedSelection || previewUrl),
+    },
+    handlers: {
+      'grim.capture.cancel': () => {
         void handleCancel();
-      }
-
-      if (event.key === 'Enter' && phase === 'preview') {
-        event.preventDefault();
+      },
+      'grim.capture.confirm': () => {
         void handleConfirmCapture();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [handleCancel, handleConfirmCapture, phase]);
+      },
+      'grim.capture.copyPreview': handleCopyPreview,
+      'grim.capture.resetSelection': handleResetSelection,
+    },
+  });
 
   const stopPointerPropagation = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     event.stopPropagation();
