@@ -38,12 +38,12 @@ export function resolveKeybinding(
     platform = getCurrentGrimPlatform(),
   }: ResolveKeybindingOptions = {},
 ): ResolvedKeybinding | null {
-  if (event.isComposing) {
+  const editableTarget = isEditableKeybindingTarget(event.target);
+  if (event.isComposing && editableTarget) {
     return null;
   }
 
   const normalizedKey = normalizeKeyEvent(event);
-  const editableTarget = isEditableKeybindingTarget(event.target);
   const candidates: KeybindingCandidate[] = [];
 
   keybindings.forEach((binding, index) => {

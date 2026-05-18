@@ -26,6 +26,29 @@ describe('normalizeKeyEvent', () => {
     expect(normalizeKeyEvent(new KeyboardEvent('keydown', { key: 'Spacebar' }))).toBe('space');
   });
 
+  it('prefers physical key codes for layout-independent single-letter shortcuts', () => {
+    expect(
+      normalizeKeyEvent(
+        new KeyboardEvent('keydown', {
+          code: 'KeyM',
+          key: 'ㅡ',
+        }),
+      ),
+    ).toBe('m');
+  });
+
+  it('prefers physical digit codes for layout-independent numeric shortcuts', () => {
+    expect(
+      normalizeKeyEvent(
+        new KeyboardEvent('keydown', {
+          code: 'Digit1',
+          key: '!',
+          shiftKey: true,
+        }),
+      ),
+    ).toBe('shift+1');
+  });
+
   it('normalizes destructive macOS delete shortcuts', () => {
     const event = new KeyboardEvent('keydown', {
       key: 'Backspace',

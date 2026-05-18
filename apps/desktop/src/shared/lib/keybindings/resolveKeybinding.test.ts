@@ -69,7 +69,7 @@ describe('resolveKeybinding', () => {
     expect(resolved?.preventDefault).toBe(true);
   });
 
-  it('ignores composing keyboard events', () => {
+  it('resolves composing keyboard events outside editable targets', () => {
     const resolved = resolveKeybinding(keyboardEvent('r', { isComposing: true }), {
       context: {
         gridFocus: true,
@@ -80,7 +80,44 @@ describe('resolveKeybinding', () => {
       platform: 'linux',
     });
 
+    expect(resolved?.command).toBe('grim.currentView.refresh');
+  });
+
+  it('ignores composing keyboard events inside editable targets', () => {
+    const input = document.createElement('input');
+
+    const resolved = resolveKeybinding(keyboardEvent('r', { isComposing: true }, input), {
+      context: {
+        gridFocus: true,
+        inputFocus: false,
+        libraryPage: true,
+      },
+      keybindings: [baseBinding],
+      platform: 'linux',
+    });
+
     expect(resolved).toBeNull();
+  });
+
+  it('uses physical key codes so alphabet shortcuts survive IME layout changes', () => {
+    const resolved = resolveKeybinding(keyboardEvent('ㅡ', { code: 'KeyM' }), {
+      context: {
+        gridFocus: true,
+        inputFocus: false,
+        referencesView: true,
+      },
+      keybindings: [
+        {
+          command: 'grim.references.selection.toggleMode',
+          key: { win: 'm', linux: 'm', mac: 'm' },
+          scope: 'library',
+          when: 'referencesView && gridFocus && !inputFocus',
+        },
+      ],
+      platform: 'linux',
+    });
+
+    expect(resolved?.command).toBe('grim.references.selection.toggleMode');
   });
 
   it('ignores editable targets unless a binding explicitly allows them', () => {
