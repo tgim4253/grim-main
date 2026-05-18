@@ -1,10 +1,15 @@
-import { useCallback, useMemo } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppUpdate } from '@/features/app-update';
 import { formatBytes } from '../../../lib/format';
 import { useTheme, type Theme } from '../../../shared/hooks';
 import { LANGUAGE_OPTIONS, resolveLanguageCode } from '../../../shared/lib/language';
 import { Button, Modal, ModalFooter, Select, type SelectOption } from '../../../shared/ui';
+import {
+  createSettingsShortcutSections,
+  getSettingsShortcutPlatform,
+  type SettingsTab,
+} from '../lib/settings-shortcuts';
 import './settings-modal.css';
 
 export type SettingsModalProps = {
@@ -40,8 +45,10 @@ function looksLikeTranslationKey(message: string) {
 
 export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const { i18n, t } = useTranslation('common');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const appUpdate = useAppUpdate(open);
   const { setTheme, theme } = useTheme();
+  const shortcutPlatform = useMemo(() => getSettingsShortcutPlatform(), []);
   const languageValue = resolveLanguageCode(i18n.resolvedLanguage ?? i18n.language);
   const themeOptions = useMemo<SelectOption[]>(
     () => [
@@ -72,6 +79,13 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
     appUpdate.status === 'downloading' ||
     appUpdate.status === 'installing' ||
     appUpdate.status === 'restarting';
+  const shortcutSections = createSettingsShortcutSections(t, shortcutPlatform);
+
+  useEffect(() => {
+    if (!open) {
+      setActiveTab('general');
+    }
+  }, [open]);
 
   const handleLanguageChange = useCallback(
     (nextLanguage: string) => {
@@ -168,81 +182,184 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
         </ModalFooter>
       }
     >
-      <section className="settings-modal__row settings-modal__version-row">
-        <div className="settings-modal__copy">
-          <p className="settings-modal__label">
-            {t('settings.current_version', { defaultValue: 'Current version' })}
-          </p>
-          <p className="settings-modal__value">{formatVersion(displayedVersion)}</p>
-        </div>
+      <div className="settings-modal__layout">
+        <nav
+          className="settings-modal__tabs"
+          aria-label={t('settings.tabs.aria_label', { defaultValue: 'Settings sections' })}
+          role="tablist"
+        >
+          <button
+            id="settings-tab-general"
+            className="settings-modal__tab"
+            type="button"
+            role="tab"
+            aria-controls="settings-panel-general"
+            aria-selected={activeTab === 'general'}
+            data-active={activeTab === 'general'}
+            onClick={() => {
+              setActiveTab('general');
+            }}
+          >
+            {t('settings.tabs.general', { defaultValue: 'General' })}
+          </button>
+          <button
+            id="settings-tab-shortcuts"
+            className="settings-modal__tab"
+            type="button"
+            role="tab"
+            aria-controls="settings-panel-shortcuts"
+            aria-selected={activeTab === 'shortcuts'}
+            data-active={activeTab === 'shortcuts'}
+            onClick={() => {
+              setActiveTab('shortcuts');
+            }}
+          >
+            {t('settings.tabs.shortcuts', { defaultValue: 'Shortcuts' })}
+          </button>
+        </nav>
 
-        {appUpdate.status === 'idle' ? (
-          <Button
-            size="sm"
-            variant="secondary"
-            className="settings-modal__update-button"
-            disabled={!appUpdate.supported || appUpdate.busy}
-            onClick={() => void appUpdate.checkForUpdates()}
-          >
-            {t('settings.check_for_updates', { defaultValue: 'Check for updates' })}
-          </Button>
-        ) : (
-          <div
-            className="settings-modal__update-progress"
-            data-state={appUpdate.status === 'error' ? 'error' : undefined}
-          >
-            <p className="settings-modal__progress-copy" aria-live="polite">
-              {updateStatusLabel}
-            </p>
-            {showUpdateProgress ? (
-              <div
-                className="settings-modal__progress-track"
-                role="progressbar"
-                aria-label={updateStatusLabel ?? undefined}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={updateProgress}
-              >
-                <span
-                  className="settings-modal__progress-value"
-                  style={{ width: `${String(updateProgress)}%` }}
+        <span className="settings-modal__divider" aria-hidden="true" />
+
+        <div className="settings-modal__panel">
+          {activeTab === 'general' ? (
+            <div
+              id="settings-panel-general"
+              className="settings-modal__general-panel"
+              role="tabpanel"
+              aria-labelledby="settings-tab-general"
+            >
+              <section className="settings-modal__row settings-modal__version-row">
+                <div className="settings-modal__copy">
+                  <p className="settings-modal__label">
+                    {t('settings.current_version', { defaultValue: 'Current version' })}
+                  </p>
+                  <p className="settings-modal__value">{formatVersion(displayedVersion)}</p>
+                </div>
+
+                {appUpdate.status === 'idle' ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="settings-modal__update-button"
+                    disabled={!appUpdate.supported || appUpdate.busy}
+                    onClick={() => void appUpdate.checkForUpdates()}
+                  >
+                    {t('settings.check_for_updates', { defaultValue: 'Check for updates' })}
+                  </Button>
+                ) : (
+                  <div
+                    className="settings-modal__update-progress"
+                    data-state={appUpdate.status === 'error' ? 'error' : undefined}
+                  >
+                    <p className="settings-modal__progress-copy" aria-live="polite">
+                      {updateStatusLabel}
+                    </p>
+                    {showUpdateProgress ? (
+                      <div
+                        className="settings-modal__progress-track"
+                        role="progressbar"
+                        aria-label={updateStatusLabel ?? undefined}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={updateProgress}
+                      >
+                        <span
+                          className="settings-modal__progress-value"
+                          style={{ width: `${String(updateProgress)}%` }}
+                        />
+                      </div>
+                    ) : null}
+                    {downloadMeta ? (
+                      <p className="settings-modal__progress-meta">{downloadMeta}</p>
+                    ) : null}
+                  </div>
+                )}
+              </section>
+
+              <section className="settings-modal__row settings-modal__language-row">
+                <div className="settings-modal__copy">
+                  <p className="settings-modal__label">
+                    {t('settings.language', { defaultValue: 'Language' })}
+                  </p>
+                </div>
+
+                <Select
+                  aria-label={t('settings.language', { defaultValue: 'Language' })}
+                  className="settings-modal__language-select"
+                  options={LANGUAGE_OPTIONS}
+                  value={languageValue}
+                  onValueChange={handleLanguageChange}
                 />
+              </section>
+
+              <section className="settings-modal__row settings-modal__theme-row">
+                <div className="settings-modal__copy">
+                  <p className="settings-modal__label">
+                    {t('settings.theme', { defaultValue: 'Theme' })}
+                  </p>
+                </div>
+
+                <Select
+                  aria-label={t('settings.theme', { defaultValue: 'Theme' })}
+                  className="settings-modal__theme-select"
+                  options={themeOptions}
+                  value={theme}
+                  onValueChange={handleThemeChange}
+                />
+              </section>
+            </div>
+          ) : (
+            <div
+              id="settings-panel-shortcuts"
+              className="settings-modal__shortcuts-panel"
+              role="tabpanel"
+              aria-labelledby="settings-tab-shortcuts"
+            >
+              <div className="settings-modal__shortcuts-header">
+                <h3 className="settings-modal__shortcuts-title">
+                  {t('settings.shortcuts.title', { defaultValue: 'Keyboard shortcuts' })}
+                </h3>
+                <p className="settings-modal__shortcuts-description">
+                  {t('settings.shortcuts.description', {
+                    defaultValue: 'Review and learn the shortcuts available in Grim.',
+                  })}
+                </p>
               </div>
-            ) : null}
-            {downloadMeta ? <p className="settings-modal__progress-meta">{downloadMeta}</p> : null}
-          </div>
-        )}
-      </section>
 
-      <section className="settings-modal__row settings-modal__language-row">
-        <div className="settings-modal__copy">
-          <p className="settings-modal__label">
-            {t('settings.language', { defaultValue: 'Language' })}
-          </p>
+              {shortcutSections.map(section => (
+                <section className="settings-modal__shortcut-section" key={section.id}>
+                  <h4 className="settings-modal__shortcut-section-title">{section.title}</h4>
+                  <div className="settings-modal__shortcut-list">
+                    {section.items.map(item => (
+                      <div className="settings-modal__shortcut-row" key={item.command}>
+                        <div className="settings-modal__shortcut-copy">
+                          <p className="settings-modal__shortcut-label">{item.name}</p>
+                          <p className="settings-modal__shortcut-description">{item.description}</p>
+                        </div>
+                        <div
+                          className="settings-modal__shortcut-keys"
+                          aria-label={`${item.name}: ${item.keyParts.join(' + ')}`}
+                        >
+                          {item.keyParts.map((keyPart, index) => (
+                            <Fragment key={`${item.command}-${keyPart}-${String(index)}`}>
+                              {index > 0 ? (
+                                <span className="settings-modal__shortcut-plus" aria-hidden="true">
+                                  +
+                                </span>
+                              ) : null}
+                              <kbd className="settings-modal__shortcut-key">{keyPart}</kbd>
+                            </Fragment>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
         </div>
-
-        <Select
-          aria-label={t('settings.language', { defaultValue: 'Language' })}
-          className="settings-modal__language-select"
-          options={LANGUAGE_OPTIONS}
-          value={languageValue}
-          onValueChange={handleLanguageChange}
-        />
-      </section>
-
-      <section className="settings-modal__row settings-modal__theme-row">
-        <div className="settings-modal__copy">
-          <p className="settings-modal__label">{t('settings.theme', { defaultValue: 'Theme' })}</p>
-        </div>
-
-        <Select
-          aria-label={t('settings.theme', { defaultValue: 'Theme' })}
-          className="settings-modal__theme-select"
-          options={themeOptions}
-          value={theme}
-          onValueChange={handleThemeChange}
-        />
-      </section>
+      </div>
     </Modal>
   );
 }
