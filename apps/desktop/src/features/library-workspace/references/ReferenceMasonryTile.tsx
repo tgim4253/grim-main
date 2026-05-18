@@ -12,6 +12,7 @@ type ReferenceMasonryTileProps = {
   selected: boolean;
   selectionIndex?: number;
   selectionMode?: boolean;
+  onFocus?: () => void;
   onSelect: () => void;
 };
 
@@ -21,6 +22,7 @@ export function ReferenceMasonryTile({
   selected,
   selectionIndex,
   selectionMode = false,
+  onFocus,
   onSelect,
 }: ReferenceMasonryTileProps) {
   const style = {
@@ -42,6 +44,7 @@ export function ReferenceMasonryTile({
       )}
       style={style}
       onClick={onSelect}
+      onFocus={onFocus}
     >
       {imageSrc ? (
         <img

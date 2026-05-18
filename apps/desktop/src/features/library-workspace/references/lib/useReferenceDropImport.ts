@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getErrorMessage } from '../../../../shared/lib/error';
 import { ipc } from '../../../../shared/lib/ipc';
+import { useShortcutFocusStore } from '../../../../shared/lib/keybindings';
 import type { AssetListSource, ImportFailure, ImportResult } from '../../../../shared/types';
 import {
   collectSupportedDroppedImageFiles,
@@ -21,6 +22,7 @@ type UseReferenceDropImportParams = {
   source: AssetListSource;
   onAssetsRefresh: () => Promise<void>;
   onExplorerRefresh?: () => Promise<void> | void;
+  pasteEnabled?: boolean;
 };
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
@@ -189,39 +191,29 @@ function hasDroppableData(dataTransfer: DataTransfer) {
   return hasFileDropData(dataTransfer) || types.some(type => REMOTE_DROP_TYPES.includes(type));
 }
 
-function describeDroppedFileDataSource(source: DroppedFileDataSource | null) {
-  if (!source) {
-    return null;
+function isEditablePasteTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) {
+    return false;
   }
 
-  if (source.kind === 'entries') {
-    return {
-      kind: source.kind,
-      entries: source.entries.map(entry => ({
-        name: entry.name,
-        isFile: entry.isFile,
-        isDirectory: entry.isDirectory,
-      })),
-    };
+  const editableElement = target.closest('input, textarea, select, [contenteditable]');
+  if (!editableElement) {
+    return false;
   }
 
-  return {
-    kind: source.kind,
-    files: source.files.map(file => ({
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      lastModified: file.lastModified,
-    })),
-  };
+  return (
+    editableElement instanceof HTMLInputElement ||
+    editableElement instanceof HTMLTextAreaElement ||
+    editableElement instanceof HTMLSelectElement ||
+    (editableElement instanceof HTMLElement && editableElement.isContentEditable) ||
+    editableElement.getAttribute('contenteditable') === 'true' ||
+    editableElement.getAttribute('contenteditable') === 'plaintext-only'
+  );
 }
 
-function describeDataTransferItems(dataTransfer: DataTransfer) {
-  return Array.from(dataTransfer.items).map((item, index) => ({
-    index,
-    kind: item.kind,
-    type: item.type,
-  }));
+function hasReferenceShortcutFocus() {
+  const { area } = useShortcutFocusStore.getState();
+  return area === 'references' || area === 'references.grid' || area === 'references.preview';
 }
 
 function createEmptyImportResult(failed: ImportFailure[] = []): ImportResult {
@@ -284,11 +276,14 @@ async function collectPendingDropImport({
   localSource,
   remoteSources,
 }: PendingDropImport): Promise<DropImportPayload> {
+  const imageCollection = localSource
+    ? await collectSupportedDroppedImageFiles(localSource)
+    : createEmptyDroppedImageFileCollection();
+  const resolvedRemoteSources = imageCollection.files.length > 0 ? [] : remoteSources;
+
   return {
-    imageCollection: localSource
-      ? await collectSupportedDroppedImageFiles(localSource)
-      : createEmptyDroppedImageFileCollection(),
-    remoteSources,
+    imageCollection,
+    remoteSources: resolvedRemoteSources,
   };
 }
 
@@ -296,6 +291,7 @@ export function useReferenceDropImport({
   source,
   onAssetsRefresh,
   onExplorerRefresh,
+  pasteEnabled = true,
 }: UseReferenceDropImportParams) {
   const { t } = useTranslation('common');
   const [dropImportActive, setDropImportActive] = useState(false);
@@ -445,13 +441,6 @@ export function useReferenceDropImport({
         ? createDroppedFileDataSource(dataTransfer)
         : null;
       const pendingDrop = { localSource, remoteSources };
-
-      console.log('[useReferenceDropImport] dropped item', {
-        types: Array.from(dataTransfer.types),
-        items: describeDataTransferItems(dataTransfer),
-        localSource: describeDroppedFileDataSource(localSource),
-        remoteSources,
-      });
 
       dropImportInFlightRef.current = true;
       setDropImportPreparing(true);
@@ -607,6 +596,37 @@ export function useReferenceDropImport({
       document.removeEventListener('drop', handleDocumentDrop, true);
     };
   }, [importDroppedDomData]);
+
+  useEffect(() => {
+    const handleDocumentPaste = (event: ClipboardEvent) => {
+      const dataTransfer = event.clipboardData;
+      const target = event.target;
+      const isInsideDropShell =
+        target instanceof Node && dropShellRef.current?.contains(target) === true;
+      const hasShortcutFocus = hasReferenceShortcutFocus();
+      const remoteSources = dataTransfer ? collectRemoteDropSources(dataTransfer) : [];
+
+      if (
+        !pasteEnabled ||
+        dropImportWarning !== null ||
+        !dataTransfer ||
+        (!isInsideDropShell && !hasShortcutFocus) ||
+        isEditablePasteTarget(target) ||
+        (!hasFileDropData(dataTransfer) && remoteSources.length === 0)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      importDroppedDomData(dataTransfer);
+    };
+
+    document.addEventListener('paste', handleDocumentPaste, true);
+    return () => {
+      document.removeEventListener('paste', handleDocumentPaste, true);
+    };
+  }, [dropImportWarning, importDroppedDomData, pasteEnabled]);
 
   const dropOverlayVisible = dropImportActive || dropImportBusy || dropImportPreparing;
 

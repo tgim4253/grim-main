@@ -14,6 +14,7 @@ type MasonryGridProps<TItem extends LibraryWorkspaceItem> = {
   selectionMode?: boolean;
   busy?: boolean;
   emptyState?: ReactNode;
+  onFocusedItemChange?: (itemId: string) => void;
   onSelectedItemChange?: (itemId: string) => void;
   renderTile: LibraryWorkspaceRenderTile<TItem>;
 };
@@ -27,6 +28,7 @@ export function MasonryGrid<TItem extends LibraryWorkspaceItem>({
   selectionMode = false,
   busy = false,
   emptyState = null,
+  onFocusedItemChange,
   onSelectedItemChange,
   renderTile,
 }: MasonryGridProps<TItem>) {
@@ -44,6 +46,9 @@ export function MasonryGrid<TItem extends LibraryWorkspaceItem>({
   const renderItem = (item: TItem) => {
     const selectionIndex = selectedItemOrder.get(item.id);
     const selected = selectionMode ? selectionIndex !== undefined : item.id === selectedItemId;
+    const onFocus = () => {
+      onFocusedItemChange?.(item.id);
+    };
     const onSelect = () => {
       onSelectedItemChange?.(item.id);
     };
@@ -55,6 +60,7 @@ export function MasonryGrid<TItem extends LibraryWorkspaceItem>({
           selected,
           selectionIndex,
           selectionMode,
+          onFocus,
           onSelect,
         })}
       </div>

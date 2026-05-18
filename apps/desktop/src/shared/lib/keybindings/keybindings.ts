@@ -164,6 +164,7 @@ export const grimKeybindings = [
     key: { win: 'ctrl+v', linux: 'ctrl+v', mac: 'meta+v' },
     when: 'referencesView && !modalOpen && !inputFocus',
     scope: 'library',
+    preventDefault: false,
   },
   {
     command: 'grim.references.folder.add',
@@ -268,6 +269,7 @@ export const grimKeybindings = [
     key: { win: 'ctrl+s', linux: 'ctrl+s', mac: 'meta+s' },
     when: 'tagSettingsView && dirty',
     scope: 'library',
+    allowInEditable: true,
   },
   {
     command: 'grim.tags.rename',
@@ -312,6 +314,7 @@ export const grimKeybindings = [
     key: { win: 'ctrl+s', linux: 'ctrl+s', mac: 'meta+s' },
     when: 'presetSettingsView && dirty',
     scope: 'library',
+    allowInEditable: true,
   },
   {
     command: 'grim.presets.rename',
@@ -330,6 +333,7 @@ export const grimKeybindings = [
     key: { win: 'ctrl+enter', linux: 'ctrl+enter', mac: 'meta+enter' },
     when: 'presetSettingsView && editorFocus',
     scope: 'library',
+    allowInEditable: true,
   },
   {
     command: 'grim.presets.cancelEdit',

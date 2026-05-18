@@ -4,6 +4,7 @@ export {
   type GrimKeybindingContext,
   type GrimKeybindingContextValue,
 } from './context';
+export { useShortcutFocusStore, type GrimShortcutFocusArea } from './shortcutFocusStore';
 export {
   grimKeybindingScopePriority,
   grimKeybindings,

@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useKeybindings } from '@/shared/hooks';
+import { useShortcutFocusStore } from '@/shared/lib/keybindings';
 import { getErrorMessage } from '../../../shared/lib/error';
 import { ipc } from '../../../shared/lib/ipc';
 import type {
@@ -38,6 +40,7 @@ import { createRecordResultItem } from './recordResultItems';
 import './record-workspace.css';
 
 type RecordsViewProps = {
+  modalOpen?: boolean;
   refreshKey?: number;
   onExplorerRefresh?: () => Promise<void> | void;
 };
@@ -51,8 +54,17 @@ type RecordTagAddTarget =
       recordId: string;
     };
 
-export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewProps) {
+export function RecordsView({
+  modalOpen = false,
+  refreshKey = 0,
+  onExplorerRefresh,
+}: RecordsViewProps) {
   const { t } = useTranslation('common');
+  const shortcutFocusArea = useShortcutFocusStore(state => state.area);
+  const focusedRecordId = useShortcutFocusStore(state => state.recordId);
+  const focusRecordGrid = useShortcutFocusStore(state => state.focusRecordGrid);
+  const setRecordId = useShortcutFocusStore(state => state.setRecordId);
+  const setShortcutFocusArea = useShortcutFocusStore(state => state.setArea);
   const [layout, setLayout] = useState<LibraryWorkspaceLayout>('masonry');
   const [records, setRecords] = useState<CroquisRecordSummary[]>([]);
   const [recordDetailsById, setRecordDetailsById] = useState(
@@ -67,6 +79,8 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [filterExpanded, setFilterExpanded] = useState(false);
+  const recordViewFocus = shortcutFocusArea === 'records' || shortcutFocusArea === 'records.grid';
+  const gridFocus = recordViewFocus;
   const [selectedRecordFilters, setSelectedRecordFilters] = useState<SelectedRecordFilters>({});
   const [recordExportOpen, setRecordExportOpen] = useState(false);
   const [tagAddTarget, setTagAddTarget] = useState<RecordTagAddTarget | null>(null);
@@ -113,6 +127,7 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
       setRecordDetailsById(new Map());
       setSelectedRecordId(null);
       setSelectedRecordIds([]);
+      setRecordId(null);
       setPreviewOpen(false);
       setError(
         getErrorMessage(
@@ -156,7 +171,10 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
   useEffect(() => {
     const recordIds = new Set(records.map(record => record.id));
     setSelectedRecordIds(current => current.filter(recordId => recordIds.has(recordId)));
-  }, [records]);
+    if (focusedRecordId && !recordIds.has(focusedRecordId)) {
+      setRecordId(null);
+    }
+  }, [focusedRecordId, records, setRecordId]);
 
   const items = useMemo(
     () => records.map(record => createRecordResultItem(record, recordDetailsById.get(record.id))),
@@ -403,8 +421,11 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
 
   useEffect(() => {
     const itemIds = new Set(filteredItems.map(item => item.id));
+    if (focusedRecordId && !itemIds.has(focusedRecordId)) {
+      setRecordId(null);
+    }
     setSelectedRecordIds(current => current.filter(recordId => itemIds.has(recordId)));
-  }, [filteredItems]);
+  }, [filteredItems, focusedRecordId, setRecordId]);
 
   const handleFilterTagToggle = useCallback((groupKey: string, tagId: string) => {
     setSelectedRecordFilters(current => {
@@ -431,6 +452,8 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
   }, []);
 
   const handleSelectedRecordChange = (recordId: string) => {
+    focusRecordGrid(recordId);
+
     if (selectionMode) {
       setSelectedRecordIds(current => {
         if (current.includes(recordId)) {
@@ -459,12 +482,14 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
           return current;
         }
 
-        return selectedRecordId && filteredItems.some(record => record.id === selectedRecordId)
-          ? [selectedRecordId]
+        const activeRecordId = focusedRecordId ?? selectedRecordId;
+
+        return activeRecordId && filteredItems.some(record => record.id === activeRecordId)
+          ? [activeRecordId]
           : [];
       });
     },
-    [filteredItems, selectedRecordId],
+    [filteredItems, focusedRecordId, selectedRecordId],
   );
 
   const handleSelectAllChange = useCallback(
@@ -473,6 +498,80 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
     },
     [filteredItems],
   );
+
+  const getActiveRecordId = useCallback(() => {
+    if (focusedRecordId && filteredItems.some(record => record.id === focusedRecordId)) {
+      return focusedRecordId;
+    }
+
+    if (selectedRecordId) {
+      return selectedRecordId;
+    }
+
+    return filteredItems[0]?.id ?? null;
+  }, [filteredItems, focusedRecordId, selectedRecordId]);
+
+  const handlePreviewOpen = useCallback(() => {
+    if (selectionMode) {
+      return;
+    }
+
+    const recordId = getActiveRecordId();
+    if (!recordId) {
+      return;
+    }
+
+    setSelectedRecordId(recordId);
+    setRecordId(recordId);
+    setPreviewOpen(true);
+  }, [getActiveRecordId, selectionMode, setRecordId]);
+
+  const handlePreviewClose = useCallback(() => {
+    setPreviewOpen(false);
+    focusRecordGrid(selectedRecordId ?? focusedRecordId ?? null);
+  }, [focusRecordGrid, focusedRecordId, selectedRecordId]);
+
+  const handleRecordsPointerDown = useCallback(
+    (event: PointerEvent<HTMLElement>) => {
+      if (!(event.target instanceof Element)) {
+        return;
+      }
+
+      if (event.target.closest('.library-workspace__grid-region')) {
+        focusRecordGrid(getActiveRecordId());
+        return;
+      }
+
+      if (event.target.closest('.library-workspace__preview-shell')) {
+        setShortcutFocusArea('records.preview');
+        return;
+      }
+
+      setShortcutFocusArea('records');
+    },
+    [focusRecordGrid, getActiveRecordId, setShortcutFocusArea],
+  );
+
+  const handleSelectionToggleItem = useCallback(() => {
+    if (!selectionMode) {
+      return;
+    }
+
+    const recordId = getActiveRecordId();
+    if (!recordId) {
+      return;
+    }
+
+    setSelectedRecordIds(current =>
+      current.includes(recordId)
+        ? current.filter(selectedRecordId => selectedRecordId !== recordId)
+        : [...current, recordId],
+    );
+  }, [getActiveRecordId, selectionMode]);
+
+  const handleLayoutToggle = useCallback(() => {
+    setLayout(current => (current === 'masonry' ? 'grid' : 'masonry'));
+  }, []);
 
   const handleDeleteSelected = useCallback(() => {
     if (selectedRecordIds.length === 0 || isActionBusy) {
@@ -510,6 +609,67 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
       });
   }, [isActionBusy, loadRecords, onExplorerRefresh, selectedRecordId, selectedRecordIds, t]);
 
+  const handleCurrentViewRefresh = useCallback(() => {
+    void (async () => {
+      await loadRecords();
+      await onExplorerRefresh?.();
+    })();
+  }, [loadRecords, onExplorerRefresh]);
+
+  const recordsModalOpen = modalOpen || recordExportOpen || tagAddTarget !== null;
+  const selectedRecordCount = selectedRecordIds.length;
+  const activeRecordId = getActiveRecordId();
+
+  useKeybindings({
+    context: {
+      gridFocus,
+      inputFocus: false,
+      itemFocused: gridFocus && Boolean(activeRecordId),
+      libraryPage: true,
+      modalOpen: recordsModalOpen,
+      previewOpen,
+      recordsView: true,
+      selectedRecordCount,
+      selectionMode,
+    },
+    enabled: !recordsModalOpen,
+    handlers: {
+      'grim.currentView.filter.toggle': () => {
+        setFilterExpanded(current => !current);
+      },
+      'grim.currentView.refresh': handleCurrentViewRefresh,
+      'grim.records.deleteSelected': handleDeleteSelected,
+      'grim.records.export.open': () => {
+        if (exportableSelectedRecordCount === 0) {
+          return;
+        }
+
+        setActionError(null);
+        setRecordExportOpen(true);
+      },
+      'grim.records.layout.toggle': handleLayoutToggle,
+      'grim.records.preview.close': handlePreviewClose,
+      'grim.records.preview.open': handlePreviewOpen,
+      'grim.records.selection.clear': () => {
+        handleSelectionModeChange(false);
+      },
+      'grim.records.selection.selectAll': () => {
+        handleSelectAllChange(true);
+      },
+      'grim.records.selection.toggleItem': handleSelectionToggleItem,
+      'grim.records.selection.toggleMode': () => {
+        handleSelectionModeChange(!selectionMode);
+      },
+      'grim.records.tags.add': () => {
+        if (selectableTagsForSelectedRecords.length === 0) {
+          return;
+        }
+
+        setTagAddTarget({ kind: 'selection' });
+      },
+    },
+  });
+
   const statusError = actionError;
 
   return (
@@ -526,6 +686,8 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
         gridBusy={isLoading}
         gridEmptyState={gridEmptyState}
         onLayoutChange={setLayout}
+        onFocusedItemChange={focusRecordGrid}
+        onPointerDownCapture={handleRecordsPointerDown}
         onSelectedItemChange={handleSelectedRecordChange}
         renderHeader={({ itemCount, layout: currentLayout, onLayoutChange }) => (
           <RecordExplorerHeader
@@ -572,6 +734,7 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
             selected={tileState.selected}
             selectionIndex={tileState.selectionIndex}
             selectionMode={tileState.selectionMode}
+            onFocus={tileState.onFocus}
             onSelect={tileState.onSelect}
           />
         )}
@@ -586,9 +749,7 @@ export function RecordsView({ refreshKey = 0, onExplorerRefresh }: RecordsViewPr
               setTagAddTarget({ kind: 'record', recordId });
             }}
             onTagRemove={handleRecordTagRemove}
-            onClose={() => {
-              setPreviewOpen(false);
-            }}
+            onClose={handlePreviewClose}
           />
         )}
       />

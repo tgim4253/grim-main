@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { PointerEventHandler, ReactNode } from 'react';
 import { MasonryGrid } from './MasonryGrid';
 import type {
   LibraryWorkspaceItem,
@@ -22,6 +22,8 @@ type LibraryWorkspaceProps<TItem extends LibraryWorkspaceItem> = {
   gridBusy?: boolean;
   gridEmptyState?: ReactNode;
   onLayoutChange: (layout: LibraryWorkspaceLayout) => void;
+  onFocusedItemChange?: (itemId: string) => void;
+  onPointerDownCapture?: PointerEventHandler<HTMLElement>;
   onSelectedItemChange?: (itemId: string) => void;
   renderHeader: LibraryWorkspaceRenderHeader;
   renderToolbar?: ReactNode;
@@ -41,6 +43,8 @@ export function LibraryWorkspace<TItem extends LibraryWorkspaceItem>({
   gridBusy = false,
   gridEmptyState = null,
   onLayoutChange,
+  onFocusedItemChange,
+  onPointerDownCapture,
   onSelectedItemChange,
   renderHeader,
   renderToolbar = null,
@@ -59,7 +63,11 @@ export function LibraryWorkspace<TItem extends LibraryWorkspaceItem>({
   const previewState = previewVisible ? 'open' : 'closed';
 
   return (
-    <section className="library-workspace" data-mode={mode}>
+    <section
+      className="library-workspace"
+      data-mode={mode}
+      onPointerDownCapture={onPointerDownCapture}
+    >
       <div className="library-workspace__explorer">
         {renderHeader({
           mode,
@@ -68,7 +76,10 @@ export function LibraryWorkspace<TItem extends LibraryWorkspaceItem>({
           onLayoutChange,
         })}
         {renderToolbar}
-        <div className="library-workspace__grid-region">
+        <div
+          className="library-workspace__grid-region"
+          tabIndex={items.length === 0 ? 0 : undefined}
+        >
           <MasonryGrid
             items={items}
             layout={layout}
@@ -78,6 +89,7 @@ export function LibraryWorkspace<TItem extends LibraryWorkspaceItem>({
             selectionMode={selectionMode}
             busy={gridBusy}
             emptyState={gridEmptyState}
+            onFocusedItemChange={onFocusedItemChange}
             onSelectedItemChange={onSelectedItemChange}
             renderTile={renderTile}
           />
