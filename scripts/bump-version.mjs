@@ -88,8 +88,8 @@ function printUsage() {
 
 Examples:
   pnpm version:bump patch
-  pnpm version:bump minor
-  pnpm version:bump major
+  pnpm version:bump minor  # keeps the current patch number
+  pnpm version:bump major  # resets minor and patch to 0
   pnpm version:bump 0.5.0
   pnpm version:bump 0.5.0 --no-commit`);
 }
@@ -142,7 +142,6 @@ function bumpSemver(currentVersion, level) {
       break;
     case 'minor':
       minor += 1;
-      patch = 0;
       break;
     case 'patch':
       patch += 1;
