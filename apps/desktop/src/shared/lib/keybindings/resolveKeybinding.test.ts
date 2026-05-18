@@ -213,6 +213,32 @@ describe('resolveKeybinding', () => {
     ).toBe('grim.references.croquis.start');
   });
 
+  it('resolves the default reference clipboard paste binding', () => {
+    expect(
+      resolveKeybinding(keyboardEvent('v', { ctrlKey: true }), {
+        context: {
+          inputFocus: false,
+          modalOpen: false,
+          referencesView: true,
+        },
+        keybindings: grimKeybindings,
+        platform: 'linux',
+      })?.command,
+    ).toBe('grim.references.clipboard.paste');
+
+    expect(
+      resolveKeybinding(keyboardEvent('v', { metaKey: true }), {
+        context: {
+          inputFocus: false,
+          modalOpen: false,
+          referencesView: true,
+        },
+        keybindings: grimKeybindings,
+        platform: 'mac',
+      })?.command,
+    ).toBe('grim.references.clipboard.paste');
+  });
+
   it('resolves default record bindings with selectedRecordCount contexts', () => {
     expect(
       resolveKeybinding(keyboardEvent('Delete'), {

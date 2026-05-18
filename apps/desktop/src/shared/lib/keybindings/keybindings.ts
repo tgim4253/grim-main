@@ -160,6 +160,12 @@ export const grimKeybindings = [
     allowInEditable: true,
   },
   {
+    command: 'grim.references.clipboard.paste',
+    key: { win: 'ctrl+v', linux: 'ctrl+v', mac: 'meta+v' },
+    when: 'referencesView && !modalOpen && !inputFocus',
+    scope: 'library',
+  },
+  {
     command: 'grim.references.folder.add',
     key: { win: 'a', linux: 'a', mac: 'a' },
     when: 'referencesView && selectionMode && selectedReferenceCount > 0 && !inputFocus',

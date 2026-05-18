@@ -21,6 +21,7 @@ export const grimCommandIds = [
   'grim.references.selection.toggleItem',
   'grim.references.selection.selectAll',
   'grim.references.selection.clear',
+  'grim.references.clipboard.paste',
   'grim.references.folder.add',
   'grim.references.folder.move',
   'grim.references.croquis.start',
