@@ -1,0 +1,493 @@
+import type { GrimCommandId } from './commands';
+
+export type GrimPlatform = 'win' | 'linux' | 'mac';
+
+export type PlatformKey = {
+  win: string;
+  linux: string;
+  mac: string;
+};
+
+export type GrimKeybindingScope = 'capture' | 'modal' | 'croquis' | 'library' | 'global';
+
+export type GrimKeybinding = {
+  command: GrimCommandId;
+  key: PlatformKey;
+  when?: string;
+  scope: GrimKeybindingScope;
+  preventDefault?: boolean;
+  allowInEditable?: boolean;
+};
+
+export const grimKeybindingScopePriority: Readonly<Record<GrimKeybindingScope, number>> = {
+  capture: 500,
+  modal: 500,
+  croquis: 300,
+  library: 200,
+  global: 100,
+};
+
+export const grimKeybindings = [
+  {
+    command: 'grim.commandPalette.open',
+    key: { win: 'ctrl+shift+p', linux: 'ctrl+shift+p', mac: 'meta+shift+p' },
+    when: '!modalOpen && !captureOverlayOpen',
+    scope: 'global',
+  },
+  {
+    command: 'grim.quickOpen.open',
+    key: { win: 'ctrl+p', linux: 'ctrl+p', mac: 'meta+p' },
+    when: '!modalOpen && !captureOverlayOpen',
+    scope: 'global',
+  },
+  {
+    command: 'grim.settings.open',
+    key: { win: 'ctrl+,', linux: 'ctrl+,', mac: 'meta+,' },
+    when: '!modalOpen && !captureOverlayOpen',
+    scope: 'global',
+  },
+  {
+    command: 'grim.sidebar.toggle',
+    key: { win: 'ctrl+b', linux: 'ctrl+b', mac: 'meta+b' },
+    when: 'libraryPage && !modalOpen',
+    scope: 'library',
+  },
+  {
+    command: 'grim.view.references',
+    key: { win: 'ctrl+1', linux: 'ctrl+1', mac: 'meta+1' },
+    when: 'libraryPage && !modalOpen',
+    scope: 'library',
+  },
+  {
+    command: 'grim.view.records',
+    key: { win: 'ctrl+2', linux: 'ctrl+2', mac: 'meta+2' },
+    when: 'libraryPage && !modalOpen',
+    scope: 'library',
+  },
+  {
+    command: 'grim.view.tags',
+    key: { win: 'ctrl+3', linux: 'ctrl+3', mac: 'meta+3' },
+    when: 'libraryPage && !modalOpen',
+    scope: 'library',
+  },
+  {
+    command: 'grim.view.presets',
+    key: { win: 'ctrl+4', linux: 'ctrl+4', mac: 'meta+4' },
+    when: 'libraryPage && !modalOpen',
+    scope: 'library',
+  },
+  {
+    command: 'grim.currentView.filter.toggle',
+    key: { win: 'ctrl+f', linux: 'ctrl+f', mac: 'meta+f' },
+    when: 'libraryPage && !modalOpen',
+    scope: 'library',
+  },
+  {
+    command: 'grim.currentView.refresh',
+    key: { win: 'r', linux: 'r', mac: 'r' },
+    when: 'libraryPage && gridFocus && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.explorer.focus',
+    key: { win: 'ctrl+shift+e', linux: 'ctrl+shift+e', mac: 'meta+shift+e' },
+    when: 'libraryPage && !modalOpen',
+    scope: 'library',
+  },
+  {
+    command: 'grim.explorer.import.open',
+    key: { win: 'ctrl+o', linux: 'ctrl+o', mac: 'meta+o' },
+    when: 'referencesView && !modalOpen',
+    scope: 'library',
+  },
+  {
+    command: 'grim.explorer.folder.new',
+    key: { win: 'ctrl+n', linux: 'ctrl+n', mac: 'meta+n' },
+    when: 'explorerFocus && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.explorer.node.rename',
+    key: { win: 'f2', linux: 'f2', mac: 'f2' },
+    when: 'explorerFocus && folderSelected && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.explorer.node.delete',
+    key: { win: 'delete', linux: 'delete', mac: 'meta+backspace' },
+    when: 'explorerFocus && folderSelected && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.explorer.node.expand',
+    key: { win: 'arrowright', linux: 'arrowright', mac: 'arrowright' },
+    when: 'explorerFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.explorer.node.collapse',
+    key: { win: 'arrowleft', linux: 'arrowleft', mac: 'arrowleft' },
+    when: 'explorerFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.explorer.node.open',
+    key: { win: 'enter', linux: 'enter', mac: 'enter' },
+    when: 'explorerFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.references.preview.open',
+    key: { win: 'enter', linux: 'enter', mac: 'enter' },
+    when: 'referencesView && gridFocus && itemFocused && !selectionMode',
+    scope: 'library',
+  },
+  {
+    command: 'grim.references.preview.close',
+    key: { win: 'escape', linux: 'escape', mac: 'escape' },
+    when: 'referencesView && previewOpen',
+    scope: 'library',
+    allowInEditable: true,
+  },
+  {
+    command: 'grim.references.selection.toggleMode',
+    key: { win: 'm', linux: 'm', mac: 'm' },
+    when: 'referencesView && gridFocus && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.references.selection.toggleItem',
+    key: { win: 'space', linux: 'space', mac: 'space' },
+    when: 'referencesView && gridFocus && selectionMode',
+    scope: 'library',
+  },
+  {
+    command: 'grim.references.selection.selectAll',
+    key: { win: 'ctrl+a', linux: 'ctrl+a', mac: 'meta+a' },
+    when: 'referencesView && selectionMode && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.references.selection.clear',
+    key: { win: 'escape', linux: 'escape', mac: 'escape' },
+    when: 'referencesView && selectionMode',
+    scope: 'library',
+    allowInEditable: true,
+  },
+  {
+    command: 'grim.references.folder.add',
+    key: { win: 'a', linux: 'a', mac: 'a' },
+    when: 'referencesView && selectionMode && selectedReferenceCount > 0 && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.references.folder.move',
+    key: { win: 'v', linux: 'v', mac: 'v' },
+    when: 'referencesView && selectionMode && selectedReferenceCount > 0 && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.references.croquis.start',
+    key: { win: 'alt+enter', linux: 'alt+enter', mac: 'alt+enter' },
+    when: 'referencesView && selectedReferenceCount > 0',
+    scope: 'library',
+  },
+  {
+    command: 'grim.references.layout.toggle',
+    key: { win: 'ctrl+l', linux: 'ctrl+l', mac: 'meta+l' },
+    when: 'referencesView && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.records.preview.open',
+    key: { win: 'enter', linux: 'enter', mac: 'enter' },
+    when: 'recordsView && gridFocus && itemFocused && !selectionMode',
+    scope: 'library',
+  },
+  {
+    command: 'grim.records.preview.close',
+    key: { win: 'escape', linux: 'escape', mac: 'escape' },
+    when: 'recordsView && previewOpen',
+    scope: 'library',
+    allowInEditable: true,
+  },
+  {
+    command: 'grim.records.selection.toggleMode',
+    key: { win: 'm', linux: 'm', mac: 'm' },
+    when: 'recordsView && gridFocus && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.records.selection.toggleItem',
+    key: { win: 'space', linux: 'space', mac: 'space' },
+    when: 'recordsView && gridFocus && selectionMode',
+    scope: 'library',
+  },
+  {
+    command: 'grim.records.selection.selectAll',
+    key: { win: 'ctrl+a', linux: 'ctrl+a', mac: 'meta+a' },
+    when: 'recordsView && selectionMode && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.records.selection.clear',
+    key: { win: 'escape', linux: 'escape', mac: 'escape' },
+    when: 'recordsView && selectionMode',
+    scope: 'library',
+    allowInEditable: true,
+  },
+  {
+    command: 'grim.records.tags.add',
+    key: { win: 't', linux: 't', mac: 't' },
+    when: 'recordsView && selectedRecordCount > 0 && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.records.export.open',
+    key: { win: 'ctrl+e', linux: 'ctrl+e', mac: 'meta+e' },
+    when: 'recordsView && selectedRecordCount > 0',
+    scope: 'library',
+  },
+  {
+    command: 'grim.records.deleteSelected',
+    key: { win: 'delete', linux: 'delete', mac: 'meta+backspace' },
+    when: 'recordsView && selectionMode && selectedRecordCount > 0',
+    scope: 'library',
+  },
+  {
+    command: 'grim.records.layout.toggle',
+    key: { win: 'ctrl+l', linux: 'ctrl+l', mac: 'meta+l' },
+    when: 'recordsView && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.tags.group.new',
+    key: { win: 'ctrl+n', linux: 'ctrl+n', mac: 'meta+n' },
+    when: 'tagSettingsView && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.tags.tag.new',
+    key: { win: 'alt+n', linux: 'alt+n', mac: 'alt+n' },
+    when: 'tagSettingsView && groupSelected && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.tags.save',
+    key: { win: 'ctrl+s', linux: 'ctrl+s', mac: 'meta+s' },
+    when: 'tagSettingsView && dirty',
+    scope: 'library',
+  },
+  {
+    command: 'grim.tags.rename',
+    key: { win: 'f2', linux: 'f2', mac: 'f2' },
+    when: 'tagSettingsView && itemSelected && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.tags.delete',
+    key: { win: 'delete', linux: 'delete', mac: 'meta+backspace' },
+    when: 'tagSettingsView && itemSelected && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.tags.cancelEdit',
+    key: { win: 'escape', linux: 'escape', mac: 'escape' },
+    when: 'tagSettingsView && editing',
+    scope: 'library',
+    allowInEditable: true,
+  },
+  {
+    command: 'grim.tags.commitEdit',
+    key: { win: 'enter', linux: 'enter', mac: 'enter' },
+    when: 'tagSettingsView && editing',
+    scope: 'library',
+    allowInEditable: true,
+  },
+  {
+    command: 'grim.presets.session.new',
+    key: { win: 'ctrl+n', linux: 'ctrl+n', mac: 'meta+n' },
+    when: 'presetSettingsView && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.presets.timeStep.new',
+    key: { win: 'alt+n', linux: 'alt+n', mac: 'alt+n' },
+    when: 'presetSettingsView && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.presets.save',
+    key: { win: 'ctrl+s', linux: 'ctrl+s', mac: 'meta+s' },
+    when: 'presetSettingsView && dirty',
+    scope: 'library',
+  },
+  {
+    command: 'grim.presets.rename',
+    key: { win: 'f2', linux: 'f2', mac: 'f2' },
+    when: 'presetSettingsView && itemSelected && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.presets.delete',
+    key: { win: 'delete', linux: 'delete', mac: 'meta+backspace' },
+    when: 'presetSettingsView && itemSelected && !inputFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.presets.step.add',
+    key: { win: 'ctrl+enter', linux: 'ctrl+enter', mac: 'meta+enter' },
+    when: 'presetSettingsView && editorFocus',
+    scope: 'library',
+  },
+  {
+    command: 'grim.presets.cancelEdit',
+    key: { win: 'escape', linux: 'escape', mac: 'escape' },
+    when: 'presetSettingsView && editing',
+    scope: 'library',
+    allowInEditable: true,
+  },
+  {
+    command: 'grim.presets.commitEdit',
+    key: { win: 'enter', linux: 'enter', mac: 'enter' },
+    when: 'presetSettingsView && editing',
+    scope: 'library',
+    allowInEditable: true,
+  },
+  {
+    command: 'grim.croquis.playback.toggle',
+    key: { win: 'space', linux: 'space', mac: 'space' },
+    when: 'croquisWindow && !quickActionMenuOpen',
+    scope: 'croquis',
+  },
+  {
+    command: 'grim.croquis.previous',
+    key: { win: 'arrowleft', linux: 'arrowleft', mac: 'arrowleft' },
+    when: 'croquisWindow && hasPrevious',
+    scope: 'croquis',
+  },
+  {
+    command: 'grim.croquis.next',
+    key: { win: 'arrowright', linux: 'arrowright', mac: 'arrowright' },
+    when: 'croquisWindow && hasNext',
+    scope: 'croquis',
+  },
+  {
+    command: 'grim.croquis.saveRecord',
+    key: { win: 's', linux: 's', mac: 's' },
+    when: 'croquisWindow && recordSaveEnabled && !currentRecordSaved',
+    scope: 'croquis',
+  },
+  {
+    command: 'grim.croquis.capture',
+    key: { win: 'c', linux: 'c', mac: 'c' },
+    when: 'croquisWindow && captureEnabled && recordSaveEnabled',
+    scope: 'croquis',
+  },
+  {
+    command: 'grim.croquis.copyImage',
+    key: { win: 'ctrl+c', linux: 'ctrl+c', mac: 'meta+c' },
+    when: 'croquisWindow && imageFocused',
+    scope: 'croquis',
+  },
+  {
+    command: 'grim.croquis.quickAction.close',
+    key: { win: 'escape', linux: 'escape', mac: 'escape' },
+    when: 'croquisWindow && quickActionMenuOpen',
+    scope: 'croquis',
+    allowInEditable: true,
+  },
+  {
+    command: 'grim.croquis.window.close',
+    key: { win: 'ctrl+w', linux: 'ctrl+w', mac: 'meta+w' },
+    when: 'croquisWindow && !captureOverlayOpen',
+    scope: 'croquis',
+  },
+  {
+    command: 'grim.capture.cancel',
+    key: { win: 'escape', linux: 'escape', mac: 'escape' },
+    when: 'captureOverlayOpen',
+    scope: 'capture',
+    allowInEditable: true,
+  },
+  {
+    command: 'grim.capture.confirm',
+    key: { win: 'enter', linux: 'enter', mac: 'enter' },
+    when: 'captureOverlayOpen && capturePreview',
+    scope: 'capture',
+    allowInEditable: true,
+  },
+  {
+    command: 'grim.capture.resetSelection',
+    key: { win: 'r', linux: 'r', mac: 'r' },
+    when: 'captureOverlayOpen && hasSelection',
+    scope: 'capture',
+  },
+  {
+    command: 'grim.capture.copyPreview',
+    key: { win: 'ctrl+c', linux: 'ctrl+c', mac: 'meta+c' },
+    when: 'captureOverlayOpen && capturePreview',
+    scope: 'capture',
+    allowInEditable: true,
+  },
+  {
+    command: 'grim.form.cancel',
+    key: { win: 'escape', linux: 'escape', mac: 'escape' },
+    when: 'formFocus && dirty',
+    scope: 'modal',
+    allowInEditable: true,
+  },
+  {
+    command: 'grim.modal.close',
+    key: { win: 'escape', linux: 'escape', mac: 'escape' },
+    when: 'modalOpen && closeable',
+    scope: 'modal',
+    allowInEditable: true,
+  },
+  {
+    command: 'grim.form.submit',
+    key: { win: 'enter', linux: 'enter', mac: 'enter' },
+    when: 'formFocus && canSubmit && !multilineInputFocus',
+    scope: 'modal',
+    allowInEditable: true,
+  },
+  {
+    command: 'grim.form.save',
+    key: { win: 'ctrl+s', linux: 'ctrl+s', mac: 'meta+s' },
+    when: 'formFocus && dirty',
+    scope: 'modal',
+    allowInEditable: true,
+  },
+  {
+    command: 'grim.focus.next',
+    key: { win: 'tab', linux: 'tab', mac: 'tab' },
+    when: 'modalOpen',
+    scope: 'modal',
+    allowInEditable: true,
+  },
+  {
+    command: 'grim.focus.previous',
+    key: { win: 'shift+tab', linux: 'shift+tab', mac: 'shift+tab' },
+    when: 'modalOpen',
+    scope: 'modal',
+    allowInEditable: true,
+  },
+] as const satisfies readonly GrimKeybinding[];
+
+export function getCurrentGrimPlatform(): GrimPlatform {
+  if (typeof navigator === 'undefined') {
+    return 'linux';
+  }
+
+  const platform = navigator.userAgent.toLowerCase();
+
+  if (platform.includes('mac')) {
+    return 'mac';
+  }
+
+  if (platform.includes('win')) {
+    return 'win';
+  }
+
+  return 'linux';
+}
