@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { cx } from '../../../shared/lib/cx';
 import { ipc } from '../../../shared/lib/ipc';
+import { isMacPlatform } from '../../../shared/lib/platform';
 import { IconButton } from '../../../shared/ui';
 import type { CroquisSession, CroquisSessionItem } from '../../../shared/types';
 import { clampFilterPercent, getRuntimeSessionFilterSettings } from '@/entities/session-preset';
@@ -12,7 +13,6 @@ import { useCroquisSessionController } from '../lib/useCroquisSessionController'
 import { CroquisQuickActionMenu, type CroquisQuickAction } from './CroquisQuickActionMenu';
 import './croquis.css';
 
-const MAC_PLATFORM_PATTERN = /Mac|iPhone|iPad|iPod/i;
 const QUICK_ACTION_MENU_MARGIN = 8;
 const QUICK_ACTION_MENU_WIDTH = 160;
 const QUICK_ACTION_MENU_ROW_HEIGHT = 36;
@@ -33,14 +33,6 @@ type CroquisQuickActionMenuState = {
 type QuickActionMenuPosition = {
   x: number;
   y: number;
-};
-
-const isMacPlatform = () => {
-  if (typeof navigator === 'undefined') {
-    return false;
-  }
-
-  return MAC_PLATFORM_PATTERN.test(navigator.userAgent);
 };
 
 const shouldShowCustomWindowControls = () => {
