@@ -1,15 +1,20 @@
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useId,
   useRef,
+  useState,
   type HTMLAttributes,
+  type FocusEvent as ReactFocusEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useKeybindings } from '../../hooks';
 import { cx } from '../../lib/cx';
+import { useShortcutFocusStore } from '../../lib/keybindings';
 import { IconButton } from '../icon-button/IconButton';
 import './modal.css';
 
@@ -71,6 +76,65 @@ const getFocusableElements = (element: HTMLElement) =>
     candidate =>
       !candidate.hasAttribute('hidden') && candidate.getAttribute('aria-hidden') !== 'true',
   );
+
+const INACTIVE_MODAL_FORM_STATE = {
+  formFocus: false,
+  multilineInputFocus: false,
+};
+
+type ModalFormFocusState = typeof INACTIVE_MODAL_FORM_STATE;
+
+function getActiveElementInDialog(dialogElement: HTMLElement | null) {
+  const activeElement =
+    typeof document !== 'undefined' && document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+
+  if (!dialogElement || !activeElement || !dialogElement.contains(activeElement)) {
+    return null;
+  }
+
+  return activeElement;
+}
+
+function getFormForElement(element: HTMLElement | null) {
+  const formElement = element?.closest('form');
+  return formElement instanceof HTMLFormElement ? formElement : null;
+}
+
+function isMultilineEditableElement(element: HTMLElement | null) {
+  if (!element) {
+    return false;
+  }
+
+  return (
+    element instanceof HTMLTextAreaElement ||
+    element.getAttribute('contenteditable') === 'true' ||
+    element.getAttribute('contenteditable') === 'plaintext-only'
+  );
+}
+
+function moveDialogFocus(dialogElement: HTMLElement | null, direction: 1 | -1) {
+  if (!dialogElement) {
+    return;
+  }
+
+  const focusableElements = getFocusableElements(dialogElement);
+  if (focusableElements.length === 0) {
+    dialogElement.focus();
+    return;
+  }
+
+  const activeElement = getActiveElementInDialog(dialogElement);
+  const currentIndex = activeElement ? focusableElements.indexOf(activeElement) : -1;
+  const fallbackIndex = direction > 0 ? 0 : focusableElements.length - 1;
+  const nextIndex =
+    currentIndex === -1
+      ? fallbackIndex
+      : (currentIndex + direction + focusableElements.length) % focusableElements.length;
+
+  focusableElements[nextIndex]?.focus();
+}
 
 export const ModalHeader = forwardRef<HTMLDivElement, ModalHeaderProps>(function ModalHeader(
   {
@@ -155,6 +219,8 @@ export const Modal = forwardRef<HTMLDivElement, ModalProps>(function Modal(
     children,
     'aria-label': ariaLabel,
     'aria-labelledby': ariaLabelledBy,
+    onBlurCapture,
+    onFocusCapture,
     onKeyDown,
     ...props
   },
@@ -162,12 +228,61 @@ export const Modal = forwardRef<HTMLDivElement, ModalProps>(function Modal(
 ) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement | null>(null);
+  const pushShortcutModal = useShortcutFocusStore(state => state.pushModal);
+  const popShortcutModal = useShortcutFocusStore(state => state.popModal);
+  const [formFocusState, setFormFocusState] =
+    useState<ModalFormFocusState>(INACTIVE_MODAL_FORM_STATE);
   const hasGeneratedHeader = header === undefined && title !== undefined;
   const resolvedAriaLabelledBy =
     ariaLabelledBy ?? (hasGeneratedHeader && title ? titleId : undefined);
+  const refreshFormFocusState = useCallback((target?: EventTarget | null) => {
+    const dialogElement = dialogRef.current;
+    const focusTarget =
+      target instanceof HTMLElement ? target : getActiveElementInDialog(dialogElement);
+    const formElement =
+      dialogElement && focusTarget && dialogElement.contains(focusTarget)
+        ? getFormForElement(focusTarget)
+        : null;
+    const nextState = {
+      formFocus: Boolean(formElement),
+      multilineInputFocus: isMultilineEditableElement(focusTarget),
+    };
+
+    setFormFocusState(current =>
+      current.formFocus === nextState.formFocus &&
+      current.multilineInputFocus === nextState.multilineInputFocus
+        ? current
+        : nextState,
+    );
+  }, []);
+  const submitActiveForm = useCallback(() => {
+    const formElement = getFormForElement(getActiveElementInDialog(dialogRef.current));
+    if (!formElement) {
+      return;
+    }
+
+    formElement.requestSubmit();
+  }, []);
+  const cancelActiveForm = useCallback(() => {
+    const formElement = getFormForElement(getActiveElementInDialog(dialogRef.current));
+    formElement?.reset();
+    onClose?.();
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) {
+      return undefined;
+    }
+
+    pushShortcutModal();
+    return () => {
+      popShortcutModal();
+    };
+  }, [open, popShortcutModal, pushShortcutModal]);
+
+  useEffect(() => {
+    if (!open) {
+      setFormFocusState(INACTIVE_MODAL_FORM_STATE);
       return;
     }
 
@@ -190,22 +305,31 @@ export const Modal = forwardRef<HTMLDivElement, ModalProps>(function Modal(
     };
   }, [open]);
 
-  useEffect(() => {
-    if (!open || !closeOnEscape || !onClose) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [closeOnEscape, onClose, open]);
+  useKeybindings({
+    context: {
+      canSubmit: formFocusState.formFocus,
+      closeable: closeOnEscape && Boolean(onClose),
+      dirty: formFocusState.formFocus,
+      formFocus: formFocusState.formFocus,
+      modalOpen: open,
+      multilineInputFocus: formFocusState.multilineInputFocus,
+    },
+    enabled: open,
+    handlers: {
+      'grim.focus.next': () => {
+        moveDialogFocus(dialogRef.current, 1);
+      },
+      'grim.focus.previous': () => {
+        moveDialogFocus(dialogRef.current, -1);
+      },
+      'grim.form.cancel': cancelActiveForm,
+      'grim.form.save': submitActiveForm,
+      'grim.form.submit': submitActiveForm,
+      'grim.modal.close': () => {
+        onClose?.();
+      },
+    },
+  });
 
   if (!open) {
     return null;
@@ -219,6 +343,18 @@ export const Modal = forwardRef<HTMLDivElement, ModalProps>(function Modal(
     if (event.target === event.currentTarget) {
       onClose();
     }
+  };
+
+  const handleDialogFocusCapture = (event: ReactFocusEvent<HTMLDivElement>) => {
+    onFocusCapture?.(event);
+    refreshFormFocusState(event.target);
+  };
+
+  const handleDialogBlurCapture = (event: ReactFocusEvent<HTMLDivElement>) => {
+    onBlurCapture?.(event);
+    window.requestAnimationFrame(() => {
+      refreshFormFocusState();
+    });
   };
 
   const handleDialogKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -302,6 +438,8 @@ export const Modal = forwardRef<HTMLDivElement, ModalProps>(function Modal(
         aria-modal="true"
         aria-label={ariaLabel}
         aria-labelledby={resolvedAriaLabelledBy}
+        onBlurCapture={handleDialogBlurCapture}
+        onFocusCapture={handleDialogFocusCapture}
         onKeyDown={handleDialogKeyDown}
         tabIndex={-1}
         className={cx(

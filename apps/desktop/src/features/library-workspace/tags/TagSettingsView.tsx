@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useKeybindings } from '@/shared/hooks';
 import { Button, ChipButton, Icon } from '../../../shared/ui';
 import { ipc } from '../../../shared/lib/ipc';
 import type { SaveTagGroupPayload, SaveTagPayload, TagIndex } from '../../../shared/types';
@@ -14,7 +15,11 @@ import { TagSettingsPreviewPanel } from './ui/TagSettingsPreviewPanel';
 import { TagSettingsState } from './ui/TagSettingsState';
 import './tag-settings.css';
 
-export function TagSettingsView() {
+type TagSettingsViewProps = {
+  modalOpen?: boolean;
+};
+
+export function TagSettingsView({ modalOpen = false }: TagSettingsViewProps) {
   const { t } = useTranslation('common');
   const [tagIndex, setTagIndex] = useState<TagIndex>(EMPTY_TAG_INDEX);
   const [selection, setSelection] = useState<TagSettingsSelection | null>(null);
@@ -99,6 +104,40 @@ export function TagSettingsView() {
 
   const selectedTagId = selection?.kind === 'tag' ? selection.id : null;
   const selectedGroupId = selection?.kind === 'group' ? selection.id : null;
+  const itemSelected = selection?.kind === 'group' || selection?.kind === 'tag';
+
+  useKeybindings({
+    context: {
+      groupSelected: Boolean(selectedGroupId),
+      inputFocus: false,
+      itemSelected,
+      libraryPage: true,
+      modalOpen,
+      tagSettingsView: true,
+    },
+    enabled: !modalOpen,
+    handlers: {
+      'grim.tags.group.new': () => {
+        setSelection({ kind: 'new-group' });
+      },
+      'grim.tags.rename': () => {
+        if (!itemSelected) {
+          return;
+        }
+
+        document
+          .querySelector<HTMLInputElement>('.tag-settings-preview input:not([disabled])')
+          ?.focus();
+      },
+      'grim.tags.tag.new': () => {
+        if (!selectedGroupId) {
+          return;
+        }
+
+        setSelection({ kind: 'new-tag', groupId: selectedGroupId });
+      },
+    },
+  });
 
   return (
     <section
@@ -229,6 +268,7 @@ export function TagSettingsView() {
             onSaveTag={handleSaveTag}
             onDeleteGroup={handleDeleteGroup}
             onDeleteTag={handleDeleteTag}
+            shortcutsDisabled={modalOpen}
           />
         </div>
       ) : null}

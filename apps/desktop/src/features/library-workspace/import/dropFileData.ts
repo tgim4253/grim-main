@@ -61,7 +61,12 @@ export type DroppedImageFileCandidateCount = {
 };
 
 export function hasFileDropData(dataTransfer: DataTransfer) {
-  return Array.from(dataTransfer.types).includes('Files');
+  const maybeFileDataTransfer = dataTransfer as { files?: FileList };
+
+  return (
+    Array.from(dataTransfer.types).includes('Files') ||
+    (maybeFileDataTransfer.files?.length ?? 0) > 0
+  );
 }
 
 function getFileExtension(fileName: string) {

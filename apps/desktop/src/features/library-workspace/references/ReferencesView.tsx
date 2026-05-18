@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type PointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CroquisStartModal } from '@/features/croquis';
+import { useKeybindings } from '@/shared/hooks';
+import { useShortcutFocusStore } from '@/shared/lib/keybindings';
 import type { AssetDetail, AssetListSource } from '../../../shared/types';
 import { Button } from '../../../shared/ui';
 import { LibraryWorkspace } from '../common/LibraryWorkspace';
@@ -25,18 +27,33 @@ import './reference-workspace.css';
 
 type ReferencesViewProps = {
   source: AssetListSource;
+  modalOpen?: boolean;
   refreshKey?: number;
   onExplorerRefresh?: () => Promise<void> | void;
 };
 
-export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: ReferencesViewProps) {
+export function ReferencesView({
+  source,
+  modalOpen = false,
+  refreshKey = 0,
+  onExplorerRefresh,
+}: ReferencesViewProps) {
   const { i18n, t } = useTranslation('common');
+  const shortcutFocusArea = useShortcutFocusStore(state => state.area);
+  const focusedAssetId = useShortcutFocusStore(state => state.referenceAssetId);
+  const focusReferenceGrid = useShortcutFocusStore(state => state.focusReferenceGrid);
+  const setReferenceAssetId = useShortcutFocusStore(state => state.setReferenceAssetId);
+  const setShortcutFocusArea = useShortcutFocusStore(state => state.setArea);
   const [layout, setLayout] = useState<LibraryWorkspaceLayout>('masonry');
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [filterExpanded, setFilterExpanded] = useState(false);
+  const referenceViewFocus =
+    shortcutFocusArea === 'references' || shortcutFocusArea === 'references.grid';
+  const referencePreviewFocus = shortcutFocusArea === 'references.preview';
+  const gridFocus = referenceViewFocus;
   const { assets, isLoading, error, loadAssets } = useReferenceAssets({ source, refreshKey });
   const {
     assetRecordCountsById,
@@ -50,7 +67,8 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
   } = useNoRecordFilter({ assets, source });
   const handlePreviewClose = useCallback(() => {
     setPreviewOpen(false);
-  }, []);
+    focusReferenceGrid(selectedAssetId ?? focusedAssetId ?? null);
+  }, [focusReferenceGrid, focusedAssetId, selectedAssetId]);
   const { selectedAssetDetail, assetDetailsById, relatedRecordDetailsById, mergeAssetDetails } =
     useSelectedAssetDetail({
       assets,
@@ -165,6 +183,7 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
     dropShellProps,
   } = useReferenceDropImport({
     source,
+    pasteEnabled: !modalOpen && folderAction === null && !croquisModalOpen,
     onAssetsRefresh: loadAssets,
     onExplorerRefresh,
   });
@@ -185,6 +204,9 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
 
   useEffect(() => {
     const itemIds = new Set(filteredItems.map(item => item.id));
+    if (focusedAssetId && !itemIds.has(focusedAssetId)) {
+      setReferenceAssetId(null);
+    }
     setSelectedAssetIds(current => retainIdsInSet(current, itemIds));
     if (selectedAssetId && noRecordFilterSelected && !noRecordFilterLoading) {
       if (!itemIds.has(selectedAssetId)) {
@@ -192,9 +214,18 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
         setPreviewOpen(false);
       }
     }
-  }, [filteredItems, noRecordFilterLoading, noRecordFilterSelected, selectedAssetId]);
+  }, [
+    filteredItems,
+    focusedAssetId,
+    noRecordFilterLoading,
+    noRecordFilterSelected,
+    selectedAssetId,
+    setReferenceAssetId,
+  ]);
 
   const handleSelectedAssetChange = (assetId: string) => {
+    focusReferenceGrid(assetId);
+
     if (selectionMode) {
       setSelectedAssetIds(current => {
         if (current.includes(assetId)) {
@@ -223,12 +254,14 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
           return current;
         }
 
-        return selectedAssetId && filteredItems.some(asset => asset.id === selectedAssetId)
-          ? [selectedAssetId]
+        const activeAssetId = focusedAssetId ?? selectedAssetId;
+
+        return activeAssetId && filteredItems.some(asset => asset.id === activeAssetId)
+          ? [activeAssetId]
           : [];
       });
     },
-    [filteredItems, selectedAssetId],
+    [filteredItems, focusedAssetId, selectedAssetId],
   );
 
   const handleSelectAllChange = useCallback(
@@ -236,6 +269,85 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
       setSelectedAssetIds(selected ? filteredItems.map(asset => asset.id) : []);
     },
     [filteredItems],
+  );
+
+  const handleLayoutToggle = useCallback(() => {
+    setLayout(current => (current === 'masonry' ? 'grid' : 'masonry'));
+  }, []);
+
+  const getActiveReferenceId = useCallback(() => {
+    if (focusedAssetId && filteredItems.some(item => item.id === focusedAssetId)) {
+      return focusedAssetId;
+    }
+
+    if (selectedAssetId) {
+      return selectedAssetId;
+    }
+
+    return filteredItems[0]?.id ?? null;
+  }, [filteredItems, focusedAssetId, selectedAssetId]);
+
+  const handlePreviewOpen = useCallback(() => {
+    if (selectionMode) {
+      return;
+    }
+
+    const assetId = getActiveReferenceId();
+    if (!assetId) {
+      return;
+    }
+
+    setSelectedAssetId(assetId);
+    setReferenceAssetId(assetId);
+    setPreviewOpen(true);
+  }, [getActiveReferenceId, selectionMode, setReferenceAssetId]);
+
+  const handleSelectionToggleItem = useCallback(() => {
+    if (!selectionMode) {
+      return;
+    }
+
+    const assetId = getActiveReferenceId();
+    if (!assetId) {
+      return;
+    }
+
+    setSelectedAssetIds(current =>
+      current.includes(assetId)
+        ? current.filter(selectedAssetId => selectedAssetId !== assetId)
+        : [...current, assetId],
+    );
+  }, [getActiveReferenceId, selectionMode]);
+
+  const getShortcutReferenceId = useCallback(() => {
+    const activeReferenceId = getActiveReferenceId();
+
+    if (gridFocus) {
+      return activeReferenceId;
+    }
+
+    return referencePreviewFocus && previewOpen ? selectedAssetId : null;
+  }, [getActiveReferenceId, gridFocus, previewOpen, referencePreviewFocus, selectedAssetId]);
+
+  const handleReferencePointerDown = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (!(event.target instanceof Element)) {
+        return;
+      }
+
+      if (event.target.closest('.library-workspace__grid-region')) {
+        focusReferenceGrid(getActiveReferenceId());
+        return;
+      }
+
+      if (event.target.closest('.library-workspace__preview-shell')) {
+        setShortcutFocusArea('references.preview');
+        return;
+      }
+
+      setShortcutFocusArea('references');
+    },
+    [focusReferenceGrid, getActiveReferenceId, setShortcutFocusArea],
   );
 
   const handlePreviewAddFolder = useCallback(
@@ -275,6 +387,73 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
     openFolderAction({ assetIds: selectedAssetIds, mode: 'replace' });
   }, [openFolderAction, selectedAssetIds]);
 
+  const handleShortcutCroquisStart = useCallback(() => {
+    if (selectionMode) {
+      startCroquisForSelectedAssets();
+      return;
+    }
+
+    const assetId = getShortcutReferenceId();
+    if (assetId) {
+      openCroquisForAssets([assetId]);
+    }
+  }, [getShortcutReferenceId, openCroquisForAssets, selectionMode, startCroquisForSelectedAssets]);
+
+  const handleCurrentViewRefresh = useCallback(() => {
+    void (async () => {
+      await loadAssets();
+      await onExplorerRefresh?.();
+    })();
+  }, [loadAssets, onExplorerRefresh]);
+
+  const referencesModalOpen =
+    modalOpen || folderAction !== null || croquisModalOpen || dropImportWarning !== null;
+  const activeReferenceId = getActiveReferenceId();
+  const shortcutReferenceId = getShortcutReferenceId();
+  const selectedReferenceCount = selectionMode
+    ? selectedAssetIds.length
+    : shortcutReferenceId
+      ? 1
+      : 0;
+
+  useKeybindings({
+    context: {
+      gridFocus,
+      inputFocus: false,
+      itemFocused: gridFocus && Boolean(activeReferenceId),
+      libraryPage: true,
+      modalOpen: referencesModalOpen,
+      previewOpen,
+      referencesView: true,
+      selectedReferenceCount,
+      selectionMode,
+    },
+    enabled: !referencesModalOpen,
+    handlers: {
+      'grim.currentView.filter.toggle': () => {
+        setFilterExpanded(current => !current);
+      },
+      'grim.currentView.refresh': handleCurrentViewRefresh,
+      'grim.references.croquis.start': handleShortcutCroquisStart,
+      'grim.references.clipboard.paste': () => undefined,
+      'grim.references.folder.add': handleAddSelectedToFolder,
+      'grim.references.folder.move': handleMoveSelectedToFolder,
+      'grim.references.layout.toggle': handleLayoutToggle,
+      'grim.references.preview.close': handlePreviewClose,
+      'grim.references.preview.open': handlePreviewOpen,
+      'grim.references.selection.clear': () => {
+        handleSelectionModeChange(false);
+      },
+      'grim.references.selection.selectAll': () => {
+        handleSelectAllChange(true);
+      },
+      'grim.references.selection.toggleItem': handleSelectionToggleItem,
+      'grim.references.selection.toggleMode': () => {
+        handleSelectionModeChange(!selectionMode);
+      },
+    },
+  });
+
   const gridEmptyState = getReferenceGridEmptyState({
     isLoading,
     error,
@@ -289,7 +468,11 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
 
   return (
     <>
-      <div className="references-view-drop-shell" {...dropShellProps}>
+      <div
+        className="references-view-drop-shell"
+        {...dropShellProps}
+        onPointerDownCapture={handleReferencePointerDown}
+      >
         <LibraryWorkspace
           mode="references"
           items={filteredItems}
@@ -302,6 +485,7 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
           gridBusy={isLoading || noRecordFilterLoading}
           gridEmptyState={gridEmptyState}
           onLayoutChange={setLayout}
+          onFocusedItemChange={focusReferenceGrid}
           onSelectedItemChange={handleSelectedAssetChange}
           renderHeader={headerProps => (
             <ReferenceExplorerHeader
@@ -333,6 +517,7 @@ export function ReferencesView({ source, refreshKey = 0, onExplorerRefresh }: Re
               selected={tileState.selected}
               selectionIndex={tileState.selectionIndex}
               selectionMode={tileState.selectionMode}
+              onFocus={tileState.onFocus}
               onSelect={tileState.onSelect}
             />
           )}
