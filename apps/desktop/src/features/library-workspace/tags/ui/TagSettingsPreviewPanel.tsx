@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useKeybindings } from '@/shared/hooks';
 import type { SaveTagGroupPayload, SaveTagPayload, TagIndex } from '@/shared/types';
 import { Button, Input, PreviewPanel, Select, type SelectOption } from '@/shared/ui';
 import {
@@ -22,6 +23,7 @@ type TagSettingsPreviewPanelProps = {
   onSaveTag: (payload: SaveTagPayload) => Promise<void>;
   onDeleteGroup: (groupId: string) => Promise<void>;
   onDeleteTag: (tagId: string) => Promise<void>;
+  shortcutsDisabled?: boolean;
 };
 
 export function TagSettingsPreviewPanel({
@@ -32,6 +34,7 @@ export function TagSettingsPreviewPanel({
   onSaveTag,
   onDeleteGroup,
   onDeleteTag,
+  shortcutsDisabled = false,
 }: TagSettingsPreviewPanelProps) {
   const { t } = useTranslation('common');
   const selectionKey = getSelectionKey(selection);
@@ -62,6 +65,7 @@ export function TagSettingsPreviewPanel({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [deleteConfirmationPending, setDeleteConfirmationPending] = useState(false);
   const [busy, setBusy] = useState(false);
+  const formRef = useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
     setErrorMessage(null);
@@ -194,6 +198,52 @@ export function TagSettingsPreviewPanel({
   const deleteButtonLabel = deleteConfirmationPending
     ? t('common.confirm_delete', { defaultValue: 'Confirm Delete' })
     : t('common.delete', { defaultValue: 'Delete' });
+  const initialName =
+    selection.kind === 'group'
+      ? (selectedGroup?.name ?? '')
+      : selection.kind === 'tag'
+        ? (selectedTag?.name ?? '')
+        : '';
+  const initialGroupId =
+    selection.kind === 'tag' ? (selectedTag?.groupId ?? UNGROUPED_GROUP_VALUE) : groupId;
+  const initialColor = selection.kind === 'tag' ? (selectedTag?.color ?? '') : '';
+  const initialSortOrder =
+    selection.kind === 'group'
+      ? String(selectedGroup?.sortOrder ?? 0)
+      : selection.kind === 'tag'
+        ? String(selectedTag?.sortOrder ?? 0)
+        : sortOrder;
+  const dirty =
+    selection.kind === 'new-group' ||
+    selection.kind === 'new-tag' ||
+    name !== initialName ||
+    groupId !== initialGroupId ||
+    color !== initialColor ||
+    sortOrder !== initialSortOrder;
+
+  useKeybindings({
+    context: {
+      dirty,
+      editing: true,
+      inputFocus: false,
+      itemSelected: selection.kind === 'group' || selection.kind === 'tag',
+      libraryPage: true,
+      tagSettingsView: true,
+    },
+    enabled: !shortcutsDisabled,
+    handlers: {
+      'grim.tags.cancelEdit': onClose,
+      'grim.tags.commitEdit': () => {
+        formRef.current?.requestSubmit();
+      },
+      'grim.tags.delete': () => {
+        void handleDelete();
+      },
+      'grim.tags.save': () => {
+        formRef.current?.requestSubmit();
+      },
+    },
+  });
 
   return (
     <PreviewPanel
@@ -203,6 +253,7 @@ export function TagSettingsPreviewPanel({
       onClose={onClose}
     >
       <form
+        ref={formRef}
         className="tag-settings-preview__form"
         onSubmit={event => {
           void handleSubmit(event);
